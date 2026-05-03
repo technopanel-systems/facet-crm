@@ -115,7 +115,7 @@ export default async function DashboardPage() {
           </div>
           <div className="divide-y divide-gray-50">
             {repStatus.map(rep => {
-              const s = statusConfig[rep.status];
+              const s = statusConfig[rep.status as keyof typeof statusConfig];
               return (
                 <div key={rep.id} className="flex items-center justify-between px-5 py-3">
                   <div className="flex items-center gap-3">
