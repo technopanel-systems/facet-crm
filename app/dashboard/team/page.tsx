@@ -27,8 +27,9 @@ export default function TeamPage() {
   }
 
   async function updateRep(id: string, field: string, value: string | number) {
-    // Optimistic UI update
+    // Instantly update the screen so it feels fast
     setReps(reps.map(r => r.id === id ? { ...r, [field]: value } : r));
+    // Send the update to Supabase
     await supabase.from("reps").update({ [field]: value }).eq("id", id);
   }
 
