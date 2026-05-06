@@ -23,6 +23,44 @@ export default function RegisterPage() {
       return;
     }
 
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, name }),
+      });
+
+      // Catch silent server crashes
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        throw new Error("Server error: Check if SUPABASE_SERVICE_ROLE_KEY is saved in Vercel.");
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error || "Registration failed.");
+      }
+
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      // This ensures the button ALWAYS un-sticks, even on an error
+      setLoading(false);
+    }
+  }
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    if (!email.endsWith("@technopanel.com.sa")) {
+      setError("You must use a valid @technopanel.com.sa email address.");
+      setLoading(false);
+      return;
+    }
+
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
