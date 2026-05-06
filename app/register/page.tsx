@@ -51,31 +51,6 @@ export default function RegisterPage() {
       setLoading(false);
     }
   }
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    if (!email.endsWith("@technopanel.com.sa")) {
-      setError("You must use a valid @technopanel.com.sa email address.");
-      setLoading(false);
-      return;
-    }
-
-    const res = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, name }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      setError(data.error || "Registration failed.");
-    } else {
-      setSuccess(true);
-    }
-    setLoading(false);
-  }
 
   if (success) {
     return (
