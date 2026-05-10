@@ -11,7 +11,7 @@ type Rep     = { id: string; name: string };
 type Contact = { id: string; contact_code: string; full_name: string; full_name_ar: string | null; title: string | null; phone: string | null; whatsapp: string | null; email: string | null; is_primary: boolean; notes: string | null };
 type Project = { id: string; project_code: string; project_name: string | null; stage: string; quoted_sqm: number; won_sqm: number; created_at: string };
 type Company = { id: string; customer_code: string; company_name: string; company_type: string | null; region: string | null; source: string | null; status: string; notes: string | null; primary_rep_id: string | null; created_at: string };
-type CompanyRep = { rep_id: string; role: string; reps: { name: string } | null };
+type CompanyRep = { rep_id: string; role: string; reps: { name: string }[] | null };
 
 const STAGE_COLOR: Record<string, string> = {
   'New Lead': 'bg-gray-100 text-gray-700',
