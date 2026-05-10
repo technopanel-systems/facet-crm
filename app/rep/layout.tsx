@@ -9,9 +9,15 @@ export default async function RepLayout({ children }: { children: React.ReactNod
 
   const { data: rep } = await supabase
     .from("reps")
-    .select("name, role")
+    .select("name, role, status")
     .eq("auth_user_id", user.id)
     .single();
+
+  // Manager should never be in rep layout
+  if (rep?.role === "manager") redirect("/dashboard");
+
+  // Pending reps see a waiting screen, not the app
+  if (rep?.status === "pending") redirect("/pending");
 
   return (
     <div className="flex">
