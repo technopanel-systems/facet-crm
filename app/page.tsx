@@ -9,10 +9,11 @@ export default async function Home() {
 
   const { data: rep } = await supabase
     .from("reps")
-    .select("role")
+    .select("role, status")
     .eq("auth_user_id", user.id)
     .single();
 
-  if (rep?.role === "manager") redirect("/dashboard");
+  if (rep?.status === "pending") redirect("/pending");
+  if (rep?.role === "manager" || rep?.role === "sales_coordinator") redirect("/dashboard");
   redirect("/rep");
 }
