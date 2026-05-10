@@ -65,7 +65,7 @@ export default function CompanyDetailPage() {
     ]);
     setCompany(compRes.data);
     setEditForm(compRes.data ?? {});
-    setCompanyReps((crRes.data ?? []) as CompanyRep[]);
+    setCompanyReps((crRes.data ?? []) as unknown as CompanyRep[]);
     setContacts(contactRes.data ?? []);
     setProjects(projRes.data ?? []);
     setAllReps(repRes.data ?? []);
