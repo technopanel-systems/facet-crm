@@ -19,7 +19,7 @@ type Company = {
   company_type: string | null; region: string | null;
   status: string; source: string | null; notes: string | null;
   created_at: string;
-  company_reps: { role: string; reps: Rep | null }[];
+  company_reps: { role: string; reps: any }[];
 };
 
 const emptyForm = () => ({
@@ -55,7 +55,7 @@ export default function ManagerCompaniesPage() {
         .eq('status', 'active')
         .order('name'),
     ]);
-    setCompanies((compRes.data ?? []) as Company[]);
+    setCompanies((compRes.data ?? []) as unknown as Company[]);
     setReps(repRes.data ?? []);
     setLoading(false);
   }
@@ -179,7 +179,7 @@ export default function ManagerCompaniesPage() {
             <tbody className="divide-y divide-gray-50">
               {filtered.map(c => {
                 const repNames = c.company_reps
-                  ?.map(cr => cr.reps?.name)
+                  ?.map(cr => Array.isArray(cr.reps) ? cr.reps[0]?.name : cr.reps?.name)
                   .filter(Boolean)
                   .join(', ') || '—';
                 return (
