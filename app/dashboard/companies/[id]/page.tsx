@@ -11,7 +11,7 @@ type Rep     = { id: string; name: string };
 type Contact = { id: string; contact_code: string; full_name: string; full_name_ar: string | null; title: string | null; phone: string | null; whatsapp: string | null; email: string | null; is_primary: boolean; notes: string | null };
 type Project = { id: string; project_code: string; project_name: string | null; stage: string; quoted_sqm: number; won_sqm: number; created_at: string };
 type Company = { id: string; customer_code: string; company_name: string; company_type: string | null; region: string | null; source: string | null; status: string; notes: string | null; primary_rep_id: string | null; created_at: string };
-type CompanyRep = { rep_id: string; role: string; reps: { name: string }[] | null };
+type CompanyRep = { rep_id: string; role: string; reps: any };
 
 const STAGE_COLOR: Record<string, string> = {
   'New Lead': 'bg-gray-100 text-gray-700',
@@ -171,7 +171,7 @@ export default function CompanyDetailPage() {
             {companyReps.length === 0 && <span className="text-sm text-gray-400">No reps assigned yet</span>}
             {companyReps.map(cr => (
               <div key={cr.rep_id} className="flex items-center gap-1.5 bg-gray-100 rounded-lg px-3 py-1.5 text-sm">
-                <span className="font-medium text-gray-800">{cr.reps?.name}</span>
+                <span className="font-medium text-gray-800">{Array.isArray(cr.reps) ? cr.reps[0]?.name : cr.reps?.name}</span>
                 <span className="text-xs text-gray-500">({cr.role})</span>
                 <button onClick={() => removeRep(cr.rep_id)} className="ml-1 text-gray-400 hover:text-red-500">×</button>
               </div>
