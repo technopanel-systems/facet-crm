@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
 
 type NavItem = { label: string; href: string; icon: React.ReactNode };
@@ -20,7 +21,7 @@ const managerNav: NavItem[] = [
   { label: "Projects",    href: "/dashboard/projects",   icon: <Icon d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" /> },
   { label: "Activities",  href: "/dashboard/activities", icon: <Icon d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /> },
   { label: "Team",        href: "/dashboard/team",       icon: <Icon d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" /> },
-  { label: "Duplicates",  href: "/dashboard/duplicates", icon: <Icon d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /> },
+  { label: "Notifications",href: "/dashboard/notifications",icon: <Icon d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /> },
 ];
 
 const repNav: NavItem[] = [
@@ -28,13 +29,14 @@ const repNav: NavItem[] = [
   { label: "My Companies",  href: "/rep/companies",    icon: <Icon d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8" /> },
   { label: "My Projects",   href: "/rep/projects",     icon: <Icon d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" /> },
   { label: "My Stats",      href: "/rep/stats",        icon: <Icon d="M18 20V10M12 20V4M6 20v-6" /> },
-  { label: "History",       href: "/rep/history",      icon: <Icon d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /> },
+  { label: "Notifications", href: "/rep/notifications",icon: <Icon d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /> },
 ];
 
 const coordinatorNav: NavItem[] = [
   { label: "Companies",   href: "/dashboard/companies",   icon: <Icon d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8" /> },
   { label: "Projects",    href: "/dashboard/projects",    icon: <Icon d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" /> },
   { label: "Quotations",  href: "/dashboard/quotations",  icon: <Icon d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /> },
+  { label: "Notifications",href: "/dashboard/notifications",icon: <Icon d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /> },
 ];
 
 const marketingNav: NavItem[] = [
@@ -69,6 +71,24 @@ export default function Sidebar({ role, repName }: SidebarProps) {
   const router = useRouter();
   const supabase = createClient();
   const nav = NAV_MAP[role] ?? repNav;
+  
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    async function loadUnread() {
+      const { count } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('is_read', false);
+      setUnreadCount(count ?? 0);
+    }
+    loadUnread();
+
+    // Subscribe to new notifications in real-time
+    const channel = supabase.channel('realtime_notifications')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, () => {
+        loadUnread();
+      }).subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -77,7 +97,6 @@ export default function Sidebar({ role, repName }: SidebarProps) {
 
   return (
     <aside className="w-60 min-h-screen bg-brand-navy flex flex-col fixed left-0 top-0 bottom-0 z-40">
-      {/* Logo */}
       <div className="px-5 py-6 border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-brand-blue rounded-lg flex items-center justify-center flex-shrink-0">
@@ -92,7 +111,6 @@ export default function Sidebar({ role, repName }: SidebarProps) {
         </div>
       </div>
 
-      {/* User badge */}
       <div className="px-5 py-3 border-b border-white/10">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-brand-blue/30 flex items-center justify-center text-xs font-bold text-brand-blue flex-shrink-0">
@@ -105,31 +123,34 @@ export default function Sidebar({ role, repName }: SidebarProps) {
         </div>
       </div>
 
-      {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {nav.map(item => {
-          const active =
-            pathname === item.href ||
-            (item.href !== "/rep" && item.href !== "/dashboard" && pathname.startsWith(item.href));
+          const active = pathname === item.href || (item.href !== "/rep" && item.href !== "/dashboard" && pathname.startsWith(item.href));
+          const isNotification = item.label === "Notifications";
+          
           return (
             <Link
               key={item.href}
               href={item.href}
               className={clsx(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
-                active
-                  ? "bg-brand-blue text-white"
-                  : "text-gray-400 hover:text-white hover:bg-white/10"
+                "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
+                active ? "bg-brand-blue text-white" : "text-gray-400 hover:text-white hover:bg-white/10"
               )}
             >
-              {item.icon}
-              {item.label}
+              <div className="flex items-center gap-3">
+                {item.icon}
+                {item.label}
+              </div>
+              {isNotification && unreadCount > 0 && (
+                <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  {unreadCount}
+                </span>
+              )}
             </Link>
           );
         })}
       </nav>
 
-      {/* Sign out */}
       <div className="px-3 py-4 border-t border-white/10">
         <button
           onClick={handleSignOut}
