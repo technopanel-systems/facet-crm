@@ -54,19 +54,16 @@ export default function RepPage() {
         const myCompanies = compReps?.map(cr => Array.isArray(cr.companies) ? cr.companies[0] : cr.companies).filter(Boolean) as Company[];
         setCompanies(myCompanies || []);
 
-        // Fetch contacts for these companies
         if (myCompanies && myCompanies.length > 0) {
             const compIds = myCompanies.map(c => c.id);
             const { data: contactData } = await supabase.from("contacts").select("id, full_name, company_id").in("company_id", compIds);
             setContacts(contactData || []);
         }
 
-        // Fetch assigned projects via junction table
         const { data: projReps } = await supabase.from("project_reps").select("project_id, projects(id, project_name, project_code, customer_id)").eq("rep_id", repData.id);
         const myProjects = projReps?.map(pr => Array.isArray(pr.projects) ? pr.projects[0] : pr.projects).filter(Boolean) as Project[];
         setProjects(myProjects || []);
 
-        // Fetch this month's sqm
         const monthStart = format(new Date(), "yyyy-MM-01");
         const { data: actData } = await supabase.from("activities").select("sqm_done").eq("rep_id", repData.id).gte("activity_date", monthStart);
         setMonthSqm((actData ?? []).reduce((s, a) => s + (Number(a.sqm_done) || 0), 0));
@@ -78,7 +75,6 @@ export default function RepPage() {
   function updateRow(idx: number, field: keyof Row, value: string) {
     const updated = [...rows];
     updated[idx] = { ...updated[idx], [field]: value };
-    // Auto-clear project and contact if company changes
     if (field === "company_id") {
         updated[idx].project_id = "";
         updated[idx].contact_id = "";
@@ -135,7 +131,6 @@ export default function RepPage() {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Daily Report</h1>
