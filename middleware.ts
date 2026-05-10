@@ -24,17 +24,26 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
 
-  // Allow unauthenticated access to login, auth callbacks, and the register page
-  const isPublicPath = path.startsWith("/login") || path.startsWith("/auth") || path.startsWith("/register") || path.startsWith("/pending");
+  const isPublicPath =
+    path.startsWith("/login") ||
+    path.startsWith("/auth") ||
+    path.startsWith("/register") ||
+    path.startsWith("/pending");
 
-  // Not logged in → send to login (unless they are on a public path)
   if (!user && !isPublicPath) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    const redirectResponse = NextResponse.redirect(new URL("/login", request.url));
+    supabaseResponse.cookies.getAll().forEach(cookie =>
+      redirectResponse.cookies.set(cookie.name, cookie.value)
+    );
+    return redirectResponse;
   }
 
-  // Logged in → don't let them see login or register pages
   if (user && (path === "/login" || path === "/register")) {
-    return NextResponse.redirect(new URL("/", request.url));
+    const redirectResponse = NextResponse.redirect(new URL("/", request.url));
+    supabaseResponse.cookies.getAll().forEach(cookie =>
+      redirectResponse.cookies.set(cookie.name, cookie.value)
+    );
+    return redirectResponse;
   }
 
   return supabaseResponse;
