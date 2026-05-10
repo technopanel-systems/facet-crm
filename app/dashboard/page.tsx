@@ -7,13 +7,13 @@ async function getDashboardData() {
   const yesterday = subDays(today, 1);
   const monthStart = startOfMonth(today);
 
-  const [repsRes, activitiesTodayRes, activitiesMonthRes, customersRes, projectsRes] = await Promise.all([
+  const [repsRes, activitiesTodayRes, activitiesMonthRes, companiesRes, projectsRes] = await Promise.all([
     supabase.from("reps").select("*").eq("status", "active").order("name"),
     supabase.from("activities").select("rep_name, submission_status, activity_date, sqm_done")
       .eq("activity_date", format(yesterday, "yyyy-MM-dd")),
     supabase.from("activities").select("rep_name, sqm_done, sqm_expected, interaction_type")
       .gte("activity_date", format(monthStart, "yyyy-MM-dd")),
-    supabase.from("customers").select("id, status", { count: "exact" }).eq("status", "active"),
+    supabase.from("companies").select("id", { count: "exact" }),
     supabase.from("projects").select("id, stage, won_sqm, quoted_sqm", { count: "exact" }),
   ]);
 
@@ -21,7 +21,7 @@ async function getDashboardData() {
     reps: repsRes.data ?? [],
     activitiesYesterday: activitiesTodayRes.data ?? [],
     activitiesMonth: activitiesMonthRes.data ?? [],
-    totalCustomers: customersRes.count ?? 0,
+    totalCompanies: companiesRes.count ?? 0,
     projects: projectsRes.data ?? [],
     yesterday: format(yesterday, "dd MMM yyyy"),
     month: format(today, "MMMM yyyy"),
@@ -47,7 +47,6 @@ function StatCard({ label, value, sub, color = "blue" }: { label: string; value:
 export default async function DashboardPage() {
   const data = await getDashboardData();
 
-  // Submission status per rep for yesterday
   const repStatus = data.reps
     .filter(r => r.role === "rep")
     .map(rep => {
@@ -59,7 +58,6 @@ export default async function DashboardPage() {
       return { ...rep, status, count: repActivities.length };
     });
 
-  // Monthly SQM per rep
   const repSqm = data.reps.filter(r => r.role === "rep").map(rep => {
     const sqm = data.activitiesMonth
       .filter(a => a.rep_name === rep.name)
@@ -84,24 +82,19 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-gray-500 text-sm mt-1">{data.month} · Showing yesterday's report status: {data.yesterday}</p>
       </div>
 
-      {/* KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="SQM This Month" value={totalSqmDone.toLocaleString()} sub={`Target: ${totalTarget.toLocaleString()} SQM`} color="blue" />
         <StatCard label="Pipeline SQM"   value={pipelineSqm.toLocaleString()} sub="Expected from activities" color="purple" />
-        <StatCard label="Active Customers" value={data.totalCustomers} sub="Total in system" color="green" />
+        <StatCard label="Active Companies" value={data.totalCompanies} sub="Total in system" color="green" />
         <StatCard label="Won Projects"   value={wonProjects} sub={`${data.projects.length} total projects`} color="amber" />
       </div>
 
-      {/* Two columns */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Submission status */}
         <div className="card">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
             <div>
@@ -134,7 +127,6 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* SQM Progress */}
         <div className="card">
           <div className="px-5 py-4 border-b border-gray-100">
             <h2 className="font-semibold text-gray-900">SQM Progress — {data.month}</h2>
@@ -162,7 +154,6 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Projects pipeline */}
       <div className="card">
         <div className="px-5 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">Project Pipeline</h2>
@@ -188,4 +179,3 @@ export default async function DashboardPage() {
     </div>
   );
 }
-
