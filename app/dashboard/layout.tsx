@@ -13,15 +13,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .eq("auth_user_id", user.id)
     .single();
 
-  // Only manager and sales_coordinator can access the dashboard layout
-  if (rep?.role !== "manager" && rep?.role !== "sales_coordinator") redirect("/rep");
-
-  // Pending accounts see the waiting screen
   if (rep?.status === "pending") redirect("/pending");
+
+  const role = rep?.role?.toLowerCase().trim();
+  if (role !== "manager" && role !== "sales_coordinator") {
+    redirect("/rep");
+  }
 
   return (
     <div className="flex">
-      <Sidebar role={(rep?.role ?? "manager") as SidebarRole} repName={rep?.name ?? "User"} />
+      <Sidebar role={(role ?? "manager") as SidebarRole} repName={rep?.name ?? "User"} />
       <main className="ml-60 flex-1 min-h-screen p-6 lg:p-8">
         {children}
       </main>
