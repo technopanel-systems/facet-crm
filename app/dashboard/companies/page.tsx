@@ -104,7 +104,7 @@ export default function ManagerCompaniesPage() {
   const filtered = companies.filter(c => {
     const q = search.toLowerCase();
     const matchSearch = !q ||
-      c.company_name.toLowerCase().includes(q) ||
+      (c.company_name || "").toLowerCase().includes(q) ||
       (c.customer_code ?? '').toLowerCase().includes(q);
     return matchSearch &&
       (!filterType   || c.company_type === filterType) &&
