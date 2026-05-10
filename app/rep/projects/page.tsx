@@ -17,7 +17,7 @@ type Project = {
   id: string; project_code: string; project_name: string | null;
   stage: string; quoted_sqm: number; next_follow_up: string | null;
   customer_id: string | null;
-  companies: { company_name: string } | null;
+  companies: any;
 };
 
 const emptyForm = () => ({
@@ -60,7 +60,7 @@ export default function RepProjectsPage() {
         .order('created_at', { ascending: false }),
       supabase.from('companies').select('id, company_name').order('company_name'),
     ]);
-    setProjects((projRes.data ?? []) as Project[]);
+    setProjects((projRes.data ?? []) as unknown as Project[]);
     setCompanies(compRes.data ?? []);
     setLoading(false);
   }
