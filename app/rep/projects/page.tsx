@@ -71,8 +71,12 @@ export default function RepProjectsPage() {
     if (!repId) return;
     setSaving(true);
 
+    const selectedCompany = companies.find(c => c.id === form.customer_id);
+
     const { data: project, error: err } = await supabase.from('projects').insert({
       customer_id:    form.customer_id,
+      company_name:   selectedCompany?.company_name || 'Unknown',
+      assigned_rep_id: repId,
       project_name:   form.project_name   || null,
       city:           form.city           || null,
       stage:          form.stage,
@@ -124,7 +128,6 @@ export default function RepProjectsPage() {
         </button>
       </div>
 
-      {/* Follow-ups due today */}
       {followUpsToday.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
           <div className="text-sm font-semibold text-amber-800 mb-2">📅 {followUpsToday.length} follow-up{followUpsToday.length > 1 ? 's' : ''} due today</div>
@@ -190,7 +193,6 @@ export default function RepProjectsPage() {
         </div>
       )}
 
-      {/* Add Project Modal */}
       {showAdd && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
