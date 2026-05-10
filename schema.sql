@@ -22,7 +22,7 @@ create table if not exists reps (
   created_at           timestamptz not null default now()
 );
 
-create table if not exists customers (
+create table if not exists companies (
   id                       uuid primary key default uuid_generate_v4(),
   customer_code            text unique,
   company_name             text not null,
@@ -45,7 +45,7 @@ create table if not exists customers (
 create table if not exists projects (
   id               uuid primary key default uuid_generate_v4(),
   project_code     text unique,
-  customer_id      uuid references customers(id) on delete set null,
+  customer_id      uuid references companies(id) on delete set null,
   company_name     text not null,
   project_name     text,
   city             text,
@@ -89,8 +89,8 @@ create table if not exists activities (
 
 create table if not exists duplicate_flags (
   id              uuid primary key default uuid_generate_v4(),
-  customer_id_1   uuid references customers(id) on delete cascade,
-  customer_id_2   uuid references customers(id) on delete cascade,
+  customer_id_1   uuid references companies(id) on delete cascade,
+  customer_id_2   uuid references companies(id) on delete cascade,
   match_type      text check (match_type in ('phone','name')),
   match_key       text,
   classification  text not null default 'pending' check (classification in ('pending','shared','conflict','resolved')),
@@ -155,8 +155,8 @@ begin
 end;
 $$;
 
-drop trigger if exists trg_customer_code on customers;
-create trigger trg_customer_code before insert on customers
+drop trigger if exists trg_customer_code on companies;
+create trigger trg_customer_code before insert on companies
   for each row execute function set_customer_code();
 
 drop trigger if exists trg_project_code on projects;
@@ -167,8 +167,8 @@ drop trigger if exists trg_activity_code on activities;
 create trigger trg_activity_code before insert on activities
   for each row execute function set_activity_code();
 
-drop trigger if exists trg_customers_updated on customers;
-create trigger trg_customers_updated before update on customers
+drop trigger if exists trg_companies_updated on companies;
+create trigger trg_companies_updated before update on companies
   for each row execute function set_updated_at();
 
 drop trigger if exists trg_projects_updated on projects;
@@ -205,8 +205,8 @@ begin
 end;
 $$;
 
-drop trigger if exists trg_normalize_customer on customers;
-create trigger trg_normalize_customer before insert or update on customers
+drop trigger if exists trg_normalize_customer on companies;
+create trigger trg_normalize_customer before insert or update on companies
   for each row execute function auto_normalize_customer();
 
 -- ============================================================
@@ -214,7 +214,7 @@ create trigger trg_normalize_customer before insert or update on customers
 -- ============================================================
 
 alter table reps enable row level security;
-alter table customers enable row level security;
+alter table companies enable row level security;
 alter table projects enable row level security;
 alter table activities enable row level security;
 alter table duplicate_flags enable row level security;
@@ -240,20 +240,20 @@ create policy "reps_read" on reps for select using (auth.uid() is not null);
 drop policy if exists "reps_manager_write" on reps;
 create policy "reps_manager_write" on reps for all using (current_user_role() = 'manager');
 
--- CUSTOMERS: managers all, reps see assigned or shared
-drop policy if exists "customers_manager" on customers;
-create policy "customers_manager" on customers for all using (current_user_role() = 'manager');
+-- companies: managers all, reps see assigned or shared
+drop policy if exists "companies_manager" on companies;
+create policy "companies_manager" on companies for all using (current_user_role() = 'manager');
 
-drop policy if exists "customers_rep_read" on customers;
-create policy "customers_rep_read" on customers for select using (
+drop policy if exists "companies_rep_read" on companies;
+create policy "companies_rep_read" on companies for select using (
   current_user_role() = 'rep' and (
     primary_rep_id = current_rep_id() or
     shared_with ilike '%' || current_rep_name() || '%'
   )
 );
 
-drop policy if exists "customers_rep_update" on customers;
-create policy "customers_rep_update" on customers for update using (
+drop policy if exists "companies_rep_update" on companies;
+create policy "companies_rep_update" on companies for update using (
   current_user_role() = 'rep' and (
     primary_rep_id = current_rep_id() or
     shared_with ilike '%' || current_rep_name() || '%'
