@@ -24,23 +24,37 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
 
-  // Use strict equality for pages, startsWith for directories
   const isPublicPath = 
     path === "/login" || 
     path === "/register" || 
     path === "/pending" || 
     path.startsWith("/auth");
 
+  // CRITICAL FIX: If we redirect, we MUST carry over the Supabase cookies!
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    const redirectResponse = NextResponse.redirect(url);
+    
+    // Copy the cookies over to the new redirect response
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value);
+    });
+    return redirectResponse;
   }
 
-  if (user && (path === "/login" || path === "/register")) {
+  // Notice: I removed /register from this check. 
+  // If a user just auth'd but hasn't finished setting up their profile, we don't want to block them.
+  if (user && path === "/login") {
     const url = request.nextUrl.clone();
     url.pathname = "/";
-    return NextResponse.redirect(url);
+    const redirectResponse = NextResponse.redirect(url);
+    
+    // Copy the cookies over here as well
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value);
+    });
+    return redirectResponse;
   }
 
   return supabaseResponse;
