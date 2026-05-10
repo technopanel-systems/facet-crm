@@ -13,15 +13,14 @@ export default async function RepLayout({ children }: { children: React.ReactNod
     .eq("auth_user_id", user.id)
     .single();
 
-  // Manager should never be in rep layout
-  if (rep?.role === "manager") redirect("/dashboard");
-
-  // Pending reps see a waiting screen, not the app
   if (rep?.status === "pending") redirect("/pending");
+
+  const role = rep?.role?.toLowerCase().trim();
+  if (role === "manager") redirect("/dashboard");
 
   return (
     <div className="flex">
-      <Sidebar role="rep" repName={rep?.name ?? "Rep"} />
+      <Sidebar role={(role ?? "rep") as any} repName={rep?.name ?? "Rep"} />
       <main className="ml-60 flex-1 min-h-screen p-6 lg:p-8">
         {children}
       </main>
