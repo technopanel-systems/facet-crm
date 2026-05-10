@@ -10,7 +10,7 @@ export async function middleware(request: NextRequest) {
     {
       cookies: {
         getAll() { return request.cookies.getAll(); },
-        setAll(cookiesToSet: { name: string; value: string; options: any }[]) {
+        setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
@@ -24,26 +24,23 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
 
-  const isPublicPath =
-    path.startsWith("/login") ||
-    path.startsWith("/auth") ||
-    path.startsWith("/register") ||
-    path.startsWith("/pending");
+  // Use strict equality for pages, startsWith for directories
+  const isPublicPath = 
+    path === "/login" || 
+    path === "/register" || 
+    path === "/pending" || 
+    path.startsWith("/auth");
 
   if (!user && !isPublicPath) {
-    const redirectResponse = NextResponse.redirect(new URL("/login", request.url));
-    supabaseResponse.cookies.getAll().forEach(cookie =>
-      redirectResponse.cookies.set(cookie.name, cookie.value)
-    );
-    return redirectResponse;
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
   }
 
   if (user && (path === "/login" || path === "/register")) {
-    const redirectResponse = NextResponse.redirect(new URL("/", request.url));
-    supabaseResponse.cookies.getAll().forEach(cookie =>
-      redirectResponse.cookies.set(cookie.name, cookie.value)
-    );
-    return redirectResponse;
+    const url = request.nextUrl.clone();
+    url.pathname = "/";
+    return NextResponse.redirect(url);
   }
 
   return supabaseResponse;
