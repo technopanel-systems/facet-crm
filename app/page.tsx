@@ -7,13 +7,20 @@ export default async function Home() {
 
   if (!user) redirect("/login");
 
-  const { data: rep } = await supabase
+  const { data: rep, error } = await supabase
     .from("reps")
     .select("role, status")
     .eq("auth_user_id", user.id)
     .single();
 
-  if (rep?.status === "pending") redirect("/pending");
-  if (rep?.role === "manager" || rep?.role === "sales_coordinator") redirect("/dashboard");
+  // THE FAILSAFE: If the database row isn't ready, errors out, or they are explicitly pending
+  if (error || !rep || rep.status === "pending") {
+    redirect("/pending");
+  }
+
+  if (rep.role === "manager" || rep.role === "sales_coordinator") {
+    redirect("/dashboard");
+  }
+  
   redirect("/rep");
 }
