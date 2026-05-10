@@ -20,7 +20,7 @@ const emptyRow = (): Row => ({
 
 const INTERACTIONS = ["Visit", "Call", "WhatsApp", "Email", "Meeting", "Site Visit"];
 const REGIONS      = ["Central", "West", "East", "North", "South", "Foreign"];
-const TYPES        = ["Factory", "Contractor", "Developer", "Consultant", "Trading", "Government", "Other"];
+const TYPES = ["Factory","Advertising","Real Estate","Owner","Consultant","Contractor","Station Management","Workshop","Other"];
 
 export default function RepPage() {
   const supabase = createClient();
