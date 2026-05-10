@@ -25,7 +25,7 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // Allow unauthenticated access to login, auth callbacks, and the register page
-  const isPublicPath = path.startsWith("/login") || path.startsWith("/auth") || path.startsWith("/register");
+  const isPublicPath = path.startsWith("/login") || path.startsWith("/auth") || path.startsWith("/register") || path.startsWith("/pending");
 
   // Not logged in → send to login (unless they are on a public path)
   if (!user && !isPublicPath) {
