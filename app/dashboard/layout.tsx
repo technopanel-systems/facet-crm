@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import Sidebar from "@/components/Sidebar";
+import Sidebar, { type SidebarRole } from "@/components/Sidebar";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
@@ -9,15 +9,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const { data: rep } = await supabase
     .from("reps")
-    .select("name, role")
+    .select("name, role, status")
     .eq("auth_user_id", user.id)
     .single();
 
-  if (rep?.role !== "manager") redirect("/rep");
+  // Only manager and sales_coordinator can access the dashboard layout
+  if (rep?.role !== "manager" && rep?.role !== "sales_coordinator") redirect("/rep");
+
+  // Pending accounts see the waiting screen
+  if (rep?.status === "pending") redirect("/pending");
 
   return (
     <div className="flex">
-      <Sidebar role="manager" repName={rep?.name ?? "Manager"} />
+      <Sidebar role={(rep?.role ?? "manager") as SidebarRole} repName={rep?.name ?? "User"} />
       <main className="ml-60 flex-1 min-h-screen p-6 lg:p-8">
         {children}
       </main>
