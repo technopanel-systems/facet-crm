@@ -74,19 +74,20 @@ export default function ManagerActivitiesPage() {
 
   const hasFilters = search || filterRep || filterType || filterStatus || dateFrom || dateTo;
 
-  function exportCSV() {
-    const headers = ['Date','Rep','Company','Project','Type','Region','SQM Done','SQM Expected','Status'];
+function exportCSV() {
+    const headers = ["Date","Rep","Company","Project","Type","Region","SQM Done","SQM Expected","Status"];
     const rows = filtered.map(a => [
-      a.activity_date, a.rep_name, a.company_name, a.project_name??'',
-      a.interaction_type??'', a.region??'', a.sqm_done, a.sqm_expected,
-      a.submission_status??''
+      a.activity_date, a.rep_name, a.company_name, a.project_name ?? "",
+      a.interaction_type ?? "", a.region ?? "", a.sqm_done, a.sqm_expected,
+      a.submission_status ?? ""
     ]);
-    const csv = [headers, ...rows].map(r => r.map(v => JSON.stringify(v)).join(',')).join('
-');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const csv = [headers, ...rows]
+      .map(r => r.map(v => JSON.stringify(v)).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
     const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = 'activities.csv'; a.click();
+    const a    = document.createElement("a");
+    a.href = url; a.download = "activities.csv"; a.click();
     URL.revokeObjectURL(url);
   }
 
