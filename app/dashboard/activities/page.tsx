@@ -74,6 +74,22 @@ export default function ManagerActivitiesPage() {
 
   const hasFilters = search || filterRep || filterType || filterStatus || dateFrom || dateTo;
 
+  function exportCSV() {
+    const headers = ['Date','Rep','Company','Project','Type','Region','SQM Done','SQM Expected','Status'];
+    const rows = filtered.map(a => [
+      a.activity_date, a.rep_name, a.company_name, a.project_name??'',
+      a.interaction_type??'', a.region??'', a.sqm_done, a.sqm_expected,
+      a.submission_status??''
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(v => JSON.stringify(v)).join(',')).join('
+');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'activities.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
@@ -83,6 +99,10 @@ export default function ManagerActivitiesPage() {
             {loading ? "—" : `${filtered.length} activities · ${totalSqm.toLocaleString()} SQM total`}
           </p>
         </div>
+        <button onClick={exportCSV} disabled={filtered.length===0} className="btn-secondary text-sm flex items-center gap-2">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
       </div>
 
       {/* Filters */}
