@@ -17,7 +17,7 @@ type Project = {
   id: string; project_code: string; project_name: string | null;
   stage: string; quoted_sqm: number; next_follow_up: string | null;
   customer_id: string | null;
-  companies: any;
+  companies: { company_name: string } | null;
 };
 
 const emptyForm = () => ({
@@ -60,7 +60,7 @@ export default function RepProjectsPage() {
         .order('created_at', { ascending: false }),
       supabase.from('companies').select('id, company_name').order('company_name'),
     ]);
-    setProjects((projRes.data ?? []) as unknown as Project[]);
+    setProjects((projRes.data ?? []) as Project[]);
     setCompanies(compRes.data ?? []);
     setLoading(false);
   }
@@ -71,28 +71,19 @@ export default function RepProjectsPage() {
     if (!repId) return;
     setSaving(true);
 
-    const selectedCompany = companies.find(c => c.id === form.customer_id);
-
-    const { data: project, error: err } = await supabase.from('projects').insert({
-      customer_id:    form.customer_id,
-      company_name:   selectedCompany?.company_name || 'Unknown',
-      assigned_rep_id: repId,
-      project_name:   form.project_name   || null,
-      city:           form.city           || null,
-      stage:          form.stage,
-      quoted_sqm:     parseFloat(form.quoted_sqm) || 0,
-      next_follow_up: form.next_follow_up  || null,
-      notes:          form.notes           || null,
-      contact_id:     form.contact_id      || null,
-    }).select().single();
+    const { error: err } = await supabase.rpc('create_project_with_rep', {
+      p_customer_id:    form.customer_id,
+      p_project_name:   form.project_name   || null,
+      p_city:           form.city           || null,
+      p_stage:          form.stage,
+      p_quoted_sqm:     parseFloat(form.quoted_sqm) || 0,
+      p_next_follow_up: form.next_follow_up  || null,
+      p_notes:          form.notes           || null,
+      p_contact_id:     form.contact_id      || null,
+      p_rep_id:         repId,
+    });
 
     if (err) { setError(err.message); setSaving(false); return; }
-
-    if (project) {
-      await supabase.from('project_reps').insert({
-        project_id: project.id, rep_id: repId, role: 'primary', assigned_by: repId,
-      });
-    }
 
     setForm(emptyForm());
     setShowAdd(false);
@@ -128,6 +119,7 @@ export default function RepProjectsPage() {
         </button>
       </div>
 
+      {/* Follow-ups due today */}
       {followUpsToday.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
           <div className="text-sm font-semibold text-amber-800 mb-2">📅 {followUpsToday.length} follow-up{followUpsToday.length > 1 ? 's' : ''} due today</div>
@@ -193,6 +185,7 @@ export default function RepProjectsPage() {
         </div>
       )}
 
+      {/* Add Project Modal */}
       {showAdd && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
