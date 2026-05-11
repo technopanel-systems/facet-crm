@@ -21,8 +21,8 @@ type Project = {
   stage: string; quoted_sqm: number; won_sqm: number;
   city: string | null; next_follow_up: string | null;
   customer_id: string | null;
- companies: any;
-  project_reps: { role: string; reps: any }[];
+  companies: { company_name: string } | null;
+  project_reps: { role: string; reps: { name: string } | null }[];
 };
 
 const emptyForm = () => ({
@@ -63,7 +63,7 @@ export default function ManagerProjectsPage() {
       supabase.from('companies').select('id, company_name').order('company_name'),
       supabase.from('reps').select('id, name').in('role',['rep','marketing']).eq('status','active').order('name'),
     ]);
-    setProjects((projRes.data ?? []) as unknown as Project[]);
+    setProjects((projRes.data ?? []) as Project[]);
     setCompanies(compRes.data ?? []);
     setReps(repRes.data ?? []);
     setLoading(false);
@@ -74,25 +74,19 @@ export default function ManagerProjectsPage() {
     if (!form.customer_id) { setError('Please select a company.'); return; }
     setSaving(true);
 
-    const { data: project, error: err } = await supabase.from('projects').insert({
-      customer_id:    form.customer_id,
-      project_name:   form.project_name   || null,
-      city:           form.city           || null,
-      stage:          form.stage,
-      quoted_sqm:     parseFloat(form.quoted_sqm)  || 0,
-      won_sqm:        parseFloat(form.won_sqm)      || 0,
-      next_follow_up: form.next_follow_up || null,
-      notes:          form.notes          || null,
-      contact_id:     form.contact_id     || null,
-    }).select().single();
+    const { error: err } = await supabase.rpc('create_project_with_rep', {
+      p_customer_id:    form.customer_id,
+      p_project_name:   form.project_name   || null,
+      p_city:           form.city           || null,
+      p_stage:          form.stage,
+      p_quoted_sqm:     parseFloat(form.quoted_sqm) || 0,
+      p_next_follow_up: form.next_follow_up || null,
+      p_notes:          form.notes          || null,
+      p_contact_id:     form.contact_id     || null,
+      p_rep_id:         form.assign_rep_id  || null,
+    });
 
     if (err) { setError(err.message); setSaving(false); return; }
-
-    if (project && form.assign_rep_id) {
-      await supabase.from('project_reps').insert({
-        project_id: project.id, rep_id: form.assign_rep_id, role: 'primary',
-      });
-    }
 
     setForm(emptyForm());
     setShowAdd(false);
@@ -113,7 +107,7 @@ export default function ManagerProjectsPage() {
 
   const filtered = projects.filter(p => {
     const q = search.toLowerCase();
-    return (!search || (p.project_name ?? '').toLowerCase().includes(q) || (p.project_code || '').toLowerCase().includes(q) || (p.companies?.company_name ?? '').toLowerCase().includes(q))
+    return (!search || (p.project_name ?? '').toLowerCase().includes(q) || (p.project_code ?? '').toLowerCase().includes(q) || (p.companies?.company_name ?? '').toLowerCase().includes(q))
       && (!filterStage || p.stage === filterStage);
   });
 
@@ -161,7 +155,7 @@ export default function ManagerProjectsPage() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map(p => {
-                const repNames = p.project_reps?.map(pr => Array.isArray(pr.reps) ? pr.reps[0]?.name : pr.reps?.name).filter(Boolean).join(', ') || '—';
+                const repNames = p.project_reps?.map(pr => pr.reps?.name).filter(Boolean).join(', ') || '—';
                 const followUp = p.next_follow_up;
                 const isOverdue = followUp && new Date(followUp) < new Date();
                 return (
@@ -234,14 +228,6 @@ export default function ManagerProjectsPage() {
                   </select>
                 </div>
               )}
-              
-              <div>
-                <label className="label">Assign Rep</label>
-                <select className="input" value={form.assign_rep_id} onChange={e => setForm({...form, assign_rep_id: e.target.value})}>
-                  <option value="">Unassigned</option>
-                  {reps.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                </select>
-              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label">Project Name</label>
@@ -273,6 +259,13 @@ export default function ManagerProjectsPage() {
                   <label className="label">Won SQM</label>
                   <input type="number" className="input" value={form.won_sqm} onChange={e => setForm({...form, won_sqm: e.target.value})} placeholder="0" min="0" />
                 </div>
+              </div>
+              <div>
+                <label className="label">Assign Rep</label>
+                <select className="input" value={form.assign_rep_id} onChange={e => setForm({...form, assign_rep_id: e.target.value})}>
+                  <option value="">Unassigned for now</option>
+                  {reps.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
               </div>
               <div>
                 <label className="label">Notes</label>
