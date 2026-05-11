@@ -30,6 +30,7 @@ const repNav: NavItem[] = [
   { label: "My Companies",  href: "/rep/companies",    icon: <Icon d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8" /> },
   { label: "My Projects",   href: "/rep/projects",     icon: <Icon d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" /> },
   { label: "My Stats",      href: "/rep/stats",        icon: <Icon d="M18 20V10M12 20V4M6 20v-6" /> },
+  { label: "My Quotations", href: "/rep/quotations",    icon: <Icon d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /> },
   { label: "History",       href: "/rep/history",      icon: <Icon d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /> },
   { label: "Notifications", href: "/rep/notifications",icon: <Icon d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /> },
 ];
@@ -45,6 +46,7 @@ const marketingNav: NavItem[] = [
   { label: "Daily Report",  href: "/rep",              icon: <Icon d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /> },
   { label: "My Companies",  href: "/rep/companies",    icon: <Icon d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8" /> },
   { label: "My Projects",   href: "/rep/projects",     icon: <Icon d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" /> },
+  { label: "Quotations",  href: "/dashboard/quotations",  icon: <Icon d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /> },
   { label: "History",       href: "/rep/history",      icon: <Icon d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /> },
 ];
 
