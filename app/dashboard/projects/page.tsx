@@ -21,7 +21,7 @@ type Project = {
   stage: string; quoted_sqm: number; won_sqm: number;
   city: string | null; next_follow_up: string | null;
   customer_id: string | null;
-  companies: { company_name: string } | null;
+  companies: any;
   project_reps: { role: string; reps: { name: string } | null }[];
 };
 
@@ -63,7 +63,7 @@ export default function ManagerProjectsPage() {
       supabase.from('companies').select('id, company_name').order('company_name'),
       supabase.from('reps').select('id, name').in('role',['rep','marketing']).eq('status','active').order('name'),
     ]);
-    setProjects((projRes.data ?? []) as Project[]);
+    setProjects((projRes.data ?? []) as unknown as Project[]);
     setCompanies(compRes.data ?? []);
     setReps(repRes.data ?? []);
     setLoading(false);
