@@ -138,13 +138,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   });
   const totalInteractions = Object.values(interactionMap).reduce((s,v) => s+v, 0);
 
-  const submittedCount = repStatus.filter(r => r.status !== "missing").length;
+  const submittedCount = repStatus.filter(r => r.status === "on_time" || r.status === "late").length;
   const missingCount   = repStatus.filter(r => r.status === "missing").length;
+  const excusedCount   = repStatus.filter(r => r.status === "excused").length;
 
   const statusConfig = {
     on_time: { label: "✅ Submitted", cls: "badge-on-time" },
     late:    { label: "🕒 Late",      cls: "badge-late" },
     missing: { label: "❌ Missing",   cls: "badge-missing" },
+    excused: { label: "🟡 Excused",   cls: "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700" },
   };
 
   return (
@@ -181,7 +183,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
         <StatCard label="Active Projects"  value={data.projects.filter(p => !["Won","Delivered","Lost"].includes(p.stage)).length} sub="In pipeline" color="blue" />
         <StatCard label="Won Projects"     value={data.projects.filter(p => p.stage === "Won").length}      sub="All time"       color="green" />
         <StatCard label="Stale Projects"   value={data.staleProjects.length}  sub="No update 14+ days"     color="red" />
-        <StatCard label="Submitted Today"  value={`${submittedCount}/${repStatus.length}`} sub={`${missingCount} missing`} color={missingCount > 0 ? "amber" : "green"} />
+        <StatCard label="Submitted Today"  value={`${submittedCount}/${repStatus.length - excusedCount}`} sub={`${missingCount} missing · ${excusedCount} excused`} color={missingCount > 0 ? "amber" : "green"} />
       </div>
 
       {/* Row: Submission status + SQM progress */}
@@ -196,6 +198,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
             <div className="flex gap-3 text-xs">
               <span className="text-green-700 font-semibold">{submittedCount} submitted</span>
               <span className="text-red-600 font-semibold">{missingCount} missing</span>
+              {excusedCount > 0 && (
+                <span className="text-blue-600 font-semibold">{excusedCount} excused</span>
+              )}
             </div>
           </div>
           <div className="divide-y divide-gray-50">
