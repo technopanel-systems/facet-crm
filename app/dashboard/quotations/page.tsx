@@ -118,14 +118,15 @@ export default function QuotationsPage() {
   }
 
   async function saveEdit(id: string) {
-    await supabase.from("quotations").update({
-      status:        editStatus,
-      sqm_invoiced:  parseFloat(editSqmInvoiced)  || 0,
-      sqm_delivered: parseFloat(editSqmDelivered) || 0,
-    }).eq("id", id);
-    setEditId(null);
-    load();
-  }
+  await supabase.from("quotations").update({
+    status:          editStatus,
+    sqm_invoiced:    parseFloat(editSqmInvoiced)  || 0,
+    sqm_delivered:   parseFloat(editSqmDelivered) || 0,
+    last_revised_at: new Date().toISOString(),
+  }).eq("id", id);
+  setEditId(null);
+  load();
+}
 
   async function handleDelete(id: string, code: string) {
     if (!confirm(`Delete quotation ${code}?`)) return;
