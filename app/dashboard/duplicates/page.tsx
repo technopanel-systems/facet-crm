@@ -78,39 +78,19 @@ export default function DuplicatesPage() {
   }
 
   async function createFlag() {
-    // Manual duplicate detection — scan for similar company names
-    const { data: companies } = await supabase
-      .from("companies")
-      .select("id,company_name,company_name_normalized")
-      .eq("status","active");
-
-    if (!companies) return;
-
-    // Simple normalized match detection
-    const pairs: { id1: string; id2: string; key: string }[] = [];
-    for (let i = 0; i < companies.length; i++) {
-      for (let j = i + 1; j < companies.length; j++) {
-        const n1 = (companies[i].company_name_normalized || companies[i].company_name || "").toLowerCase().replace(/\s+/g,"");
-        const n2 = (companies[j].company_name_normalized || companies[j].company_name || "").toLowerCase().replace(/\s+/g,"");
-        if (n1 && n2 && (n1 === n2 || (n1.length > 4 && n2.includes(n1)) || (n2.length > 4 && n1.includes(n2)))) {
-          pairs.push({ id1: companies[i].id, id2: companies[j].id, key: companies[i].company_name });
-        }
-      }
-    }
-
-    // Insert new flags (skip existing)
-    for (const p of pairs) {
-      const { data: existing } = await supabase.from("duplicate_flags")
-        .select("id").eq("company_id_1", p.id1).eq("company_id_2", p.id2).single();
-      if (!existing) {
-        await supabase.from("duplicate_flags").insert({
-          company_id_1: p.id1, company_id_2: p.id2,
-          match_type: "name", match_key: p.key, classification: "pending",
-        });
-      }
-    }
-    load();
+  const { data, error } = await supabase.rpc('detect_duplicate_companies');
+  if (error) {
+    console.error('Duplicate scan error:', error.message);
+    return;
   }
+  const newFlags = data as number;
+  if (newFlags === 0) {
+    alert('Scan complete. No new duplicates found.');
+  } else {
+    alert(`Scan complete. ${newFlags} new duplicate flag${newFlags !== 1 ? 's' : ''} added.`);
+  }
+  load();
+}
 
   const filtered = flags.filter(f => filter === "all" || f.classification === filter);
   const pendingCount = flags.filter(f => f.classification === "pending").length;
