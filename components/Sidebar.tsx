@@ -81,18 +81,35 @@ export default function Sidebar({ role, repName }: SidebarProps) {
 
   useEffect(() => {
     async function loadUnread() {
-      const { count } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('is_read', false);
-      setUnreadCount(count ?? 0);
-    }
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  const { data: repData } = await supabase
+    .from('reps')
+    .select('id')
+    .eq('auth_user_id', user.id)
+    .single();
+  if (!repData) return;
+
+  const { count } = await supabase
+    .from('notifications')
+    .select('*', { count: 'exact', head: true })
+    .eq('is_read', false)
+    .eq('recipient_id', repData.id);
+  setUnreadCount(count ?? 0);
+}
+loadUnread();
+
+// Subscribe only to this user's new notifications
+const channel = supabase.channel('realtime_notifications')
+  .on('postgres_changes', {
+    event: 'INSERT',
+    schema: 'public',
+    table: 'notifications',
+  }, () => {
     loadUnread();
+  }).subscribe();
 
-    // Subscribe to new notifications in real-time
-    const channel = supabase.channel('realtime_notifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, () => {
-        loadUnread();
-      }).subscribe();
-
-    return () => { supabase.removeChannel(channel); };
+return () => { supabase.removeChannel(channel); };
   }, []);
 
   async function handleSignOut() {
