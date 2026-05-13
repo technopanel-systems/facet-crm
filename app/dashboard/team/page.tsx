@@ -78,9 +78,11 @@ export default function TeamPage() {
                   <select 
                     value={rep.role} 
                     onChange={(e) => updateRep(rep.id, "role", e.target.value)}
-                    className="input py-1.5 px-2 text-xs w-32"
+                    className="input py-1.5 px-2 text-xs w-36"
                   >
                     <option value="rep">Sales Rep</option>
+                    <option value="sales_coordinator">Coordinator</option>
+                    <option value="marketing">Marketing</option>
                     <option value="manager">Manager</option>
                   </select>
                 </td>
