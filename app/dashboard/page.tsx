@@ -80,10 +80,28 @@ function StatCard({ label, value, sub, color = "blue" }: { label:string; value:s
 export default async function DashboardPage({ searchParams }: { searchParams: { branch?: string } }) {
   const data = await getDashboardData(searchParams?.branch);
 
+ // Check if yesterday was a weekend
+  const yesterdayDow = new Date(data.yesterdayStr).getDay(); // 0=Sun,5=Fri,6=Sat
+  const yesterdayIsWeekend = yesterdayDow === 5 || yesterdayDow === 6;
+
+  // Check if yesterday was a company holiday
+  const yesterdayIsHoliday = (data.holidays ?? []).length > 0;
+
   // Submission status per rep
   const repStatus = data.reps.filter(r => r.role === "rep").map(rep => {
+    // Weekend or company holiday — everyone is excused
+    if (yesterdayIsWeekend || yesterdayIsHoliday) {
+      return { ...rep, status: "excused" as const, count: 0 };
+    }
+
+    // Check if this specific rep has an approved absence
+    const isAbsent = (data.absences ?? []).some(a => a.rep_id === rep.id);
+    if (isAbsent) {
+      return { ...rep, status: "excused" as const, count: 0 };
+    }
+
     const acts = data.activitiesYesterday.filter(a => a.rep_name === rep.name);
-    const status: "on_time"|"late"|"missing" = acts.length === 0 ? "missing"
+    const status: "on_time"|"late"|"missing"|"excused" = acts.length === 0 ? "missing"
       : acts.some(a => a.submission_status === "on_time") ? "on_time" : "late";
     return { ...rep, status, count: acts.length };
   });
