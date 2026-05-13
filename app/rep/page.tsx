@@ -42,8 +42,19 @@ export default function RepPage() {
       const { data: repData } = await supabase.from("reps").select("id, name, monthly_target_sqm").eq("auth_user_id", user.id).single();
       setRep(repData);
       if (repData) {
-        const { data: custData } = await supabase.from("customers").select("company_name, company_type, contact1_name, contact1_phone, region").eq("primary_rep_id", repData.id);
-        setCustomers(custData ?? []);
+        const { data: crData } = await supabase
+  .from("company_reps")
+  .select("companies(company_name, company_type, region)")
+  .eq("rep_id", repData.id);
+
+const custData = (crData ?? [])
+  .map((row: any) => {
+    const c = Array.isArray(row.companies) ? row.companies[0] : row.companies;
+    return c ? { company_name: c.company_name, company_type: c.company_type ?? "", contact1_name: "", contact1_phone: "", region: c.region ?? "" } : null;
+  })
+  .filter(Boolean) as { company_name: string; company_type: string; contact1_name: string; contact1_phone: string; region: string }[];
+
+setCustomers(custData);
         // fetch this month's sqm
         const monthStart = format(new Date(), "yyyy-MM-01");
         const { data: actData } = await supabase.from("activities").select("sqm_done").eq("rep_id", repData.id).gte("activity_date", monthStart);
