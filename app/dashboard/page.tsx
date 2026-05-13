@@ -3,6 +3,8 @@ import { format, subDays, startOfMonth } from "date-fns";
 
 async function getDashboardData(branchId?: string) {
   const supabase = createClient();
+    // Fire missing submission notifications for expired grace periods
+  await supabase.rpc('check_missing_submissions');
   const today      = new Date();
   const yesterday  = subDays(today, 1);
   const monthStart = startOfMonth(today);
