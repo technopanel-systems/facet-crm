@@ -37,6 +37,8 @@ export default function RepProjectsPage() {
   const [form, setForm]           = useState(emptyForm());
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState('');
+  const [lossModal, setLossModal]   = useState<{ pid: string; name: string } | null>(null);
+  const [lossReason, setLossReason] = useState('');
 
   useEffect(() => { load(); }, []);
 
@@ -92,9 +94,27 @@ export default function RepProjectsPage() {
   }
 
   async function updateStage(pid: string, stage: string) {
-    await supabase.from('projects').update({ stage, stage_changed_at: new Date().toISOString() }).eq('id', pid);
-    setProjects(projects.map(p => p.id === pid ? {...p, stage} : p));
+  if (stage === 'Lost') {
+    const project = projects.find(p => p.id === pid);
+    setLossReason('');
+    setLossModal({ pid, name: project?.project_name ?? project?.project_code ?? pid });
+    return;
   }
+  await supabase.from('projects').update({ stage, stage_changed_at: new Date().toISOString() }).eq('id', pid);
+  setProjects(projects.map(p => p.id === pid ? {...p, stage} : p));
+}
+
+async function confirmLost() {
+  if (!lossModal || !lossReason) return;
+  await supabase.from('projects').update({
+    stage: 'Lost',
+    stage_changed_at: new Date().toISOString(),
+    loss_reason: lossReason,
+  }).eq('id', lossModal.pid);
+  setProjects(projects.map(p => p.id === lossModal.pid ? {...p, stage: 'Lost'} : p));
+  setLossModal(null);
+  setLossReason('');
+}
 
   async function updateFollowUp(pid: string, date: string) {
     await supabase.from('projects').update({ next_follow_up: date || null }).eq('id', pid);
@@ -184,7 +204,44 @@ export default function RepProjectsPage() {
           })}
         </div>
       )}
-
+{/* Loss Reason Modal */}
+      {lossModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="px-6 py-5 border-b border-gray-100">
+              <h2 className="font-semibold text-gray-900">Mark Project as Lost</h2>
+              <p className="text-sm text-gray-500 mt-1">"{lossModal.name}"</p>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              <label className="label">Reason for Loss *</label>
+              <select
+                className="input"
+                value={lossReason}
+                onChange={e => setLossReason(e.target.value)}
+              >
+                <option value="">Select a reason…</option>
+                <option value="Price">Price — too expensive</option>
+                <option value="Competitor">Competitor — chose another supplier</option>
+                <option value="Timeline">Timeline — project delayed or cancelled</option>
+                <option value="No Budget">No Budget — budget was cut</option>
+                <option value="Specification Mismatch">Specification Mismatch — product didn't fit</option>
+                <option value="No Response">No Response — client went silent</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50/50">
+              <button onClick={() => setLossModal(null)} className="btn-secondary">Cancel</button>
+              <button
+                onClick={confirmLost}
+                disabled={!lossReason}
+                className="btn-primary bg-red-600 hover:bg-red-700"
+              >
+                Confirm Lost
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Add Project Modal */}
       {showAdd && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
