@@ -9,16 +9,19 @@ async function getDashboardData(branchId?: string) {
   const yesterday  = subDays(today, 1);
   const monthStart = startOfMonth(today);
 
+  const yesterdayStr = format(yesterday,"yyyy-MM-dd");
+
   const [
     repsRes, activitiesYesterdayRes, activitiesMonthRes,
     projectsRes, staleRes, pipelineRes, quotationsRes, branchesRes,
+    holidaysRes, absencesRes,
   ] = await Promise.all([
     branchId
       ? supabase.from("reps").select("*").eq("status","active").eq("branch_id", branchId).order("name")
       : supabase.from("reps").select("*").eq("status","active").order("name"),
     supabase.from("activities")
       .select("rep_name,submission_status,sqm_done")
-      .eq("activity_date", format(yesterday,"yyyy-MM-dd")),
+      .eq("activity_date", yesterdayStr),
     supabase.from("activities")
       .select("rep_name,sqm_done,sqm_expected,interaction_type")
       .gte("activity_date", format(monthStart,"yyyy-MM-dd")),
@@ -27,19 +30,26 @@ async function getDashboardData(branchId?: string) {
     supabase.from("pipeline_summary").select("*"),
     supabase.from("quotations").select("status,sqm_quoted,sqm_invoiced"),
     supabase.from("branches").select("id,name").eq("is_active", true).order("name"),
+    supabase.from("company_holidays").select("date_from,date_to")
+      .lte("date_from", yesterdayStr).gte("date_to", yesterdayStr),
+    supabase.from("rep_absences").select("rep_id,date_from,date_to")
+      .lte("date_from", yesterdayStr).gte("date_to", yesterdayStr),
   ]);
 
   return {
-    reps:               repsRes.data ?? [],
+    reps:                repsRes.data ?? [],
     activitiesYesterday: activitiesYesterdayRes.data ?? [],
-    activitiesMonth:    activitiesMonthRes.data ?? [],
-    projects:           projectsRes.data ?? [],
-    staleProjects:      staleRes.data ?? [],
-    pipeline:           pipelineRes.data ?? [],
-    quotations:         quotationsRes.data ?? [],
-    branches:           branchesRes.data ?? [],
-    yesterday:          format(yesterday,"dd MMM yyyy"),
-    month:              format(today,"MMMM yyyy"),
+    activitiesMonth:     activitiesMonthRes.data ?? [],
+    projects:            projectsRes.data ?? [],
+    staleProjects:       staleRes.data ?? [],
+    pipeline:            pipelineRes.data ?? [],
+    quotations:          quotationsRes.data ?? [],
+    branches:            branchesRes.data ?? [],
+    holidays:            holidaysRes.data ?? [],
+    absences:            absencesRes.data ?? [],
+    yesterday:           format(yesterday,"dd MMM yyyy"),
+    yesterdayStr,
+    month:               format(today,"MMMM yyyy"),
   };
 }
 
