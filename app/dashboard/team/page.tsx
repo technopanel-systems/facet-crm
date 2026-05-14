@@ -27,7 +27,6 @@ type Absence = {
   date_to: string;
   notes: string | null;
   created_at: string;
-  reps: { name: string } | null;
 };
 
 const ABSENCE_TYPES: Record<string, string> = {
@@ -94,13 +93,13 @@ export default function TeamPage() {
         .order("status", { ascending: false }).order("name"),
       supabase.from("company_holidays").select("*")
         .order("date_from", { ascending: false }),
-      supabase.from("rep_absences").select("*, reps(name)")
-        .order("date_from", { ascending: false }),
+      supabase.from("rep_absences").select("*")
+  .order("date_from", { ascending: false }),
     ]);
 
     if (repsRes.data)     setReps(repsRes.data);
     if (holidaysRes.data) setHolidays(holidaysRes.data);
-    if (absencesRes.data) setAbsences(absencesRes.data as unknown as Absence[]);
+    if (absencesRes.data) setAbsences(absencesRes.data as Absence[]);
 
     setLoading(false);
   }
@@ -363,7 +362,7 @@ export default function TeamPage() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {absences.map(a => {
-                  const repName = Array.isArray(a.reps) ? a.reps[0]?.name : a.reps?.name;
+                  const repName = reps.find(r => r.id === a.rep_id)?.name ?? '—';
                   return (
                     <tr key={a.id} className="bg-white hover:bg-gray-50/60">
                       <td className="px-5 py-3 font-medium text-gray-900">{repName ?? "—"}</td>
