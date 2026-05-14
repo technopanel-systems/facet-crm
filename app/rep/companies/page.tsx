@@ -124,10 +124,9 @@ export default function RepCompaniesPage() {
               <div>
                 <div className="font-medium text-gray-900 group-hover:text-brand-blue transition-colors">{c.company_name}</div>
                 <div className="flex gap-4 mt-1 text-xs text-gray-500">
-                  <span>{c.customer_code}</span>
-                  {c.company_type && <span>{c.company_type}</span>}
-                  {c.region       && <span>📍 {c.region}</span>}
-                </div>
+  {c.company_type && <span>{c.company_type}</span>}
+  {c.region       && <span>📍 {c.region}</span>}
+</div>
               </div>
               <div className="flex items-center gap-3">
                 <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${c.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
