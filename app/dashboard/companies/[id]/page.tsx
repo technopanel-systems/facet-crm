@@ -153,7 +153,7 @@ export default function CompanyDetailPage() {
                 {company.status}
               </span>
             </div>
-            <div className="text-xs text-gray-400">{company.customer_code}</div>
+            <div className="text-xs text-gray-400">Ref: {company.customer_code}</div>
             <div className="flex flex-wrap gap-4 mt-3 text-sm text-gray-600">
               {company.company_type && <span>📁 {company.company_type}</span>}
               {company.region       && <span>📍 {company.region}</span>}
