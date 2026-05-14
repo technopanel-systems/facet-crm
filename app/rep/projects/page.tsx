@@ -177,8 +177,8 @@ async function confirmLost() {
                   <div>
                     <div className="font-medium text-gray-900">{p.project_name || '(No name)'}</div>
                     <div className="text-xs text-gray-400 mt-0.5">
-                      {p.project_code}{p.companies ? ` · ${p.companies.company_name}` : ''}
-                    </div>
+  {p.companies ? p.companies.company_name : ''}
+</div>
                     <div className="text-sm text-gray-600 mt-1">{(p.quoted_sqm ?? 0).toLocaleString()} SQM quoted</div>
                   </div>
                   <div className="flex flex-col items-end gap-2">
