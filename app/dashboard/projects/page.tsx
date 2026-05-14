@@ -181,9 +181,9 @@ async function confirmLost() {
                 return (
                   <tr key={p.id} className="hover:bg-gray-50/60 transition-colors">
                     <td className="px-5 py-3.5">
-                      <div className="font-medium text-gray-900">{p.project_name || '(No name)'}</div>
-                      <div className="text-xs text-gray-400">{p.project_code}{p.city ? ` · ${p.city}` : ''}</div>
-                    </td>
+  <div className="font-medium text-gray-900">{p.project_name || '(No name)'}</div>
+  {p.city && <div className="text-xs text-gray-400">{p.city}</div>}
+</td>
                     <td className="px-5 py-3.5">
                       {p.companies ? (
                         <Link href={`/dashboard/companies/${p.customer_id}`} className="text-brand-blue hover:underline text-sm">
