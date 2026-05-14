@@ -87,7 +87,7 @@ export default function RepCompanyDetailPage() {
           <h1 className="text-xl font-bold text-gray-900">{company.company_name}</h1>
           <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${company.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>{company.status}</span>
         </div>
-        <div className="text-xs text-gray-400 mb-3">{company.customer_code}</div>
+        <div className="text-xs text-gray-400 mb-3">Ref: {company.customer_code}</div>
         <div className="flex flex-wrap gap-4 text-sm text-gray-600">
           {company.company_type && <span>📁 {company.company_type}</span>}
           {company.region       && <span>📍 {company.region}</span>}
