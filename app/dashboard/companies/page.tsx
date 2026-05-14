@@ -19,7 +19,6 @@ type Company = {
   company_type: string | null; region: string | null;
   status: string; source: string | null; notes: string | null;
   created_at: string;
-  company_reps: { role: string; reps: any }[];
 };
 
 const emptyForm = () => ({
@@ -47,8 +46,8 @@ export default function ManagerCompaniesPage() {
     setLoading(true);
     const [compRes, repRes] = await Promise.all([
       supabase.from('companies')
-        .select('id, customer_code, company_name, company_type, region, status, source, notes, created_at, company_reps(role, reps(id, name))')
-        .order('company_name'),
+  .select('id, customer_code, company_name, company_type, region, status, source, notes, created_at')
+  .order('company_name'),
       supabase.from('reps')
         .select('id, name')
         .in('role', ['rep', 'marketing'])
@@ -171,17 +170,12 @@ export default function ManagerCompaniesPage() {
                 <th className="px-5 py-3">Company</th>
                 <th className="px-5 py-3">Type</th>
                 <th className="px-5 py-3">Region</th>
-                <th className="px-5 py-3">Assigned Rep(s)</th>
                 <th className="px-5 py-3">Status</th>
                 <th className="px-5 py-3">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map(c => {
-                const repNames = c.company_reps
-                  ?.map(cr => Array.isArray(cr.reps) ? cr.reps[0]?.name : cr.reps?.name)
-                  .filter(Boolean)
-                  .join(', ') || '—';
                 return (
                   <tr key={c.id} className="hover:bg-gray-50/60 transition-colors">
                     <td className="px-5 py-3.5">
@@ -190,7 +184,6 @@ export default function ManagerCompaniesPage() {
                     </td>
                     <td className="px-5 py-3.5 text-gray-600">{c.company_type || '—'}</td>
                     <td className="px-5 py-3.5 text-gray-600">{c.region || '—'}</td>
-                    <td className="px-5 py-3.5 text-gray-600 text-xs">{repNames}</td>
                     <td className="px-5 py-3.5">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLE[c.status] ?? 'bg-gray-100 text-gray-600'}`}>
                         {c.status}
