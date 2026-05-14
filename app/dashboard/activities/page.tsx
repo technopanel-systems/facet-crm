@@ -199,7 +199,6 @@ function exportCSV() {
                           {a.contact_person && <span>👤 {a.contact_person}</span>}
                           {a.region         && <span>📍 {a.region}</span>}
                           {a.company_type   && <span>📁 {a.company_type}</span>}
-                          {a.activity_code  && <span className="text-gray-400">{a.activity_code}</span>}
                         </div>
                         {a.notes && <p className="mt-2 text-sm text-gray-600 italic">"{a.notes}"</p>}
                       </td>
