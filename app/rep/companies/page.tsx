@@ -5,7 +5,6 @@ import Link from "next/link";
 
 const COMPANY_TYPES = ['Factory','Advertising','Real Estate','Owner','Consultant','Contractor','Station Management','Workshop','Other'];
 const REGIONS       = ['Central','West','East','North','South','Foreign'];
-const SOURCES       = ['Form','Marketing','Management','Referral','Direct','Exhibition'];
 
 type Company = {
   id: string; customer_code: string; company_name: string;
@@ -14,7 +13,8 @@ type Company = {
 };
 
 const emptyForm = () => ({
-  company_name: '', company_type: '', region: '', source: '', notes: '',
+  company_name: '', company_type: '', region: '',
+  source: '', source_detail: '', notes: '',
 });
 
 export default function RepCompaniesPage() {
@@ -56,18 +56,19 @@ export default function RepCompaniesPage() {
     setSaving(true);
 
     const { data: company, error: insertError } = await supabase
-      .from('companies')
-      .insert({
-        company_name:   form.company_name.trim(),
-        company_type:   form.company_type  || null,
-        region:         form.region        || null,
-        source:         form.source        || null,
-        notes:          form.notes         || null,
-        status:         'active',
-        primary_rep_id: repId,
-      })
-      .select()
-      .single();
+  .from('companies')
+  .insert({
+    company_name:   form.company_name.trim(),
+    company_type:   form.company_type  || null,
+    region:         form.region        || null,
+    source:         form.source        || null,
+    source_detail:  form.source_detail || null,
+    notes:          form.notes         || null,
+    status:         'active',
+    primary_rep_id: repId,
+  })
+  .select()
+  .single();
 
     if (insertError) { setError(insertError.message); setSaving(false); return; }
 
@@ -173,13 +174,50 @@ export default function RepCompaniesPage() {
                   </select>
                 </div>
               </div>
-              <div>
-                <label className="label">Source</label>
-                <select className="input" value={form.source} onChange={e => setForm({...form, source: e.target.value})}>
-                  <option value="">Select…</option>
-                  {SOURCES.map(s => <option key={s}>{s}</option>)}
-                </select>
-              </div>
+             <div>
+  <label className="label">Source</label>
+  <select className="input" value={form.source}
+    onChange={e => setForm({...form, source: e.target.value, source_detail: ''})}>
+    <option value="">Select…</option>
+    <option value="Field Visit">Field Visit</option>
+    <option value="Direct Contact">Direct Contact</option>
+    <option value="Referral">Referral</option>
+    <option value="Exhibition">Exhibition</option>
+    <option value="Other">Other</option>
+  </select>
+</div>
+
+{form.source === 'Direct Contact' && (
+  <div>
+    <label className="label">Contact Method</label>
+    <select className="input" value={form.source_detail}
+      onChange={e => setForm({...form, source_detail: e.target.value})}>
+      <option value="">Select…</option>
+      <option value="Call">Call</option>
+      <option value="Email">Email</option>
+      <option value="WhatsApp">WhatsApp</option>
+      <option value="Other">Other</option>
+    </select>
+  </div>
+)}
+
+{form.source === 'Direct Contact' && form.source_detail === 'Other' && (
+  <div>
+    <label className="label">Specify Contact Method</label>
+    <input className="input" value={form.source_detail === 'Other' ? '' : form.source_detail}
+      onChange={e => setForm({...form, source_detail: e.target.value})}
+      placeholder="Describe the contact method…" />
+  </div>
+)}
+
+{form.source === 'Other' && (
+  <div>
+    <label className="label">Please Specify</label>
+    <input className="input" value={form.source_detail}
+      onChange={e => setForm({...form, source_detail: e.target.value})}
+      placeholder="Describe how this lead was sourced…" />
+  </div>
+)}
               <div>
                 <label className="label">Notes</label>
                 <textarea className="input resize-none" rows={2} value={form.notes}
