@@ -294,9 +294,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
                   </div>
                   <div className="text-right flex-shrink-0">
                     <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{p.stage}</span>
-                    {p.next_follow_up && (
-                      <div className="text-xs text-red-500 mt-1">📅 {p.next_follow_up}</div>
-                    )}
                   </div>
                 </div>
               ))}
