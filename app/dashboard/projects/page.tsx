@@ -19,7 +19,7 @@ type Rep     = { id: string; name: string };
 type Project = {
   id: string; project_code: string; project_name: string | null;
   stage: string; quoted_sqm: number; won_sqm: number;
-  city: string | null; next_follow_up: string | null;
+  city: string | null; project_date: string | null;
   customer_id: string | null;
   companies: any;
   project_reps: { role: string; reps: { name: string } | null }[];
@@ -27,10 +27,9 @@ type Project = {
 
 const emptyForm = () => ({
   customer_id: '', project_name: '', city: '', stage: 'New Lead',
-  quoted_sqm: '', won_sqm: '', next_follow_up: '', notes: '',
+  quoted_sqm: '', won_sqm: '', project_date: new Date().toISOString().split('T')[0], notes: '',
   contact_id: '', assign_rep_id: '',
 });
-
 export default function ManagerProjectsPage() {
   const supabase = createClient();
   const [projects, setProjects]     = useState<Project[]>([]);
@@ -60,9 +59,9 @@ export default function ManagerProjectsPage() {
   async function load() {
     setLoading(true);
     const [projRes, compRes, repRes] = await Promise.all([
-      supabase.from('projects')
-        .select('id, project_code, project_name, stage, quoted_sqm, won_sqm, city, next_follow_up, customer_id, companies(company_name), project_reps(role, reps(name))')
-        .order('created_at', { ascending: false }),
+supabase.from('projects')
+  .select('id, project_code, project_name, stage, quoted_sqm, won_sqm, city, project_date, customer_id, companies(company_name), project_reps(role, reps(name))')
+  .order('created_at', { ascending: false }),
       supabase.from('companies').select('id, company_name').order('company_name'),
       supabase.from('reps').select('id, name').in('role',['rep','marketing']).eq('status','active').order('name'),
     ]);
@@ -78,16 +77,16 @@ export default function ManagerProjectsPage() {
     setSaving(true);
 
     const { error: err } = await supabase.rpc('create_project_with_rep', {
-      p_customer_id:    form.customer_id,
-      p_project_name:   form.project_name   || null,
-      p_city:           form.city           || null,
-      p_stage:          form.stage,
-      p_quoted_sqm:     parseFloat(form.quoted_sqm) || 0,
-      p_next_follow_up: form.next_follow_up || null,
-      p_notes:          form.notes          || null,
-      p_contact_id:     form.contact_id     || null,
-      p_rep_id:         form.assign_rep_id  || null,
-    });
+  p_customer_id:  form.customer_id,
+  p_project_name: form.project_name  || null,
+  p_city:         form.city          || null,
+  p_stage:        form.stage,
+  p_quoted_sqm:   parseFloat(form.quoted_sqm) || 0,
+  p_project_date: form.project_date  || null,
+  p_notes:        form.notes         || null,
+  p_contact_id:   form.contact_id    || null,
+  p_rep_id:       form.assign_rep_id || null,
+});
 
     if (err) { setError(err.message); setSaving(false); return; }
 
@@ -173,15 +172,13 @@ setLossNotes('');
                 <th className="px-5 py-3">Stage</th>
                 <th className="px-5 py-3">SQM</th>
                 <th className="px-5 py-3">Rep(s)</th>
-                <th className="px-5 py-3">Follow Up</th>
+                <th className="px-5 py-3">Project Date</th>
                 <th className="px-5 py-3">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map(p => {
                 const repNames = p.project_reps?.map(pr => pr.reps?.name).filter(Boolean).join(', ') || '—';
-                const followUp = p.next_follow_up;
-                const isOverdue = followUp && new Date(followUp) < new Date();
                 return (
                   <tr key={p.id} className="hover:bg-gray-50/60 transition-colors">
                     <td className="px-5 py-3.5">
@@ -209,11 +206,9 @@ setLossNotes('');
                       {p.won_sqm > 0 && <div className="text-green-700 font-medium text-xs">{p.won_sqm.toLocaleString()} won</div>}
                     </td>
                     <td className="px-5 py-3.5 text-xs text-gray-600">{repNames}</td>
-                    <td className="px-5 py-3.5 text-xs">
-                      {followUp
-                        ? <span className={isOverdue ? 'text-red-600 font-medium' : 'text-gray-600'}>{followUp}</span>
-                        : <span className="text-gray-300">—</span>}
-                    </td>
+                   <td className="px-5 py-3.5 text-xs text-gray-600">
+  {p.project_date ?? '—'}
+</td>
                     <td className="px-5 py-3.5">
                       <button onClick={() => handleDelete(p.id, p.project_name ?? p.project_code)}
                         className="text-red-400 hover:text-red-600 text-xs">Delete</button>
@@ -316,10 +311,10 @@ setLossNotes('');
                     {STAGES.map(s => <option key={s}>{s}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="label">Next Follow Up</label>
-                  <input type="date" className="input" value={form.next_follow_up} onChange={e => setForm({...form, next_follow_up: e.target.value})} />
-                </div>
+              <div>
+  <label className="label">Project Date</label>
+  <input type="date" className="input" value={form.project_date} onChange={e => setForm({...form, project_date: e.target.value})} />
+</div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
