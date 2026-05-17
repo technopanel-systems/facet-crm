@@ -5,7 +5,6 @@ import Link from "next/link";
 
 const COMPANY_TYPES = ['Factory','Advertising','Real Estate','Owner','Consultant','Contractor','Station Management','Workshop','Other'];
 const REGIONS      = ['Central','West','East','North','South','Foreign'];
-const SOURCES      = ['Form','Marketing','Management','Referral','Direct','Exhibition'];
 
 const STATUS_STYLE: Record<string, string> = {
   active:   'bg-green-100 text-green-800',
@@ -23,7 +22,7 @@ type Company = {
 
 const emptyForm = () => ({
   company_name: '', company_type: '', region: '',
-  source: '', notes: '', status: 'active', assign_rep_id: '',
+  source: '', source_detail: '', notes: '', status: 'active', assign_rep_id: '',
 });
 
 export default function ManagerCompaniesPage() {
@@ -65,18 +64,19 @@ export default function ManagerCompaniesPage() {
     setSaving(true);
 
     const { data: company, error: insertError } = await supabase
-      .from('companies')
-      .insert({
-        company_name:  form.company_name.trim(),
-        company_type:  form.company_type  || null,
-        region:        form.region        || null,
-        source:        form.source        || null,
-        notes:         form.notes         || null,
-        status:        form.status,
-        primary_rep_id: form.assign_rep_id || null,
-      })
-      .select()
-      .single();
+  .from('companies')
+  .insert({
+    company_name:  form.company_name.trim(),
+    company_type:  form.company_type  || null,
+    region:        form.region        || null,
+    source:        form.source        || null,
+    source_detail: form.source_detail || null,
+    notes:         form.notes         || null,
+    status:        form.status,
+    primary_rep_id: form.assign_rep_id || null,
+  })
+  .select()
+  .single();
 
     if (insertError) { setError(insertError.message); setSaving(false); return; }
 
@@ -243,14 +243,60 @@ export default function ManagerCompaniesPage() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label">Source</label>
-                  <select className="input" value={form.source}
-                    onChange={e => setForm({...form, source: e.target.value})}>
-                    <option value="">Select…</option>
-                    {SOURCES.map(s => <option key={s}>{s}</option>)}
-                  </select>
-                </div>
+               <div>
+  <label className="label">Source</label>
+  <select className="input" value={form.source}
+    onChange={e => setForm({...form, source: e.target.value, source_detail: ''})}>
+    <option value="">Select…</option>
+    <option value="Field Visit">Field Visit</option>
+    <option value="Direct Contact">Direct Contact</option>
+    <option value="Referral">Referral</option>
+    <option value="Exhibition">Exhibition</option>
+    <option value="Marketing">Marketing</option>
+    <option value="Other">Other</option>
+  </select>
+</div>
+
+{form.source === 'Direct Contact' && (
+  <div>
+    <label className="label">Contact Method</label>
+    <select className="input" value={form.source_detail}
+      onChange={e => setForm({...form, source_detail: e.target.value})}>
+      <option value="">Select…</option>
+      <option value="Call">Call</option>
+      <option value="Email">Email</option>
+      <option value="WhatsApp">WhatsApp</option>
+      <option value="Other">Other</option>
+    </select>
+  </div>
+)}
+
+{form.source === 'Marketing' && (
+  <div>
+    <label className="label">Marketing Channel</label>
+    <select className="input" value={form.source_detail}
+      onChange={e => setForm({...form, source_detail: e.target.value})}>
+      <option value="">Select…</option>
+      <option value="Social Media">Social Media</option>
+      <option value="Website">Website</option>
+      <option value="Google">Google</option>
+      <option value="Email Marketing">Email Marketing</option>
+      <option value="Exhibition">Exhibition</option>
+      <option value="Other">Other</option>
+    </select>
+  </div>
+)}
+
+{(form.source === 'Other' ||
+  (form.source === 'Direct Contact' && form.source_detail === 'Other') ||
+  (form.source === 'Marketing' && form.source_detail === 'Other')) && (
+  <div>
+    <label className="label">Please Specify</label>
+    <input className="input" value={form.source_detail}
+      onChange={e => setForm({...form, source_detail: e.target.value})}
+      placeholder="Describe the source…" />
+  </div>
+)}
                 <div>
                   <label className="label">Status</label>
                   <select className="input" value={form.status}
