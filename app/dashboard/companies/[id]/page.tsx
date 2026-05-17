@@ -5,12 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 
 const COMPANY_TYPES = ['Factory','Advertising','Real Estate','Owner','Consultant','Contractor','Station Management','Workshop','Other'];
 const REGIONS       = ['Central','West','East','North','South','Foreign'];
-const SOURCES       = ['Form','Marketing','Management','Referral','Direct','Exhibition'];
 
 type Rep     = { id: string; name: string };
 type Contact = { id: string; contact_code: string; full_name: string; full_name_ar: string | null; title: string | null; phone: string | null; whatsapp: string | null; email: string | null; is_primary: boolean; notes: string | null };
 type Project = { id: string; project_code: string; project_name: string | null; stage: string; quoted_sqm: number; won_sqm: number; created_at: string };
-type Company = { id: string; customer_code: string; company_name: string; company_type: string | null; region: string | null; source: string | null; status: string; notes: string | null; primary_rep_id: string | null; created_at: string };
+type Company = { id: string; customer_code: string; company_name: string; company_type: string | null; region: string | null; source: string | null; source_detail: string | null; status: string; notes: string | null; primary_rep_id: string | null; created_at: string };
 type CompanyRep = { rep_id: string; role: string; reps: any };
 
 const STAGE_COLOR: Record<string, string> = {
@@ -74,14 +73,15 @@ export default function CompanyDetailPage() {
 
   async function saveCompany() {
     setSaving(true);
-    await supabase.from('companies').update({
-      company_name:  editForm.company_name,
-      company_type:  editForm.company_type  || null,
-      region:        editForm.region        || null,
-      source:        editForm.source        || null,
-      status:        editForm.status,
-      notes:         editForm.notes         || null,
-    }).eq('id', id);
+await supabase.from('companies').update({
+  company_name:  editForm.company_name,
+  company_type:  editForm.company_type  || null,
+  region:        editForm.region        || null,
+  source:        editForm.source        || null,
+  source_detail: editForm.source_detail || null,
+  status:        editForm.status,
+  notes:         editForm.notes         || null,
+}).eq('id', id);
     setEditing(false);
     setSaving(false);
     load();
@@ -292,12 +292,59 @@ export default function CompanyDetailPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="label">Source</label>
-                  <select className="input" value={editForm.source ?? ''} onChange={e => setEditForm({...editForm, source: e.target.value})}>
-                    <option value="">Select…</option>
-                    {SOURCES.map(s => <option key={s}>{s}</option>)}
-                  </select>
-                </div>
+  <label className="label">Source</label>
+  <select className="input" value={editForm.source ?? ''}
+    onChange={e => setEditForm({...editForm, source: e.target.value, source_detail: ''})}>
+    <option value="">Select…</option>
+    <option value="Field Visit">Field Visit</option>
+    <option value="Direct Contact">Direct Contact</option>
+    <option value="Referral">Referral</option>
+    <option value="Exhibition">Exhibition</option>
+    <option value="Marketing">Marketing</option>
+    <option value="Other">Other</option>
+  </select>
+</div>
+
+{editForm.source === 'Direct Contact' && (
+  <div>
+    <label className="label">Contact Method</label>
+    <select className="input" value={editForm.source_detail ?? ''}
+      onChange={e => setEditForm({...editForm, source_detail: e.target.value})}>
+      <option value="">Select…</option>
+      <option value="Call">Call</option>
+      <option value="Email">Email</option>
+      <option value="WhatsApp">WhatsApp</option>
+      <option value="Other">Other</option>
+    </select>
+  </div>
+)}
+
+{editForm.source === 'Marketing' && (
+  <div>
+    <label className="label">Marketing Channel</label>
+    <select className="input" value={editForm.source_detail ?? ''}
+      onChange={e => setEditForm({...editForm, source_detail: e.target.value})}>
+      <option value="">Select…</option>
+      <option value="Social Media">Social Media</option>
+      <option value="Website">Website</option>
+      <option value="Google">Google</option>
+      <option value="Email Marketing">Email Marketing</option>
+      <option value="Exhibition">Exhibition</option>
+      <option value="Other">Other</option>
+    </select>
+  </div>
+)}
+
+{(editForm.source === 'Other' ||
+  (editForm.source === 'Direct Contact' && editForm.source_detail === 'Other') ||
+  (editForm.source === 'Marketing' && editForm.source_detail === 'Other')) && (
+  <div>
+    <label className="label">Please Specify</label>
+    <input className="input" value={editForm.source_detail ?? ''}
+      onChange={e => setEditForm({...editForm, source_detail: e.target.value})}
+      placeholder="Describe the source…" />
+  </div>
+)}
                 <div>
                   <label className="label">Status</label>
                   <select className="input" value={editForm.status ?? 'active'} onChange={e => setEditForm({...editForm, status: e.target.value})}>
