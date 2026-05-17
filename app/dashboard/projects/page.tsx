@@ -45,7 +45,8 @@ export default function ManagerProjectsPage() {
   const [saving, setSaving]         = useState(false);
   const [error, setError]           = useState('');
   const [lossModal, setLossModal]   = useState<{ pid: string; name: string } | null>(null);
-  const [lossReason, setLossReason] = useState('');
+  const [lossReason, setLossReason] = useState(''); 
+  const [lossNotes, setLossNotes]   = useState('');
 
   useEffect(() => { load(); }, []);
 
@@ -106,7 +107,8 @@ export default function ManagerProjectsPage() {
   if (stage === 'Lost') {
     const project = projects.find(p => p.id === pid);
     setLossReason('');
-    setLossModal({ pid, name: project?.project_name ?? project?.project_code ?? pid });
+setLossNotes('');
+setLossModal({ pid, name: project?.project_name ?? project?.project_code ?? pid });
     return;
   }
   await supabase.from('projects').update({ stage, stage_changed_at: new Date().toISOString() }).eq('id', pid);
@@ -116,13 +118,15 @@ export default function ManagerProjectsPage() {
 async function confirmLost() {
   if (!lossModal || !lossReason) return;
   await supabase.from('projects').update({
-    stage: 'Lost',
-    stage_changed_at: new Date().toISOString(),
-    loss_reason: lossReason,
-  }).eq('id', lossModal.pid);
+  stage: 'Lost',
+  stage_changed_at: new Date().toISOString(),
+  loss_reason: lossReason,
+  loss_notes:  lossNotes || null,
+}).eq('id', lossModal.pid);
   setProjects(projects.map(p => p.id === lossModal.pid ? {...p, stage: 'Lost'} : p));
   setLossModal(null);
-  setLossReason('');
+setLossReason('');
+setLossNotes('');
 }
 
   const filtered = projects.filter(p => {
@@ -245,6 +249,16 @@ async function confirmLost() {
                 <option value="No Response">No Response — client went silent</option>
                 <option value="Other">Other</option>
               </select>
+           </div>
+            <div className="px-6 py-2 space-y-3">
+              <label className="label">Additional Notes (optional)</label>
+              <textarea
+                className="input resize-none"
+                rows={3}
+                placeholder="e.g. Competitor quoted 15% lower, client went with local supplier…"
+                value={lossNotes}
+                onChange={e => setLossNotes(e.target.value)}
+              />
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50/50">
               <button onClick={() => setLossModal(null)} className="btn-secondary">Cancel</button>
