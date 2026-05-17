@@ -15,14 +15,14 @@ type Company = { id: string; company_name: string };
 type Contact = { id: string; full_name: string };
 type Project = {
   id: string; project_code: string; project_name: string | null;
-  stage: string; quoted_sqm: number; next_follow_up: string | null;
+  stage: string; quoted_sqm: number; project_date: string | null;
   customer_id: string | null;
   companies: any;
 };
 
 const emptyForm = () => ({
   customer_id: '', project_name: '', city: '', stage: 'New Lead',
-  quoted_sqm: '', next_follow_up: '', notes: '', contact_id: '',
+  quoted_sqm: '', project_date: new Date().toISOString().split('T')[0], notes: '', contact_id: '',
 });
 
 export default function RepProjectsPage() {
@@ -59,8 +59,8 @@ const [lossNotes, setLossNotes]   = useState('');
 
     const [projRes, compRes] = await Promise.all([
       supabase.from('projects')
-        .select('id, project_code, project_name, stage, quoted_sqm, next_follow_up, customer_id, companies(company_name)')
-        .order('created_at', { ascending: false }),
+  .select('id, project_code, project_name, stage, quoted_sqm, project_date, customer_id, companies(company_name)')
+  .order('created_at', { ascending: false }),
       supabase.from('companies').select('id, company_name').order('company_name'),
     ]);
     setProjects((projRes.data ?? []) as unknown as Project[]);
@@ -75,17 +75,16 @@ const [lossNotes, setLossNotes]   = useState('');
     setSaving(true);
 
     const { error: err } = await supabase.rpc('create_project_with_rep', {
-      p_customer_id:    form.customer_id,
-      p_project_name:   form.project_name   || null,
-      p_city:           form.city           || null,
-      p_stage:          form.stage,
-      p_quoted_sqm:     parseFloat(form.quoted_sqm) || 0,
-      p_next_follow_up: form.next_follow_up  || null,
-      p_notes:          form.notes           || null,
-      p_contact_id:     form.contact_id      || null,
-      p_rep_id:         repId,
-    });
-
+  p_customer_id:  form.customer_id,
+  p_project_name: form.project_name || null,
+  p_city:         form.city         || null,
+  p_stage:        form.stage,
+  p_quoted_sqm:   parseFloat(form.quoted_sqm) || 0,
+  p_project_date: form.project_date || null,
+  p_notes:        form.notes        || null,
+  p_contact_id:   form.contact_id   || null,
+  p_rep_id:       repId,
+});
     if (err) { setError(err.message); setSaving(false); return; }
 
     setForm(emptyForm());
@@ -120,15 +119,9 @@ setLossReason('');
 setLossNotes('');
 }
 
-  async function updateFollowUp(pid: string, date: string) {
-    await supabase.from('projects').update({ next_follow_up: date || null }).eq('id', pid);
-    setProjects(projects.map(p => p.id === pid ? {...p, next_follow_up: date || null} : p));
-  }
-
   const filtered = projects.filter(p => !filterStage || p.stage === filterStage);
 
-  const today = new Date().toISOString().split('T')[0];
-  const followUpsToday = projects.filter(p => p.next_follow_up === today);
+const today = new Date().toISOString().split('T')[0];
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -142,20 +135,6 @@ setLossNotes('');
           Add Project
         </button>
       </div>
-
-      {/* Follow-ups due today */}
-      {followUpsToday.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
-          <div className="text-sm font-semibold text-amber-800 mb-2">📅 {followUpsToday.length} follow-up{followUpsToday.length > 1 ? 's' : ''} due today</div>
-          <div className="space-y-1">
-            {followUpsToday.map(p => (
-              <div key={p.id} className="text-sm text-amber-700">
-                • {p.project_name || p.project_code} — {p.companies?.company_name}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="flex gap-3">
         <select className="input w-48" value={filterStage} onChange={e => setFilterStage(e.target.value)}>
@@ -174,7 +153,6 @@ setLossNotes('');
       ) : (
         <div className="space-y-3">
           {filtered.map(p => {
-            const isOverdue = p.next_follow_up && p.next_follow_up < today;
             return (
               <div key={p.id} className="card px-5 py-4">
                 <div className="flex items-start justify-between gap-4">
@@ -195,14 +173,11 @@ setLossNotes('');
                     </select>
                   </div>
                 </div>
-                <div className="mt-3 flex items-center gap-3 border-t border-gray-100 pt-3">
-                  <label className="text-xs text-gray-500 whitespace-nowrap">Next follow-up:</label>
-                  <input type="date" className="input py-1 text-xs w-40"
-                    value={p.next_follow_up ?? ''}
-                    onChange={e => updateFollowUp(p.id, e.target.value)}
-                  />
-                  {isOverdue && <span className="text-xs text-red-600 font-medium">Overdue!</span>}
-                </div>
+                <div className="mt-3 border-t border-gray-100 pt-3">
+  <span className="text-xs text-gray-400">
+    Project Date: {p.project_date ?? 'Not set'}
+  </span>
+</div>
               </div>
             );
           })}
@@ -305,10 +280,10 @@ setLossNotes('');
                   <input type="number" className="input" value={form.quoted_sqm} onChange={e => setForm({...form, quoted_sqm: e.target.value})} placeholder="0" min="0" />
                 </div>
               </div>
-              <div>
-                <label className="label">Next Follow Up Date</label>
-                <input type="date" className="input" value={form.next_follow_up} onChange={e => setForm({...form, next_follow_up: e.target.value})} />
-              </div>
+             <div>
+  <label className="label">Project Date</label>
+  <input type="date" className="input" value={form.project_date} onChange={e => setForm({...form, project_date: e.target.value})} />
+</div>
               <div>
                 <label className="label">Notes</label>
                 <textarea className="input resize-none" rows={2} value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
