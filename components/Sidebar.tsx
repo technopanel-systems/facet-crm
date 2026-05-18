@@ -50,13 +50,14 @@ const marketingNav: NavItem[] = [
   { label: "History",       href: "/rep/history",      icon: <Icon d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /> },
 ];
 
-export type SidebarRole = "manager" | "rep" | "sales_coordinator" | "marketing";
+export type SidebarRole = "manager" | "rep" | "sales_coordinator" | "marketing" | "super_admin";
 
 const NAV_MAP: Record<SidebarRole, NavItem[]> = {
   manager: managerNav,
   rep: repNav,
   sales_coordinator: coordinatorNav,
   marketing: marketingNav,
+  super_admin: managerNav,
 };
 
 const ROLE_LABELS: Record<SidebarRole, string> = {
@@ -64,6 +65,7 @@ const ROLE_LABELS: Record<SidebarRole, string> = {
   rep: "Sales Rep",
   sales_coordinator: "Coordinator",
   marketing: "Marketing",
+  super_admin: "Super Admin",
 };
 
 interface SidebarProps {
@@ -133,17 +135,34 @@ return () => { supabase.removeChannel(channel); };
         </div>
       </div>
 
-      <div className="px-5 py-3 border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-brand-blue/30 flex items-center justify-center text-xs font-bold text-brand-blue flex-shrink-0">
-            {repName.charAt(0)}
-          </div>
-          <div className="overflow-hidden">
-            <div className="text-white text-xs font-medium truncate">{repName}</div>
-            <div className="text-gray-400 text-xs">{ROLE_LABELS[role]}</div>
-          </div>
-        </div>
-      </div>
+<div className="px-5 py-3 border-b border-white/10">
+  <div className="flex items-center gap-2">
+    <div className="w-7 h-7 rounded-full bg-brand-blue/30 flex items-center justify-center text-xs font-bold text-brand-blue flex-shrink-0">
+      {repName.charAt(0)}
+    </div>
+    <div className="overflow-hidden">
+      <div className="text-white text-xs font-medium truncate">{repName}</div>
+      <div className="text-gray-400 text-xs">{ROLE_LABELS[role]}</div>
+    </div>
+  </div>
+  {role === 'super_admin' && (
+    <div className="mt-2">
+      <select
+        className="w-full text-xs bg-white/10 text-gray-300 border border-white/20 rounded-lg px-2 py-1 outline-none cursor-pointer"
+        onChange={e => {
+          const path = e.target.value;
+          if (path) window.location.href = path;
+        }}
+        defaultValue=""
+      >
+        <option value="" disabled>View as role…</option>
+        <option value="/dashboard">Manager View</option>
+        <option value="/rep">Rep View</option>
+        <option value="/dashboard/quotations">Coordinator View</option>
+      </select>
+    </div>
+  )}
+</div>
 
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {nav.map(item => {
