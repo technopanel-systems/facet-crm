@@ -18,10 +18,10 @@ export default async function Home() {
   }
 
   // Ensure case-insensitivity and remove trailing spaces
-  const role = rep.role?.toLowerCase().trim();
-  if (role === "manager" || role === "sales_coordinator") {
-    redirect("/dashboard");
-  }
+const role = rep.role?.toLowerCase().trim();
+if (role === "manager" || role === "sales_coordinator" || role === "super_admin") {
+  redirect("/dashboard");
+}
   
   redirect("/rep");
 }
