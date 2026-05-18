@@ -231,16 +231,22 @@ export default function TeamPage() {
                     </select>
                   </td>
                   <td className="px-5 py-4">
-                    <select
-                      value={rep.role}
-                      onChange={(e) => updateRep(rep.id, "role", e.target.value)}
-                      className="input py-1.5 px-2 text-xs w-36"
-                    >
-                      <option value="rep">Sales Rep</option>
-                      <option value="sales_coordinator">Coordinator</option>
-                      <option value="marketing">Marketing</option>
-                      <option value="manager">Manager</option>
-                    </select>
+{rep.role === 'super_admin' ? (
+  <span className="text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-1 rounded-lg">
+    Super Admin
+  </span>
+) : (
+  <select
+    value={rep.role}
+    onChange={(e) => updateRep(rep.id, "role", e.target.value)}
+    className="input py-1.5 px-2 text-xs w-36"
+  >
+    <option value="rep">Sales Rep</option>
+    <option value="sales_coordinator">Coordinator</option>
+    <option value="marketing">Marketing</option>
+    <option value="manager">Manager</option>
+  </select>
+)}
                   </td>
                   <td className="px-5 py-4">
                     <input
