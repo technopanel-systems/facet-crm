@@ -15,8 +15,8 @@ export default async function RepLayout({ children }: { children: React.ReactNod
 
   if (rep?.status === "pending") redirect("/pending");
 
-  const role = rep?.role?.toLowerCase().trim();
-  if (role === "manager") redirect("/dashboard");
+const role = rep?.role?.toLowerCase().trim();
+if (role === "manager" || role === "super_admin") redirect("/dashboard");
 
   return (
     <div className="flex">
