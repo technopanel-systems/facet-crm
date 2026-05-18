@@ -15,10 +15,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (rep?.status === "pending") redirect("/pending");
 
-  const role = rep?.role?.toLowerCase().trim();
-  if (role !== "manager" && role !== "sales_coordinator") {
-    redirect("/rep");
-  }
+const role = rep?.role?.toLowerCase().trim();
+if (role !== "manager" && role !== "sales_coordinator" && role !== "super_admin") {
+  redirect("/rep");
+}
 
   return (
     <div className="flex">
