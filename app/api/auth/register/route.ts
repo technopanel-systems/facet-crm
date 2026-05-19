@@ -3,9 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
   try {
-    const { email, password, name } = await request.json();
+    const { email, password, name, role, monthly_target_sqm } = await request.json();
 
-    // 1. Strict Domain Validation
     if (!email.endsWith("@technopanel.com.sa")) {
       return NextResponse.json(
         { error: "Only @technopanel.com.sa email addresses are allowed." },
@@ -13,25 +12,23 @@ export async function POST(request: Request) {
       );
     }
 
-    const adminAuthClient = createAdminClient();
+    const adminClient = createAdminClient();
 
-    // 2. Create User in Supabase Auth (Auto-confirmed for now, waiting on Manager Approval)
-    const { data: authData, error: authError } = await adminAuthClient.auth.admin.createUser({
-      email: email,
-      password: password,
-      email_confirm: true, 
+    const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
     });
 
     if (authError) throw authError;
 
-    // 3. Insert into reps table as 'pending'
-    const { error: dbError } = await adminAuthClient.from("reps").insert({
-      auth_user_id: authData.user.id,
-      name: name,
-      email: email,
-      role: "rep",
-      status: "pending",
-      monthly_target_sqm: 0,
+    const { error: dbError } = await adminClient.from("reps").insert({
+      auth_user_id:       authData.user.id,
+      name,
+      email,
+      role:               role ?? "rep",
+      status:             "active",
+      monthly_target_sqm: monthly_target_sqm ?? 0,
     });
 
     if (dbError) throw dbError;
