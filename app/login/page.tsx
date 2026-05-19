@@ -110,10 +110,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <div className="text-center mt-6 space-y-4">
-          <p className="text-sm text-gray-500">
-            Need an account? <Link href="/register" className="text-brand-blue font-semibold hover:underline">Register here</Link>
-          </p>
+<div className="text-center mt-6">
           <p className="text-gray-600 text-xs">
             © 2026 Technopanel · FACET CRM v1.0
           </p>
