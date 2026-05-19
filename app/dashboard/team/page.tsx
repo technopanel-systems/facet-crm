@@ -71,8 +71,17 @@ export default function TeamPage() {
   const [savingAbsence, setSavingAbsence]   = useState(false);
   const [absenceError, setAbsenceError]     = useState("");
 
-  // Current manager id
+// Current manager id
   const [managerId, setManagerId] = useState<string>("");
+
+  // Create user state
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    name: '', email: '', password: '', role: 'rep', monthly_target_sqm: 0
+  });
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [createSuccess, setCreateSuccess] = useState('');
 
   useEffect(() => {
     loadAll();
@@ -102,6 +111,39 @@ export default function TeamPage() {
     if (absencesRes.data) setAbsences(absencesRes.data as Absence[]);
 
     setLoading(false);
+  }
+// ── Create User ─────────────────────────────────────────────
+
+  async function createUser() {
+    setCreateError('');
+    setCreateSuccess('');
+    if (!createForm.name.trim())  { setCreateError('Name is required.'); return; }
+    if (!createForm.email.trim()) { setCreateError('Email is required.'); return; }
+    if (!createForm.password || createForm.password.length < 6) {
+      setCreateError('Password must be at least 6 characters.'); return;
+    }
+    if (!createForm.email.endsWith('@technopanel.com.sa')) {
+      setCreateError('Email must end in @technopanel.com.sa'); return;
+    }
+
+    setCreatingUser(true);
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(createForm),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      setCreateError(data.error || 'Failed to create user.');
+      setCreatingUser(false);
+      return;
+    }
+
+    setCreateSuccess(`Account created for ${createForm.name}. They can now log in.`);
+    setCreateForm({ name: '', email: '', password: '', role: 'rep', monthly_target_sqm: 0 });
+    setCreatingUser(false);
+    loadAll();
   }
 
   // ── Team functions ──────────────────────────────────────────
@@ -190,11 +232,22 @@ export default function TeamPage() {
 
       {/* ── Section 1: Team Members ── */}
       <div className="space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Team Management</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Approve accounts, set roles, and assign monthly SQM targets.
-          </p>
+<div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Team Management</h1>
+            <p className="text-gray-500 text-sm mt-1">
+              Approve accounts, set roles, and assign monthly SQM targets.
+            </p>
+          </div>
+          <button
+            onClick={() => { setShowCreateUser(true); setCreateError(''); setCreateSuccess(''); }}
+            className="btn-primary flex items-center gap-2"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Create User
+          </button>
         </div>
 
         <div className="card overflow-hidden">
@@ -544,7 +597,75 @@ export default function TeamPage() {
           </div>
         </div>
       )}
-
+{/* ── Create User Modal ── */}
+      {showCreateUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="font-semibold text-gray-900">Create User Account</h2>
+              <button onClick={() => setShowCreateUser(false)} className="text-gray-400 hover:text-gray-600">×</button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              {createError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">
+                  {createError}
+                </div>
+              )}
+              {createSuccess && (
+                <div className="bg-green-50 border border-green-200 text-green-700 text-sm px-4 py-3 rounded-lg">
+                  {createSuccess}
+                </div>
+              )}
+              <div>
+                <label className="label">Full Name *</label>
+                <input className="input" value={createForm.name}
+                  onChange={e => setCreateForm({...createForm, name: e.target.value})}
+                  placeholder="Omar Ahmed" />
+              </div>
+              <div>
+                <label className="label">Company Email *</label>
+                <input className="input" type="email" value={createForm.email}
+                  onChange={e => setCreateForm({...createForm, email: e.target.value})}
+                  placeholder="name@technopanel.com.sa" />
+              </div>
+              <div>
+                <label className="label">Password *</label>
+                <input className="input" type="password" value={createForm.password}
+                  onChange={e => setCreateForm({...createForm, password: e.target.value})}
+                  placeholder="Minimum 6 characters" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Role</label>
+                  <select className="input" value={createForm.role}
+                    onChange={e => setCreateForm({...createForm, role: e.target.value})}>
+                    <option value="rep">Sales Rep</option>
+                    <option value="sales_coordinator">Coordinator</option>
+                    <option value="marketing">Marketing</option>
+                    <option value="manager">Manager</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Monthly Target (SQM)</label>
+                  <input className="input" type="number" min="0"
+                    value={createForm.monthly_target_sqm}
+                    onChange={e => setCreateForm({...createForm, monthly_target_sqm: Number(e.target.value)})}
+                    placeholder="0" />
+                </div>
+              </div>
+              <p className="text-xs text-gray-400">
+                Account is created immediately as active. Share the password with the user directly.
+              </p>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50/50">
+              <button onClick={() => setShowCreateUser(false)} className="btn-secondary">Cancel</button>
+              <button onClick={createUser} disabled={creatingUser} className="btn-primary">
+                {creatingUser ? 'Creating…' : 'Create Account'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
