@@ -38,8 +38,11 @@ export default function RepProjectsPage() {
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState('');
   const [lossModal, setLossModal]   = useState<{ pid: string; name: string } | null>(null);
+  const [historyModal, setHistoryModal] = useState<string | null>(null);
+  const [historyData, setHistoryData]   = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [lossReason, setLossReason] = useState('');
-const [lossNotes, setLossNotes]   = useState('');
+  const [lossNotes, setLossNotes]   = useState('');
 
   useEffect(() => { load(); }, []);
 
@@ -92,7 +95,17 @@ const [lossNotes, setLossNotes]   = useState('');
     setSaving(false);
     load();
   }
-
+async function loadHistory(pid: string) {
+  setHistoryModal(pid);
+  setHistoryLoading(true);
+  const { data } = await supabase
+    .from('project_history')
+    .select('id, field_name, old_value, new_value, changed_at, reps(name)')
+    .eq('project_id', pid)
+    .order('changed_at', { ascending: false });
+  setHistoryData(data ?? []);
+  setHistoryLoading(false);
+}
   async function updateStage(pid: string, stage: string) {
   if (stage === 'Lost') {
     const project = projects.find(p => p.id === pid);
@@ -173,16 +186,65 @@ const today = new Date().toISOString().split('T')[0];
                     </select>
                   </div>
                 </div>
-                <div className="mt-3 border-t border-gray-100 pt-3">
+<div className="mt-3 border-t border-gray-100 pt-3 flex items-center justify-between">
   <span className="text-xs text-gray-400">
     Project Date: {p.project_date ?? 'Not set'}
   </span>
+  <button
+    onClick={() => loadHistory(p.id)}
+    className="text-xs text-brand-blue hover:underline"
+  >
+    History
+  </button>
 </div>
               </div>
             );
           })}
         </div>
       )}
+      {/* History Modal */}
+{historyModal && (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col">
+      <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+        <h2 className="font-semibold text-gray-900">Project History</h2>
+        <button onClick={() => setHistoryModal(null)} className="text-gray-400 hover:text-gray-600">×</button>
+      </div>
+      <div className="px-6 py-5 overflow-y-auto flex-1">
+        {historyLoading ? (
+          <p className="text-sm text-gray-400">Loading…</p>
+        ) : historyData.length === 0 ? (
+          <p className="text-sm text-gray-400">No changes recorded yet.</p>
+        ) : (
+          <div className="space-y-4">
+            {historyData.map((h: any) => {
+              const repName = Array.isArray(h.reps) ? h.reps[0]?.name : h.reps?.name;
+              const fieldLabel: Record<string,string> = {
+                stage: 'Stage changed', quoted_sqm: 'SQM updated',
+                loss_reason: 'Loss reason', assigned_rep: 'Rep changed',
+              };
+              return (
+                <div key={h.id} className="border-l-2 border-brand-blue/20 pl-4">
+                  <div className="text-sm font-medium text-gray-900">
+                    {fieldLabel[h.field_name] ?? h.field_name}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {h.old_value && <span className="line-through text-gray-400 mr-2">{h.old_value}</span>}
+                    {h.new_value && <span className="font-medium text-gray-700">{h.new_value}</span>}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    {repName && <span>{repName} · </span>}
+                    {new Date(h.changed_at).toLocaleString()}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
 {/* Loss Reason Modal */}
       {lossModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
