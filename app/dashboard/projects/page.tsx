@@ -209,10 +209,14 @@ setLossNotes('');
                    <td className="px-5 py-3.5 text-xs text-gray-600">
   {p.project_date ?? '—'}
 </td>
-                    <td className="px-5 py-3.5">
-                      <button onClick={() => handleDelete(p.id, p.project_name ?? p.project_code)}
-                        className="text-red-400 hover:text-red-600 text-xs">Delete</button>
-                    </td>
+<td className="px-5 py-3.5">
+  <div className="flex items-center gap-3">
+    <Link href={`/dashboard/projects/${p.id}`}
+      className="text-brand-blue hover:underline text-xs font-medium">View</Link>
+    <button onClick={() => handleDelete(p.id, p.project_name ?? p.project_code)}
+      className="text-red-400 hover:text-red-600 text-xs">Delete</button>
+  </div>
+</td>
                   </tr>
                 );
               })}
