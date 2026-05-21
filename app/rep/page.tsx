@@ -181,32 +181,34 @@ export default function RepPage() {
     // Load projects and contacts in parallel if not already loaded
     const loaders: Promise<void>[] = [];
 
-    if (projectsMap[c.id] === undefined) {
+if (projectsMap[c.id] === undefined) {
       loaders.push(
-        supabase
-          .from("projects")
-          .select("id, project_name, project_code, stage")
-          .eq("customer_id", c.id)
-          .order("created_at", { ascending: false })
-          .then(({ data }) => {
-            const active = (data ?? []).filter(
-              p => !["Won", "Delivered", "Lost"].includes(p.stage)
-            );
-            setProjectsMap(m => ({ ...m, [c.id]: active }));
-          })
+        Promise.resolve(
+          supabase
+            .from("projects")
+            .select("id, project_name, project_code, stage")
+            .eq("customer_id", c.id)
+            .order("created_at", { ascending: false })
+        ).then(({ data }) => {
+          const active = (data ?? []).filter(
+            p => !["Won", "Delivered", "Lost"].includes(p.stage)
+          );
+          setProjectsMap(m => ({ ...m, [c.id]: active }));
+        })
       );
     }
 
     if (contactsMap[c.id] === undefined) {
       loaders.push(
-        supabase
-          .from("contacts")
-          .select("id, full_name, title, phone, whatsapp")
-          .eq("company_id", c.id)
-          .order("is_primary", { ascending: false })
-          .then(({ data }) => {
-            setContactsMap(m => ({ ...m, [c.id]: data ?? [] }));
-          })
+        Promise.resolve(
+          supabase
+            .from("contacts")
+            .select("id, full_name, title, phone, whatsapp")
+            .eq("company_id", c.id)
+            .order("is_primary", { ascending: false })
+        ).then(({ data }) => {
+          setContactsMap(m => ({ ...m, [c.id]: data ?? [] }));
+        })
       );
     }
 
