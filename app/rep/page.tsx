@@ -10,6 +10,14 @@ type Company = {
   region: string;
 };
 
+type Contact = {
+  id: string;
+  full_name: string;
+  title: string | null;
+  phone: string | null;
+  whatsapp: string | null;
+};
+
 type Project = {
   id: string;
   project_name: string | null;
@@ -22,13 +30,14 @@ type Row = {
   company_id: string;
   company_name: string;
   company_type: string;
+  region: string;
+  contact_id: string;
   contact_person: string;
   phone: string;
   interaction_type: string;
   project_id: string;
   project_name: string;
   notes: string;
-  region: string;
   sqm_done: string;
   sqm_expected: string;
 };
@@ -38,20 +47,20 @@ const emptyRow = (): Row => ({
   company_id: "",
   company_name: "",
   company_type: "",
+  region: "",
+  contact_id: "",
   contact_person: "",
   phone: "",
   interaction_type: "",
   project_id: "",
   project_name: "",
   notes: "",
-  region: "",
   sqm_done: "",
   sqm_expected: "",
 });
 
 const INTERACTIONS = ["Visit", "Call", "WhatsApp", "Email", "Meeting", "Site Visit"];
 const REGIONS      = ["Central", "West", "East", "North", "South", "Foreign"];
-const TYPES        = ["Factory","Advertising","Real Estate","Owner","Consultant","Contractor","Station Management","Workshop","Other"];
 
 function normalizeAr(s: string) {
   return s.toLowerCase()
@@ -67,16 +76,20 @@ export default function RepPage() {
   const [rep, setRep]             = useState<{ id: string; name: string; monthly_target_sqm: number } | null>(null);
   const [rows, setRows]           = useState<Row[]>([emptyRow()]);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [projectsMap, setProjectsMap] = useState<Record<string, Project[]>>({});
-  const [submitting, setSubmitting]   = useState(false);
-  const [submitted, setSubmitted]     = useState(false);
-  const [error, setError]             = useState("");
-  const [monthSqm, setMonthSqm]       = useState(0);
 
-  // Per-row search state (separate from the selected company_name)
+  // Per-company loaded data
+  const [projectsMap, setProjectsMap] = useState<Record<string, Project[]>>({});
+  const [contactsMap, setContactsMap] = useState<Record<string, Contact[]>>({});
+
+  // Dropdown state
   const [companySearch, setCompanySearch] = useState<string[]>([""]);
   const [dropdownOpen, setDropdownOpen]   = useState<number | null>(null);
   const dropdownRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted]   = useState(false);
+  const [error, setError]           = useState("");
+  const [monthSqm, setMonthSqm]     = useState(0);
 
   useEffect(() => {
     async function load() {
@@ -152,6 +165,9 @@ export default function RepPage() {
       company_name: c.company_name,
       company_type: c.company_type ?? "",
       region:       c.region ?? "",
+      contact_id:   "",
+      contact_person: "",
+      phone:        "",
       project_id:   "",
       project_name: "",
     };
@@ -162,17 +178,39 @@ export default function RepPage() {
     setCompanySearch(updatedSearch);
     setDropdownOpen(null);
 
-    // Load projects for this company
-    if (!projectsMap[c.id] && rep) {
-      const { data: projDirect } = await supabase
-        .from("projects")
-        .select("id, project_name, project_code, stage")
-        .eq("customer_id", c.id)
-        .not("stage", "in", '("Won","Delivered","Lost")')
-        .order("created_at", { ascending: false });
+    // Load projects and contacts in parallel if not already loaded
+    const loaders: Promise<void>[] = [];
 
-      setProjectsMap(m => ({ ...m, [c.id]: projDirect ?? [] }));
+    if (projectsMap[c.id] === undefined) {
+      loaders.push(
+        supabase
+          .from("projects")
+          .select("id, project_name, project_code, stage")
+          .eq("customer_id", c.id)
+          .order("created_at", { ascending: false })
+          .then(({ data }) => {
+            const active = (data ?? []).filter(
+              p => !["Won", "Delivered", "Lost"].includes(p.stage)
+            );
+            setProjectsMap(m => ({ ...m, [c.id]: active }));
+          })
+      );
     }
+
+    if (contactsMap[c.id] === undefined) {
+      loaders.push(
+        supabase
+          .from("contacts")
+          .select("id, full_name, title, phone, whatsapp")
+          .eq("company_id", c.id)
+          .order("is_primary", { ascending: false })
+          .then(({ data }) => {
+            setContactsMap(m => ({ ...m, [c.id]: data ?? [] }));
+          })
+      );
+    }
+
+    await Promise.all(loaders);
   }
 
   function clearCompany(idx: number) {
@@ -183,6 +221,9 @@ export default function RepPage() {
       company_name: "",
       company_type: "",
       region:       "",
+      contact_id:   "",
+      contact_person: "",
+      phone:        "",
       project_id:   "",
       project_name: "",
     };
@@ -198,6 +239,17 @@ export default function RepPage() {
     setRows(updated);
   }
 
+  function pickContact(idx: number, contact: Contact) {
+    const updated = [...rows];
+    updated[idx] = {
+      ...updated[idx],
+      contact_id:     contact.id,
+      contact_person: contact.full_name,
+      phone:          contact.phone ?? contact.whatsapp ?? "",
+    };
+    setRows(updated);
+  }
+
   function addRow() {
     setRows([...rows, emptyRow()]);
     setCompanySearch([...companySearch, ""]);
@@ -210,14 +262,12 @@ export default function RepPage() {
   }
 
   async function handleSubmit() {
-    // Validate: every row must have a selected company (company_id set)
-    const validRows = rows.filter(r => r.company_id && r.interaction_type);
     const unselected = rows.filter(r => r.company_name && !r.company_id);
-
     if (unselected.length > 0) {
-      setError("Please select a company from the dropdown for each row. Free text company names are not allowed.");
+      setError("Please select a company from the dropdown for each row.");
       return;
     }
+    const validRows = rows.filter(r => r.company_id && r.interaction_type);
     if (validRows.length === 0) {
       setError("Add at least one activity with a company and interaction type selected.");
       return;
@@ -226,31 +276,24 @@ export default function RepPage() {
     setSubmitting(true);
     setError("");
 
-    const inserts = validRows.map(r => {
-      let resolvedProjectName = r.project_name;
-      if (r.project_id && projectsMap[r.company_id]) {
-        const proj = projectsMap[r.company_id]?.find(p => p.id === r.project_id);
-        if (proj) resolvedProjectName = proj.project_name || proj.project_code;
-      }
-
-      return {
-        activity_date:    r.date,
-        rep_id:           rep.id,
-        rep_name:         rep.name,
-        company_id:       r.company_id,
-        company_name:     r.company_name,
-        company_type:     r.company_type || null,
-        contact_person:   r.contact_person || null,
-        phone:            r.phone || null,
-        interaction_type: r.interaction_type,
-        project_id:       r.project_id || null,
-        project_name:     resolvedProjectName || null,
-        notes:            r.notes || null,
-        region:           r.region || null,
-        sqm_done:         parseFloat(r.sqm_done)     || 0,
-        sqm_expected:     parseFloat(r.sqm_expected) || 0,
-      };
-    });
+    const inserts = validRows.map(r => ({
+      activity_date:    r.date,
+      rep_id:           rep.id,
+      rep_name:         rep.name,
+      company_id:       r.company_id,
+      company_name:     r.company_name,
+      company_type:     r.company_type || null,
+      contact_id:       r.contact_id   || null,
+      contact_person:   r.contact_person || null,
+      phone:            r.phone         || null,
+      interaction_type: r.interaction_type,
+      project_id:       r.project_id    || null,
+      project_name:     r.project_name  || null,
+      notes:            r.notes         || null,
+      region:           r.region        || null,
+      sqm_done:         parseFloat(r.sqm_done)     || 0,
+      sqm_expected:     parseFloat(r.sqm_expected) || 0,
+    }));
 
     const { error: err } = await supabase.from("activities").insert(inserts);
     if (err) { setError("Failed to submit: " + err.message); setSubmitting(false); return; }
@@ -267,7 +310,6 @@ export default function RepPage() {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Daily Report</h1>
@@ -306,7 +348,7 @@ export default function RepPage() {
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
             <h2 className="font-semibold text-gray-900">Today's Activities</h2>
-            <p className="text-xs text-gray-500 mt-0.5">One row per interaction. Company must be selected from your list.</p>
+            <p className="text-xs text-gray-500 mt-0.5">One row per interaction. Select company, contact, and project from your registered data.</p>
           </div>
           <button onClick={addRow} className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -318,17 +360,16 @@ export default function RepPage() {
 
         <div className="divide-y divide-gray-50">
           {rows.map((row, idx) => {
+            const search          = companySearch[idx] ?? "";
+            const filteredComp    = getFilteredCompanies(search);
+            const isOpen          = dropdownOpen === idx;
             const companyProjects = row.company_id ? (projectsMap[row.company_id] ?? null) : null;
-            const search = companySearch[idx] ?? "";
-            const filtered = getFilteredCompanies(search);
-            const isOpen = dropdownOpen === idx;
+            const companyContacts = row.company_id ? (contactsMap[row.company_id] ?? null) : null;
 
             return (
               <div key={idx} className="p-5 space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                    Activity #{idx + 1}
-                  </span>
+                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Activity #{idx + 1}</span>
                   {rows.length > 1 && (
                     <button onClick={() => removeRow(idx)} className="text-gray-300 hover:text-red-500 transition-colors">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -338,7 +379,7 @@ export default function RepPage() {
                   )}
                 </div>
 
-                {/* Row 1: date + company + type */}
+                {/* Row 1: date + company + interaction */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="label">Date *</label>
@@ -346,29 +387,21 @@ export default function RepPage() {
                       onChange={e => updateRow(idx, "date", e.target.value)} />
                   </div>
 
-                  {/* Company searchable dropdown */}
+                  {/* Searchable company dropdown */}
                   <div className="relative" ref={el => { dropdownRefs.current[idx] = el; }}>
                     <label className="label">Company * (must select)</label>
-
-                    {/* Selected state */}
                     {row.company_id ? (
-                      <div className="input flex items-center justify-between gap-2 cursor-default">
-                        <span className="text-gray-900 text-sm font-medium truncate">{row.company_name}</span>
-                        <button
-                          type="button"
-                          onClick={() => clearCompany(idx)}
-                          className="text-gray-400 hover:text-red-500 flex-shrink-0 transition-colors"
-                          title="Change company"
-                        >
+                      <div className="input flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium text-gray-900 truncate">{row.company_name}</span>
+                        <button type="button" onClick={() => clearCompany(idx)}
+                          className="text-gray-400 hover:text-red-500 flex-shrink-0 transition-colors" title="Change">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                           </svg>
                         </button>
                       </div>
                     ) : (
-                      /* Search input */
-                      <input
-                        className="input"
+                      <input className="input"
                         placeholder={companies.length === 0 ? "No companies assigned yet" : "Search your companies…"}
                         value={search}
                         disabled={companies.length === 0}
@@ -382,25 +415,20 @@ export default function RepPage() {
                         autoComplete="off"
                       />
                     )}
-
-                    {/* Dropdown list */}
                     {!row.company_id && isOpen && (
                       <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-xl z-50 mt-1 overflow-hidden max-h-60 overflow-y-auto">
-                        {filtered.length === 0 ? (
-                          <div className="px-4 py-3 text-sm text-gray-400">
-                            {search ? "No matches found." : "Start typing to search…"}
-                          </div>
+                        {filteredComp.length === 0 ? (
+                          <div className="px-4 py-3 text-sm text-gray-400">No matches found.</div>
                         ) : (
-                          filtered.map(c => (
-                            <button
-                              key={c.id}
-                              type="button"
+                          filteredComp.map(c => (
+                            <button key={c.id} type="button"
                               className="w-full text-left px-4 py-3 hover:bg-brand-light text-sm border-b border-gray-50 last:border-0 transition-colors"
-                              onMouseDown={e => { e.preventDefault(); pickCompany(idx, c); }}
-                            >
+                              onMouseDown={e => { e.preventDefault(); pickCompany(idx, c); }}>
                               <div className="font-medium text-gray-900">{c.company_name}</div>
-                              {c.company_type && (
-                                <div className="text-xs text-gray-400 mt-0.5">{c.company_type}{c.region ? ` · ${c.region}` : ""}</div>
+                              {(c.company_type || c.region) && (
+                                <div className="text-xs text-gray-400 mt-0.5">
+                                  {[c.company_type, c.region].filter(Boolean).join(" · ")}
+                                </div>
                               )}
                             </button>
                           ))
@@ -413,28 +441,6 @@ export default function RepPage() {
                   </div>
 
                   <div>
-                    <label className="label">Company Type</label>
-                    <select className="input" value={row.company_type}
-                      onChange={e => updateRow(idx, "company_type", e.target.value)}>
-                      <option value="">Select…</option>
-                      {TYPES.map(t => <option key={t}>{t}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Row 2: contact + phone + interaction */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="label">Contact Person</label>
-                    <input className="input" placeholder="Name" value={row.contact_person}
-                      onChange={e => updateRow(idx, "contact_person", e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="label">Phone</label>
-                    <input className="input" placeholder="05xxxxxxxx" value={row.phone}
-                      onChange={e => updateRow(idx, "phone", e.target.value)} />
-                  </div>
-                  <div>
                     <label className="label">Interaction *</label>
                     <select className="input" value={row.interaction_type}
                       onChange={e => updateRow(idx, "interaction_type", e.target.value)}>
@@ -444,22 +450,57 @@ export default function RepPage() {
                   </div>
                 </div>
 
-                {/* Row 3: project + region + SQM */}
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                {/* Row 2: contact + project + region */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+                  {/* Contact dropdown */}
+                  <div>
+                    <label className="label">Contact Person</label>
+                    {!row.company_id ? (
+                      <select className="input" disabled><option>Select company first</option></select>
+                    ) : companyContacts === null ? (
+                      <select className="input" disabled><option>Loading…</option></select>
+                    ) : companyContacts.length === 0 ? (
+                      <div>
+                        <select className="input" disabled><option>No contacts registered</option></select>
+                        <p className="text-xs text-gray-400 mt-1">Add contacts under My Companies → {row.company_name}</p>
+                      </div>
+                    ) : (
+                      <select className="input" value={row.contact_id}
+                        onChange={e => {
+                          const cid = e.target.value;
+                          if (!cid) {
+                            updateRow(idx, "contact_id", "");
+                            updateRow(idx, "contact_person", "");
+                            updateRow(idx, "phone", "");
+                            return;
+                          }
+                          const contact = companyContacts.find(c => c.id === cid);
+                          if (contact) pickContact(idx, contact);
+                        }}>
+                        <option value="">Select contact…</option>
+                        {companyContacts.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.full_name}{c.title ? ` — ${c.title}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {/* Show phone read-only when contact selected */}
+                    {row.phone && (
+                      <p className="text-xs text-gray-500 mt-1">📞 {row.phone}</p>
+                    )}
+                  </div>
+
+                  {/* Project dropdown */}
                   <div>
                     <label className="label">Project</label>
                     {!row.company_id ? (
-                      <select className="input" disabled>
-                        <option>Select company first</option>
-                      </select>
+                      <select className="input" disabled><option>Select company first</option></select>
                     ) : companyProjects === null ? (
-                      <select className="input" disabled>
-                        <option>Loading…</option>
-                      </select>
+                      <select className="input" disabled><option>Loading…</option></select>
                     ) : companyProjects.length === 0 ? (
-                      <select className="input" disabled>
-                        <option>No active projects</option>
-                      </select>
+                      <select className="input" disabled><option>No active projects</option></select>
                     ) : (
                       <select className="input" value={row.project_id}
                         onChange={e => {
@@ -468,15 +509,15 @@ export default function RepPage() {
                           updateRow(idx, "project_id", pid);
                           updateRow(idx, "project_name", proj ? (proj.project_name || proj.project_code) : "");
                         }}>
-                        <option value="">No project</option>
+                        <option value="">No specific project</option>
                         {companyProjects.map(p => (
-                          <option key={p.id} value={p.id}>
-                            {p.project_name || p.project_code}
-                          </option>
+                          <option key={p.id} value={p.id}>{p.project_name || p.project_code}</option>
                         ))}
                       </select>
                     )}
                   </div>
+
+                  {/* Region — pre-filled from company, editable */}
                   <div>
                     <label className="label">Region</label>
                     <select className="input" value={row.region}
@@ -485,6 +526,10 @@ export default function RepPage() {
                       {REGIONS.map(r => <option key={r}>{r}</option>)}
                     </select>
                   </div>
+                </div>
+
+                {/* Row 3: SQM */}
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="label">SQM Confirmed</label>
                     <input type="number" className="input" placeholder="0" min="0"
@@ -514,7 +559,7 @@ export default function RepPage() {
 
         <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
           <p className="text-xs text-gray-500">
-            {rows.length} row{rows.length !== 1 ? "s" : ""} · Company must be selected from your list
+            {rows.length} row{rows.length !== 1 ? "s" : ""} · All data must be selected from your registered records
           </p>
           <button onClick={handleSubmit} disabled={submitting} className="btn-primary flex items-center gap-2 px-6">
             {submitting ? (
