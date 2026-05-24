@@ -58,35 +58,22 @@ export default function ManagerCompaniesPage() {
     setLoading(false);
   }
 
-  async function handleAdd() {
+async function handleAdd() {
     setError('');
     if (!form.company_name.trim()) { setError('Company name is required.'); return; }
     setSaving(true);
 
-    const { data: company, error: insertError } = await supabase
-  .from('companies')
-  .insert({
-    company_name:  form.company_name.trim(),
-    company_type:  form.company_type  || null,
-    region:        form.region        || null,
-    source:        form.source        || null,
-    source_detail: form.source_detail || null,
-    notes:         form.notes         || null,
-    status:        form.status,
-    primary_rep_id: form.assign_rep_id || null,
-  })
-  .select()
-  .single();
+    const { data: companyId, error: rpcError } = await supabase.rpc('create_company_with_rep', {
+      p_company_name:  form.company_name.trim(),
+      p_company_type:  form.company_type  || '',
+      p_region:        form.region        || '',
+      p_source:        form.source        || '',
+      p_source_detail: form.source_detail || '',
+      p_notes:         form.notes         || '',
+      p_rep_id:        form.assign_rep_id || null,
+    });
 
-    if (insertError) { setError(insertError.message); setSaving(false); return; }
-
-    if (form.assign_rep_id && company) {
-      await supabase.from('company_reps').insert({
-        company_id:  company.id,
-        rep_id:      form.assign_rep_id,
-        role:        'primary',
-      });
-    }
+    if (rpcError) { setError(rpcError.message); setSaving(false); return; }
 
     setForm(emptyForm());
     setShowAdd(false);
