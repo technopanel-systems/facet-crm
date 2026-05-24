@@ -153,21 +153,9 @@ return () => { supabase.removeChannel(channel); };
       <div className="text-gray-400 text-xs">{ROLE_LABELS[role]}</div>
     </div>
   </div>
-  {role === 'super_admin' && (
-    <div className="mt-2">
-      <select
-        className="w-full text-xs bg-white/10 text-gray-300 border border-white/20 rounded-lg px-2 py-1 outline-none cursor-pointer"
-        onChange={e => {
-          const path = e.target.value;
-          if (path) window.location.href = path;
-        }}
-        defaultValue=""
-      >
-        <option value="" disabled>View as role…</option>
-        <option value="/dashboard">Manager View</option>
-        <option value="/rep">Rep View</option>
-        <option value="/dashboard/quotations">Coordinator View</option>
-      </select>
+{role === 'super_admin' && (
+    <div className="mt-2 px-1">
+      <span className="text-xs text-gray-500">Full system access</span>
     </div>
   )}
 </div>
