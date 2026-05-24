@@ -6,7 +6,7 @@ import { format, subMonths } from "date-fns";
 type Rep = { id: string; name: string; monthly_target_sqm: number };
 type Activity = { sqm_done: number; sqm_expected: number; interaction_type: string | null; submission_status: string | null; activity_date: string; company_name: string };
 type Project  = { stage: string; quoted_sqm: number; project_name: string | null; companies: any };
-type Quotation = { status: string; sqm_quoted: number; sqm_invoiced: number; product_type: string | null };
+type Quotation = { status: string; sqm_quoted: number; sqm_invoiced: number };
 
 const STAGE_COLOR: Record<string,string> = {
   "New Lead":"bg-gray-100 text-gray-700","Catalog Sent":"bg-blue-50 text-blue-700",
@@ -49,9 +49,17 @@ export default function RepStatsPage() {
     const nextMonth  = month === 12 ? `${year+1}-01-01` : `${year}-${String(month+1).padStart(2,"0")}-01`;
 
     const [actRes, projRes, quotRes] = await Promise.all([
-      supabase.from("activities").select("sqm_done,sqm_expected,interaction_type,submission_status,activity_date,company_name").eq("rep_id", repData.id).gte("activity_date", monthStart).lt("activity_date", nextMonth),
-      supabase.from("projects").select("stage,quoted_sqm,project_name,companies(company_name)").order("created_at", { ascending: false }),
-      supabase.from("quotations").select("status,sqm_quoted,sqm_invoiced,product_type").eq("rep_id", repData.id),
+      supabase.from("activities")
+        .select("sqm_done,sqm_expected,interaction_type,submission_status,activity_date,company_name")
+        .eq("rep_id", repData.id)
+        .gte("activity_date", monthStart)
+        .lt("activity_date", nextMonth),
+      supabase.from("projects")
+        .select("stage,quoted_sqm,project_name,companies(company_name)")
+        .order("created_at", { ascending: false }),
+      supabase.from("quotations")
+        .select("status,sqm_quoted,sqm_invoiced")
+        .or(`rep_id.eq.${repData.id},assigned_to_id.eq.${repData.id}`),
     ]);
 
     setActivities(actRes.data ?? []);
@@ -85,9 +93,6 @@ export default function RepStatsPage() {
 
   const quotStatusMap: Record<string,number> = {};
   quotations.forEach(q => { quotStatusMap[q.status]=(quotStatusMap[q.status]??0)+1; });
-
-  const productMap: Record<string,number> = {};
-  quotations.forEach(q => { if(q.product_type) productMap[q.product_type]=(productMap[q.product_type]??0)+1; });
 
   const companyMap: Record<string,number> = {};
   activities.forEach(a => { companyMap[a.company_name]=(companyMap[a.company_name]??0)+1; });
@@ -143,10 +148,10 @@ export default function RepStatsPage() {
         <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Quotations — All Time</div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label:"Total Quotes",   value:quotations.length,                   color:"text-gray-700" },
-            { label:"Won",            value:wonQ.length,                         color:"text-green-600" },
-            { label:"Win Rate",       value:`${winRate}%`,                       color:winRate>=50?"text-green-600":"text-amber-600" },
-            { label:"SQM Invoiced",   value:`${totalSqmInvoiced.toLocaleString()}`, color:"text-brand-blue" },
+            { label:"Total Quotes", value:quotations.length,                        color:"text-gray-700" },
+            { label:"Won",          value:wonQ.length,                              color:"text-green-600" },
+            { label:"Win Rate",     value:`${winRate}%`,                            color:winRate>=50?"text-green-600":"text-amber-600" },
+            { label:"SQM Invoiced", value:`${totalSqmInvoiced.toLocaleString()}`,   color:"text-brand-blue" },
           ].map(k => (
             <div key={k.label} className="card px-4 py-4 text-center">
               <div className="text-xs text-gray-500 mb-1">{k.label}</div>
@@ -199,21 +204,6 @@ export default function RepStatsPage() {
               {Object.entries(quotStatusMap).sort((a,b)=>b[1]-a[1]).map(([status,count]) => (
                 <div key={status} className="flex items-center justify-between">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${QUOT_STYLE[status]??"bg-gray-100 text-gray-600"}`}>{status}</span>
-                  <span className="text-sm font-semibold text-gray-700">{count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Product types */}
-        {Object.keys(productMap).length>0 && (
-          <div className="card p-5">
-            <div className="font-semibold text-gray-900 text-sm mb-4">Quoted Products</div>
-            <div className="space-y-2">
-              {Object.entries(productMap).sort((a,b)=>b[1]-a[1]).map(([product,count]) => (
-                <div key={product} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">{product}</span>
                   <span className="text-sm font-semibold text-gray-700">{count}</span>
                 </div>
               ))}
