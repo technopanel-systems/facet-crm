@@ -1,16 +1,16 @@
 "use client";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { format } from "date-fns";
 
 const INTERACTIONS = ["Visit","Call","WhatsApp","Email","Meeting","Site Visit"];
 
 type Activity = {
-  id: string; activity_code: string; activity_date: string;
-  rep_name: string; company_name: string; company_type: string | null;
+  id: string; activity_date: string;
+  rep_id: string | null; rep_name: string;
+  company_name: string; company_type: string | null;
   contact_person: string | null; interaction_type: string | null;
-  project_name: string | null; region: string | null;
-  sqm_done: number; sqm_expected: number;
+  project_id: string | null; project_name: string | null;
+  region: string | null; sqm_done: number; sqm_expected: number;
   submission_status: string | null; notes: string | null;
   submitted_at: string;
 };
@@ -42,7 +42,7 @@ export default function ManagerActivitiesPage() {
     setLoading(true);
     const [actRes, repRes] = await Promise.all([
       supabase.from("activities")
-        .select("id,activity_code,activity_date,rep_name,company_name,company_type,contact_person,interaction_type,project_name,region,sqm_done,sqm_expected,submission_status,notes,submitted_at")
+        .select("id,activity_date,rep_id,rep_name,company_name,company_type,contact_person,interaction_type,project_id,project_name,region,sqm_done,sqm_expected,submission_status,notes,submitted_at")
         .order("activity_date", { ascending: false })
         .order("submitted_at", { ascending: false })
         .limit(500),
@@ -57,7 +57,7 @@ export default function ManagerActivitiesPage() {
     const q = search.toLowerCase();
     return (
       (!search       || (a.company_name||"").toLowerCase().includes(q) || (a.project_name||"").toLowerCase().includes(q) || (a.rep_name||"").toLowerCase().includes(q)) &&
-      (!filterRep    || a.rep_name === filterRep) &&
+      (!filterRep    || a.rep_id === filterRep) &&
       (!filterType   || a.interaction_type === filterType) &&
       (!filterStatus || a.submission_status === filterStatus) &&
       (!dateFrom     || a.activity_date >= dateFrom) &&
@@ -74,7 +74,7 @@ export default function ManagerActivitiesPage() {
 
   const hasFilters = search || filterRep || filterType || filterStatus || dateFrom || dateTo;
 
-function exportCSV() {
+  function exportCSV() {
     const headers = ["Date","Rep","Company","Project","Type","Region","SQM Done","SQM Expected","Status"];
     const rows = filtered.map(a => [
       a.activity_date, a.rep_name, a.company_name, a.project_name ?? "",
@@ -113,7 +113,7 @@ function exportCSV() {
             value={search} onChange={e => setSearch(e.target.value)} />
           <select className="input w-44" value={filterRep} onChange={e => setFilterRep(e.target.value)}>
             <option value="">All Reps</option>
-            {reps.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+            {reps.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
           <select className="input w-44" value={filterType} onChange={e => setFilterType(e.target.value)}>
             <option value="">All Types</option>
@@ -154,6 +154,7 @@ function exportCSV() {
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Rep</th>
                 <th className="px-4 py-3">Company</th>
+                <th className="px-4 py-3">Project</th>
                 <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">SQM</th>
                 <th className="px-4 py-3">Status</th>
@@ -168,7 +169,17 @@ function exportCSV() {
                     <td className="px-4 py-3 font-medium text-gray-900">{a.rep_name}</td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900">{a.company_name}</div>
-                      {a.project_name && <div className="text-xs text-gray-400">{a.project_name}</div>}
+                      {a.company_type && <div className="text-xs text-gray-400">{a.company_type}</div>}
+                    </td>
+                    <td className="px-4 py-3">
+                      {a.project_id ? (
+                        <a href={`/dashboard/projects/${a.project_id}`}
+                          className="text-brand-blue hover:underline text-xs font-medium">
+                          {a.project_name || "View project"}
+                        </a>
+                      ) : (
+                        <span className="text-gray-300 text-xs">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-600">{a.interaction_type || "—"}</td>
                     <td className="px-4 py-3">
@@ -194,11 +205,10 @@ function exportCSV() {
                   </tr>
                   {expanded === a.id && (
                     <tr key={`${a.id}-exp`} className="bg-blue-50/30">
-                      <td colSpan={7} className="px-4 py-3">
+                      <td colSpan={8} className="px-4 py-3">
                         <div className="flex flex-wrap gap-6 text-sm text-gray-600">
                           {a.contact_person && <span>👤 {a.contact_person}</span>}
                           {a.region         && <span>📍 {a.region}</span>}
-                          {a.company_type   && <span>📁 {a.company_type}</span>}
                         </div>
                         {a.notes && <p className="mt-2 text-sm text-gray-600 italic">"{a.notes}"</p>}
                       </td>
