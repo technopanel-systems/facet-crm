@@ -109,9 +109,9 @@ export default function QuotationsPage() {
     }
 
     const [qRes, cRes, pRes, rRes] = await Promise.all([
-      supabase.from("quotations")
-        .select("*,companies(company_name),projects(project_code,project_name),reps(name)")
-        .order("created_at", { ascending: false }),
+supabase.from("quotations")
+  .select("*,companies(company_name),projects(project_code,project_name)")
+  .order("created_at", { ascending: false }),
       supabase.from("companies").select("id,company_name").order("company_name"),
       supabase.from("projects").select("id,project_code,project_name,customer_id").order("created_at", { ascending: false }),
       supabase.from("reps").select("id,name").eq("status", "active").order("name"),
@@ -347,7 +347,7 @@ export default function QuotationsPage() {
                 const compName = Array.isArray(q.companies) ? q.companies[0]?.company_name : q.companies?.company_name;
                 const projCode = Array.isArray(q.projects)  ? q.projects[0]?.project_code  : q.projects?.project_code;
                 const projName = Array.isArray(q.projects)  ? q.projects[0]?.project_name  : q.projects?.project_name;
-                const repName  = Array.isArray(q.reps)      ? q.reps[0]?.name              : q.reps?.name;
+                const repName = allReps.find(r => r.id === q.rep_id || r.id === q.assigned_to_id)?.name || "—";
                 const isExpiring = q.valid_until && new Date(q.valid_until) <= in7days && new Date(q.valid_until) >= today && q.status === "submitted";
 
                 return (
