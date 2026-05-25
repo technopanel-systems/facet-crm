@@ -133,9 +133,9 @@ export default function FollowupsPage() {
       {!loading && (
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: "Due Today",      value: todayCount,                        color: "text-amber-600" },
-            { label: "Overdue",        value: overdueCount,                      color: "text-red-600"   },
-            { label: "Total Projects", value: filtered.length,                   color: "text-gray-700"  },
+            { label: "Due Today",      value: todayCount,        color: "text-amber-600" },
+            { label: "Overdue",        value: overdueCount,      color: "text-red-600"   },
+            { label: "Total Projects", value: filtered.length,   color: "text-gray-700"  },
           ].map(c => (
             <div key={c.label} className="card px-5 py-4 text-center">
               <div className="text-xs text-gray-500 mb-1">{c.label}</div>
@@ -182,7 +182,7 @@ export default function FollowupsPage() {
                     <div key={p.id} className="px-5 py-4 flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          
+                          <a
                             href={`/dashboard/projects/${p.id}`}
                             className="font-medium text-gray-900 hover:text-brand-blue transition-colors"
                           >
@@ -203,7 +203,7 @@ export default function FollowupsPage() {
                           )}
                         </div>
                       </div>
-                      
+                      <a
                         href={`/dashboard/projects/${p.id}`}
                         className="btn-secondary text-xs px-3 py-1.5 flex-shrink-0"
                       >
