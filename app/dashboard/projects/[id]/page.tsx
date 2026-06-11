@@ -19,7 +19,8 @@ type Project = {
   loss_reason: string | null; loss_notes: string | null;
   notes: string | null;
   companies: any;
-  project_reps: { role: string; reps: any }[];
+  assigned_rep_id: string | null;
+  reps: { name: string } | null;
 };
 
 const STAGE_COLOR: Record<string, string> = {
@@ -55,8 +56,9 @@ export default function ProjectDetailPage() {
   async function load() {
     setLoading(true);
     const [projRes, histRes] = await Promise.all([
+      // FIXED: Removed the ambiguous project_reps relationship and used assigned_rep_id directly
       supabase.from('projects')
-        .select('id, project_code, project_name, stage, quoted_sqm, won_sqm, city, project_date, loss_reason, loss_notes, notes, companies(company_name), project_reps(role, reps(name))')
+        .select('id, project_code, project_name, stage, quoted_sqm, won_sqm, city, project_date, loss_reason, loss_notes, notes, companies(company_name), assigned_rep_id, reps(name)')
         .eq('id', id)
         .single(),
       supabase.from('project_history')
@@ -64,6 +66,11 @@ export default function ProjectDetailPage() {
         .eq('project_id', id)
         .order('changed_at', { ascending: false }),
     ]);
+
+    if (projRes.error) {
+      console.error("Error loading project:", projRes.error);
+    }
+
     setProject(projRes.data as unknown as Project);
     setHistory((histRes.data ?? []) as unknown as HistoryEntry[]);
     setLoading(false);
@@ -76,9 +83,10 @@ export default function ProjectDetailPage() {
     ? project.companies[0]?.company_name
     : project.companies?.company_name;
 
-  const repNames = project.project_reps
-    ?.map(pr => Array.isArray(pr.reps) ? pr.reps[0]?.name : pr.reps?.name)
-    .filter(Boolean).join(', ') || '—';
+  // FIXED: Accessing the name directly from the reps relationship
+  const repNames = Array.isArray(project.reps) 
+    ? project.reps[0]?.name 
+    : (project.reps?.name || '—');
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -121,7 +129,7 @@ export default function ProjectDetailPage() {
             </div>
           )}
           <div>
-            <div className="text-xs text-gray-400 mb-0.5">Assigned Rep(s)</div>
+            <div className="text-xs text-gray-400 mb-0.5">Assigned Rep</div>
             <div className="font-semibold text-gray-900">{repNames}</div>
           </div>
         </div>
