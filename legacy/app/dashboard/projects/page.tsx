@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 
 const STAGES  = ['New Lead','Catalog Sent','Quotation Sent','Under Review','Won','In Production','Delivered','Lost'];
-const REGIONS = ['Central','West','East','North','South','Foreign'];
 
 const STAGE_COLOR: Record<string, string> = {
   'New Lead': 'bg-gray-100 text-gray-700', 'Catalog Sent': 'bg-blue-50 text-blue-700',
@@ -21,8 +20,9 @@ type Project = {
   stage: string; quoted_sqm: number; won_sqm: number;
   city: string | null; project_date: string | null;
   customer_id: string | null;
-  companies: any;
-  project_reps: { role: string; reps: { name: string } | null }[];
+  assigned_rep_id: string | null;
+  companies: { company_name: string } | null;
+  reps: { name: string } | null;
 };
 
 const emptyForm = () => ({
@@ -30,22 +30,27 @@ const emptyForm = () => ({
   quoted_sqm: '', won_sqm: '', project_date: new Date().toISOString().split('T')[0], notes: '',
   contact_id: '', assign_rep_id: '',
 });
+
 export default function ManagerProjectsPage() {
   const supabase = createClient();
-  const [projects, setProjects]     = useState<Project[]>([]);
-  const [companies, setCompanies]   = useState<Company[]>([]);
-  const [reps, setReps]             = useState<Rep[]>([]);
-  const [contacts, setContacts]     = useState<Contact[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [search, setSearch]         = useState('');
+  const [projects, setProjects]       = useState<Project[]>([]);
+  const [companies, setCompanies]     = useState<Company[]>([]);
+  const [reps, setReps]               = useState<Rep[]>([]);
+  const [contacts, setContacts]       = useState<Contact[]>([]);
+  const [loading, setLoading]         = useState(true);
+  
+  const [search, setSearch]           = useState('');
   const [filterStage, setFilterStage] = useState('');
-  const [showAdd, setShowAdd]       = useState(false);
-  const [form, setForm]             = useState(emptyForm());
-  const [saving, setSaving]         = useState(false);
-  const [error, setError]           = useState('');
-  const [lossModal, setLossModal]   = useState<{ pid: string; name: string } | null>(null);
-  const [lossReason, setLossReason] = useState(''); 
-  const [lossNotes, setLossNotes]   = useState('');
+  const [filterRep, setFilterRep]     = useState(''); // Added Filter for Managers
+  
+  const [showAdd, setShowAdd]         = useState(false);
+  const [form, setForm]               = useState(emptyForm());
+  const [saving, setSaving]           = useState(false);
+  const [error, setError]             = useState('');
+  
+  const [lossModal, setLossModal]     = useState<{ pid: string; name: string } | null>(null);
+  const [lossReason, setLossReason]   = useState(''); 
+  const [lossNotes, setLossNotes]     = useState('');
 
   useEffect(() => { load(); }, []);
 
@@ -59,12 +64,18 @@ export default function ManagerProjectsPage() {
   async function load() {
     setLoading(true);
     const [projRes, compRes, repRes] = await Promise.all([
-supabase.from('projects')
-  .select('id, project_code, project_name, stage, quoted_sqm, won_sqm, city, project_date, customer_id, companies(company_name), project_reps(role, reps(name))')
-  .order('created_at', { ascending: false }),
+      // FIXED: Switched to unambiguous direct relationship "assigned_rep_id, reps(name)"
+      supabase.from('projects')
+        .select('id, project_code, project_name, stage, quoted_sqm, won_sqm, city, project_date, customer_id, assigned_rep_id, companies(company_name), reps(name)')
+        .order('created_at', { ascending: false }),
       supabase.from('companies').select('id, company_name').order('company_name'),
       supabase.from('reps').select('id, name').in('role',['rep','marketing']).eq('status','active').order('name'),
     ]);
+
+    if (projRes.error) {
+      console.error("Projects load error:", projRes.error);
+    }
+
     setProjects((projRes.data ?? []) as unknown as Project[]);
     setCompanies(compRes.data ?? []);
     setReps(repRes.data ?? []);
@@ -77,16 +88,16 @@ supabase.from('projects')
     setSaving(true);
 
     const { error: err } = await supabase.rpc('create_project_with_rep', {
-  p_customer_id:  form.customer_id,
-  p_project_name: form.project_name  || null,
-  p_city:         form.city          || null,
-  p_stage:        form.stage,
-  p_quoted_sqm:   parseFloat(form.quoted_sqm) || 0,
-  p_project_date: form.project_date  || null,
-  p_notes:        form.notes         || null,
-  p_contact_id:   form.contact_id    || null,
-  p_rep_id:       form.assign_rep_id || null,
-});
+      p_customer_id:  form.customer_id,
+      p_project_name: form.project_name  || null,
+      p_city:         form.city          || null,
+      p_stage:        form.stage,
+      p_quoted_sqm:   parseFloat(form.quoted_sqm) || 0,
+      p_project_date: form.project_date  || null,
+      p_notes:        form.notes         || null,
+      p_contact_id:   form.contact_id    || null,
+      p_rep_id:       form.assign_rep_id || null,
+    });
 
     if (err) { setError(err.message); setSaving(false); return; }
 
@@ -103,43 +114,50 @@ supabase.from('projects')
   }
 
   async function updateStage(pid: string, stage: string) {
-  if (stage === 'Lost') {
-    const project = projects.find(p => p.id === pid);
-    setLossReason('');
-setLossNotes('');
-setLossModal({ pid, name: project?.project_name ?? project?.project_code ?? pid });
-    return;
+    if (stage === 'Lost') {
+      const project = projects.find(p => p.id === pid);
+      setLossReason('');
+      setLossNotes('');
+      setLossModal({ pid, name: project?.project_name ?? project?.project_code ?? pid });
+      return;
+    }
+    await supabase.from('projects').update({ stage, stage_changed_at: new Date().toISOString() }).eq('id', pid);
+    setProjects(projects.map(p => p.id === pid ? {...p, stage} : p));
   }
-  await supabase.from('projects').update({ stage, stage_changed_at: new Date().toISOString() }).eq('id', pid);
-  setProjects(projects.map(p => p.id === pid ? {...p, stage} : p));
-}
 
-async function confirmLost() {
-  if (!lossModal || !lossReason) return;
-  await supabase.from('projects').update({
-  stage: 'Lost',
-  stage_changed_at: new Date().toISOString(),
-  loss_reason: lossReason,
-  loss_notes:  lossNotes || null,
-}).eq('id', lossModal.pid);
-  setProjects(projects.map(p => p.id === lossModal.pid ? {...p, stage: 'Lost'} : p));
-  setLossModal(null);
-setLossReason('');
-setLossNotes('');
-}
+  async function confirmLost() {
+    if (!lossModal || !lossReason) return;
+    await supabase.from('projects').update({
+      stage: 'Lost',
+      stage_changed_at: new Date().toISOString(),
+      loss_reason: lossReason,
+      loss_notes:  lossNotes || null,
+    }).eq('id', lossModal.pid);
+    setProjects(projects.map(p => p.id === lossModal.pid ? {...p, stage: 'Lost'} : p));
+    setLossModal(null);
+    setLossReason('');
+    setLossNotes('');
+  }
 
   const filtered = projects.filter(p => {
     const q = search.toLowerCase();
-    return (!search || (p.project_name ?? '').toLowerCase().includes(q) || (p.project_code ?? '').toLowerCase().includes(q) || (p.companies?.company_name ?? '').toLowerCase().includes(q))
-      && (!filterStage || p.stage === filterStage);
+    const matchesSearch = (!search || (p.project_name ?? '').toLowerCase().includes(q) || (p.project_code ?? '').toLowerCase().includes(q) || (p.companies?.company_name ?? '').toLowerCase().includes(q));
+    const matchesStage = (!filterStage || p.stage === filterStage);
+    const matchesRep = (!filterRep || p.assigned_rep_id === filterRep);
+    return matchesSearch && matchesStage && matchesRep;
   });
+
+  // Additional overview metrics for the manager
+  const totalFilteredSqm = filtered.reduce((sum, p) => sum + (Number(p.quoted_sqm) || 0), 0);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
-          <p className="text-gray-500 text-sm mt-1">{loading ? '—' : `${projects.length} total · ${filtered.length} shown`}</p>
+          <p className="text-gray-500 text-sm mt-1">
+            {loading ? '—' : `${projects.length} total · ${filtered.length} shown · ${totalFilteredSqm.toLocaleString()} SQM Quoted`}
+          </p>
         </div>
         <button onClick={() => { setShowAdd(true); setError(''); }} className="btn-primary flex items-center gap-2">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -153,14 +171,19 @@ setLossNotes('');
           <option value="">All Stages</option>
           {STAGES.map(s => <option key={s}>{s}</option>)}
         </select>
-        {(search || filterStage) && <button onClick={() => { setSearch(''); setFilterStage(''); }} className="btn-secondary text-sm px-3">Clear</button>}
+        {/* ADDED: Manager Rep Filter */}
+        <select className="input w-48" value={filterRep} onChange={e => setFilterRep(e.target.value)}>
+          <option value="">All Reps</option>
+          {reps.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+        </select>
+        {(search || filterStage || filterRep) && <button onClick={() => { setSearch(''); setFilterStage(''); setFilterRep(''); }} className="btn-secondary text-sm px-3">Clear</button>}
       </div>
 
       {loading ? (
         <div className="card p-10 text-center text-gray-400">Loading projects…</div>
       ) : filtered.length === 0 ? (
         <div className="card p-10 text-center text-gray-400">
-          {search || filterStage ? 'No projects match your filters.' : 'No projects yet. Add your first one above.'}
+          {search || filterStage || filterRep ? 'No projects match your filters.' : 'No projects yet. Add your first one above.'}
         </div>
       ) : (
         <div className="card overflow-hidden">
@@ -178,13 +201,13 @@ setLossNotes('');
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map(p => {
-                const repNames = p.project_reps?.map(pr => pr.reps?.name).filter(Boolean).join(', ') || '—';
+                const repName = p.reps?.name || '—';
                 return (
                   <tr key={p.id} className="hover:bg-gray-50/60 transition-colors">
                     <td className="px-5 py-3.5">
-  <div className="font-medium text-gray-900">{p.project_name || '(No name)'}</div>
-  {p.city && <div className="text-xs text-gray-400">{p.city}</div>}
-</td>
+                      <div className="font-medium text-gray-900">{p.project_name || '(No name)'}</div>
+                      {p.city && <div className="text-xs text-gray-400">{p.city}</div>}
+                    </td>
                     <td className="px-5 py-3.5">
                       {p.companies ? (
                         <Link href={`/dashboard/companies/${p.customer_id}`} className="text-brand-blue hover:underline text-sm">
@@ -205,18 +228,14 @@ setLossNotes('');
                       <div className="text-gray-600">{(p.quoted_sqm ?? 0).toLocaleString()}</div>
                       {p.won_sqm > 0 && <div className="text-green-700 font-medium text-xs">{p.won_sqm.toLocaleString()} won</div>}
                     </td>
-                    <td className="px-5 py-3.5 text-xs text-gray-600">{repNames}</td>
-                   <td className="px-5 py-3.5 text-xs text-gray-600">
-  {p.project_date ?? '—'}
-</td>
-<td className="px-5 py-3.5">
-  <div className="flex items-center gap-3">
-    <Link href={`/dashboard/projects/${p.id}`}
-      className="text-brand-blue hover:underline text-xs font-medium">View</Link>
-    <button onClick={() => handleDelete(p.id, p.project_name ?? p.project_code)}
-      className="text-red-400 hover:text-red-600 text-xs">Delete</button>
-  </div>
-</td>
+                    <td className="px-5 py-3.5 text-xs text-gray-600 font-medium">{repName}</td>
+                    <td className="px-5 py-3.5 text-xs text-gray-600">{p.project_date ?? '—'}</td>
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <Link href={`/dashboard/projects/${p.id}`} className="text-brand-blue hover:underline text-xs font-medium">View</Link>
+                        <button onClick={() => handleDelete(p.id, p.project_name ?? p.project_code)} className="text-red-400 hover:text-red-600 text-xs">Delete</button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -224,7 +243,8 @@ setLossNotes('');
           </table>
         </div>
       )}
-{/* Loss Reason Modal */}
+
+      {/* Loss Reason Modal */}
       {lossModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
@@ -234,11 +254,7 @@ setLossNotes('');
             </div>
             <div className="px-6 py-5 space-y-3">
               <label className="label">Reason for Loss *</label>
-              <select
-                className="input"
-                value={lossReason}
-                onChange={e => setLossReason(e.target.value)}
-              >
+              <select className="input" value={lossReason} onChange={e => setLossReason(e.target.value)}>
                 <option value="">Select a reason…</option>
                 <option value="Price">Price — too expensive</option>
                 <option value="Competitor">Competitor — chose another supplier</option>
@@ -251,27 +267,18 @@ setLossNotes('');
            </div>
             <div className="px-6 py-2 space-y-3">
               <label className="label">Additional Notes (optional)</label>
-              <textarea
-                className="input resize-none"
-                rows={3}
-                placeholder="e.g. Competitor quoted 15% lower, client went with local supplier…"
-                value={lossNotes}
-                onChange={e => setLossNotes(e.target.value)}
-              />
+              <textarea className="input resize-none" rows={3} placeholder="e.g. Competitor quoted 15% lower, client went with local supplier…" value={lossNotes} onChange={e => setLossNotes(e.target.value)} />
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50/50">
               <button onClick={() => setLossModal(null)} className="btn-secondary">Cancel</button>
-              <button
-                onClick={confirmLost}
-                disabled={!lossReason}
-                className="btn-primary bg-red-600 hover:bg-red-700"
-              >
+              <button onClick={confirmLost} disabled={!lossReason} className="btn-primary bg-red-600 hover:bg-red-700">
                 Confirm Lost
               </button>
             </div>
           </div>
         </div>
       )}
+
       {/* Add Project Modal */}
       {showAdd && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -315,10 +322,10 @@ setLossNotes('');
                     {STAGES.map(s => <option key={s}>{s}</option>)}
                   </select>
                 </div>
-              <div>
-  <label className="label">Project Date</label>
-  <input type="date" className="input" value={form.project_date} onChange={e => setForm({...form, project_date: e.target.value})} />
-</div>
+                <div>
+                  <label className="label">Project Date</label>
+                  <input type="date" className="input" value={form.project_date} onChange={e => setForm({...form, project_date: e.target.value})} />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
