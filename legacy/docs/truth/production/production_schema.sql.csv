@@ -1,0 +1,254 @@
+table_schema_ddl
+"CREATE TABLE public.activities (
+    id uuid NOT NULL,
+    activity_code text,
+    activity_date date NOT NULL,
+    month text,
+    rep_id uuid,
+    rep_name text NOT NULL,
+    company_name text NOT NULL,
+    company_type text,
+    contact_person text,
+    phone text,
+    interaction_type text,
+    project_name text,
+    notes text,
+    region text,
+    sqm_done numeric,
+    sqm_expected numeric,
+    submitted_at timestamp with time zone NOT NULL,
+    submission_status text,
+    created_at timestamp with time zone NOT NULL,
+    company_id uuid,
+    project_id uuid,
+    contact_id uuid
+);"
+"CREATE TABLE public.branches (
+    id uuid NOT NULL,
+    name text NOT NULL,
+    region text NOT NULL,
+    is_active boolean,
+    created_at timestamp with time zone
+);"
+"CREATE TABLE public.companies (
+    id uuid NOT NULL,
+    customer_code text,
+    company_name text NOT NULL,
+    company_name_normalized text,
+    company_type text,
+    contact1_name text,
+    contact1_phone text,
+    contact2_name text,
+    contact2_phone text,
+    region text,
+    source text,
+    primary_rep_id uuid,
+    status text NOT NULL,
+    notes text,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
+    branch_id uuid,
+    source_detail text
+);"
+"CREATE TABLE public.company_holidays (
+    id uuid NOT NULL,
+    holiday_name text NOT NULL,
+    date_from date NOT NULL,
+    date_to date NOT NULL,
+    created_by uuid,
+    created_at timestamp with time zone NOT NULL
+);"
+"CREATE TABLE public.company_reps (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    rep_id uuid NOT NULL,
+    role text NOT NULL,
+    assigned_by uuid,
+    assigned_at timestamp with time zone
+);"
+"CREATE TABLE public.contacts (
+    id uuid NOT NULL,
+    contact_code text,
+    company_id uuid NOT NULL,
+    full_name text NOT NULL,
+    full_name_ar text,
+    title text,
+    phone text,
+    whatsapp text,
+    email text,
+    is_primary boolean,
+    notes text,
+    created_by uuid,
+    created_at timestamp with time zone,
+    updated_at timestamp with time zone
+);"
+"CREATE TABLE public.duplicate_flags (
+    id uuid NOT NULL,
+    company_id_1 uuid,
+    company_id_2 uuid,
+    match_type text,
+    match_key text,
+    classification text NOT NULL,
+    resolved_at timestamp with time zone,
+    resolved_by uuid,
+    created_at timestamp with time zone NOT NULL
+);"
+"CREATE TABLE public.notifications (
+    id uuid NOT NULL,
+    recipient_id uuid NOT NULL,
+    type text NOT NULL,
+    title text NOT NULL,
+    body text,
+    entity_type text,
+    entity_id uuid,
+    is_read boolean,
+    created_at timestamp with time zone
+);"
+"CREATE TABLE public.pipeline_summary (
+    stage text,
+    project_count bigint,
+    total_sqm numeric
+);"
+"CREATE TABLE public.project_history (
+    id uuid NOT NULL,
+    project_id uuid NOT NULL,
+    changed_by uuid,
+    changed_at timestamp with time zone NOT NULL,
+    field_name text NOT NULL,
+    old_value text,
+    new_value text
+);"
+"CREATE TABLE public.project_reps (
+    id uuid NOT NULL,
+    project_id uuid NOT NULL,
+    rep_id uuid NOT NULL,
+    role text NOT NULL,
+    sqm_split numeric,
+    assigned_by uuid,
+    assigned_at timestamp with time zone
+);"
+"CREATE TABLE public.projects (
+    id uuid NOT NULL,
+    project_code text,
+    customer_id uuid,
+    company_name text NOT NULL,
+    project_name text,
+    city text,
+    stage text NOT NULL,
+    quoted_sqm numeric NOT NULL,
+    won_sqm numeric NOT NULL,
+    assigned_rep_id uuid,
+    quote_date date,
+    expected_close date,
+    notes text,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
+    contact_id uuid,
+    stage_changed_at timestamp with time zone,
+    next_follow_up date,
+    loss_reason text,
+    loss_notes text,
+    project_date date NOT NULL
+);"
+"CREATE TABLE public.quotation_items (
+    id uuid NOT NULL,
+    quotation_id uuid NOT NULL,
+    class text NOT NULL,
+    fr_rating text NOT NULL,
+    color_code text,
+    supplier_code text,
+    width_m numeric NOT NULL,
+    width_is_custom boolean,
+    length_m numeric NOT NULL,
+    num_sheets integer NOT NULL,
+    thickness_mm integer NOT NULL,
+    price_per_sqm numeric,
+    total_sqm numeric,
+    created_at timestamp with time zone NOT NULL
+);"
+"CREATE TABLE public.quotation_services (
+    id uuid NOT NULL,
+    quotation_id uuid NOT NULL,
+    service_type text NOT NULL,
+    price_per_sqm numeric,
+    created_at timestamp with time zone NOT NULL
+);"
+"CREATE TABLE public.quotations (
+    id uuid NOT NULL,
+    quotation_code text,
+    project_id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    rep_id uuid,
+    coordinator_id uuid,
+    product_type text,
+    finish text,
+    sqm_quoted numeric NOT NULL,
+    price_per_sqm numeric,
+    quote_date date NOT NULL,
+    valid_until date,
+    revision_number integer,
+    status text,
+    sqm_invoiced numeric,
+    sqm_delivered numeric,
+    notes text,
+    created_at timestamp with time zone,
+    updated_at timestamp with time zone,
+    last_revised_at timestamp with time zone,
+    erp_quotation_id text,
+    cancellation_reason text,
+    assigned_to_id uuid
+);"
+"CREATE TABLE public.rep_absences (
+    id uuid NOT NULL,
+    rep_id uuid NOT NULL,
+    absence_type text NOT NULL,
+    date_from date NOT NULL,
+    date_to date NOT NULL,
+    notes text,
+    created_by uuid,
+    created_at timestamp with time zone NOT NULL
+);"
+"CREATE TABLE public.rep_branch_summary (
+    branch_id uuid,
+    branch_name text,
+    region text,
+    rep_id uuid,
+    rep_name text,
+    monthly_target_sqm numeric,
+    sqm_done_month numeric,
+    activity_count_month bigint
+);"
+"CREATE TABLE public.rep_monthly_sqm (
+    rep_id uuid,
+    rep_name text,
+    target_sqm numeric,
+    month_start date,
+    month_label text,
+    achieved_sqm numeric,
+    pipeline_sqm numeric,
+    activity_count bigint
+);"
+"CREATE TABLE public.reps (
+    id uuid NOT NULL,
+    name text NOT NULL,
+    email text NOT NULL,
+    role text NOT NULL,
+    status text NOT NULL,
+    monthly_target_sqm numeric NOT NULL,
+    auth_user_id uuid,
+    created_at timestamp with time zone NOT NULL,
+    branch_id uuid,
+    language_pref text
+);"
+"CREATE TABLE public.stale_projects (
+    id uuid,
+    project_code text,
+    project_name text,
+    stage text,
+    customer_id uuid,
+    company_name text,
+    next_follow_up date,
+    stage_changed_at timestamp with time zone,
+    time_in_stage interval,
+    assigned_rep_name text
+);"

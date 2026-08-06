@@ -1,0 +1,59 @@
+table_name,view_definition
+pipeline_summary," SELECT stage,
+    count(*) AS project_count,
+    COALESCE(sum(quoted_sqm), (0)::numeric) AS total_sqm
+   FROM projects
+  GROUP BY stage
+  ORDER BY
+        CASE stage
+            WHEN 'New Lead'::text THEN 1
+            WHEN 'Catalog Sent'::text THEN 2
+            WHEN 'Quotation Sent'::text THEN 3
+            WHEN 'Under Review'::text THEN 4
+            WHEN 'Won'::text THEN 5
+            WHEN 'In Production'::text THEN 6
+            WHEN 'Delivered'::text THEN 7
+            WHEN 'Lost'::text THEN 8
+            ELSE 9
+        END;"
+rep_branch_summary," SELECT b.id AS branch_id,
+    b.name AS branch_name,
+    b.region,
+    r.id AS rep_id,
+    r.name AS rep_name,
+    r.monthly_target_sqm,
+    COALESCE(sum(a.sqm_done), (0)::numeric) AS sqm_done_month,
+    count(a.id) AS activity_count_month
+   FROM ((branches b
+     LEFT JOIN reps r ON (((r.branch_id = b.id) AND (r.status = 'active'::text) AND (r.role = ANY (ARRAY['rep'::text, 'marketing'::text])))))
+     LEFT JOIN activities a ON (((a.rep_id = r.id) AND (a.activity_date >= date_trunc('month'::text, (CURRENT_DATE)::timestamp with time zone)))))
+  WHERE (b.is_active = true)
+  GROUP BY b.id, b.name, b.region, r.id, r.name, r.monthly_target_sqm
+  ORDER BY b.name, r.name;"
+rep_monthly_sqm," SELECT r.id AS rep_id,
+    r.name AS rep_name,
+    r.monthly_target_sqm AS target_sqm,
+    (date_trunc('month'::text, (a.activity_date)::timestamp with time zone))::date AS month_start,
+    to_char((a.activity_date)::timestamp with time zone, 'Month YYYY'::text) AS month_label,
+    COALESCE(sum(a.sqm_done), (0)::numeric) AS achieved_sqm,
+    COALESCE(sum(a.sqm_expected), (0)::numeric) AS pipeline_sqm,
+    count(a.id) AS activity_count
+   FROM (reps r
+     LEFT JOIN activities a ON ((a.rep_id = r.id)))
+  WHERE (r.status = 'active'::text)
+  GROUP BY r.id, r.name, r.monthly_target_sqm, (date_trunc('month'::text, (a.activity_date)::timestamp with time zone)), (to_char((a.activity_date)::timestamp with time zone, 'Month YYYY'::text));"
+stale_projects," SELECT p.id,
+    p.project_code,
+    p.project_name,
+    p.stage,
+    p.customer_id,
+    c.company_name,
+    p.next_follow_up,
+    p.stage_changed_at,
+    (now() - p.stage_changed_at) AS time_in_stage,
+    r.name AS assigned_rep_name
+   FROM ((projects p
+     LEFT JOIN companies c ON ((c.id = p.customer_id)))
+     LEFT JOIN reps r ON ((r.id = p.assigned_rep_id)))
+  WHERE ((p.stage <> ALL (ARRAY['Won'::text, 'Delivered'::text, 'Lost'::text])) AND ((p.stage_changed_at < (now() - '14 days'::interval)) OR (p.stage_changed_at IS NULL)))
+  ORDER BY p.stage_changed_at NULLS FIRST;"

@@ -1,0 +1,65 @@
+schemaname,tablename,policyname,permissive,roles,cmd,qual,with_check
+public,activities,activities_rep_read,PERMISSIVE,{public},SELECT,((current_user_role() = 'rep'::text) AND (rep_id = current_rep_id())),null
+public,activities,activities_manager,PERMISSIVE,{public},ALL,"(current_user_role() = ANY (ARRAY['manager'::text, 'super_admin'::text]))",null
+public,activities,activities_rep_insert,PERMISSIVE,{public},INSERT,null,((current_user_role() = 'rep'::text) AND (rep_id = current_rep_id()))
+public,companies,companies_rep_update,PERMISSIVE,{public},UPDATE,"((current_user_role() = 'rep'::text) AND (EXISTS ( SELECT 1
+   FROM company_reps
+  WHERE ((company_reps.company_id = companies.id) AND (company_reps.rep_id = current_rep_id())))))",null
+public,companies,companies_manager,PERMISSIVE,{public},ALL,"(current_user_role() = ANY (ARRAY['manager'::text, 'sales_coordinator'::text, 'super_admin'::text]))",null
+public,companies,companies_coordinator_read,PERMISSIVE,{public},SELECT,(current_user_role() = 'sales_coordinator'::text),null
+public,companies,companies_rep_insert,PERMISSIVE,{public},INSERT,null,"(current_user_role() = ANY (ARRAY['rep'::text, 'marketing'::text, 'manager'::text, 'super_admin'::text]))"
+public,companies,companies_rep_read,PERMISSIVE,{public},SELECT,"((current_user_role() = ANY (ARRAY['rep'::text, 'marketing'::text])) AND (EXISTS ( SELECT 1
+   FROM company_reps
+  WHERE ((company_reps.company_id = companies.id) AND (company_reps.rep_id = current_rep_id())))))",null
+public,company_holidays,holidays_manager,PERMISSIVE,{public},ALL,"(current_user_role() = ANY (ARRAY['manager'::text, 'super_admin'::text]))",null
+public,company_holidays,holidays_read_all,PERMISSIVE,{public},SELECT,(auth.uid() IS NOT NULL),null
+public,company_reps,company_reps_rep_read,PERMISSIVE,{public},SELECT,(rep_id = current_rep_id()),null
+public,company_reps,company_reps_rep_insert,PERMISSIVE,{public},INSERT,null,"(current_user_role() = ANY (ARRAY['rep'::text, 'marketing'::text, 'super_admin'::text]))"
+public,company_reps,company_reps_manager,PERMISSIVE,{public},ALL,"(current_user_role() = ANY (ARRAY['manager'::text, 'super_admin'::text]))",null
+public,contacts,contacts_rep_access,PERMISSIVE,{public},SELECT,"((current_user_role() = ANY (ARRAY['rep'::text, 'marketing'::text])) AND (EXISTS ( SELECT 1
+   FROM company_reps
+  WHERE ((company_reps.company_id = contacts.company_id) AND (company_reps.rep_id = current_rep_id())))))",null
+public,contacts,contacts_rep_insert,PERMISSIVE,{public},INSERT,null,"(current_user_role() = ANY (ARRAY['rep'::text, 'marketing'::text]))"
+public,contacts,contacts_manager,PERMISSIVE,{public},ALL,"(current_user_role() = ANY (ARRAY['manager'::text, 'sales_coordinator'::text, 'super_admin'::text]))",null
+public,contacts,contacts_rep_update,PERMISSIVE,{public},UPDATE,"((current_user_role() = 'rep'::text) AND (EXISTS ( SELECT 1
+   FROM company_reps
+  WHERE ((company_reps.company_id = contacts.company_id) AND (company_reps.rep_id = current_rep_id())))))",null
+public,duplicate_flags,duplicates_manager,PERMISSIVE,{public},ALL,"(current_user_role() = ANY (ARRAY['manager'::text, 'super_admin'::text]))",null
+public,notifications,notifications_update,PERMISSIVE,{public},UPDATE,"((recipient_id = current_rep_id()) OR (current_user_role() = ANY (ARRAY['manager'::text, 'super_admin'::text])))",null
+public,notifications,notifications_insert,PERMISSIVE,{public},INSERT,null,true
+public,notifications,notifications_select,PERMISSIVE,{public},SELECT,"((recipient_id = current_rep_id()) OR (current_user_role() = ANY (ARRAY['manager'::text, 'super_admin'::text])))",null
+public,project_history,history_insert,PERMISSIVE,{public},INSERT,null,true
+public,project_history,history_manager,PERMISSIVE,{public},ALL,"(current_user_role() = ANY (ARRAY['manager'::text, 'super_admin'::text]))",null
+public,project_history,project_history_rep_read,PERMISSIVE,{public},SELECT,"((current_user_role() = ANY (ARRAY['rep'::text, 'marketing'::text])) AND (EXISTS ( SELECT 1
+   FROM project_reps
+  WHERE ((project_reps.project_id = project_history.project_id) AND (project_reps.rep_id = current_rep_id())))))",null
+public,project_history,history_rep_read,PERMISSIVE,{public},SELECT,"((current_user_role() = ANY (ARRAY['rep'::text, 'marketing'::text])) AND (EXISTS ( SELECT 1
+   FROM project_reps
+  WHERE ((project_reps.project_id = project_history.project_id) AND (project_reps.rep_id = current_rep_id())))))",null
+public,project_history,project_history_rep_insert,PERMISSIVE,{public},INSERT,null,"(current_user_role() = ANY (ARRAY['rep'::text, 'marketing'::text, 'manager'::text, 'super_admin'::text]))"
+public,project_history,project_history_manager,PERMISSIVE,{public},ALL,"(current_user_role() = ANY (ARRAY['manager'::text, 'super_admin'::text]))",null
+public,project_reps,project_reps_rep_read,PERMISSIVE,{public},SELECT,(rep_id = current_rep_id()),null
+public,project_reps,project_reps_manager,PERMISSIVE,{public},ALL,"(current_user_role() = ANY (ARRAY['manager'::text, 'super_admin'::text]))",null
+public,projects,projects_rep_insert,PERMISSIVE,{public},INSERT,null,"(current_user_role() = ANY (ARRAY['rep'::text, 'marketing'::text, 'manager'::text]))"
+public,projects,projects_rep_update,PERMISSIVE,{public},UPDATE,"((current_user_role() = ANY (ARRAY['rep'::text, 'marketing'::text])) AND (EXISTS ( SELECT 1
+   FROM project_reps
+  WHERE ((project_reps.project_id = projects.id) AND (project_reps.rep_id = current_rep_id())))))",null
+public,projects,projects_coordinator_read,PERMISSIVE,{public},SELECT,(current_user_role() = 'sales_coordinator'::text),null
+public,projects,projects_rep_read,PERMISSIVE,{public},SELECT,"((current_user_role() = ANY (ARRAY['rep'::text, 'marketing'::text])) AND ((assigned_rep_id = current_rep_id()) OR (EXISTS ( SELECT 1
+   FROM project_reps
+  WHERE ((project_reps.project_id = projects.id) AND (project_reps.rep_id = current_rep_id()))))))",null
+public,projects,projects_manager,PERMISSIVE,{public},ALL,"(current_user_role() = ANY (ARRAY['manager'::text, 'sales_coordinator'::text, 'super_admin'::text]))",null
+public,quotation_items,items_rep_read,PERMISSIVE,{public},SELECT,"((current_user_role() = ANY (ARRAY['rep'::text, 'marketing'::text])) AND (EXISTS ( SELECT 1
+   FROM quotations
+  WHERE ((quotations.id = quotation_items.quotation_id) AND ((quotations.rep_id = current_rep_id()) OR (quotations.assigned_to_id = current_rep_id()))))))",null
+public,quotation_items,items_manager,PERMISSIVE,{public},ALL,"(current_user_role() = ANY (ARRAY['manager'::text, 'sales_coordinator'::text, 'super_admin'::text]))",null
+public,quotation_services,services_manager,PERMISSIVE,{public},ALL,"(current_user_role() = ANY (ARRAY['manager'::text, 'sales_coordinator'::text, 'super_admin'::text]))",null
+public,quotation_services,services_rep_read,PERMISSIVE,{public},SELECT,"((current_user_role() = ANY (ARRAY['rep'::text, 'marketing'::text])) AND (EXISTS ( SELECT 1
+   FROM quotations
+  WHERE ((quotations.id = quotation_services.quotation_id) AND ((quotations.rep_id = current_rep_id()) OR (quotations.assigned_to_id = current_rep_id()))))))",null
+public,quotations,quotations_rep_read,PERMISSIVE,{public},SELECT,"((current_user_role() = ANY (ARRAY['rep'::text, 'marketing'::text])) AND (rep_id = current_rep_id()))",null
+public,quotations,quotations_manager,PERMISSIVE,{public},ALL,"(current_user_role() = ANY (ARRAY['manager'::text, 'sales_coordinator'::text, 'super_admin'::text]))",null
+public,rep_absences,absences_rep_read,PERMISSIVE,{public},SELECT,"((current_user_role() = ANY (ARRAY['rep'::text, 'marketing'::text])) AND (rep_id = current_rep_id()))",null
+public,rep_absences,absences_manager,PERMISSIVE,{public},ALL,"(current_user_role() = ANY (ARRAY['manager'::text, 'super_admin'::text]))",null
+public,reps,reps_read,PERMISSIVE,{public},SELECT,(auth.uid() IS NOT NULL),null
+public,reps,reps_manager_write,PERMISSIVE,{public},ALL,"(current_user_role() = ANY (ARRAY['manager'::text, 'super_admin'::text]))",null

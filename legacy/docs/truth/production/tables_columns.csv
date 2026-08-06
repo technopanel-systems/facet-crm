@@ -1,0 +1,101 @@
+table_name,column_name,data_type,is_nullable,column_default
+activities,id,uuid,NO,uuid_generate_v4()
+activities,activity_code,text,YES,null
+activities,activity_date,date,NO,null
+activities,month,text,YES,null
+activities,rep_id,uuid,YES,null
+activities,rep_name,text,NO,null
+activities,company_name,text,NO,null
+activities,company_type,text,YES,null
+activities,contact_person,text,YES,null
+activities,phone,text,YES,null
+activities,interaction_type,text,YES,null
+activities,project_name,text,YES,null
+activities,notes,text,YES,null
+activities,region,text,YES,null
+activities,sqm_done,numeric,YES,0
+activities,sqm_expected,numeric,YES,0
+activities,submitted_at,timestamp with time zone,NO,now()
+activities,submission_status,text,YES,null
+activities,created_at,timestamp with time zone,NO,now()
+activities,company_id,uuid,YES,null
+activities,project_id,uuid,YES,null
+activities,contact_id,uuid,YES,null
+branches,id,uuid,NO,uuid_generate_v4()
+branches,name,text,NO,null
+branches,region,text,NO,null
+branches,is_active,boolean,YES,true
+branches,created_at,timestamp with time zone,YES,now()
+companies,id,uuid,NO,uuid_generate_v4()
+companies,customer_code,text,YES,null
+companies,company_name,text,NO,null
+companies,company_name_normalized,text,YES,null
+companies,company_type,text,YES,null
+companies,contact1_name,text,YES,null
+companies,contact1_phone,text,YES,null
+companies,contact2_name,text,YES,null
+companies,contact2_phone,text,YES,null
+companies,region,text,YES,null
+companies,source,text,YES,null
+companies,primary_rep_id,uuid,YES,null
+companies,status,text,NO,'active'::text
+companies,notes,text,YES,null
+companies,created_at,timestamp with time zone,NO,now()
+companies,updated_at,timestamp with time zone,NO,now()
+companies,branch_id,uuid,YES,null
+companies,source_detail,text,YES,null
+company_holidays,id,uuid,NO,uuid_generate_v4()
+company_holidays,holiday_name,text,NO,null
+company_holidays,date_from,date,NO,null
+company_holidays,date_to,date,NO,null
+company_holidays,created_by,uuid,YES,null
+company_holidays,created_at,timestamp with time zone,NO,now()
+company_reps,id,uuid,NO,uuid_generate_v4()
+company_reps,company_id,uuid,NO,null
+company_reps,rep_id,uuid,NO,null
+company_reps,role,text,NO,'primary'::text
+company_reps,assigned_by,uuid,YES,null
+company_reps,assigned_at,timestamp with time zone,YES,now()
+contacts,id,uuid,NO,uuid_generate_v4()
+contacts,contact_code,text,YES,null
+contacts,company_id,uuid,NO,null
+contacts,full_name,text,NO,null
+contacts,full_name_ar,text,YES,null
+contacts,title,text,YES,null
+contacts,phone,text,YES,null
+contacts,whatsapp,text,YES,null
+contacts,email,text,YES,null
+contacts,is_primary,boolean,YES,false
+contacts,notes,text,YES,null
+contacts,created_by,uuid,YES,null
+contacts,created_at,timestamp with time zone,YES,now()
+contacts,updated_at,timestamp with time zone,YES,now()
+duplicate_flags,id,uuid,NO,uuid_generate_v4()
+duplicate_flags,company_id_1,uuid,YES,null
+duplicate_flags,company_id_2,uuid,YES,null
+duplicate_flags,match_type,text,YES,null
+duplicate_flags,match_key,text,YES,null
+duplicate_flags,classification,text,NO,'pending'::text
+duplicate_flags,resolved_at,timestamp with time zone,YES,null
+duplicate_flags,resolved_by,uuid,YES,null
+duplicate_flags,created_at,timestamp with time zone,NO,now()
+notifications,id,uuid,NO,uuid_generate_v4()
+notifications,recipient_id,uuid,NO,null
+notifications,type,text,NO,null
+notifications,title,text,NO,null
+notifications,body,text,YES,null
+notifications,entity_type,text,YES,null
+notifications,entity_id,uuid,YES,null
+notifications,is_read,boolean,YES,false
+notifications,created_at,timestamp with time zone,YES,now()
+pipeline_summary,stage,text,YES,null
+pipeline_summary,project_count,bigint,YES,null
+pipeline_summary,total_sqm,numeric,YES,null
+project_history,id,uuid,NO,uuid_generate_v4()
+project_history,project_id,uuid,NO,null
+project_history,changed_by,uuid,YES,null
+project_history,changed_at,timestamp with time zone,NO,now()
+project_history,field_name,text,NO,null
+project_history,old_value,text,YES,null
+project_history,new_value,text,YES,null
+project_reps,id,uuid,NO,uuid_generate_v4()

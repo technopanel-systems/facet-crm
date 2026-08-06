@@ -1,0 +1,478 @@
+routine_name,routine_definition
+normalize_arabic,"
+declare result text;
+begin
+  result := lower(coalesce(input, ''));
+  result := regexp_replace(result, '[\u064B-\u065F\u0670]', '', 'g');
+  result := replace(result, 'أ', 'ا');
+  result := replace(result, 'إ', 'ا');
+  result := replace(result, 'آ', 'ا');
+  result := replace(result, 'ٱ', 'ا');
+  result := replace(result, 'ة', 'ه');
+  result := replace(result, 'ى', 'ي');
+  result := regexp_replace(result, '^ال', '', 'g');
+  result := trim(regexp_replace(result, '\s+', ' ', 'g'));
+  return result;
+end;
+"
+auto_normalize_customer,"
+begin
+  new.company_name_normalized := normalize_arabic(new.company_name);
+  return new;
+end;
+"
+current_rep_id,"
+  select id from reps where auth_user_id = auth.uid() limit 1;
+"
+current_rep_name,"
+  select name from reps where auth_user_id = auth.uid() limit 1;
+"
+current_user_role,"
+  SELECT lower(trim(role)) FROM reps WHERE auth_user_id = auth.uid() LIMIT 1;
+"
+set_updated_at,"
+begin
+  new.updated_at := now();
+  return new;
+end;
+"
+gtrgm_union,null
+gtrgm_same,null
+gin_extract_value_trgm,null
+gin_extract_query_trgm,null
+gin_trgm_consistent,null
+gin_trgm_triconsistent,null
+strict_word_similarity,null
+strict_word_similarity_op,null
+strict_word_similarity_commutator_op,null
+strict_word_similarity_dist_op,null
+strict_word_similarity_dist_commutator_op,null
+gtrgm_options,null
+set_customer_code,"
+begin
+  if new.customer_code is null then
+    new.customer_code := 'CUST-' || lpad(nextval('customer_code_seq')::text, 5, '0');
+  end if;
+  return new;
+end;
+"
+set_project_code,"
+begin
+  if new.project_code is null then
+    new.project_code := 'PROJ-' || lpad(nextval('project_code_seq')::text, 5, '0');
+  end if;
+  return new;
+end;
+"
+set_limit,null
+show_limit,null
+show_trgm,null
+similarity,null
+similarity_op,null
+word_similarity,null
+word_similarity_op,null
+word_similarity_commutator_op,null
+similarity_dist,null
+word_similarity_dist_op,null
+word_similarity_dist_commutator_op,null
+gtrgm_in,null
+gtrgm_out,null
+gtrgm_consistent,null
+gtrgm_distance,null
+gtrgm_compress,null
+gtrgm_decompress,null
+gtrgm_penalty,null
+gtrgm_picksplit,null
+set_contact_code,"
+begin
+  if new.contact_code is null then
+    new.contact_code := 'CON-' || lpad(nextval('contact_code_seq')::text, 5, '0');
+  end if;
+  return new;
+end;
+"
+set_quotation_code,"
+begin
+  if new.quotation_code is null then
+    new.quotation_code := 'QUO-' || lpad(nextval('quotation_code_seq')::text, 5, '0');
+  end if;
+  return new;
+end;
+"
+notify_pending_rep,"
+begin
+  if new.status = 'pending' then
+    insert into notifications (recipient_id, type, title, body, entity_type, entity_id)
+    select id, 'pending_approval',
+      'New Registration: ' || new.name,
+      new.email || ' has registered and is awaiting approval.',
+      'rep', new.id
+    from reps where role = 'manager' and status = 'active';
+  end if;
+  return new;
+end;
+"
+notify_company_assignment,"
+declare
+  v_rep_name text;
+  v_company_name text;
+begin
+  select name into v_rep_name from reps where id = new.rep_id;
+  select company_name into v_company_name from companies where id = new.company_id;
+
+  insert into notifications (recipient_id, type, title, body, entity_type, entity_id)
+  values (
+    new.rep_id, 'assignment',
+    'Company Assigned: ' || v_company_name,
+    'You have been assigned to ' || v_company_name || ' as ' || new.role || '.',
+    'company', new.company_id
+  );
+  return new;
+end;
+"
+notify_duplicate_flag,"
+begin
+  if new.classification = 'pending' then
+    insert into notifications (recipient_id, type, title, body, entity_type, entity_id)
+    select id, 'duplicate_alert',
+      'Duplicate Detected: ' || new.match_key,
+      'A possible duplicate company was detected. Please review in the Duplicates section.',
+      'company', new.company_id_1
+    from reps where role = 'manager' and status = 'active';
+  end if;
+  return new;
+end;
+"
+set_activity_code,"
+DECLARE
+  submitted_date   date;
+  activity_dow     int;
+  next_working_day date;
+  is_excused       boolean := false;
+BEGIN
+  -- Auto-generate activity code
+  IF new.activity_code IS NULL THEN
+    new.activity_code := 'ACT-' || lpad(nextval('activity_code_seq')::text, 5, '0');
+  END IF;
+
+  -- Set month label
+  IF new.activity_date IS NOT NULL THEN
+    new.month := to_char(new.activity_date, 'Month YYYY');
+  END IF;
+
+  -- Set submission status
+  IF new.submission_status IS NULL THEN
+    submitted_date := date(new.submitted_at AT TIME ZONE 'Asia/Riyadh');
+    activity_dow   := EXTRACT(DOW FROM new.activity_date);
+    -- 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+
+    -- Step 1: Weekend check (Fri=5, Sat=6)
+    IF activity_dow IN (5, 6) THEN
+      new.submission_status := 'on_time';
+
+    ELSE
+      -- Step 2: Company holiday check
+      SELECT EXISTS (
+        SELECT 1 FROM company_holidays
+        WHERE new.activity_date BETWEEN date_from AND date_to
+      ) INTO is_excused;
+
+      -- Step 3: Rep absence check (only if not already excused)
+      IF NOT is_excused AND new.rep_id IS NOT NULL THEN
+        SELECT EXISTS (
+          SELECT 1 FROM rep_absences
+          WHERE rep_id = new.rep_id
+          AND new.activity_date BETWEEN date_from AND date_to
+        ) INTO is_excused;
+      END IF;
+
+      -- Step 4: Apply excused status
+      IF is_excused THEN
+        new.submission_status := 'on_time';
+
+      -- Step 5: Same day submission
+      ELSIF submitted_date = new.activity_date THEN
+        new.submission_status := 'on_time';
+
+      -- Step 6: Grace period check
+      ELSIF submitted_date > new.activity_date THEN
+        -- Calculate next working day after activity_date
+        -- skipping weekends and company holidays
+        next_working_day := new.activity_date + 1;
+
+        LOOP
+          -- Skip Friday and Saturday
+          IF EXTRACT(DOW FROM next_working_day) IN (5, 6) THEN
+            next_working_day := next_working_day + 1;
+            CONTINUE;
+          END IF;
+
+          -- Skip company holidays
+          IF EXISTS (
+            SELECT 1 FROM company_holidays
+            WHERE next_working_day BETWEEN date_from AND date_to
+          ) THEN
+            next_working_day := next_working_day + 1;
+            CONTINUE;
+          END IF;
+
+          -- Found next working day
+          EXIT;
+        END LOOP;
+
+        IF submitted_date <= next_working_day THEN
+          new.submission_status := 'on_time';
+        ELSE
+          new.submission_status := 'late';
+        END IF;
+
+      END IF;
+    END IF;
+  END IF;
+
+  RETURN new;
+END;
+"
+detect_duplicate_companies,"
+DECLARE
+  new_flags integer := 0;
+BEGIN
+  INSERT INTO duplicate_flags (
+    company_id_1, company_id_2, match_type, match_key, classification
+  )
+  SELECT
+    a.id,
+    b.id,
+    'name',
+    a.company_name,
+    'pending'
+  FROM companies a
+  JOIN companies b ON b.id > a.id
+  WHERE
+    a.status = 'active'
+    AND b.status = 'active'
+    AND (
+      -- Exact normalized match
+      a.company_name_normalized = b.company_name_normalized
+      OR
+      -- High similarity match using pg_trgm (threshold 0.6)
+      similarity(
+        COALESCE(a.company_name_normalized, a.company_name),
+        COALESCE(b.company_name_normalized, b.company_name)
+      ) > 0.6
+    )
+    -- Skip pairs already flagged
+    AND NOT EXISTS (
+      SELECT 1 FROM duplicate_flags df
+      WHERE (df.company_id_1 = a.id AND df.company_id_2 = b.id)
+      OR    (df.company_id_1 = b.id AND df.company_id_2 = a.id)
+    );
+
+  GET DIAGNOSTICS new_flags = ROW_COUNT;
+  RETURN new_flags;
+END;
+"
+check_missing_submissions,"
+DECLARE
+  yesterday        date;
+  yesterday_dow    int;
+  rep_record       RECORD;
+  manager_record   RECORD;
+  already_notified boolean;
+  is_excused       boolean;
+BEGIN
+  yesterday     := CURRENT_DATE - 1;
+  yesterday_dow := EXTRACT(DOW FROM yesterday);
+
+  -- Step 1: If yesterday was a weekend, do nothing at all
+  IF yesterday_dow IN (5, 6) THEN
+    RETURN;
+  END IF;
+
+  -- Step 2: If yesterday was a company holiday, do nothing at all
+  IF EXISTS (
+    SELECT 1 FROM company_holidays
+    WHERE yesterday BETWEEN date_from AND date_to
+  ) THEN
+    RETURN;
+  END IF;
+
+  -- Step 3: Yesterday was a real working day — check each rep
+  FOR rep_record IN
+    SELECT id, name
+    FROM reps
+    WHERE status = 'active'
+    AND role IN ('rep', 'marketing')
+  LOOP
+    -- Check if this rep has an approved absence for yesterday
+    SELECT EXISTS (
+      SELECT 1 FROM rep_absences
+      WHERE rep_id = rep_record.id
+      AND yesterday BETWEEN date_from AND date_to
+    ) INTO is_excused;
+
+    -- Skip excused reps silently
+    IF is_excused THEN
+      CONTINUE;
+    END IF;
+
+    -- Check if rep submitted anything for yesterday
+    IF NOT EXISTS (
+      SELECT 1 FROM activities
+      WHERE rep_id = rep_record.id
+      AND activity_date = yesterday
+    ) THEN
+      -- Only notify if we haven't already notified today
+      SELECT EXISTS (
+        SELECT 1 FROM notifications
+        WHERE recipient_id = rep_record.id
+        AND type = 'missing_submission'
+        AND created_at::date = CURRENT_DATE
+        AND body LIKE '%' || yesterday::text || '%'
+      ) INTO already_notified;
+
+      IF NOT already_notified THEN
+        -- Notify the rep
+        INSERT INTO notifications (
+          recipient_id, type, title, body, entity_type
+        ) VALUES (
+          rep_record.id,
+          'missing_submission',
+          'Missing Daily Report',
+          'You have not submitted your daily report for ' ||
+            to_char(yesterday, 'DD Mon YYYY') ||
+            '. Please submit it or ask your manager to record an absence.',
+          'rep'
+        );
+
+        -- Notify all managers
+        FOR manager_record IN
+          SELECT id FROM reps
+          WHERE status = 'active'
+          AND role IN ('manager', 'super_admin')
+        LOOP
+          SELECT EXISTS (
+            SELECT 1 FROM notifications
+            WHERE recipient_id = manager_record.id
+            AND type = 'missing_submission'
+            AND created_at::date = CURRENT_DATE
+            AND body LIKE '%' || rep_record.name || '%'
+            AND body LIKE '%' || yesterday::text || '%'
+          ) INTO already_notified;
+
+          IF NOT already_notified THEN
+            INSERT INTO notifications (
+              recipient_id, type, title, body, entity_type
+            ) VALUES (
+              manager_record.id,
+              'missing_submission',
+              'Missing Report: ' || rep_record.name,
+              rep_record.name || ' has not submitted their daily report for ' ||
+                to_char(yesterday, 'DD Mon YYYY') || '.',
+              'rep'
+            );
+          END IF;
+        END LOOP;
+
+      END IF;
+    END IF;
+  END LOOP;
+END;
+"
+create_project_with_rep,"
+DECLARE
+  v_project_id   uuid;
+  v_company_name text;
+BEGIN
+  SELECT company_name INTO v_company_name FROM companies WHERE id = p_customer_id;
+  INSERT INTO projects (
+    customer_id, company_name, project_name, city, stage,
+    quoted_sqm, project_date, notes, contact_id, assigned_rep_id
+  ) VALUES (
+    p_customer_id, v_company_name, p_project_name, p_city, p_stage,
+    p_quoted_sqm, p_project_date, p_notes, p_contact_id, p_rep_id
+  ) RETURNING id INTO v_project_id;
+
+  IF p_rep_id IS NOT NULL THEN
+    INSERT INTO project_reps (project_id, rep_id, role, assigned_by)
+    VALUES (v_project_id, p_rep_id, 'primary', p_rep_id);
+  END IF;
+
+  RETURN v_project_id;
+END;
+"
+update_quotation_sqm,"
+BEGIN
+  UPDATE quotations
+  SET sqm_quoted = (
+    SELECT COALESCE(SUM(total_sqm), 0)
+    FROM quotation_items
+    WHERE quotation_id = COALESCE(NEW.quotation_id, OLD.quotation_id)
+  )
+  WHERE id = COALESCE(NEW.quotation_id, OLD.quotation_id);
+  RETURN NEW;
+END;
+"
+sync_project_sqm,"
+DECLARE v_project_id uuid;
+BEGIN
+  v_project_id := COALESCE(NEW.project_id, OLD.project_id);
+  IF v_project_id IS NULL THEN RETURN NEW; END IF;
+  UPDATE projects SET
+    quoted_sqm = (
+      SELECT COALESCE(SUM(sqm_quoted), 0) FROM quotations
+      WHERE project_id = v_project_id AND status NOT IN ('cancelled')
+    ),
+    won_sqm = (
+      SELECT COALESCE(SUM(sqm_invoiced), 0) FROM quotations
+      WHERE project_id = v_project_id AND status = 'won'
+    ),
+    updated_at = now()
+  WHERE id = v_project_id;
+  RETURN NEW;
+END;
+"
+log_project_changes,"
+DECLARE v_rep_id uuid;
+BEGIN
+  SELECT current_rep_id() INTO v_rep_id;
+  IF OLD.stage IS DISTINCT FROM NEW.stage THEN
+    INSERT INTO project_history(project_id,field_name,old_value,new_value,changed_by)
+    VALUES(NEW.id,'stage',OLD.stage,NEW.stage,v_rep_id);
+  END IF;
+  IF OLD.quoted_sqm IS DISTINCT FROM NEW.quoted_sqm THEN
+    INSERT INTO project_history(project_id,field_name,old_value,new_value,changed_by)
+    VALUES(NEW.id,'quoted_sqm',OLD.quoted_sqm::text,NEW.quoted_sqm::text,v_rep_id);
+  END IF;
+  IF OLD.loss_reason IS DISTINCT FROM NEW.loss_reason AND NEW.loss_reason IS NOT NULL THEN
+    INSERT INTO project_history(project_id,field_name,old_value,new_value,changed_by)
+    VALUES(NEW.id,'loss_reason',OLD.loss_reason,NEW.loss_reason,v_rep_id);
+  END IF;
+  RETURN NEW;
+END;
+"
+create_company_with_rep,"
+DECLARE v_company_id uuid;
+BEGIN
+  INSERT INTO companies (
+    company_name, company_type, region, source,
+    source_detail, notes, status, primary_rep_id
+  ) VALUES (
+    p_company_name,
+    NULLIF(p_company_type, ''),
+    NULLIF(p_region, ''),
+    NULLIF(p_source, ''),
+    NULLIF(p_source_detail, ''),
+    NULLIF(p_notes, ''),
+    'active',
+    p_rep_id
+  ) RETURNING id INTO v_company_id;
+
+  IF p_rep_id IS NOT NULL THEN
+    INSERT INTO company_reps (company_id, rep_id, role, assigned_by)
+    VALUES (v_company_id, p_rep_id, 'primary', p_rep_id);
+  END IF;
+
+  RETURN v_company_id;
+END;
+"
