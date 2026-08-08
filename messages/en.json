@@ -1,0 +1,24 @@
+{
+  "app": {
+    "name": "FACET",
+    "tagline": "Technopanel operations platform"
+  },
+  "locale": {
+    "label": "Language",
+    "en": "English",
+    "ar": "العربية"
+  },
+  "status": {
+    "heading": "System status",
+    "app": "Application",
+    "database": "Database",
+    "up": "Connected",
+    "down": "Unavailable",
+    "running": "Running",
+    "checkedAt": "Checked at {time}"
+  },
+  "skeleton": {
+    "heading": "Project skeleton",
+    "body": "No business tables yet. Schema lands in phase 5, authentication in phase 6."
+  }
+}

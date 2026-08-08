@@ -1,0 +1,20 @@
+node_modules
+.next
+.git
+.env
+.env.*
+!.env.example
+
+# Reference only, never built. See CLAUDE.md.
+legacy
+docs
+
+npm-debug.log*
+README.md
+CLAUDE.md
+AGENTS.md
+Dockerfile
+docker-compose.yml
+.dockerignore
+.claudeignore
+.claude
