@@ -21,5 +21,8 @@ export const env = {
   get DATABASE_URL(): string {
     return required("DATABASE_URL");
   },
+  get AUTH_SECRET(): string {
+    return required("AUTH_SECRET");
+  },
   NODE_ENV: process.env.NODE_ENV ?? "development",
 };
