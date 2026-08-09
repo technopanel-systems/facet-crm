@@ -243,11 +243,18 @@ export const roles = pgTable(
   (t) => [uniqueIndex("roles_name_en_key").on(t.nameEn)],
 );
 
-/** `09 §3.6` — "city, with a Saudi city lookup" `[07 A7]`. */
+/**
+ * `09 §3.6` — "city, with a Saudi city lookup" `[07 A7]`.
+ *
+ * `region` is `NOT NULL` because `15 §3` maps every city: the grouping is
+ * stated per administrative region, never per city, so a row with no region
+ * would be one `15 §4` cannot derive a record's region from.
+ */
 export const cities = pgTable("cities", {
   id: pk(),
   nameEn: text("name_en").notNull(),
   nameAr: text("name_ar").notNull(),
+  region: regionEnum("region").notNull(),
   createdAt: createdAt(),
 });
 
@@ -378,11 +385,22 @@ export const companyCategories = pgTable("company_categories", {
   createdAt: createdAt(),
 });
 
-/** `10 §12` — accepted. Marketing channels will multiply. */
+/**
+ * `10 §12` — accepted. Marketing channels will multiply. Values seeded by
+ * `15 §1`.
+ *
+ * `rep_selectable` restricts a value to holders of `can_assign` `[15 §2]`.
+ * "Marketing" means the lead arrived from the marketing team, so a rep picking
+ * it by hand would record something that did not happen. It is a flag on the
+ * row rather than a special case in code: a second restricted source must be
+ * configuration, not a deploy. Default `true` — a source added later is
+ * selectable unless someone says otherwise.
+ */
 export const leadSources = pgTable("lead_sources", {
   id: pk(),
   nameEn: text("name_en").notNull(),
   nameAr: text("name_ar").notNull(),
+  repSelectable: boolean("rep_selectable").notNull().default(true),
   createdAt: createdAt(),
 });
 

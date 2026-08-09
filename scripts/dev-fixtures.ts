@@ -16,7 +16,21 @@
  *
  * The password comes from the environment deliberately — a default baked into
  * the repository would be a known credential on every checkout, and these are
- * real, loginable accounts. Refuses to run against NODE_ENV=production.
+ * real, loginable accounts.
+ *
+ * **It refuses to run unless NODE_ENV is exactly "development"** `[15 §7]`.
+ * Refusing only when NODE_ENV=production is set is the weaker half of the
+ * rule: it passes whenever the variable is simply absent, which is every
+ * shell that has not been told otherwise. Requiring the positive value is safe
+ * because the two environments genuinely differ —
+ *
+ *   - `.dockerignore` excludes `.env*`, so `NODE_ENV=development` in a
+ *     developer's `.env` never reaches the image;
+ *   - `docker-compose.yml` sets `NODE_ENV: production` on the app container as
+ *     a real environment variable, and `process.loadEnvFile` cannot override
+ *     one that is already set.
+ *
+ * So the guard passes on a developer's host and fails in the container.
  */
 
 process.loadEnvFile(".env");
@@ -35,8 +49,14 @@ const FIXTURES = [
 ] as const;
 
 async function main(): Promise<void> {
-  if (process.env.NODE_ENV === "production") {
-    console.error("dev:fixtures refuses to run with NODE_ENV=production.");
+  // This script creates real, loginable accounts. It must never be runnable
+  // anywhere but a developer's machine `[15 §7]`.
+  if (process.env.NODE_ENV !== "development") {
+    console.error(
+      "dev:fixtures refuses to run outside development.\n" +
+        `  NODE_ENV is ${process.env.NODE_ENV ?? "unset"}, and must be "development".\n` +
+        "  Add NODE_ENV=development to .env (it is excluded from the Docker image).",
+    );
     process.exit(1);
   }
 

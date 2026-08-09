@@ -5,11 +5,12 @@ import { useTranslations } from "next-intl";
 
 import { FormField, SelectField } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "@/i18n/navigation";
 import { PROJECT_END_STATES, REGIONS } from "@/lib/enums";
-import type { LookupRow } from "@/lib/lookups";
+import type { CityRow } from "@/lib/lookups";
 import type { ProjectInput } from "@/lib/projects";
 import { emptyFormState, type FormState } from "@/lib/validation";
 
@@ -33,7 +34,7 @@ export function ProjectForm({
   defaults?: Partial<ProjectInput>;
   submitLabel: string;
   cancelHref: string;
-  cities: LookupRow[];
+  cities: CityRow[];
   companies: CompanyOption[];
   locale: string;
   withCompanies?: boolean;
@@ -45,6 +46,10 @@ export function ProjectForm({
   const errors = state.fieldErrors ?? {};
   const value = (name: keyof ProjectInput) =>
     state.values?.[name] ?? (defaults?.[name] as string | null | undefined) ?? "";
+
+  // `15 §4` — display only; the data layer derives what is written.
+  const [cityId, setCityId] = useState(value("cityId"));
+  const cityRegion = cities.find((city) => city.id === cityId)?.region ?? null;
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
@@ -103,40 +108,58 @@ export function ProjectForm({
           />
         </FormField>
 
-        <FormField name="region" label={t("common.region")} error={errors.region}>
-          <SelectField
-            name="region"
-            defaultValue={value("region")}
-            placeholder={t("common.none")}
-            invalid={Boolean(errors.region)}
-          >
-            {REGIONS.map((region) => (
-              <option key={region} value={region}>
-                {t(`enums.region.${region}`)}
-              </option>
-            ))}
-          </SelectField>
-        </FormField>
-
+        {/* City before region — the city answers the region `[15 §4]`. */}
         <FormField
           name="cityId"
           label={t("common.city")}
           error={errors.cityId}
           hint={cities.length === 0 ? t("common.noOptions") : undefined}
         >
-          <SelectField
+          <Combobox
             name="cityId"
             defaultValue={value("cityId")}
+            options={cities.map((city) => ({
+              value: city.id,
+              label: locale === "ar" ? city.nameAr || city.nameEn : city.nameEn,
+              altLabel: locale === "ar" ? city.nameEn : city.nameAr,
+            }))}
             placeholder={t("common.none")}
+            searchPlaceholder={t("common.searchCity")}
+            emptyLabel={t("common.noMatches")}
+            clearLabel={t("common.none")}
             disabled={cities.length === 0}
             invalid={Boolean(errors.cityId)}
-          >
-            {cities.map((city) => (
-              <option key={city.id} value={city.id}>
-                {locale === "ar" ? city.nameAr || city.nameEn : city.nameEn}
-              </option>
-            ))}
-          </SelectField>
+            onChange={setCityId}
+          />
+        </FormField>
+
+        <FormField
+          name="region"
+          label={t("common.region")}
+          error={errors.region}
+          hint={cityRegion ? t("common.regionFromCity") : undefined}
+        >
+          {cityRegion ? (
+            <p
+              className="border-input bg-muted text-muted-foreground flex h-9
+                items-center rounded-md border px-3 text-start text-sm"
+            >
+              {t(`enums.region.${cityRegion}`)}
+            </p>
+          ) : (
+            <SelectField
+              name="region"
+              defaultValue={value("region")}
+              placeholder={t("common.none")}
+              invalid={Boolean(errors.region)}
+            >
+              {REGIONS.map((region) => (
+                <option key={region} value={region}>
+                  {t(`enums.region.${region}`)}
+                </option>
+              ))}
+            </SelectField>
+          )}
         </FormField>
 
         <FormField

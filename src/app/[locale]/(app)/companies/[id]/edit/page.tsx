@@ -33,7 +33,9 @@ export default async function EditCompanyPage({
   const [categories, cities, leadSources] = await Promise.all([
     listCompanyCategories(),
     listCities(),
-    listLeadSources(),
+    // The company's own lead source is passed in so a rep editing a
+    // marketing-sourced company keeps it rather than blanking it `[15 §2.1]`.
+    listLeadSources(session, company.leadSourceId),
   ]);
 
   return (

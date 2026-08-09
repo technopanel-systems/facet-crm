@@ -47,6 +47,7 @@ import {
   type Region,
   type SameValues,
 } from "@/lib/enums";
+import { regionForCity } from "@/lib/lookups";
 import { normalizedNameFor } from "@/lib/normalize";
 import { RuleError } from "@/lib/validation";
 
@@ -352,11 +353,17 @@ export async function createProject(
     links.map((link) => link.companyId),
   );
 
+  // The city decides the region when there is one `[15 §4]`. Read before the
+  // transaction opens — it only reads, and a bad city id should not have
+  // started one.
+  const region = await regionForCity(input.cityId, input.region);
+
   return withAudit(session.actor, async (tx, log) => {
     const [project] = await tx
       .insert(projects)
       .values({
         ...input,
+        region,
         nameNormalized: normalizedNameFor(input),
         // Created by a rep and belongs to him `[07 A8]`.
         ownerUserId: session.user.id,
@@ -416,12 +423,20 @@ export async function updateProject(
       .limit(1);
     if (!before) throw new RuleError("projects.errors.notFound");
 
-    const changed = EDITABLE.filter((key) => before[key] !== input[key]);
+    // What will actually be written: the region follows the city `[15 §4]`.
+    // The diff compares against this rather than the form, so a region that
+    // changed because the city changed is recorded as the change it is.
+    const values: ProjectInput = {
+      ...input,
+      region: await regionForCity(input.cityId, input.region),
+    };
+
+    const changed = EDITABLE.filter((key) => before[key] !== values[key]);
     if (changed.length === 0) return before;
 
     const [after] = await tx
       .update(projects)
-      .set({ ...input, nameNormalized: normalizedNameFor(input) })
+      .set({ ...values, nameNormalized: normalizedNameFor(values) })
       .where(eq(projects.id, id))
       .returning();
 

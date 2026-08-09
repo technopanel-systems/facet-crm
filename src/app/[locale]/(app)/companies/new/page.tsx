@@ -20,13 +20,15 @@ export default async function NewCompanyPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  await requireSession();
+  const session = await requireSession();
 
   const t = await getTranslations();
   const [categories, cities, leadSources] = await Promise.all([
     listCompanyCategories(),
     listCities(),
-    listLeadSources(),
+    // No current value on a new company, so a rep sees only the selectable
+    // sources `[15 §2]`.
+    listLeadSources(session),
   ]);
 
   return (

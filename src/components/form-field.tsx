@@ -63,6 +63,12 @@ export function FormField({
  * no hidden-input bridge, no client state, and no JavaScript to submit. The
  * browser also handles RTL popup placement for free. Radix `Select` can
  * replace this later without touching a single action.
+ *
+ * **One field is now an exception: the city** `[15 §5]`. A list of roughly two
+ * hundred cities is unusable as a plain dropdown, so it uses
+ * `components/ui/combobox`. That reversal is scoped to that control — every
+ * short list on these forms still belongs here, and the reasoning above is
+ * unchanged for them.
  */
 export function SelectField({
   name,

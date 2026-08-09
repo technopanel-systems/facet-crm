@@ -19,34 +19,39 @@ Current phase and model/skill routing: `docs/05-roadmap.md`.
 When sources disagree, higher wins.
 
 **User truth** — stated directly by the founder:
-1. `docs/14-slice1-decisions.md` — latest; corrects 12 §3 and 13 §2's scope rule
-2. `docs/12-closing-open-items.md` — corrects 07, 08, 09, 10, 11
-3. `docs/11-architectural-decisions.md` §1–3
-4. `docs/04-founder-answers.md`
-5. `docs/07-phase4-answers.md`
-6. `docs/08-quotation-model.md` §A–C
+1. `docs/15-lookup-decisions.md` — latest; reverses 14 §5's control choice for
+   the city field, and makes region derived rather than entered
+2. `docs/14-slice1-decisions.md` — corrects 12 §3 and 13 §2's scope rule
+3. `docs/12-closing-open-items.md` — corrects 07, 08, 09, 10, 11
+4. `docs/11-architectural-decisions.md` §1–3
+5. `docs/04-founder-answers.md`
+6. `docs/07-phase4-answers.md`
+7. `docs/08-quotation-model.md` §A–C
 
 **Settled decisions** — agreed, do not re-litigate:
-7. `docs/13-data-model-decisions.md` — §3 is **LOCKED**; §1–2 explain the
+8. `docs/13-data-model-decisions.md` — §3 is **LOCKED**; §1–2 explain the
    schema, they do not govern it
-8. `docs/10-schema-decisions.md`
-9. `docs/09-schema-design.md`
-10. `docs/03-stack.md`
-11. `docs/01-business-model.md`
+9. `docs/10-schema-decisions.md`
+10. `docs/09-schema-design.md`
+11. `docs/03-stack.md`
+12. `docs/01-business-model.md`
 
 **Reference only** — never authority:
-12. `docs/06-strategic-review.md` — proposals, explicitly not truth
-13. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
+13. `docs/06-strategic-review.md` — proposals, explicitly not truth
+14. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
     whole; cite sections)
-14. `docs/02-history-extract.md` — mined from old chat transcripts
-15. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
-16. `legacy/**`
+15. `docs/02-history-extract.md` — mined from old chat transcripts
+16. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
+17. `legacy/**`
 
-**Later decisions correct earlier ones.** `14` corrects `12 §3` (the executive
-may edit records) and adds project–company link removal. `12` corrects
-`10 §5` (specs key on supplier too), `07 A3` (project roles are free text) and
-`08 B2` (coils are out of scope for quotations). `10` corrects `09`. When two
-documents disagree, the later one is the answer — no judgement call needed.
+**Later decisions correct earlier ones.** `15` reverses `14`'s "native select,
+no Radix" **for the city field only** — a ~200-item list is unusable as a plain
+dropdown — and makes `region` derived from the chosen city rather than asked
+for. `14` corrects `12 §3` (the executive may edit records) and adds
+project–company link removal. `12` corrects `10 §5` (specs key on supplier
+too), `07 A3` (project roles are free text) and `08 B2` (coils are out of scope
+for quotations). `10` corrects `09`. When two documents disagree, the later one
+is the answer — no judgement call needed.
 
 Never treat `legacy/` code, schema or docs as a specification. v1 failed. It is
 kept to understand what was attempted, not what should be built.
@@ -116,23 +121,51 @@ There is **no test harness**. What is automated, and what is not:
 - **Nothing tests behaviour.** Visibility, audit writes and the business rules
   were checked with throwaway scripts, which is not the same as a suite.
 
+**Auth bridge** (`11 §4.1`) — re-run after any upgrade of `next-auth`,
+`@auth/core`, `@auth/drizzle-adapter` or `next`. Failure here is **silent**:
+login still works, sessions just stop being revocable.
+
+The whole checklist was run against a freshly reset cluster on 2026-08-09 and
+passed:
+
+- Credentials login writes a real `sessions` row; the cookie carries its token.
+- **Deactivation kills a live session on the next request.** Verified both
+  ways: flipping `is_active` directly in SQL — bypassing `deactivateUser`'s own
+  cleanup — still redirects the next request to login and destroys every
+  session row, so `getSession`'s re-check is doing the work on its own; and
+  `deactivateUser()` also clears them in its transaction.
+- **Impersonation** sets `acting_as_user_id`, and the banner then renders,
+  names both identities, offers "Stop impersonating", and the header greets the
+  impersonated user. Clearing the column takes all of that back. All four of
+  `startImpersonation`'s guards were exercised and each refuses for its own
+  reason (not merely "it threw").
+  **One gap, stated rather than papered over:** `startImpersonation`'s final
+  UPDATE could not be executed in-process — it needs `getSessionToken()` and so
+  a request context, and no UI starts impersonation until Phase 11. Its guards
+  and its effect are verified; the single statement between them is not.
+
 Still manual, still owed:
 
-- **Auth bridge** (`11 §4.1`) — after any upgrade of `next-auth`, `@auth/core`,
-  `@auth/drizzle-adapter` or `next`. Failure here is **silent**: login still
-  works, sessions just stop being revocable. Credentials login and database
-  sessions were re-verified against the current cluster on 2026-08-09;
-  **deactivation and impersonation have still not been re-run there.**
 - **RTL**: no lint rule enforces logical utilities. Grep before calling a
   screen done, and open `/ar`.
+- **Client-side interaction is untested.** The city combobox `[15 §5]` was
+  checked only as rendered markup in both locales. Its keyboard navigation,
+  filtering and RTL popup behaviour have never been driven in a browser.
 
-Automating the auth checklist is still the highest-value test to write.
+Automating the auth checklist is still the highest-value test to write — the
+throwaway script that produced the results above was deleted, which is exactly
+the problem.
 
 ## Working style
 
 - Plan mode first for anything structural. Show the plan, wait for approval.
 - One task per session. Small, reviewable diffs.
 - Show file paths and diffs, not whole-file reprints.
+- **Run all four checks before calling a slice done** — `npm run typecheck`,
+  `npm run lint`, `npm run build`, `npm run check:messages`. **`build` is not
+  optional and `typecheck` does not stand in for it:** typecheck passed while
+  a client component imported a data module, and only `build` caught the
+  Postgres driver being bundled for the browser. `next dev` tolerates it too.
 - Commit after every working slice.
 - Ask before adding a dependency.
 - Host-side `db:*` scripts read `DATABASE_URL` from `.env`; the app container

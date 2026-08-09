@@ -38,6 +38,7 @@ import {
   type SameValues,
   type Warmth,
 } from "@/lib/enums";
+import { assertLeadSourceSelectable, regionForCity } from "@/lib/lookups";
 import { normalizedNameFor } from "@/lib/normalize";
 import { RuleError } from "@/lib/validation";
 
@@ -265,11 +266,19 @@ export async function createCompany(
 ): Promise<Company> {
   const now = new Date();
 
+  // Both rules run before the transaction opens: they only read, and a refusal
+  // should not have started one.
+  await assertLeadSourceSelectable(session, input.leadSourceId);
+  const region = await regionForCity(input.cityId, input.region);
+
   return withAudit(session.actor, async (tx, log) => {
     const [company] = await tx
       .insert(companies)
       .values({
         ...input,
+        // The city decides the region when there is one `[15 §4]`; whatever
+        // the form posted is not consulted.
+        region,
         nameNormalized: normalizedNameFor(input),
         // Warmth is the rep's judgement, and who set it is part of the record
         // `[10 §1]`. Stamped only when a value was actually chosen.
@@ -340,16 +349,33 @@ export async function updateCompany(
       .limit(1);
     if (!before) throw new RuleError("companies.errors.notFound");
 
-    const changed = EDITABLE.filter((key) => before[key] !== input[key]);
+    // `15 §2.1` — only a *change* is checked, which is why this needs the
+    // previous value and therefore runs after the row is read. A rep re-saving
+    // a company the marketing team sourced keeps it.
+    await assertLeadSourceSelectable(
+      session,
+      input.leadSourceId,
+      before.leadSourceId,
+    );
+
+    // What will actually be written: the region comes from the city when there
+    // is one `[15 §4]`. The diff below compares against this, not against the
+    // form, so a derived region shows up in the audit log as a real change.
+    const values: CompanyInput = {
+      ...input,
+      region: await regionForCity(input.cityId, input.region),
+    };
+
+    const changed = EDITABLE.filter((key) => before[key] !== values[key]);
     if (changed.length === 0) return before;
 
-    const warmthChanged = input.warmth !== before.warmth;
+    const warmthChanged = values.warmth !== before.warmth;
 
     const [after] = await tx
       .update(companies)
       .set({
-        ...input,
-        nameNormalized: normalizedNameFor(input),
+        ...values,
+        nameNormalized: normalizedNameFor(values),
         // Only a real change restamps warmth; re-saving the form must not
         // rewrite who judged the company and when `[10 §1]`.
         ...(warmthChanged

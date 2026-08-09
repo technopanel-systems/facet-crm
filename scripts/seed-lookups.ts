@@ -1,6 +1,7 @@
 /**
  * Seed the lookup tables that `12 §14` calls for after the migration:
- * company categories `[12 §4]` and the product attribute lookups `[08 B1]`.
+ * company categories `[12 §4]`, the product attribute lookups `[08 B1]`, and —
+ * since `15` — lead sources `[15 §1]` and Saudi cities `[15 §3]`.
  * `npm run db:seed:lookups`, or `npm run db:seed` for these plus the roles.
  *
  * Idempotent by natural key — name for a category, code for a product
@@ -21,7 +22,9 @@ import { eq } from "drizzle-orm";
 
 import { closeDatabase, db } from "@/db";
 import {
+  cities,
   companyCategories,
+  leadSources,
   productClasses,
   productColours,
   productFireRatings,
@@ -29,7 +32,9 @@ import {
   productThicknesses,
 } from "@/db/schema";
 
+import { CITY_SEED } from "./seed/cities";
 import { COMPANY_CATEGORY_SEED } from "./seed/company-categories";
+import { LEAD_SOURCE_SEED } from "./seed/lead-sources";
 import {
   PRODUCT_CLASS_SEED,
   PRODUCT_COLOUR_SEED,
@@ -67,6 +72,78 @@ async function seedCompanyCategories(): Promise<Counts> {
         .update(companyCategories)
         .set({ nameAr: row.nameAr })
         .where(eq(companyCategories.id, existing.id));
+      counts.updated += 1;
+    } else {
+      counts.unchanged += 1;
+    }
+  }
+  return counts;
+}
+
+/**
+ * Lead sources `[15 §1]`, keyed on the English name.
+ *
+ * `rep_selectable` is corrected on a second run like any other attribute: it is
+ * configuration `[15 §2]`, so changing which sources a rep may pick is a seed
+ * edit and a re-run, never a migration.
+ */
+async function seedLeadSources(): Promise<Counts> {
+  const counts = zero();
+  for (const row of LEAD_SOURCE_SEED) {
+    const [existing] = await db
+      .select()
+      .from(leadSources)
+      .where(eq(leadSources.nameEn, row.nameEn))
+      .limit(1);
+
+    if (!existing) {
+      await db.insert(leadSources).values(row);
+      counts.inserted += 1;
+    } else if (
+      existing.nameAr !== row.nameAr ||
+      existing.repSelectable !== row.repSelectable
+    ) {
+      await db
+        .update(leadSources)
+        .set({ nameAr: row.nameAr, repSelectable: row.repSelectable })
+        .where(eq(leadSources.id, existing.id));
+      counts.updated += 1;
+    } else {
+      counts.unchanged += 1;
+    }
+  }
+  return counts;
+}
+
+/**
+ * Saudi cities `[15 §3]`, keyed on the English name.
+ *
+ * A city that changes region on a re-run is updated in place rather than
+ * replaced: `companies.city_id` and `projects.city_id` point at these rows, and
+ * FACET does not delete a row that history references `[12 §7]`. Existing
+ * records keep the region written at the time `[15 §4]` — re-drawing the
+ * grouping is not meant to rewrite what was already recorded.
+ */
+async function seedCities(): Promise<Counts> {
+  const counts = zero();
+  for (const row of CITY_SEED) {
+    const [existing] = await db
+      .select()
+      .from(cities)
+      .where(eq(cities.nameEn, row.nameEn))
+      .limit(1);
+
+    if (!existing) {
+      await db.insert(cities).values(row);
+      counts.inserted += 1;
+    } else if (
+      existing.nameAr !== row.nameAr ||
+      existing.region !== row.region
+    ) {
+      await db
+        .update(cities)
+        .set({ nameAr: row.nameAr, region: row.region })
+        .where(eq(cities.id, existing.id));
       counts.updated += 1;
     } else {
       counts.unchanged += 1;
@@ -212,6 +289,8 @@ async function seedThicknesses(): Promise<Counts> {
 
 export async function seedLookups(): Promise<void> {
   report("company categories", await seedCompanyCategories());
+  report("lead sources", await seedLeadSources());
+  report("cities", await seedCities());
   report("product suppliers", await seedSuppliers());
   report("product classes", await seedClasses());
   report("product fire ratings", await seedFireRatings());

@@ -1,14 +1,15 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { FormField, SelectField } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "@/i18n/navigation";
-import type { LookupRow } from "@/lib/lookups";
+import type { CityRow, LookupRow } from "@/lib/lookups";
 // Enums come from `lib/enums`, never from `lib/companies`: importing a data
 // module here would pull the Postgres driver into the browser bundle.
 import { REGIONS, WARMTHS } from "@/lib/enums";
@@ -41,7 +42,7 @@ export function CompanyForm({
   submitLabel: string;
   cancelHref: string;
   categories: LookupRow[];
-  cities: LookupRow[];
+  cities: CityRow[];
   leadSources: LookupRow[];
   locale: string;
 }) {
@@ -54,6 +55,12 @@ export function CompanyForm({
 
   const optionName = (row: LookupRow) =>
     locale === "ar" ? row.nameAr || row.nameEn : row.nameEn;
+
+  // `15 §4` — the city decides the region. This state only drives what the
+  // user sees; the data layer derives the value that is actually written, so a
+  // stale or tampered display cannot put a record in the wrong region.
+  const [cityId, setCityId] = useState(value("cityId"));
+  const cityRegion = cities.find((city) => city.id === cityId)?.region ?? null;
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
@@ -161,44 +168,62 @@ export function CompanyForm({
           </SelectField>
         </FormField>
 
-        <FormField
-          name="region"
-          label={t("common.region")}
-          error={errors.region}
-        >
-          <SelectField
-            name="region"
-            defaultValue={value("region")}
-            placeholder={t("common.none")}
-            invalid={Boolean(errors.region)}
-          >
-            {REGIONS.map((region) => (
-              <option key={region} value={region}>
-                {t(`enums.region.${region}`)}
-              </option>
-            ))}
-          </SelectField>
-        </FormField>
-
+        {/* City before region, because the city now answers the region
+            `[15 §4]` and a field should not sit above the one that fills it. */}
         <FormField
           name="cityId"
           label={t("common.city")}
           error={errors.cityId}
           hint={cities.length === 0 ? t("common.noOptions") : undefined}
         >
-          <SelectField
+          <Combobox
             name="cityId"
             defaultValue={value("cityId")}
+            options={cities.map((row) => ({
+              value: row.id,
+              label: optionName(row),
+              // The other language's name, so search works in both `[15 §5]`.
+              altLabel: locale === "ar" ? row.nameEn : row.nameAr,
+            }))}
             placeholder={t("common.none")}
+            searchPlaceholder={t("common.searchCity")}
+            emptyLabel={t("common.noMatches")}
+            clearLabel={t("common.none")}
             disabled={cities.length === 0}
             invalid={Boolean(errors.cityId)}
-          >
-            {cities.map((row) => (
-              <option key={row.id} value={row.id}>
-                {optionName(row)}
-              </option>
-            ))}
-          </SelectField>
+            onChange={setCityId}
+          />
+        </FormField>
+
+        <FormField
+          name="region"
+          label={t("common.region")}
+          error={errors.region}
+          hint={cityRegion ? t("common.regionFromCity") : undefined}
+        >
+          {cityRegion ? (
+            // Derived, so it is shown rather than asked. No input is posted:
+            // the data layer reads the city's region regardless `[15 §4]`.
+            <p
+              className="border-input bg-muted text-muted-foreground flex h-9
+                items-center rounded-md border px-3 text-start text-sm"
+            >
+              {t(`enums.region.${cityRegion}`)}
+            </p>
+          ) : (
+            <SelectField
+              name="region"
+              defaultValue={value("region")}
+              placeholder={t("common.none")}
+              invalid={Boolean(errors.region)}
+            >
+              {REGIONS.map((region) => (
+                <option key={region} value={region}>
+                  {t(`enums.region.${region}`)}
+                </option>
+              ))}
+            </SelectField>
+          )}
         </FormField>
 
         <FormField
