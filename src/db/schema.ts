@@ -37,6 +37,7 @@ import { sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import {
   boolean,
+  check,
   date,
   index,
   integer,
@@ -204,8 +205,12 @@ export const repReportKindEnum = pgEnum("rep_report_kind", ["visit", "call"]);
 /**
  * `09 §2.1` — roles are data, not code. Adding a role is configuration.
  * The eight flags named in `[07 A5 C1]`, plus `can_manage_users` — added by
- * founder instruction in phase 6 (user creation/deactivation is gated on it;
- * the flag list was open per `09 §15.1`). The rest of the list stays open.
+ * founder instruction in phase 6 (`11 §1`) — plus three added in phase 7 to
+ * make `12 §3`'s executive flag list expressible as data:
+ * `can_set_credit_split` `[12 §1, §14.6]`, `can_approve_delete` and
+ * `can_resolve_duplicate` `[12 §3]`, the last two being the acts `07 A5`
+ * gives the sales manager ("approves shares, assignments, deletes, duplicate
+ * resolution"). The rest of the list stays open `[09 §15.1]`.
  * The unique name key exists so the role seed is a true upsert.
  */
 export const roles = pgTable(
@@ -225,6 +230,14 @@ export const roles = pgTable(
       .default(false),
     canImpersonate: boolean("can_impersonate").notNull().default(false),
     canManageUsers: boolean("can_manage_users").notNull().default(false),
+    /** `[12 §1]` — deliberate act, never a side effect of a dispatch `[07 D3]`. */
+    canSetCreditSplit: boolean("can_set_credit_split").notNull().default(false),
+    /** `[04 Q8]`, `[07 A5]`, `[12 §3]` — decides a rep's delete request. */
+    canApproveDelete: boolean("can_approve_delete").notNull().default(false),
+    /** `[07 B5]`, `[12 §3]` — works the duplicate queue. */
+    canResolveDuplicate: boolean("can_resolve_duplicate")
+      .notNull()
+      .default(false),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("roles_name_en_key").on(t.nameEn)],
@@ -373,13 +386,10 @@ export const leadSources = pgTable("lead_sources", {
   createdAt: createdAt(),
 });
 
-/** `09 §3.6` — "the role list stays open and editable rather than fixed in code" `[07 A3]`. */
-export const projectCompanyRoles = pgTable("project_company_roles", {
-  id: pk(),
-  nameEn: text("name_en").notNull(),
-  nameAr: text("name_ar").notNull(),
-  createdAt: createdAt(),
-});
+/* `project_company_roles` was dropped in migration 0002. `12 §5` corrects
+ * `07 A3` and `09 §3.6`: there is no role vocabulary at all — two contractors
+ * may compete on one project, and a lookup would force a false choice between
+ * them. The label is free text on the link row instead. */
 
 /**
  * `09 §3.1` — the customer is the company `[04 Q1]`.
@@ -526,8 +536,15 @@ export const projects = pgTable(
 
 /**
  * `09 §3.5` — the join that makes a company's involvement meaningful
- * `[04 Q2]`. Exactly one linked company is the buyer — the one that takes the
- * cladding; other roles are context `[07 A3]`.
+ * `[04 Q2]`.
+ *
+ * `12 §5`, `12 §6` correct this table twice. The role is a **free text label**
+ * describing what that company is on that project, not a foreign key into a
+ * vocabulary — competing contractors must both be describable `[12 §5]`. And
+ * the buyer is **zero or one**, never exactly one: while two companies compete
+ * there is no buyer, and there may never be one `[12 §6]`. The partial unique
+ * index below is what "at most one" means in SQL, and it says nothing when no
+ * row is flagged.
  */
 export const projectCompanies = pgTable(
   "project_companies",
@@ -539,7 +556,8 @@ export const projectCompanies = pgTable(
     companyId: uuid("company_id")
       .notNull()
       .references(() => companies.id),
-    roleId: uuid("role_id").references(() => projectCompanyRoles.id),
+    /** Free text `[12 §5]`. */
+    role: text("role"),
     isBuyer: boolean("is_buyer").notNull().default(false),
     createdAt: createdAt(),
   },
@@ -775,7 +793,8 @@ export const productFireRatings = pgTable("product_fire_ratings", {
   createdAt: createdAt(),
 });
 
-/** Many values. Lookup-versus-free-code is still open `[08 E6]`, `[10 §13]`. */
+/** Many values `[08 B1]`. The standard codes only — specials live on the
+ *  quotation line as `custom_colour`, closing `08 E6` per `12 §12`. */
 export const productColours = pgTable("product_colours", {
   id: pk(),
   code: text("code").notNull(),
@@ -793,18 +812,23 @@ export const productThicknesses = pgTable("product_thicknesses", {
 });
 
 /**
- * `10 §5` — corrects `08 D6`. Specifications key off physical construction:
- * class + fire rating + thickness. Not supplier, not colour — those change the
- * code and the price, not the technical description. Rendered onto the
- * quotation at print time, in English and Arabic.
+ * `12 §9` — corrects `10 §5`, which corrected `08 D6`. The key is
+ * **supplier + class + fire rating + thickness**: specifications vary by
+ * factory `[12 §8]`, so construction alone does not determine the text.
+ * Colour is still excluded — it changes the code and the price, not the
+ * technical description. Rendered onto the quotation at print time, in English
+ * and Arabic.
  *
- * Still to confirm with a coordinator that those three attributes fully
- * determine the text before seeding `[10 §13 item 12]`.
+ * Which class/fire-rating combinations are real is not a database constraint
+ * `[12 §8]` — it is whichever rows exist here.
  */
 export const productSpecifications = pgTable(
   "product_specifications",
   {
     id: pk(),
+    supplierId: uuid("supplier_id")
+      .notNull()
+      .references(() => productSuppliers.id),
     classId: uuid("class_id")
       .notNull()
       .references(() => productClasses.id),
@@ -832,6 +856,7 @@ export const productSpecifications = pgTable(
   },
   (t) => [
     uniqueIndex("product_specifications_key").on(
+      t.supplierId,
       t.classId,
       t.fireRatingId,
       t.thicknessId,
@@ -846,7 +871,13 @@ export const productSpecifications = pgTable(
  * Width and length are editable: standard values are offered as defaults, but
  * constraining them would block real orders `[08 D3]`. Square metres are a
  * generated column, verified against quotation 9592, never hand-entered
- * `[08 D2]` — the same rule the project README states.
+ * `[08 D2]` — the same rule the project README states. `12 §11` confirms this
+ * column unchanged and cancels the proposed `entered_sqm` / `COALESCE` change.
+ *
+ * Colour is one of two things, never both and never neither `[12 §12]`: a code
+ * from the lookup, or — rarely — a specific RAL/Pantone written into
+ * `custom_colour`. Specials stay out of the lookup so one-off customer colours
+ * do not pollute the list every rep picks from.
  */
 export const quotationLines = pgTable(
   "quotation_lines",
@@ -864,12 +895,18 @@ export const quotationLines = pgTable(
     fireRatingId: uuid("fire_rating_id")
       .notNull()
       .references(() => productFireRatings.id),
-    colourId: uuid("colour_id")
-      .notNull()
-      .references(() => productColours.id),
+    /** Null when the line carries a custom colour instead `[12 §12]`. */
+    colourId: uuid("colour_id").references(() => productColours.id),
+    /** The rare RAL/Pantone case `[12 §12]`. Null when a lookup colour is used. */
+    customColour: text("custom_colour"),
     thicknessId: uuid("thickness_id")
       .notNull()
       .references(() => productThicknesses.id),
+    /**
+     * `12 §11` — quotation lines are sheets only; coils belong to production.
+     * The column is left as `08 B2` defined it and the application writes
+     * `sheet`; nothing in `12 §14` asks for it to change.
+     */
     formFactor: formFactorEnum("form_factor").notNull(),
     widthM: numeric("width_m", SQM).notNull(),
     lengthM: numeric("length_m", SQM).notNull(),
@@ -884,7 +921,15 @@ export const quotationLines = pgTable(
     vatAmount: numeric("vat_amount", MONEY),
     createdAt: createdAt(),
   },
-  (t) => [index("quotation_lines_version_idx").on(t.versionId)],
+  (t) => [
+    index("quotation_lines_version_idx").on(t.versionId),
+    // "A line uses one or the other" `[12 §12]` — a data-integrity rule, not
+    // an authorization one, so the database is the right place for it.
+    check(
+      "quotation_lines_colour_choice",
+      sql`num_nonnulls(colour_id, custom_colour) = 1`,
+    ),
+  ],
 );
 
 /** `10 §12` — accepted. CNC, cutting, bending, notching will change `[08 B4]`. */

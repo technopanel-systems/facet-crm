@@ -1,6 +1,7 @@
 /**
- * Seed the six roles. Idempotent: upserts on `roles_name_en_key`, so a
- * re-run corrects flag values and never duplicates. `npm run db:seed:roles`.
+ * Seed the seven roles `[12 §2]`. Idempotent: upserts on `roles_name_en_key`,
+ * so a re-run corrects flag values and never duplicates.
+ * `npm run db:seed:roles`, or `npm run db:seed` for roles plus lookups.
  */
 
 process.loadEnvFile(".env");
