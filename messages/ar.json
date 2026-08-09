@@ -11,7 +11,8 @@
   "nav": {
     "companies": "الشركات",
     "contacts": "جهات الاتصال",
-    "projects": "المشاريع"
+    "projects": "المشاريع",
+    "quotations": "عروض الأسعار"
   },
   "common": {
     "create": "إنشاء",
@@ -44,7 +45,16 @@
     "unknownUser": "غير معروف",
     "searchCity": "ابحث عن مدينة",
     "noMatches": "لا توجد نتائج",
-    "regionFromCity": "محددة من المدينة المختارة"
+    "regionFromCity": "محددة من المدينة المختارة",
+    "sar": "ر.س",
+    "sqm": "م²",
+    "total": "الإجمالي",
+    "qualified": "مؤهلة",
+    "yes": "نعم",
+    "no": "لا",
+    "confirm": "تأكيد",
+    "date": "التاريخ",
+    "view": "عرض"
   },
   "enums": {
     "region": {
@@ -70,6 +80,27 @@
       "assigned": "مُسنَد",
       "shared": "مشارَك",
       "merge": "مدموج"
+    },
+    "quotationThreadEndState": {
+      "accepted": "معتمد",
+      "rejected": "مرفوض",
+      "cancelled": "ملغى",
+      "expired": "منتهي الصلاحية"
+    },
+    "quotationVersionStatus": {
+      "requested": "مطلوب",
+      "issued": "صادر",
+      "superseded": "مستبدل"
+    },
+    "quotationVersionOrigin": {
+      "initial_request": "الطلب الأول",
+      "rep_change_request": "طلب تعديل من المندوب",
+      "coordinator_direct_edit": "تعديل من منسق المبيعات",
+      "expiry_revision": "مراجعة بعد انتهاء الصلاحية"
+    },
+    "smacVerification": {
+      "unverified": "غير مُتحقق منه",
+      "verified": "مُتحقق منه"
     }
   },
   "errors": {
@@ -86,7 +117,8 @@
     "invalidOption": "خيار غير صالح.",
     "notANumber": "يجب أن يكون رقمًا.",
     "negative": "لا يمكن أن يكون سالبًا.",
-    "tooManyDecimals": "عدد المنازل العشرية كبير جدًا."
+    "tooManyDecimals": "عدد المنازل العشرية كبير جدًا.",
+    "notADate": "يجب أن يكون تاريخًا صالحًا."
   },
   "companies": {
     "title": "الشركات",
@@ -172,6 +204,119 @@
       "lossReasonRequired": "المشروع الخاسر يحتاج إلى سبب.",
       "lastCompany": "يجب أن يحتفظ المشروع بشركة واحدة على الأقل.",
       "notFound": "هذا المشروع غير موجود، أو أنه ليس ضمن سجلاتك."
+    }
+  },
+  "quotations": {
+    "title": "عروض الأسعار",
+    "new": "عرض سعر جديد",
+    "newTitle": "طلب عرض سعر جديد",
+    "empty": "لا توجد عروض أسعار بعد.",
+    "emptyFiltered": "لا توجد عروض أسعار مطابقة للبحث.",
+    "searchPlaceholder": "ابحث بالرقم المرجعي أو المشروع أو الشركة",
+    "fields": {
+      "reference": "المرجع في SMAC",
+      "project": "المشروع",
+      "company": "الشركة",
+      "contact": "جهة الاتصال",
+      "raisedBy": "أنشأه",
+      "version": "النسخة",
+      "versionStatus": "النسخة",
+      "endState": "الحالة",
+      "endStateOpen": "مفتوح",
+      "validUntil": "صالح حتى",
+      "deliveryPeriod": "مدة التسليم",
+      "paymentMethod": "طريقة الدفع",
+      "shipmentTerms": "شروط الشحن",
+      "origin": "المصدر",
+      "verification": "تم التحقق من المرجع",
+      "grandTotal": "الإجمالي",
+      "payment": "الدفع"
+    },
+    "detail": {
+      "details": "التفاصيل",
+      "liveVersion": "النسخة الحالية",
+      "versionHistory": "سجل النسخ",
+      "lines": "بنود المنتجات",
+      "serviceLines": "الخدمات",
+      "noServiceLines": "لا توجد خدمات في عرض السعر هذا.",
+      "terms": "الشروط",
+      "supplier": "المورّد",
+      "productClass": "الفئة",
+      "fireRating": "درجة مقاومة الحريق",
+      "colour": "اللون",
+      "colourStandard": "من القائمة",
+      "colourCustom": "RAL / Pantone",
+      "customColour": "لون خاص",
+      "thickness": "السماكة",
+      "product": "المنتج",
+      "width": "العرض (م)",
+      "length": "الطول (م)",
+      "quantityPcs": "الكمية (ألواح)",
+      "sqm": "المساحة (م²)",
+      "unitPrice": "السعر / م²",
+      "lineTotal": "الإجمالي بدون ضريبة",
+      "vatRate": "نسبة الضريبة ٪",
+      "vatAmount": "ضريبة القيمة المضافة",
+      "service": "الخدمة",
+      "serviceQuantity": "الكمية (م²)",
+      "appliesTo": "تنطبق على",
+      "wholeQuotation": "عرض السعر كاملًا",
+      "addLine": "إضافة بند",
+      "addService": "إضافة خدمة",
+      "totals": "الإجماليات",
+      "totalSqm": "إجمالي المساحة",
+      "totalExclVat": "الإجمالي بدون ضريبة",
+      "totalVat": "ضريبة القيمة المضافة",
+      "unpricedLines": "بعض البنود بلا سعر بعد، لذلك الإجماليات أدناه غير مكتملة.",
+      "readOnly": "هذه النسخة للقراءة فقط.",
+      "supersededBy": "مستبدلة — النسخة {number} هي النسخة الحالية.",
+      "computed": "يحسبها FACET من البنود.",
+      "raisedOn": "تاريخ الإنشاء",
+      "returnedRounds": "أُعيد للتعديل",
+      "cancelledBy": "ألغاه",
+      "cancellationReason": "سبب الإلغاء",
+      "paymentConfirmedBy": "أكّد الدفع",
+      "paymentConfirmedAt": "تاريخ تأكيد الدفع",
+      "acceptedForProcessing": "معتمد للتنفيذ",
+      "notConfirmed": "غير مؤكد"
+    },
+    "actions": {
+      "coordinator": "منسق المبيعات",
+      "rep": "المندوب",
+      "issue": "تسجيل المرجع في SMAC",
+      "issueHint": "يجعل النسخة {number} صادرة في FACET. اكتب الرقم تمامًا كما يظهر في SMAC.",
+      "returnForEdit": "إعادة للتعديل",
+      "returnForEditHint": "يعيدها إلى المندوب. تبقى النسخة قابلة للتعديل.",
+      "accept": "اعتماد",
+      "acceptHint": "اعتماد داخلي — التواقيع مكتملة. هذا ليس التزامًا من العميل.",
+      "reject": "رفض",
+      "cancel": "إلغاء عرض السعر",
+      "cancelHint": "يلزم كتابة سبب.",
+      "revise": "إنشاء مراجعة",
+      "reviseHint": "النسخة {number} تحمل رقم RE. تُنقل البنود إليها وتصبح النسخة الحالية للقراءة فقط.",
+      "extend": "تمديد الصلاحية",
+      "extendHint": "استخدم هذا إذا لم يتغير شيء. وإلا فأنشئ مراجعة.",
+      "confirmPayment": "تأكيد الدفع",
+      "confirmPaymentHint": "تاريخ استلام الدفعة.",
+      "markAccepted": "اعتماد للتنفيذ",
+      "markAcceptedHint": "متاح بعد تأكيد الدفع.",
+      "done": "تم التسجيل"
+    },
+    "errors": {
+      "notFound": "عرض السعر هذا غير موجود، أو أنه ليس ضمن سجلاتك.",
+      "projectNotVisible": "لا يمكنك إنشاء عرض سعر على هذا المشروع.",
+      "companyNotOnProject": "هذه الشركة ليست ضمن المشروع. أضفها إلى المشروع أولًا ثم عد إلى هنا.",
+      "contactNotOnCompany": "جهة الاتصال هذه لا تتبع هذه الشركة.",
+      "colourChoice": "اختر لونًا من القائمة أو اكتب لونًا خاصًا — لا الاثنين.",
+      "atLeastOneLine": "يحتاج عرض السعر إلى بند منتج واحد على الأقل.",
+      "lastLine": "يجب أن يحتفظ عرض السعر ببند منتج واحد على الأقل.",
+      "versionNotEditable": "صدرت هذه النسخة بالفعل. أنشئ مراجعة لتغييرها.",
+      "alreadyIssued": "هذه النسخة تحمل مرجع SMAC بالفعل.",
+      "threadClosed": "عرض السعر هذا مغلق.",
+      "coordinatorOnly": "منسق المبيعات وحده يمكنه فعل ذلك.",
+      "cancellationReasonRequired": "الإلغاء يحتاج إلى سبب مكتوب.",
+      "paymentFirst": "أكّد الدفع أولًا.",
+      "noSuppliers": "لم تُضف أي جهات توريد بعد، لذلك لا يمكن حفظ البند."
     }
   },
   "status": {

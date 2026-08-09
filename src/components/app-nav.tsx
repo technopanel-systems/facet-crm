@@ -16,6 +16,7 @@ const SECTIONS = [
   { href: "/companies", key: "companies" },
   { href: "/contacts", key: "contacts" },
   { href: "/projects", key: "projects" },
+  { href: "/quotations", key: "quotations" },
 ] as const;
 
 export function AppNav() {

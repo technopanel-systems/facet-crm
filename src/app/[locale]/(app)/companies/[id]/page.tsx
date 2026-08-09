@@ -98,6 +98,17 @@ export default async function CompanyDetailPage({
                 t("companies.fields.warmthUnset")
               )}
             </DetailRow>
+            {/* Two separate things, deliberately `[10 §1]`: warmth is the
+                rep's judgement, qualification is what has actually happened.
+                A company is qualified because a quotation was requested
+                against it — there is nothing here for anyone to tick. */}
+            <DetailRow label={t("common.qualified")}>
+              {company.isQualified ? (
+                <Badge variant="outline">{t("common.yes")}</Badge>
+              ) : (
+                <span className="text-muted-foreground">{t("common.no")}</span>
+              )}
+            </DetailRow>
             <DetailRow label={t("common.notes")}>
               {company.notes ?? dash}
             </DetailRow>

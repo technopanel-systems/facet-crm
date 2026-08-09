@@ -40,6 +40,10 @@ import {
 } from "@/lib/enums";
 import { assertLeadSourceSelectable, regionForCity } from "@/lib/lookups";
 import { normalizedNameFor } from "@/lib/normalize";
+// Qualification is a quotation event, so its predicate lives with quotations
+// `[10 §1]`. The dependency runs one way only — that module never imports this
+// one, so there is no cycle to unpick later.
+import { companyIsQualified } from "@/lib/quotations";
 import { RuleError } from "@/lib/validation";
 
 export type Company = typeof companies.$inferSelect;
@@ -83,6 +87,8 @@ export type CompanyListRow = {
   categoryNameAr: string | null;
   cityNameEn: string | null;
   cityNameAr: string | null;
+  /** Derived, never stored — see `companyIsQualified`. */
+  isQualified: boolean;
   createdAt: Date;
 };
 
@@ -122,6 +128,9 @@ export async function listCompanies(
       categoryNameAr: companyCategories.nameAr,
       cityNameEn: cities.nameEn,
       cityNameAr: cities.nameAr,
+      // Qualification is derived from the event, never set by hand
+      // `[04 qualification]`, `[10 §1]` — a correlated EXISTS, not a column.
+      isQualified: companyIsQualified(companies.id),
       createdAt: companies.createdAt,
     })
     .from(companies)
@@ -164,6 +173,15 @@ export type CompanyDetail = Company & {
   leadSourceNameEn: string | null;
   leadSourceNameAr: string | null;
   createdByName: string | null;
+  /**
+   * **Derived, never a field anyone sets** `[04 qualification]`, `[10 §1]`.
+   *
+   * A company is qualified because a quotation was requested against it. There
+   * is no column, no flag and no tick box — the funnel is computed from what
+   * has actually happened, which is what stops a rep moving a company forward
+   * without anything happening.
+   */
+  isQualified: boolean;
 };
 
 /**
@@ -189,6 +207,7 @@ export async function getCompany(
       leadSourceNameEn: leadSources.nameEn,
       leadSourceNameAr: leadSources.nameAr,
       createdByName: users.name,
+      isQualified: companyIsQualified(companies.id),
     })
     .from(companies)
     .leftJoin(companyCategories, eq(companies.categoryId, companyCategories.id))
@@ -208,6 +227,7 @@ export async function getCompany(
     leadSourceNameEn: row.leadSourceNameEn,
     leadSourceNameAr: row.leadSourceNameAr,
     createdByName: row.createdByName,
+    isQualified: row.isQualified,
   };
 }
 

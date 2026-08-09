@@ -24,7 +24,17 @@
 import { asc, eq, or, type SQL } from "drizzle-orm";
 
 import { db } from "@/db";
-import { cities, companyCategories, leadSources } from "@/db/schema";
+import {
+  cities,
+  companyCategories,
+  leadSources,
+  productClasses,
+  productColours,
+  productFireRatings,
+  productSuppliers,
+  productThicknesses,
+  serviceTypes,
+} from "@/db/schema";
 import { can, type AuthSession } from "@/lib/authz";
 import type { Region } from "@/lib/enums";
 import { RuleError } from "@/lib/validation";
@@ -163,6 +173,102 @@ export async function assertLeadSourceSelectable(
     "companies.errors.leadSourceNotSelectable",
     "leadSourceId",
   );
+}
+
+/* ------------------------------------------------------------------ *
+ * Product attribute lookups `[08 D1]`, `[09 §5.6]`
+ *
+ * Reference data like the three above — no visibility filter, and no
+ * selectability rule either: nothing in any document restricts who may quote
+ * which supplier.
+ *
+ * **Two of these are deliberately empty** and the screens must survive it.
+ * `product_suppliers` has the seven codes from `08 B1` but no factory names in
+ * any document, and `product_colours` is described only as "many"
+ * (`scripts/seed/products.ts`). A quotation line cannot be saved until
+ * suppliers exist, because `supplier_id` is `NOT NULL` — that is a missing
+ * decision surfacing as an empty dropdown, not a bug to code around.
+ * ------------------------------------------------------------------ */
+
+/** A product attribute whose `code` is the token in the generated name. */
+export type ProductCodeRow = LookupRow & { code: string };
+
+/** 4 mm is standard and is omitted from the generated name `[08 B1]`. */
+export type ThicknessRow = {
+  id: string;
+  thicknessMm: string;
+  isStandard: boolean;
+};
+
+export async function listProductSuppliers(): Promise<ProductCodeRow[]> {
+  return db
+    .select({
+      id: productSuppliers.id,
+      code: productSuppliers.code,
+      nameEn: productSuppliers.nameEn,
+      nameAr: productSuppliers.nameAr,
+    })
+    .from(productSuppliers)
+    .orderBy(asc(productSuppliers.code));
+}
+
+export async function listProductClasses(): Promise<ProductCodeRow[]> {
+  return db
+    .select({
+      id: productClasses.id,
+      code: productClasses.code,
+      nameEn: productClasses.nameEn,
+      nameAr: productClasses.nameAr,
+    })
+    .from(productClasses)
+    .orderBy(asc(productClasses.code));
+}
+
+export async function listProductFireRatings(): Promise<ProductCodeRow[]> {
+  return db
+    .select({
+      id: productFireRatings.id,
+      code: productFireRatings.code,
+      nameEn: productFireRatings.nameEn,
+      nameAr: productFireRatings.nameAr,
+    })
+    .from(productFireRatings)
+    .orderBy(asc(productFireRatings.code));
+}
+
+export async function listProductColours(): Promise<ProductCodeRow[]> {
+  return db
+    .select({
+      id: productColours.id,
+      code: productColours.code,
+      nameEn: productColours.nameEn,
+      nameAr: productColours.nameAr,
+    })
+    .from(productColours)
+    .orderBy(asc(productColours.code));
+}
+
+export async function listProductThicknesses(): Promise<ThicknessRow[]> {
+  return db
+    .select({
+      id: productThicknesses.id,
+      thicknessMm: productThicknesses.thicknessMm,
+      isStandard: productThicknesses.isStandard,
+    })
+    .from(productThicknesses)
+    .orderBy(asc(productThicknesses.thicknessMm));
+}
+
+/** `[10 §12]`, seeded per `[16 §4]`. All are priced per m² `[12 §10]`. */
+export async function listServiceTypes(): Promise<LookupRow[]> {
+  return db
+    .select({
+      id: serviceTypes.id,
+      nameEn: serviceTypes.nameEn,
+      nameAr: serviceTypes.nameAr,
+    })
+    .from(serviceTypes)
+    .orderBy(asc(serviceTypes.nameEn));
 }
 
 /**

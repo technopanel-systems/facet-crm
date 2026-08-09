@@ -1,7 +1,8 @@
 /**
  * Seed the lookup tables that `12 §14` calls for after the migration:
  * company categories `[12 §4]`, the product attribute lookups `[08 B1]`, and —
- * since `15` — lead sources `[15 §1]` and Saudi cities `[15 §3]`.
+ * since `15` — lead sources `[15 §1]` and Saudi cities `[15 §3]`. `16 §4` adds
+ * the service types.
  * `npm run db:seed:lookups`, or `npm run db:seed` for these plus the roles.
  *
  * Idempotent by natural key — name for a category, code for a product
@@ -30,6 +31,7 @@ import {
   productFireRatings,
   productSuppliers,
   productThicknesses,
+  serviceTypes,
 } from "@/db/schema";
 
 import { CITY_SEED } from "./seed/cities";
@@ -42,6 +44,7 @@ import {
   PRODUCT_SUPPLIER_SEED,
   PRODUCT_THICKNESS_SEED,
 } from "./seed/products";
+import { SERVICE_TYPE_SEED } from "./seed/services";
 
 type Counts = { inserted: number; updated: number; unchanged: number };
 
@@ -287,6 +290,33 @@ async function seedThicknesses(): Promise<Counts> {
   return counts;
 }
 
+/** CNC, cutting, bending, notching `[08 B4]`, `[16 §4]`, keyed on the English
+ *  name. All are priced per m² `[12 §10]`, so there is no unit column here. */
+async function seedServiceTypes(): Promise<Counts> {
+  const counts = zero();
+  for (const row of SERVICE_TYPE_SEED) {
+    const [existing] = await db
+      .select()
+      .from(serviceTypes)
+      .where(eq(serviceTypes.nameEn, row.nameEn))
+      .limit(1);
+
+    if (!existing) {
+      await db.insert(serviceTypes).values(row);
+      counts.inserted += 1;
+    } else if (existing.nameAr !== row.nameAr) {
+      await db
+        .update(serviceTypes)
+        .set({ nameAr: row.nameAr })
+        .where(eq(serviceTypes.id, existing.id));
+      counts.updated += 1;
+    } else {
+      counts.unchanged += 1;
+    }
+  }
+  return counts;
+}
+
 export async function seedLookups(): Promise<void> {
   report("company categories", await seedCompanyCategories());
   report("lead sources", await seedLeadSources());
@@ -296,6 +326,7 @@ export async function seedLookups(): Promise<void> {
   report("product fire ratings", await seedFireRatings());
   report("product colours", await seedColours());
   report("product thicknesses", await seedThicknesses());
+  report("service types", await seedServiceTypes());
 }
 
 // Run directly (tsx scripts/seed-lookups.ts) — also imported by scripts/seed.ts.

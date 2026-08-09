@@ -46,6 +46,14 @@ const FIXTURES = [
   { name: "Rep A", email: "rep-a@example.test", role: "Sales Rep" },
   { name: "Rep B", email: "rep-b@example.test", role: "Sales Rep" },
   { name: "Manager", email: "manager@example.test", role: "Sales Manager" },
+  // Slice 2: the quotation chain hands off between a rep and the coordinator
+  // `[04 flow 6–11]`, and `can_approve_quotation` cannot be exercised without
+  // an account that holds it.
+  {
+    name: "Coordinator",
+    email: "coordinator@example.test",
+    role: "Sales Coordinator",
+  },
 ] as const;
 
 async function main(): Promise<void> {

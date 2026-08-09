@@ -19,32 +19,38 @@ Current phase and model/skill routing: `docs/05-roadmap.md`.
 When sources disagree, higher wins.
 
 **User truth** — stated directly by the founder:
-1. `docs/15-lookup-decisions.md` — latest; reverses 14 §5's control choice for
-   the city field, and makes region derived rather than entered
-2. `docs/14-slice1-decisions.md` — corrects 12 §3 and 13 §2's scope rule
-3. `docs/12-closing-open-items.md` — corrects 07, 08, 09, 10, 11
-4. `docs/11-architectural-decisions.md` §1–3
-5. `docs/04-founder-answers.md`
-6. `docs/07-phase4-answers.md`
-7. `docs/08-quotation-model.md` §A–C
+1. `docs/16-slice2-decisions.md` — latest; the quotation chain. FACET computes
+   the money, VAT defaults to 15%, expiry is a sweep, and **`accepted` is
+   internal approval, never a won deal**
+2. `docs/15-lookup-decisions.md` — reverses 14 §5's control choice for the city
+   field, and makes region derived rather than entered
+3. `docs/14-slice1-decisions.md` — corrects 12 §3 and 13 §2's scope rule
+4. `docs/12-closing-open-items.md` — corrects 07, 08, 09, 10, 11
+5. `docs/11-architectural-decisions.md` §1–3
+6. `docs/04-founder-answers.md`
+7. `docs/07-phase4-answers.md`
+8. `docs/08-quotation-model.md` §A–C
 
 **Settled decisions** — agreed, do not re-litigate:
-8. `docs/13-data-model-decisions.md` — §3 is **LOCKED**; §1–2 explain the
+9. `docs/13-data-model-decisions.md` — §3 is **LOCKED**; §1–2 explain the
    schema, they do not govern it
-9. `docs/10-schema-decisions.md`
-10. `docs/09-schema-design.md`
-11. `docs/03-stack.md`
-12. `docs/01-business-model.md`
+10. `docs/10-schema-decisions.md`
+11. `docs/09-schema-design.md`
+12. `docs/03-stack.md`
+13. `docs/01-business-model.md`
 
 **Reference only** — never authority:
-13. `docs/06-strategic-review.md` — proposals, explicitly not truth
-14. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
+14. `docs/06-strategic-review.md` — proposals, explicitly not truth
+15. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
     whole; cite sections)
-15. `docs/02-history-extract.md` — mined from old chat transcripts
-16. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
-17. `legacy/**`
+16. `docs/02-history-extract.md` — mined from old chat transcripts
+17. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
+18. `legacy/**`
 
-**Later decisions correct earlier ones.** `15` reverses `14`'s "native select,
+**Later decisions correct earlier ones.** `16` settles who fills the quotation
+money columns (FACET computes them) and draws the line `07 D4` and `10 §11`
+will otherwise blur: **`end_state = 'accepted'` is internal approval, not a won
+deal** — the customer commits at payment. `15` reverses `14`'s "native select,
 no Radix" **for the city field only** — a ~200-item list is unusable as a plain
 dropdown — and makes `region` derived from the chosen city rather than asked
 for. `14` corrects `12 §3` (the executive may edit records) and adds
@@ -118,8 +124,18 @@ There is **no test harness**. What is automated, and what is not:
   `next dev` tolerates and which ships the database driver to the browser.
 - `npm run check:messages` — EN and AR carry the same key tree and the same
   ICU placeholders.
-- **Nothing tests behaviour.** Visibility, audit writes and the business rules
-  were checked with throwaway scripts, which is not the same as a suite.
+- `npm run verify:slice2` — **the first behavioural check that is kept rather
+  than thrown away.** Development only, like `dev:fixtures`. It drives
+  `src/lib/quotations.ts` in process and asserts: the arithmetic against real
+  quotation 9592 (`86.3040 m²`, `10,356.48`, `1,553.47`, `11,909.95`); the
+  request is version 1; issuing freezes the lines; a revision supersedes and
+  carries them forward; every `can_approve_quotation` gate refuses a rep **with
+  its own message**, not merely by throwing; payment ordering; expiry marks an
+  overdue thread, skips a paid one, and audits under a null actor; and
+  qualification is derived. It found two real bugs on its first run.
+- **Almost nothing else tests behaviour.** The auth checklist and Slice 1's
+  visibility rules were checked with throwaway scripts, which is not the same
+  as a suite. `verify:slice2` is the shape the rest should take.
 
 **Auth bridge** (`11 §4.1`) — re-run after any upgrade of `next-auth`,
 `@auth/core`, `@auth/drizzle-adapter` or `next`. Failure here is **silent**:
@@ -148,13 +164,25 @@ Still manual, still owed:
 
 - **RTL**: no lint rule enforces logical utilities. Grep before calling a
   screen done, and open `/ar`.
-- **Client-side interaction is untested.** The city combobox `[15 §5]` was
-  checked only as rendered markup in both locales. Its keyboard navigation,
-  filtering and RTL popup behaviour have never been driven in a browser.
+- **Client-side interaction is untested.** The city combobox `[15 §5]`, the
+  quotation line editors and the colour standard/custom switch were checked
+  only as rendered markup in both locales — served over HTTP, asserted on the
+  DOM, `200` for the raiser and the coordinator and `404` for an unrelated rep.
+  Their keyboard navigation, filtering, row add/remove and RTL popup behaviour
+  have never been driven in a browser.
+  **Two traps when asserting on that markup**, both hit on 2026-08-09:
+  next-intl ships the whole message catalogue to every page, so grepping for a
+  translated string proves nothing about what rendered — assert on a DOM marker
+  like `name="smacReference"`. And a panel may be legitimately absent because
+  of record state, not permissions.
+- **`product_suppliers` and `product_colours` are still empty**, so no
+  quotation line can be saved against a fresh database. `verify:slice2` inserts
+  dev-only fixture rows for its own use; the seed still refuses to invent
+  factory names `[16 §10]`.
 
 Automating the auth checklist is still the highest-value test to write — the
 throwaway script that produced the results above was deleted, which is exactly
-the problem.
+the problem. `scripts/verify-slice2.ts` is the pattern to copy.
 
 ## Working style
 

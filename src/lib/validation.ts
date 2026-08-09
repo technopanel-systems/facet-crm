@@ -127,6 +127,37 @@ export function readFields(formData: FormData) {
       return value;
     },
 
+    /**
+     * A `date` column, kept as the `YYYY-MM-DD` string Drizzle wants — no
+     * `Date` object, so no timezone gets to reinterpret a calendar day. The
+     * app's timezone is fixed at Asia/Riyadh, and a validity date is a day in
+     * Riyadh, not an instant.
+     *
+     * Shape and calendar validity only: `2026-02-30` is rejected because
+     * `Date.parse` normalises it to March, which would silently store a day
+     * the user did not type.
+     */
+    date(name: string, options: { required?: boolean } = {}): string | null {
+      const value = raw(name);
+      if (!value) {
+        return options.required ? fail(name, "validation.required") : null;
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return fail(name, "validation.notADate");
+      }
+      // `Date.UTC` round-trip: a normalised day means the input was not real.
+      const [year, month, day] = value.split("-").map(Number);
+      const parsed = new Date(Date.UTC(year, month - 1, day));
+      if (
+        parsed.getUTCFullYear() !== year ||
+        parsed.getUTCMonth() !== month - 1 ||
+        parsed.getUTCDate() !== day
+      ) {
+        return fail(name, "validation.notADate");
+      }
+      return value;
+    },
+
     /** An unchecked checkbox submits nothing at all — absence is `false`. */
     checkbox(name: string): boolean {
       return formData.get(name) !== null;

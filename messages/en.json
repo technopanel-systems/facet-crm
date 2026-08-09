@@ -11,7 +11,8 @@
   "nav": {
     "companies": "Companies",
     "contacts": "Contacts",
-    "projects": "Projects"
+    "projects": "Projects",
+    "quotations": "Quotations"
   },
   "common": {
     "create": "Create",
@@ -44,7 +45,16 @@
     "unknownUser": "Unknown",
     "searchCity": "Search cities",
     "noMatches": "No matches",
-    "regionFromCity": "Set from the selected city"
+    "regionFromCity": "Set from the selected city",
+    "sar": "SAR",
+    "sqm": "m²",
+    "total": "Total",
+    "qualified": "Qualified",
+    "yes": "Yes",
+    "no": "No",
+    "confirm": "Confirm",
+    "date": "Date",
+    "view": "View"
   },
   "enums": {
     "region": {
@@ -70,6 +80,27 @@
       "assigned": "Assigned",
       "shared": "Shared",
       "merge": "Merged"
+    },
+    "quotationThreadEndState": {
+      "accepted": "Accepted",
+      "rejected": "Rejected",
+      "cancelled": "Cancelled",
+      "expired": "Expired"
+    },
+    "quotationVersionStatus": {
+      "requested": "Requested",
+      "issued": "Issued",
+      "superseded": "Superseded"
+    },
+    "quotationVersionOrigin": {
+      "initial_request": "Initial request",
+      "rep_change_request": "Change requested by rep",
+      "coordinator_direct_edit": "Edited by coordinator",
+      "expiry_revision": "Revised after expiry"
+    },
+    "smacVerification": {
+      "unverified": "Unverified",
+      "verified": "Verified"
     }
   },
   "errors": {
@@ -86,7 +117,8 @@
     "invalidOption": "Not a valid choice.",
     "notANumber": "Must be a number.",
     "negative": "Cannot be negative.",
-    "tooManyDecimals": "Too many decimal places."
+    "tooManyDecimals": "Too many decimal places.",
+    "notADate": "Must be a valid date."
   },
   "companies": {
     "title": "Companies",
@@ -172,6 +204,119 @@
       "lossReasonRequired": "A lost project needs a reason.",
       "lastCompany": "A project must keep at least one company.",
       "notFound": "That project does not exist, or it is not one of yours."
+    }
+  },
+  "quotations": {
+    "title": "Quotations",
+    "new": "New quotation",
+    "newTitle": "New quotation request",
+    "empty": "No quotations yet.",
+    "emptyFiltered": "No quotations match that search.",
+    "searchPlaceholder": "Search by reference, project or company",
+    "fields": {
+      "reference": "SMAC reference",
+      "project": "Project",
+      "company": "Company",
+      "contact": "Contact",
+      "raisedBy": "Raised by",
+      "version": "Version",
+      "versionStatus": "Version",
+      "endState": "State",
+      "endStateOpen": "Open",
+      "validUntil": "Valid until",
+      "deliveryPeriod": "Delivery period",
+      "paymentMethod": "Method of payment",
+      "shipmentTerms": "Terms of shipment",
+      "origin": "Origin",
+      "verification": "Reference checked",
+      "grandTotal": "Total",
+      "payment": "Payment"
+    },
+    "detail": {
+      "details": "Details",
+      "liveVersion": "Current version",
+      "versionHistory": "Version history",
+      "lines": "Product lines",
+      "serviceLines": "Services",
+      "noServiceLines": "No services on this quotation.",
+      "terms": "Terms",
+      "supplier": "Supplier",
+      "productClass": "Class",
+      "fireRating": "Fire rating",
+      "colour": "Colour",
+      "colourStandard": "From the list",
+      "colourCustom": "RAL / Pantone",
+      "customColour": "Custom colour",
+      "thickness": "Thickness",
+      "product": "Product",
+      "width": "Width (m)",
+      "length": "Length (m)",
+      "quantityPcs": "Quantity (pcs)",
+      "sqm": "Area (m²)",
+      "unitPrice": "Price / m²",
+      "lineTotal": "Total excl. VAT",
+      "vatRate": "VAT %",
+      "vatAmount": "VAT",
+      "service": "Service",
+      "serviceQuantity": "Quantity (m²)",
+      "appliesTo": "Applies to",
+      "wholeQuotation": "The whole quotation",
+      "addLine": "Add line",
+      "addService": "Add service",
+      "totals": "Totals",
+      "totalSqm": "Total area",
+      "totalExclVat": "Total excl. VAT",
+      "totalVat": "VAT",
+      "unpricedLines": "Some lines have no price yet, so the totals below are incomplete.",
+      "readOnly": "This version is read-only.",
+      "supersededBy": "Superseded — version {number} is the live one.",
+      "computed": "Calculated by FACET from the lines.",
+      "raisedOn": "Raised",
+      "returnedRounds": "Returned for edit",
+      "cancelledBy": "Cancelled by",
+      "cancellationReason": "Reason for cancellation",
+      "paymentConfirmedBy": "Payment confirmed by",
+      "paymentConfirmedAt": "Payment confirmed",
+      "acceptedForProcessing": "Accepted for processing",
+      "notConfirmed": "Not confirmed"
+    },
+    "actions": {
+      "coordinator": "Coordinator",
+      "rep": "Rep",
+      "issue": "Record SMAC reference",
+      "issueHint": "Creates version {number} in FACET as issued. Type the number exactly as SMAC shows it.",
+      "returnForEdit": "Return for edit",
+      "returnForEditHint": "Sends it back to the rep. The version stays editable.",
+      "accept": "Accept",
+      "acceptHint": "Internal approval — the signatures are in. This is not the customer's commitment.",
+      "reject": "Reject",
+      "cancel": "Cancel quotation",
+      "cancelHint": "A written reason is required.",
+      "revise": "Create a revision",
+      "reviseHint": "Version {number} carrying the RE number. The lines are carried forward and the current version becomes read-only.",
+      "extend": "Extend validity",
+      "extendHint": "Use this when nothing has changed. Otherwise revise.",
+      "confirmPayment": "Confirm payment",
+      "confirmPaymentHint": "The date the payment was received.",
+      "markAccepted": "Accept for processing",
+      "markAcceptedHint": "Available once payment is confirmed.",
+      "done": "Recorded"
+    },
+    "errors": {
+      "notFound": "That quotation does not exist, or it is not one of yours.",
+      "projectNotVisible": "You cannot raise a quotation on that project.",
+      "companyNotOnProject": "That company is not on this project. Add it to the project first, then come back.",
+      "contactNotOnCompany": "That contact does not belong to this company.",
+      "colourChoice": "Choose a colour from the list, or type a custom one — not both.",
+      "atLeastOneLine": "A quotation needs at least one product line.",
+      "lastLine": "A quotation must keep at least one product line.",
+      "versionNotEditable": "This version has been issued. Create a revision to change it.",
+      "alreadyIssued": "This version already has a SMAC reference.",
+      "threadClosed": "This quotation is closed.",
+      "coordinatorOnly": "Only the sales coordinator can do that.",
+      "cancellationReasonRequired": "Cancelling needs a written reason.",
+      "paymentFirst": "Confirm the payment first.",
+      "noSuppliers": "No product suppliers have been set up yet, so a line cannot be saved."
     }
   },
   "status": {

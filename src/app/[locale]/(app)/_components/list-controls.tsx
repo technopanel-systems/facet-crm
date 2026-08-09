@@ -16,9 +16,13 @@ const PAGE_SIZE = 25;
 export async function SearchForm({
   basePath,
   defaultValue,
+  /** Already translated. Lists that search something other than a name and a
+   *  phone say so — the default is the companies wording. */
+  placeholder,
 }: {
   basePath: string;
   defaultValue?: string;
+  placeholder?: string;
 }) {
   const t = await getTranslations();
 
@@ -28,7 +32,7 @@ export async function SearchForm({
         type="search"
         name="q"
         defaultValue={defaultValue ?? ""}
-        placeholder={t("common.searchPlaceholder")}
+        placeholder={placeholder ?? t("common.searchPlaceholder")}
         aria-label={t("common.search")}
         className="max-w-xs text-start"
       />

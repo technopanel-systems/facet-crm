@@ -80,6 +80,13 @@ export default async function CompaniesPage({
                   <TableHead className="text-start">
                     {t("companies.fields.warmth")}
                   </TableHead>
+                  {/* Derived from the quotation event, never set by hand
+                      `[04 qualification]`, `[10 §1]`. Beside warmth, never
+                      merged with it: warmth is what the rep thinks, this is
+                      what has actually happened. */}
+                  <TableHead className="text-start">
+                    {t("common.qualified")}
+                  </TableHead>
                   <TableHead className="text-start">
                     {t("common.createdAt")}
                   </TableHead>
@@ -115,6 +122,15 @@ export default async function CompaniesPage({
                         </Badge>
                       ) : (
                         t("common.none")
+                      )}
+                    </TableCell>
+                    <TableCell className="text-start">
+                      {row.isQualified ? (
+                        <Badge variant="outline">{t("common.qualified")}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          {t("common.none")}
+                        </span>
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-start">

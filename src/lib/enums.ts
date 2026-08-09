@@ -25,6 +25,58 @@ export const PROJECT_END_STATES = ["won", "lost", "dormant"] as const;
 export type ProjectEndState = (typeof PROJECT_END_STATES)[number];
 
 /**
+ * `[07 C5]`, `[07 C4]`, `[07 C7]`.
+ *
+ * **`accepted` is internal approval, never a won deal** `[16 §5]`: it means
+ * the coordinator has the signatures. The customer commits later, at
+ * `payment_confirmed_at` and then `accepted_for_processing_at`. Nothing that
+ * counts, ranks or forecasts may read this value as "bought".
+ */
+export const QUOTATION_THREAD_END_STATES = [
+  "accepted",
+  "rejected",
+  "cancelled",
+  "expired",
+] as const;
+export type QuotationThreadEndState =
+  (typeof QUOTATION_THREAD_END_STATES)[number];
+
+/** `[10 §4]` + `[07 C2]` — the request is version 1; only one version is live. */
+export const QUOTATION_VERSION_STATUSES = [
+  "requested",
+  "issued",
+  "superseded",
+] as const;
+export type QuotationVersionStatus =
+  (typeof QUOTATION_VERSION_STATUSES)[number];
+
+/** `[07 C2]`, `[07 C7]`, plus `initial_request` for version 1 `[10 §4]`. */
+export const QUOTATION_VERSION_ORIGINS = [
+  "initial_request",
+  "rep_change_request",
+  "coordinator_direct_edit",
+  "expiry_revision",
+] as const;
+export type QuotationVersionOrigin =
+  (typeof QUOTATION_VERSION_ORIGINS)[number];
+
+/** `[04 A2]` — a human typed the SMAC number, so it can be wrong. */
+export const SMAC_VERIFICATIONS = ["unverified", "verified"] as const;
+export type SmacVerification = (typeof SMAC_VERIFICATIONS)[number];
+
+/**
+ * `[16 §2]` — the Saudi rate, as a **default** and nothing more. FACET does
+ * not do tax; SMAC does `[04 A1]`. The value lives here so a client form and
+ * the data layer prefill the same number.
+ */
+export const DEFAULT_VAT_RATE = "15.00";
+
+/** `[08 D3]` — offered as defaults, both editable; constraining them would
+ *  block real orders. Sheets only `[12 §11]`. */
+export const DEFAULT_SHEET_WIDTH_M = "1.2400";
+export const DEFAULT_SHEET_LENGTH_M = "5.8000";
+
+/**
  * Both directions of assignability, so neither tuple may drift from its
  * database enum. Used as a type-level assertion in the data modules.
  */

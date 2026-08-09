@@ -283,6 +283,8 @@ export async function canViewRecord(
     case "project":
       return canViewProject(userId, recordId);
     case "quotation_thread": {
+      // The coordinator processes every quotation in the company `[16 §10]`.
+      if (session.user.role.canApproveQuotation) return true;
       const [thread] = await db
         .select({
           raisedByUserId: quotationThreads.raisedByUserId,
@@ -407,6 +409,58 @@ export function visibleProjectsFilter(session: AuthSession): SQL | undefined {
   return or(
     eq(projects.ownerUserId, userId),
     activeShareExists("project", projects.id, userId),
+  );
+}
+
+/**
+ * Quotation threads: the raising rep, an explicit thread share, or visibility
+ * of the parent project `[11 §2]` — plus the coordinator, who sees them all.
+ *
+ * This is the SQL twin of `canViewRecord`'s `quotation_thread` case above, and
+ * the two are one rule — a change to either is a change to both.
+ *
+ * **`can_approve_quotation` sees every thread** `[16 §10]`. The founder's
+ * reason: internal sales creates the quotation in the ERP, so the coordinator
+ * is already handling all of them. Without this the flag was dead — the only
+ * role that holds it could not reach a single quotation to approve, because
+ * `sees_all_reps` is false for Sales Coordinator in the seed.
+ *
+ * **It is scoped to quotations and stops there.** A coordinator gets no
+ * company, contact or project visibility from it — `16 §10` limits them to the
+ * project title, company name and contact name that the quotation itself
+ * carries. The detail screen enforces that by linking those records only when
+ * the viewer may actually open them.
+ *
+ * The project term is the founder decision in `11 §2`: project visibility
+ * cascades to the threads raised on it, or a rep would lose sight of their own
+ * deal for want of a share click. Note what none of this does: company
+ * membership is still never consulted, here or in `visibleProjectsFilter`.
+ * Company → projects does not cascade `[04 Q7]`.
+ */
+export function visibleQuotationThreadsFilter(
+  session: AuthSession,
+): SQL | undefined {
+  if (session.user.role.seesAllReps) return undefined;
+  if (session.user.role.canApproveQuotation) return undefined;
+  const userId = session.user.id;
+  return or(
+    eq(quotationThreads.raisedByUserId, userId),
+    activeShareExists("quotation_thread", quotationThreads.id, userId),
+    exists(
+      subquery
+        .select({ one: sql`1` })
+        .from(projects)
+        .where(
+          and(
+            // Column-to-column: this is what correlates the subquery.
+            eq(projects.id, quotationThreads.projectId),
+            or(
+              eq(projects.ownerUserId, userId),
+              activeShareExists("project", projects.id, userId),
+            ),
+          ),
+        ),
+    ),
   );
 }
 
