@@ -26,18 +26,20 @@ When sources disagree, higher wins.
 5. `docs/08-quotation-model.md` §A–C
 
 **Settled decisions** — agreed, do not re-litigate:
-6. `docs/10-schema-decisions.md`
-7. `docs/09-schema-design.md`
-8. `docs/03-stack.md`
-9. `docs/01-business-model.md`
+6. `docs/13-data-model-decisions.md` — §3 is **LOCKED**; §1–2 explain the
+   schema, they do not govern it
+7. `docs/10-schema-decisions.md`
+8. `docs/09-schema-design.md`
+9. `docs/03-stack.md`
+10. `docs/01-business-model.md`
 
 **Reference only** — never authority:
-10. `docs/06-strategic-review.md` — proposals, explicitly not truth
-11. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
+11. `docs/06-strategic-review.md` — proposals, explicitly not truth
+12. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
     whole; cite sections)
-12. `docs/02-history-extract.md` — mined from old chat transcripts
-13. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
-14. `legacy/**`
+13. `docs/02-history-extract.md` — mined from old chat transcripts
+14. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
+15. `legacy/**`
 
 **Later decisions correct earlier ones.** `12` corrects `10 §5` (specs key on
 supplier too), `07 A3` (project roles are free text) and `08 B2` (coils are out
@@ -51,13 +53,16 @@ kept to understand what was attempted, not what should be built.
 
 - **Do not read or modify anything under `legacy/`** unless explicitly asked.
 - **Do not reopen settled decisions.** If one looks wrong, say so once, in one
-  paragraph, and move on.
+  paragraph, and move on. Anything marked **LOCKED** requires new founder input
+  in a new user-truth document — re-reading the old text is not new information.
 - **Never invent business logic.** If a rule is not in `docs/`, stop and ask.
   Guessing produced v1's dead approval gate and its unused `branches` table.
 - **Never add a table, column or entity that no document requires.** List it
   as `PROPOSED — not required by any document` instead.
 - **Never mark something as founder-decided unless it appears in a user-truth
   document.** Assistant proposals are proposals until written down.
+- **Changes follow the document that asked for them, at the scope it asked
+  for.** Correct, harmless structure is left alone (`13 §2`).
 - Where something is undecided, write it under `OPEN — not chosen` rather than
   filling the gap.
 
@@ -69,6 +74,8 @@ kept to understand what was attempted, not what should be built.
   Adding a role must be configuration, not code.
 - **One authorization layer**, in application code, in one place. Not database
   policies. v1 had RLS, UI and docs disagreeing about who could do what.
+  This governs **who may act**. Data-integrity invariants — what a row may
+  contain — belong in the database (`13 §1`).
 - **No module invents its own version of a core concept.** Warehouse gets no
   supplier table of its own; finance gets no customer list.
 - **Accounts deactivate, never delete.** History must keep pointing at a real
@@ -77,6 +84,9 @@ kept to understand what was attempted, not what should be built.
   optionally a target (what they are measured on). Targets are SQM only.
 - **Targets and shares are dated rows, never mutable fields.** Changing one
   must not rewrite history.
+- **Sharing is manager-initiated.** Reps request by phone; the manager acts.
+  Assignment hands a record over; sharing grants access to a record someone
+  else still holds.
 - **SMAC owns money; FACET mirrors it.** Where the two disagree, SMAC is
   correct. Reference numbers are typed by humans — assume they can be wrong.
 - **The audit log is written by the data layer**, not by each feature.
@@ -89,7 +99,22 @@ kept to understand what was attempted, not what should be built.
   `pr-*`, `text-start` not `text-left`. See the README substitution table.
   This is the convention that rots fastest if unenforced.
 - Square metres are always **generated**, never hand-entered:
-  `quantity_pcs × width_m × length_m`.
+  `quantity_pcs × width_m × length_m`. Quotation lines are sheets; the
+  application writes `form_factor = 'sheet'` (`13 §2`).
+
+## Verification debt
+
+There is **no test harness**. Two checklists are manual and must be re-run by
+hand:
+
+- **Auth bridge** (`11 §4.1`) — after any upgrade of `next-auth`, `@auth/core`,
+  `@auth/drizzle-adapter` or `next`. Failure here is **silent**: login still
+  works, sessions just stop being revocable.
+- Phase 6's original verification ran against a database cluster that was
+  later destroyed. **Treat login, sessions, deactivation and impersonation as
+  unverified** until that checklist is re-run against the current cluster.
+
+Automating these five steps is the highest-value test to write.
 
 ## Working style
 
@@ -98,6 +123,9 @@ kept to understand what was attempted, not what should be built.
 - Show file paths and diffs, not whole-file reprints.
 - Commit after every working slice.
 - Ask before adding a dependency.
+- Host-side `db:*` scripts read `DATABASE_URL` from `.env`; the app container
+  builds its own connection from `POSTGRES_*`. They can disagree — and
+  `drizzle-kit` reports an auth failure by exiting 1 with no message.
 
 ## Stack (settled — see `docs/03-stack.md`)
 
