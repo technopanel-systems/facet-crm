@@ -1,7 +1,6 @@
 import { getTranslations, getFormatter } from "next-intl/server";
 
 import { checkDatabase } from "@/db";
-import { LocaleSwitcher } from "@/components/locale-switcher";
 
 // The database is checked per request, so this page cannot be static.
 export const dynamic = "force-dynamic";
@@ -29,15 +28,7 @@ export default async function HomePage() {
   const now = new Date();
 
   return (
-    <main className="mx-auto flex min-h-svh max-w-2xl flex-col gap-8 px-6 py-16">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">{t("app.name")}</h1>
-          <p className="text-muted-foreground mt-1 text-sm">{t("app.tagline")}</p>
-        </div>
-        <LocaleSwitcher />
-      </header>
-
+    <main className="mx-auto flex max-w-2xl flex-col gap-8 px-6 py-10">
       <section className="rounded-lg border p-5">
         <h2 className="mb-2 text-sm font-semibold">{t("status.heading")}</h2>
         <StatusRow label={t("status.app")} ok value={t("status.running")} />

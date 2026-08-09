@@ -310,7 +310,7 @@ export async function createUser(
         passwordHash,
       })
       .returning();
-    const { passwordHash: _hash, ...safe } = created;
+    const safe = { ...created, passwordHash: undefined };
     log({
       action: "user.created",
       entityType: "user",

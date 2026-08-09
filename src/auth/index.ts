@@ -45,8 +45,12 @@ const adapter = DrizzleAdapter(db, {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter,
+  // Database sessions. The strategy is deliberately NOT written out:
+  // with an adapter present, @auth/core already defaults to "database" —
+  // and writing `strategy: "database"` explicitly trips assertConfig's
+  // "credentials requires JWT" guard, which only checks the explicit value.
+  // The jwt.encode bridge below is what makes credentials + database work.
   session: {
-    strategy: "database",
     maxAge: SESSION_MAX_AGE_SECONDS,
   },
   // Self-hosted behind the Cloudflare Tunnel — the Host header is trusted

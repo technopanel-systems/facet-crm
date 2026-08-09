@@ -1,5 +1,4 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import { drizzle, PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
 import { env } from "@/env";
@@ -38,6 +37,12 @@ export const db = new Proxy({} as PostgresJsDatabase<typeof schema>, {
   get(_target, prop, receiver) {
     const instance = drizzle(getSql(), { schema });
     return Reflect.get(instance, prop, receiver);
+  },
+  // Drizzle's `is()` — which the Auth.js adapter uses to detect the database
+  // flavour — inspects the prototype chain, not properties. Answer with the
+  // real class prototype; it needs no connection and keeps imports free.
+  getPrototypeOf() {
+    return PostgresJsDatabase.prototype;
   },
 });
 

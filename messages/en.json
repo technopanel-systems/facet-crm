@@ -19,6 +19,22 @@
   },
   "skeleton": {
     "heading": "Project skeleton",
-    "body": "No business tables yet. Schema lands in phase 5, authentication in phase 6."
+    "body": "Schema and authentication are in place. Business screens arrive with the next phases."
+  },
+  "auth": {
+    "login": {
+      "title": "Sign in",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign in",
+      "submitting": "Signing in…",
+      "invalidCredentials": "Incorrect email or password."
+    },
+    "signOut": "Sign out",
+    "signedInAs": "Signed in as {name}",
+    "impersonation": {
+      "banner": "{real} acting as {target}",
+      "stop": "Stop impersonating"
+    }
   }
 }
