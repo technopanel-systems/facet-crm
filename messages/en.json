@@ -129,7 +129,8 @@
       "details": "Details"
     },
     "errors": {
-      "companyNotVisible": "You cannot use that company."
+      "companyNotVisible": "You cannot use that company.",
+      "notFound": "That contact does not exist, or it is not one of yours."
     }
   },
   "projects": {

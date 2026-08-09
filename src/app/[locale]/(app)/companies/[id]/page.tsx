@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
 import { getCompany, listCompanyReps } from "@/lib/companies";
+import { listContacts } from "@/lib/contacts";
 import { bilingualName, pickName } from "@/lib/lookups";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +27,12 @@ export default async function CompanyDetailPage({
 
   const t = await getTranslations();
   const format = await getFormatter();
-  const reps = await listCompanyReps(company.id);
+  const [reps, contacts] = await Promise.all([
+    listCompanyReps(company.id),
+    // Scoped like any other contact read. Seeing the company is what grants
+    // these `[14 §1]`, so on a shared company the second rep sees them too.
+    listContacts(session, { companyId: company.id }),
+  ]);
 
   const dash = t("common.none");
 
@@ -124,6 +130,50 @@ export default async function CompanyDetailPage({
               </li>
             ))}
           </ul>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <CardTitle className="text-start text-sm">
+            {t("companies.detail.contacts")}
+          </CardTitle>
+          <Button asChild size="xs" variant="outline">
+            <Link href={`/contacts/new?companyId=${company.id}`}>
+              {t("companies.detail.addContact")}
+            </Link>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {contacts.rows.length === 0 ? (
+            <p className="text-muted-foreground text-start text-sm">
+              {t("companies.detail.noContacts")}
+            </p>
+          ) : (
+            <ul className="flex flex-col">
+              {contacts.rows.map((contact) => (
+                <li
+                  key={contact.id}
+                  className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b py-2.5 last:border-b-0"
+                >
+                  <Link
+                    href={`/contacts/${contact.id}`}
+                    className="text-start text-sm font-medium hover:underline"
+                  >
+                    {bilingualName(contact, locale)}
+                  </Link>
+                  <span className="text-muted-foreground text-start text-sm">
+                    {contact.position ?? dash}
+                    {contact.phone ? (
+                      <span dir="ltr" className="ms-3">
+                        {contact.phone}
+                      </span>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </CardContent>
       </Card>
     </main>
