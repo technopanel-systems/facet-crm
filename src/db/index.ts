@@ -50,3 +50,12 @@ export async function checkDatabase(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Ends the pool. For standalone scripts (seed, bootstrap) — postgres-js keeps
+ * the process alive otherwise. The app itself never calls this.
+ */
+export async function closeDatabase(): Promise<void> {
+  await globalForDb.__facetSql?.end();
+  globalForDb.__facetSql = undefined;
+}
