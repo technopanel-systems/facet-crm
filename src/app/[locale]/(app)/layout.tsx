@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
+import { AppNav } from "@/components/app-nav";
 import { Button } from "@/components/ui/button";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { requireSession } from "@/lib/authz";
@@ -8,9 +9,14 @@ import { logoutAction, stopImpersonationAction } from "./actions";
 
 /**
  * The protected shell. Every screen inside (app) exists behind this layout,
- * so `requireSession` here IS the enforcement point — pages never check
- * again, and the impersonation banner `[07 A6]` is persistent by
+ * so `requireSession` here IS the enforcement point for RENDERING — pages
+ * never check again, and the impersonation banner `[07 A6]` is persistent by
  * construction: it renders above whatever page is open.
+ *
+ * It is NOT the enforcement point for writes. A server action is a separately
+ * reachable POST endpoint that no layout wraps, so every action calls
+ * `requireSession()` itself and every mutation re-checks record visibility in
+ * the data layer.
  */
 export default async function AppLayout({
   children,
@@ -29,7 +35,7 @@ export default async function AppLayout({
     <div className="flex min-h-svh flex-col">
       {session.isImpersonating ? (
         <div className="bg-amber-400 text-amber-950">
-          <div className="mx-auto flex max-w-2xl items-center justify-between gap-4 px-6 py-2">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-2">
             <p className="text-start text-sm font-medium">
               {t("auth.impersonation.banner", {
                 real: session.realUser.name,
@@ -46,12 +52,15 @@ export default async function AppLayout({
       ) : null}
 
       <header className="border-b">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-4 px-6 py-3">
-          <div className="text-start">
-            <p className="font-semibold tracking-tight">{t("app.name")}</p>
-            <p className="text-muted-foreground text-xs">
-              {t("auth.signedInAs", { name: session.user.name })}
-            </p>
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-6 py-3">
+          <div className="flex items-center gap-6">
+            <div className="text-start">
+              <p className="font-semibold tracking-tight">{t("app.name")}</p>
+              <p className="text-muted-foreground text-xs">
+                {t("auth.signedInAs", { name: session.user.name })}
+              </p>
+            </div>
+            <AppNav />
           </div>
           <div className="flex items-center gap-2">
             <LocaleSwitcher />

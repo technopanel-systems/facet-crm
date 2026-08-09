@@ -8,6 +8,156 @@
     "en": "English",
     "ar": "العربية"
   },
+  "nav": {
+    "companies": "الشركات",
+    "contacts": "جهات الاتصال",
+    "projects": "المشاريع"
+  },
+  "common": {
+    "create": "إنشاء",
+    "save": "حفظ التغييرات",
+    "saving": "جارٍ الحفظ…",
+    "cancel": "إلغاء",
+    "edit": "تعديل",
+    "back": "رجوع",
+    "search": "بحث",
+    "searchPlaceholder": "ابحث بالاسم أو رقم الهاتف",
+    "clear": "مسح",
+    "add": "إضافة",
+    "remove": "إزالة",
+    "none": "—",
+    "optional": "اختياري",
+    "noOptions": "لا توجد خيارات معرّفة بعد",
+    "showing": "{from}–{to} من {total}",
+    "previous": "السابق",
+    "next": "التالي",
+    "actions": "إجراءات",
+    "createdAt": "تاريخ الإنشاء",
+    "createdBy": "أنشأه",
+    "nameEn": "الاسم (بالإنجليزية)",
+    "nameAr": "الاسم (بالعربية)",
+    "phone": "الهاتف",
+    "email": "البريد الإلكتروني",
+    "notes": "ملاحظات",
+    "region": "المنطقة",
+    "city": "المدينة",
+    "unknownUser": "غير معروف"
+  },
+  "enums": {
+    "region": {
+      "center": "الوسطى",
+      "north": "الشمالية",
+      "south": "الجنوبية",
+      "east": "الشرقية",
+      "west": "الغربية"
+    },
+    "warmth": {
+      "cold": "بارد",
+      "warm": "دافئ",
+      "hot": "ساخن",
+      "dormant": "خامل"
+    },
+    "projectEndState": {
+      "won": "مكتسب",
+      "lost": "خاسر",
+      "dormant": "خامل"
+    },
+    "companyRepOrigin": {
+      "self_registered": "تسجيل ذاتي",
+      "assigned": "مُسنَد",
+      "shared": "مشارَك",
+      "merge": "مدموج"
+    }
+  },
+  "validation": {
+    "required": "هذا الحقل مطلوب.",
+    "tooLong": "النص طويل جدًا.",
+    "invalid": "قيمة غير صالحة.",
+    "invalidOption": "خيار غير صالح.",
+    "notANumber": "يجب أن يكون رقمًا.",
+    "negative": "لا يمكن أن يكون سالبًا.",
+    "tooManyDecimals": "عدد المنازل العشرية كبير جدًا."
+  },
+  "companies": {
+    "title": "الشركات",
+    "new": "شركة جديدة",
+    "newTitle": "شركة جديدة",
+    "editTitle": "تعديل الشركة",
+    "empty": "لا توجد شركات بعد.",
+    "emptyFiltered": "لا توجد شركات مطابقة للبحث.",
+    "fields": {
+      "category": "التصنيف",
+      "vatNumber": "الرقم الضريبي",
+      "leadSource": "مصدر العميل",
+      "warmth": "درجة الاهتمام",
+      "warmthUnset": "غير محددة"
+    },
+    "detail": {
+      "details": "التفاصيل",
+      "reps": "المندوبون",
+      "primary": "رئيسي",
+      "contacts": "جهات الاتصال",
+      "noContacts": "لا توجد جهات اتصال بعد.",
+      "addContact": "إضافة جهة اتصال",
+      "projects": "المشاريع",
+      "noProjects": "لا توجد مشاريع يمكنك الاطلاع عليها.",
+      "archived": "مؤرشفة"
+    }
+  },
+  "contacts": {
+    "title": "جهات الاتصال",
+    "new": "جهة اتصال جديدة",
+    "newTitle": "جهة اتصال جديدة",
+    "editTitle": "تعديل جهة الاتصال",
+    "empty": "لا توجد جهات اتصال بعد.",
+    "emptyFiltered": "لا توجد جهات اتصال مطابقة للبحث.",
+    "fields": {
+      "company": "الشركة",
+      "position": "المسمى الوظيفي"
+    },
+    "detail": {
+      "details": "التفاصيل"
+    },
+    "errors": {
+      "companyNotVisible": "لا يمكنك استخدام هذه الشركة."
+    }
+  },
+  "projects": {
+    "title": "المشاريع",
+    "new": "مشروع جديد",
+    "newTitle": "مشروع جديد",
+    "editTitle": "تعديل المشروع",
+    "empty": "لا توجد مشاريع بعد.",
+    "emptyFiltered": "لا توجد مشاريع مطابقة للبحث.",
+    "fields": {
+      "owner": "المالك",
+      "sqmExpected": "المساحة المتوقعة (م²)",
+      "endState": "الحالة النهائية",
+      "endStateOpen": "مفتوح",
+      "lossReason": "سبب الخسارة"
+    },
+    "detail": {
+      "details": "التفاصيل",
+      "companies": "الشركات",
+      "company": "الشركة",
+      "role": "الدور",
+      "rolePlaceholder": "مثال: المقاول الرئيسي",
+      "buyer": "المشتري",
+      "noBuyer": "لا يوجد مشترٍ",
+      "addCompany": "إضافة شركة",
+      "removeCompany": "إزالة",
+      "hiddenCompany": "غير مرئية لك",
+      "noCompanies": "لا توجد شركات مرتبطة."
+    },
+    "errors": {
+      "atLeastOneCompany": "يجب أن يرتبط المشروع بشركة واحدة على الأقل.",
+      "duplicateCompany": "هذه الشركة مرتبطة بالمشروع بالفعل.",
+      "oneBuyerOnly": "لا يمكن أن تكون أكثر من شركة واحدة هي المشتري.",
+      "companyNotVisible": "لا يمكنك استخدام هذه الشركة.",
+      "lossReasonRequired": "المشروع الخاسر يحتاج إلى سبب.",
+      "lastCompany": "يجب أن يحتفظ المشروع بشركة واحدة على الأقل."
+    }
+  },
   "status": {
     "heading": "حالة النظام",
     "app": "التطبيق",

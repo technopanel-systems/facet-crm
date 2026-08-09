@@ -8,6 +8,156 @@
     "en": "English",
     "ar": "العربية"
   },
+  "nav": {
+    "companies": "Companies",
+    "contacts": "Contacts",
+    "projects": "Projects"
+  },
+  "common": {
+    "create": "Create",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "back": "Back",
+    "search": "Search",
+    "searchPlaceholder": "Search by name or phone",
+    "clear": "Clear",
+    "add": "Add",
+    "remove": "Remove",
+    "none": "—",
+    "optional": "optional",
+    "noOptions": "No options configured yet",
+    "showing": "{from}–{to} of {total}",
+    "previous": "Previous",
+    "next": "Next",
+    "actions": "Actions",
+    "createdAt": "Created",
+    "createdBy": "Created by",
+    "nameEn": "Name (English)",
+    "nameAr": "Name (Arabic)",
+    "phone": "Phone",
+    "email": "Email",
+    "notes": "Notes",
+    "region": "Region",
+    "city": "City",
+    "unknownUser": "Unknown"
+  },
+  "enums": {
+    "region": {
+      "center": "Central",
+      "north": "North",
+      "south": "South",
+      "east": "East",
+      "west": "West"
+    },
+    "warmth": {
+      "cold": "Cold",
+      "warm": "Warm",
+      "hot": "Hot",
+      "dormant": "Dormant"
+    },
+    "projectEndState": {
+      "won": "Won",
+      "lost": "Lost",
+      "dormant": "Dormant"
+    },
+    "companyRepOrigin": {
+      "self_registered": "Registered",
+      "assigned": "Assigned",
+      "shared": "Shared",
+      "merge": "Merged"
+    }
+  },
+  "validation": {
+    "required": "Required.",
+    "tooLong": "Too long.",
+    "invalid": "Not a valid value.",
+    "invalidOption": "Not a valid choice.",
+    "notANumber": "Must be a number.",
+    "negative": "Cannot be negative.",
+    "tooManyDecimals": "Too many decimal places."
+  },
+  "companies": {
+    "title": "Companies",
+    "new": "New company",
+    "newTitle": "New company",
+    "editTitle": "Edit company",
+    "empty": "No companies yet.",
+    "emptyFiltered": "No companies match that search.",
+    "fields": {
+      "category": "Category",
+      "vatNumber": "VAT number",
+      "leadSource": "Lead source",
+      "warmth": "Warmth",
+      "warmthUnset": "Not set"
+    },
+    "detail": {
+      "details": "Details",
+      "reps": "Reps",
+      "primary": "Primary",
+      "contacts": "Contacts",
+      "noContacts": "No contacts yet.",
+      "addContact": "Add contact",
+      "projects": "Projects",
+      "noProjects": "No projects you can see.",
+      "archived": "Archived"
+    }
+  },
+  "contacts": {
+    "title": "Contacts",
+    "new": "New contact",
+    "newTitle": "New contact",
+    "editTitle": "Edit contact",
+    "empty": "No contacts yet.",
+    "emptyFiltered": "No contacts match that search.",
+    "fields": {
+      "company": "Company",
+      "position": "Position"
+    },
+    "detail": {
+      "details": "Details"
+    },
+    "errors": {
+      "companyNotVisible": "You cannot use that company."
+    }
+  },
+  "projects": {
+    "title": "Projects",
+    "new": "New project",
+    "newTitle": "New project",
+    "editTitle": "Edit project",
+    "empty": "No projects yet.",
+    "emptyFiltered": "No projects match that search.",
+    "fields": {
+      "owner": "Owner",
+      "sqmExpected": "Expected m²",
+      "endState": "End state",
+      "endStateOpen": "Open",
+      "lossReason": "Reason for loss"
+    },
+    "detail": {
+      "details": "Details",
+      "companies": "Companies",
+      "company": "Company",
+      "role": "Role",
+      "rolePlaceholder": "e.g. main contractor",
+      "buyer": "Buyer",
+      "noBuyer": "No buyer",
+      "addCompany": "Add company",
+      "removeCompany": "Remove",
+      "hiddenCompany": "Not visible to you",
+      "noCompanies": "No companies linked."
+    },
+    "errors": {
+      "atLeastOneCompany": "A project needs at least one company.",
+      "duplicateCompany": "That company is already linked to this project.",
+      "oneBuyerOnly": "Only one company can be the buyer.",
+      "companyNotVisible": "You cannot use that company.",
+      "lossReasonRequired": "A lost project needs a reason.",
+      "lastCompany": "A project must keep at least one company."
+    }
+  },
   "status": {
     "heading": "System status",
     "app": "Application",

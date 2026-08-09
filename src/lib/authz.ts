@@ -20,16 +20,26 @@
  * shared company does NOT expose its projects or quotations. Projects and
  * quotation threads need ownership or their own share. One founder-decided
  * extension (phase 6): owning — or being explicitly shared — a project grants
- * visibility of the quotation threads raised on it.
+ * visibility of the quotation threads raised on it. Contacts follow their
+ * company `[14 §1]`: they have no owner of their own, and per-rep contact
+ * privacy is not expressible without a column no document requires.
+ *
+ * Visibility grants EDIT, not merely read `[14 §2, §3]`. A share is working
+ * access — the point of sharing is that both people work the record — and the
+ * executive may edit records too. There is deliberately no `can_edit` flag:
+ * the answer is that the question needs no flag.
  */
 
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, exists, isNull, or, sql, type SQL } from "drizzle-orm";
+import { QueryBuilder, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { getLocale } from "next-intl/server";
 
 import { auth, getSessionToken } from "@/auth";
 import { db } from "@/db";
 import {
+  companies,
   companyReps,
+  contacts,
   projects,
   quotationThreads,
   recordShares,
@@ -69,7 +79,11 @@ export type AuthSession = {
 
 /** Record kinds whose visibility is answerable today (others arrive with
  *  their feature phases and must be added HERE, nowhere else). */
-export type ViewableRecordType = "company" | "project" | "quotation_thread";
+export type ViewableRecordType =
+  | "company"
+  | "contact"
+  | "project"
+  | "quotation_thread";
 
 /* ------------------------------------------------------------------ *
  * Session
@@ -220,11 +234,17 @@ async function canViewProject(
  *
  * - `sees_all_reps` sees everything.
  * - company: active `company_reps` membership OR an unrevoked company share.
+ * - contact: whatever its company resolves to `[14 §1]`.
  * - project: owner OR an explicit project share. Company membership is
  *   deliberately never consulted — a shared company does not expose its
  *   projects `[04 Q7]`.
  * - quotation_thread: raising rep OR an explicit thread share OR visibility
  *   of the parent project (owner/share — founder decision, phase 6).
+ *
+ * This answers ONE record. A list needs the same rule pushed into SQL — see
+ * the filters below. Detail screens use the filters too; this function is for
+ * write paths, where an id arrives from a form and must be checked before it
+ * is written into another record.
  */
 export async function canViewRecord(
   session: AuthSession,
@@ -250,6 +270,16 @@ export async function canViewRecord(
       if (membership) return true;
       return hasActiveShare(userId, "company", recordId);
     }
+    case "contact": {
+      // A contact has no owner of its own; it follows its company `[14 §1]`.
+      const [contact] = await db
+        .select({ companyId: contacts.companyId })
+        .from(contacts)
+        .where(eq(contacts.id, recordId))
+        .limit(1);
+      if (!contact) return false;
+      return canViewRecord(session, "company", contact.companyId);
+    }
     case "project":
       return canViewProject(userId, recordId);
     case "quotation_thread": {
@@ -269,6 +299,115 @@ export async function canViewRecord(
       return canViewProject(userId, thread.projectId);
     }
   }
+}
+
+/* ------------------------------------------------------------------ *
+ * List scoping `[04 Q7]`, `[07 B2]`
+ *
+ * `canViewRecord` answers one record; a list has to ask the same question of
+ * every row, so the rule is expressed a second time as a WHERE fragment.
+ * The two are the same rule and must stay that way — a change to one is a
+ * change to the other.
+ *
+ * Each builder returns a fragment for a query selecting from the named table
+ * UNALIASED, or `undefined` when the identity sees everything. `undefined` is
+ * not a special case for callers: `and(undefined, x)` is `x` in Drizzle, so
+ * every list composes the filter without branching.
+ *
+ * These functions are the ONLY place a visibility predicate is built. A
+ * hand-written `where(eq(projects.ownerUserId, session.user.id))` in a page is
+ * precisely the bug this exists to prevent, and with no database policies to
+ * fall back on `[03]` nothing else would catch it.
+ * ------------------------------------------------------------------ */
+
+/** Dialect-less builder: these stay pure, synchronous and connection-free. */
+const subquery = new QueryBuilder();
+
+/** `exists (select 1 from record_shares ...)`, correlated on a record column. */
+function activeShareExists(
+  recordType: ViewableRecordType,
+  recordIdColumn: AnyPgColumn,
+  userId: string,
+): SQL {
+  return exists(
+    subquery
+      .select({ one: sql`1` })
+      .from(recordShares)
+      .where(
+        and(
+          eq(recordShares.recordType, recordType),
+          // Column-to-column: this is what correlates the subquery.
+          eq(recordShares.recordId, recordIdColumn),
+          eq(recordShares.sharedWithUserId, userId),
+          isNull(recordShares.revokedAt),
+        ),
+      ),
+  );
+}
+
+/** `exists (select 1 from company_reps ...)`, correlated on a company column. */
+function activeMembershipExists(
+  companyIdColumn: AnyPgColumn,
+  userId: string,
+): SQL {
+  return exists(
+    subquery
+      .select({ one: sql`1` })
+      .from(companyReps)
+      .where(
+        and(
+          eq(companyReps.companyId, companyIdColumn),
+          eq(companyReps.userId, userId),
+          isNull(companyReps.removedAt),
+        ),
+      ),
+  );
+}
+
+/** Companies: active membership OR an unrevoked company share. */
+export function visibleCompaniesFilter(session: AuthSession): SQL | undefined {
+  if (session.user.role.seesAllReps) return undefined;
+  const userId = session.user.id;
+  return or(
+    activeMembershipExists(companies.id, userId),
+    activeShareExists("company", companies.id, userId),
+  );
+}
+
+/**
+ * Contacts: whatever their company resolves to `[14 §1]`. The terms are the
+ * company rule with `contacts.company_id` substituted for `companies.id`.
+ *
+ * `record_type` has a `contact` value and `record_shares` could carry one, but
+ * nothing writes such a row and no document asks for per-contact sharing, so
+ * it is not consulted here. Wiring it up on speculation is what produced v1's
+ * dead approval gate.
+ */
+export function visibleContactsFilter(session: AuthSession): SQL | undefined {
+  if (session.user.role.seesAllReps) return undefined;
+  const userId = session.user.id;
+  return or(
+    activeMembershipExists(contacts.companyId, userId),
+    activeShareExists("company", contacts.companyId, userId),
+  );
+}
+
+/**
+ * Projects: owner OR an explicit project share.
+ *
+ * Company membership is NEVER a term here. A shared company does not expose
+ * its projects `[04 Q7]` — that is the single rule this whole slice exists to
+ * get right. If you are about to join `project_companies` into this function
+ * to "fix" a project that will not appear, read `04 Q7` first: the project is
+ * not appearing because it is not meant to.
+ */
+export function visibleProjectsFilter(session: AuthSession): SQL | undefined {
+  if (session.user.role.seesAllReps) return undefined;
+  const userId = session.user.id;
+  return or(
+    eq(projects.ownerUserId, userId),
+    activeShareExists("project", projects.id, userId),
+  );
 }
 
 /* ------------------------------------------------------------------ *
