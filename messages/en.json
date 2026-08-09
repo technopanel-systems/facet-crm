@@ -166,7 +166,8 @@
       "oneBuyerOnly": "Only one company can be the buyer.",
       "companyNotVisible": "You cannot use that company.",
       "lossReasonRequired": "A lost project needs a reason.",
-      "lastCompany": "A project must keep at least one company."
+      "lastCompany": "A project must keep at least one company.",
+      "notFound": "That project does not exist, or it is not one of yours."
     }
   },
   "status": {

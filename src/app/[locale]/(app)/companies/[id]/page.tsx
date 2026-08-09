@@ -10,6 +10,7 @@ import { requireSession } from "@/lib/authz";
 import { getCompany, listCompanyReps } from "@/lib/companies";
 import { listContacts } from "@/lib/contacts";
 import { bilingualName, pickName } from "@/lib/lookups";
+import { listProjects } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -27,11 +28,16 @@ export default async function CompanyDetailPage({
 
   const t = await getTranslations();
   const format = await getFormatter();
-  const [reps, contacts] = await Promise.all([
+  const [reps, contacts, projects] = await Promise.all([
     listCompanyReps(company.id),
     // Scoped like any other contact read. Seeing the company is what grants
     // these `[14 §1]`, so on a shared company the second rep sees them too.
     listContacts(session, { companyId: company.id }),
+    // And this is the opposite rule, on the same screen: `listProjects`
+    // applies `visibleProjectsFilter`, which never consults company
+    // membership. A rep holding this company through a share sees the company
+    // and an EMPTY projects list `[04 Q7]`.
+    listProjects(session, { companyId: company.id }),
   ]);
 
   const dash = t("common.none");
@@ -167,6 +173,47 @@ export default async function CompanyDetailPage({
                     {contact.phone ? (
                       <span dir="ltr" className="ms-3">
                         {contact.phone}
+                      </span>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-start text-sm">
+            {t("companies.detail.projects")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {projects.rows.length === 0 ? (
+            <p className="text-muted-foreground text-start text-sm">
+              {t("companies.detail.noProjects")}
+            </p>
+          ) : (
+            <ul className="flex flex-col">
+              {projects.rows.map((project) => (
+                <li
+                  key={project.id}
+                  className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b py-2.5 last:border-b-0"
+                >
+                  <Link
+                    href={`/projects/${project.id}`}
+                    className="text-start text-sm font-medium hover:underline"
+                  >
+                    {bilingualName(project, locale)}
+                  </Link>
+                  <span className="text-muted-foreground text-start text-sm">
+                    {project.endState
+                      ? t(`enums.projectEndState.${project.endState}`)
+                      : t("projects.fields.endStateOpen")}
+                    {project.sqmExpected ? (
+                      <span dir="ltr" className="ms-3">
+                        {project.sqmExpected}
                       </span>
                     ) : null}
                   </span>

@@ -70,6 +70,7 @@ export function SelectField({
   placeholder,
   disabled,
   invalid,
+  onChange,
   children,
 }: {
   name: string;
@@ -77,6 +78,9 @@ export function SelectField({
   placeholder: string;
   disabled?: boolean;
   invalid?: boolean;
+  /** For the rare field that reveals another one. The select stays
+   *  uncontrolled, so `defaultValue` still wins after a rejected submit. */
+  onChange?: (value: string) => void;
   children: ReactNode;
 }) {
   return (
@@ -85,6 +89,7 @@ export function SelectField({
       name={name}
       defaultValue={defaultValue ?? ""}
       disabled={disabled}
+      onChange={onChange ? (event) => onChange(event.target.value) : undefined}
       aria-invalid={invalid || undefined}
       aria-describedby={invalid ? `${name}-error` : undefined}
       className={cn(
