@@ -16,7 +16,8 @@
     "db:seed": "tsx scripts/seed.ts",
     "db:seed:roles": "tsx scripts/seed-roles.ts",
     "db:seed:lookups": "tsx scripts/seed-lookups.ts",
-    "bootstrap:admin": "tsx scripts/bootstrap-admin.ts"
+    "bootstrap:admin": "tsx scripts/bootstrap-admin.ts",
+    "dev:fixtures": "tsx scripts/dev-fixtures.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.3",

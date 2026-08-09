@@ -69,6 +69,13 @@
       "merge": "Merged"
     }
   },
+  "errors": {
+    "notFound": {
+      "title": "Not found",
+      "body": "This record does not exist, or it is not one of yours.",
+      "home": "Back to start"
+    }
+  },
   "validation": {
     "required": "Required.",
     "tooLong": "Too long.",
@@ -102,6 +109,9 @@
       "projects": "Projects",
       "noProjects": "No projects you can see.",
       "archived": "Archived"
+    },
+    "errors": {
+      "notFound": "That company does not exist, or it is not one of yours."
     }
   },
   "contacts": {

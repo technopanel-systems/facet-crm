@@ -76,3 +76,17 @@ export function bilingualName(
 ): string {
   return locale === "ar" ? row.nameAr || row.nameEn : row.nameEn;
 }
+
+/**
+ * The same rule again, for a joined lookup name that arrived as two loose
+ * columns and may be null because the join found nothing. Returns `null` so
+ * the caller decides what an absent value looks like.
+ */
+export function pickName(
+  locale: string,
+  nameEn: string | null,
+  nameAr: string | null,
+): string | null {
+  if (!nameEn) return null;
+  return locale === "ar" ? nameAr || nameEn : nameEn;
+}
