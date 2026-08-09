@@ -19,32 +19,34 @@ Current phase and model/skill routing: `docs/05-roadmap.md`.
 When sources disagree, higher wins.
 
 **User truth** — stated directly by the founder:
-1. `docs/12-closing-open-items.md` — latest; corrects 07, 08, 09, 10, 11
-2. `docs/11-architectural-decisions.md` §1–3
-3. `docs/04-founder-answers.md`
-4. `docs/07-phase4-answers.md`
-5. `docs/08-quotation-model.md` §A–C
+1. `docs/14-slice1-decisions.md` — latest; corrects 12 §3 and 13 §2's scope rule
+2. `docs/12-closing-open-items.md` — corrects 07, 08, 09, 10, 11
+3. `docs/11-architectural-decisions.md` §1–3
+4. `docs/04-founder-answers.md`
+5. `docs/07-phase4-answers.md`
+6. `docs/08-quotation-model.md` §A–C
 
 **Settled decisions** — agreed, do not re-litigate:
-6. `docs/13-data-model-decisions.md` — §3 is **LOCKED**; §1–2 explain the
+7. `docs/13-data-model-decisions.md` — §3 is **LOCKED**; §1–2 explain the
    schema, they do not govern it
-7. `docs/10-schema-decisions.md`
-8. `docs/09-schema-design.md`
-9. `docs/03-stack.md`
-10. `docs/01-business-model.md`
+8. `docs/10-schema-decisions.md`
+9. `docs/09-schema-design.md`
+10. `docs/03-stack.md`
+11. `docs/01-business-model.md`
 
 **Reference only** — never authority:
-11. `docs/06-strategic-review.md` — proposals, explicitly not truth
-12. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
+12. `docs/06-strategic-review.md` — proposals, explicitly not truth
+13. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
     whole; cite sections)
-13. `docs/02-history-extract.md` — mined from old chat transcripts
-14. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
-15. `legacy/**`
+14. `docs/02-history-extract.md` — mined from old chat transcripts
+15. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
+16. `legacy/**`
 
-**Later decisions correct earlier ones.** `12` corrects `10 §5` (specs key on
-supplier too), `07 A3` (project roles are free text) and `08 B2` (coils are out
-of scope for quotations). `10` corrects `09`. When two documents disagree, the
-later one is the answer — no judgement call needed.
+**Later decisions correct earlier ones.** `14` corrects `12 §3` (the executive
+may edit records) and adds project–company link removal. `12` corrects
+`10 §5` (specs key on supplier too), `07 A3` (project roles are free text) and
+`08 B2` (coils are out of scope for quotations). `10` corrects `09`. When two
+documents disagree, the later one is the answer — no judgement call needed.
 
 Never treat `legacy/` code, schema or docs as a specification. v1 failed. It is
 kept to understand what was attempted, not what should be built.

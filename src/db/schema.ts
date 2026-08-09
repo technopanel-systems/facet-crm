@@ -545,6 +545,14 @@ export const projects = pgTable(
  * there is no buyer, and there may never be one `[12 §6]`. The partial unique
  * index below is what "at most one" means in SQL, and it says nothing when no
  * row is flagged.
+ *
+ * `14 §4` adds removal: links are meant to be flexible and changeable, so a
+ * company can be taken off a project. Soft, like every other state change in
+ * FACET `[09 §1]` — the row is kept and hidden. Both unique indexes are
+ * therefore partial on `removed_at is null` `[14 §5]`: without that, a removed
+ * company could never be re-linked and a removed buyer would permanently block
+ * naming a new one. A project still requires one live link `[07 A9]`, which is
+ * an application-layer rule because SQL cannot express "at least one" here.
  */
 export const projectCompanies = pgTable(
   "project_companies",
@@ -559,13 +567,17 @@ export const projectCompanies = pgTable(
     /** Free text `[12 §5]`. */
     role: text("role"),
     isBuyer: boolean("is_buyer").notNull().default(false),
+    /** `[14 §4]` — the link was taken off the project. Never a deleted row. */
+    removedAt: timestamp("removed_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [
-    uniqueIndex("project_companies_key").on(t.projectId, t.companyId),
+    uniqueIndex("project_companies_key")
+      .on(t.projectId, t.companyId)
+      .where(sql`removed_at is null`),
     uniqueIndex("project_companies_one_buyer_key")
       .on(t.projectId)
-      .where(sql`is_buyer`),
+      .where(sql`is_buyer and removed_at is null`),
   ],
 );
 
