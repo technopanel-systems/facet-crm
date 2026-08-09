@@ -322,3 +322,32 @@ get a better overall view, so effort is not stuck on one or two things.
 8. **What FACET's quotation record holds exactly** — line items confirmed;
    whether it mirrors every SMAC field, or a subset, needs one pass with a
    coordinator looking at a real SMAC quotation. (C1)
+---
+
+## G. Amendments
+
+**G1. Notifications — act-now is persistent (supersedes E5).**
+Act-now notifications **stay until resolved** and cannot be dismissed —
+a manager assignment, a quotation returned for edits, an approval waiting.
+They clear when the action is done, not when the user taps them.
+
+Digest remains for low-value staleness only (dormant companies, quiet
+quotations). Anything requiring a decision is act-now and persistent.
+
+Rationale: a notification that can be swiped away is a notification that
+gets swiped away. Persistence is what makes act-now trustworthy — and it
+only works because the digest tier keeps the noise out of it.
+
+**G2. Desktop and phone both work (supersedes E4).**
+Not desktop-first with mobile as fallback. Both are supported targets from
+the start; problems found in testing get fixed. Layouts are responsive
+rather than two separate designs.
+
+**G3. Six-month success — both criteria confirmed (closes E7).**
+1. **No bottleneck** — the manager and the CEOs can see pipeline, targets
+   and rep activity without asking anyone to assemble anything.
+2. **One place** — no rep keeps a private spreadsheet; stock no longer
+   circulates by WhatsApp.
+
+These two together define "worth it" at six months. Feature requests that
+serve neither can wait.

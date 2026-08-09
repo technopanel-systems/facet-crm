@@ -18,6 +18,7 @@ FACET grows sideways into new departments. FACET never grows down into finance.
 When sources disagree, higher wins:
 
 1. `docs/04-founder-answers.md` — user truth, stated directly by the founder
+1b. `docs/07-phase4-answers.md` — user truth, closes the open questions
 2. `docs/01-business-model.md` — derived from 04
 2b. `docs/06-strategic-review.md` — proposals only, never treat as truth
 3. `docs/03-stack.md` — technical decisions, already settled

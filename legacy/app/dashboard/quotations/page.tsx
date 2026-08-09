@@ -6,7 +6,7 @@ import { format, addDays } from "date-fns";
 const CLASSES      = ["Class A", "Class B", "Class A2G2", "Class A2G1"];
 const FR_RATINGS   = ["A2", "B1", "Normal"];
 const SUPPLIERS    = ["N", "K", "D", "C", "G", "G1", "Y"];
-const WIDTHS       = ["1.24", "1.5", "2"];
+const WIDTHS       = [" ", "1.5", "2"];
 const THICKNESSES  = [4, 5, 6];
 const SERVICES     = ["Cutting", "Grooving", "Bending", "CNC"];
 const STATUSES     = ["pending", "submitted", "won", "lost", "expired", "cancelled"];
