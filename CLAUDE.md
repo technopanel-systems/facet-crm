@@ -106,17 +106,27 @@ kept to understand what was attempted, not what should be built.
 
 ## Verification debt
 
-There is **no test harness**. Two checklists are manual and must be re-run by
-hand:
+There is **no test harness**. What is automated, and what is not:
+
+- `npm run typecheck` · `npm run lint` · `npm run build` — the build is not
+  optional: it catches a client component importing a data module, which
+  `next dev` tolerates and which ships the database driver to the browser.
+- `npm run check:messages` — EN and AR carry the same key tree and the same
+  ICU placeholders.
+- **Nothing tests behaviour.** Visibility, audit writes and the business rules
+  were checked with throwaway scripts, which is not the same as a suite.
+
+Still manual, still owed:
 
 - **Auth bridge** (`11 §4.1`) — after any upgrade of `next-auth`, `@auth/core`,
   `@auth/drizzle-adapter` or `next`. Failure here is **silent**: login still
-  works, sessions just stop being revocable.
-- Phase 6's original verification ran against a database cluster that was
-  later destroyed. **Treat login, sessions, deactivation and impersonation as
-  unverified** until that checklist is re-run against the current cluster.
+  works, sessions just stop being revocable. Credentials login and database
+  sessions were re-verified against the current cluster on 2026-08-09;
+  **deactivation and impersonation have still not been re-run there.**
+- **RTL**: no lint rule enforces logical utilities. Grep before calling a
+  screen done, and open `/ar`.
 
-Automating these five steps is the highest-value test to write.
+Automating the auth checklist is still the highest-value test to write.
 
 ## Working style
 
