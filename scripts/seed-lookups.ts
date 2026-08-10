@@ -157,7 +157,8 @@ async function seedCities(): Promise<Counts> {
 
 type CodeRow = { code: string; nameEn: string; nameAr: string };
 
-/** Suppliers `[08 B1]` — empty until the factory names are known. */
+/** Suppliers N, K, D, C `[17 §1]`. The code is the name — no factory name is
+ *  needed, and one would be invented product data. */
 async function seedSuppliers(): Promise<Counts> {
   const counts = zero();
   for (const row of PRODUCT_SUPPLIER_SEED as readonly CodeRow[]) {
@@ -236,8 +237,9 @@ async function seedFireRatings(): Promise<Counts> {
   return counts;
 }
 
-/** Colours `[08 B1: "many"]` — empty; no document lists a code. Specials are
- *  never rows here, they are `quotation_lines.custom_colour` `[12 §12]`. */
+/** Colours — empty on purpose and permanently `[17 §2]`. The colour is typed
+ *  into `quotation_lines.custom_colour`, not picked; the table stays because no
+ *  document asks for it to be dropped. This loop therefore does nothing. */
 async function seedColours(): Promise<Counts> {
   const counts = zero();
   for (const row of PRODUCT_COLOUR_SEED as readonly CodeRow[]) {
@@ -263,8 +265,9 @@ async function seedColours(): Promise<Counts> {
   return counts;
 }
 
-/** 4, 5, 6 mm `[08 B1]`. Keyed on the value; `numeric` reads back as a
- *  string, so the seed writes the same scale Postgres stores. */
+/** 2 to 8 mm `[17 §3]`, 4 mm the only standard one. Keyed on the value;
+ *  `numeric` reads back as a string, so the seed writes the same scale
+ *  Postgres stores. */
 async function seedThicknesses(): Promise<Counts> {
   const counts = zero();
   for (const row of PRODUCT_THICKNESS_SEED) {

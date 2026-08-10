@@ -4,7 +4,6 @@ import { PageHeader } from "@/components/page-header";
 import { requireSession } from "@/lib/authz";
 import {
   listProductClasses,
-  listProductColours,
   listProductFireRatings,
   listProductSuppliers,
   listProductThicknesses,
@@ -31,23 +30,16 @@ export default async function NewQuotationPage({
   const session = await requireSession();
   const t = await getTranslations();
 
-  const [
-    projects,
-    suppliers,
-    classes,
-    fireRatings,
-    colours,
-    thicknesses,
-    services,
-  ] = await Promise.all([
-    listQuotationProjectOptions(session),
-    listProductSuppliers(),
-    listProductClasses(),
-    listProductFireRatings(),
-    listProductColours(),
-    listProductThicknesses(),
-    listServiceTypes(),
-  ]);
+  // No colour list `[17 §2]` — the colour is typed on the line.
+  const [projects, suppliers, classes, fireRatings, thicknesses, services] =
+    await Promise.all([
+      listQuotationProjectOptions(session),
+      listProductSuppliers(),
+      listProductClasses(),
+      listProductFireRatings(),
+      listProductThicknesses(),
+      listServiceTypes(),
+    ]);
 
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
@@ -58,7 +50,7 @@ export default async function NewQuotationPage({
       <QuotationForm
         action={createQuotationAction}
         projects={projects}
-        products={{ suppliers, classes, fireRatings, colours, thicknesses }}
+        products={{ suppliers, classes, fireRatings, thicknesses }}
         services={services}
         locale={locale}
         defaultProjectId={projectId}

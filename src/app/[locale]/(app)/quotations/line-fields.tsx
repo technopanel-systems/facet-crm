@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { Input } from "@/components/ui/input";
@@ -37,11 +36,11 @@ export type ThicknessOption = {
   isStandard: boolean;
 };
 
+/** No colour list `[17 §2]` — the colour is typed, not picked. */
 export type ProductOptions = {
   suppliers: CodeOption[];
   classes: CodeOption[];
   fireRatings: CodeOption[];
-  colours: CodeOption[];
   thicknesses: ThicknessOption[];
 };
 
@@ -49,7 +48,6 @@ export type LineDefaults = {
   supplierId?: string | null;
   classId?: string | null;
   fireRatingId?: string | null;
-  colourId?: string | null;
   customColour?: string | null;
   thicknessId?: string | null;
   widthM?: string | null;
@@ -128,14 +126,10 @@ export function LineFields({
   errors?: Record<string, string>;
 }) {
   const t = useTranslations();
-  // `12 §12` — one colour or the other. A select rather than a radio group,
-  // because repeated radio rows sharing a name would be ONE group and the
-  // server could not tell which row it belonged to.
-  const [colourKind, setColourKind] = useState(
-    defaults?.customColour ? "custom" : "standard",
-  );
-
   const id = (name: string) => `${idPrefix}-${name}`;
+  const standardThicknessId = options.thicknesses.find(
+    (row) => row.isStandard,
+  )?.id;
 
   return (
     <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -202,15 +196,38 @@ export function LineFields({
         </select>
       </Field>
 
+      {/* One text field, not a list `[17 §2]`. The ordinary colour code and the
+          rare RAL or Pantone special go in the same box, because a colour list
+          nobody maintains is a dropdown that is always missing the colour in
+          front of the coordinator. It sits fourth because that is where it
+          lands in the generated name: supplier, class, fire rating, colour. */}
+      <Field
+        htmlFor={id("customColour")}
+        label={t("quotations.detail.colour")}
+        error={errors.customColour}
+      >
+        <Input
+          id={id("customColour")}
+          name="customColour"
+          dir="ltr"
+          defaultValue={defaults?.customColour ?? ""}
+          placeholder={t("quotations.detail.colourPlaceholder")}
+          className="text-start"
+        />
+      </Field>
+
       <Field
         htmlFor={id("thicknessId")}
         label={t("quotations.detail.thickness")}
         error={errors.thicknessId}
       >
+        {/* 4 mm is the default `[17 §3]` — the standard row, and the one the
+            generated name omits. A new line starts on it rather than on
+            "none", which is not a thickness anybody means. */}
         <select
           id={id("thicknessId")}
           name="thicknessId"
-          defaultValue={defaults?.thicknessId ?? ""}
+          defaultValue={defaults?.thicknessId ?? standardThicknessId ?? ""}
           className={selectClasses}
         >
           <option value="">{t("common.none")}</option>
@@ -221,64 +238,6 @@ export function LineFields({
           ))}
         </select>
       </Field>
-
-      <Field htmlFor={id("colourKind")} label={t("quotations.detail.colour")}>
-        <select
-          id={id("colourKind")}
-          name="colourKind"
-          value={colourKind}
-          onChange={(event) => setColourKind(event.target.value)}
-          className={selectClasses}
-        >
-          <option value="standard">{t("quotations.detail.colourStandard")}</option>
-          <option value="custom">{t("quotations.detail.colourCustom")}</option>
-        </select>
-      </Field>
-
-      {/* Both controls always submit, so the parallel rows stay index-aligned;
-          the server reads whichever `colourKind` names. Hiding rather than
-          disabling is what keeps that true — a disabled input sends nothing. */}
-      <div hidden={colourKind !== "standard"}>
-        <Field
-          htmlFor={id("colourId")}
-          label={t("quotations.detail.colourStandard")}
-          error={errors.colourId}
-        >
-          <select
-            id={id("colourId")}
-            name="colourId"
-            defaultValue={defaults?.colourId ?? ""}
-            disabled={options.colours.length === 0}
-            className={selectClasses}
-          >
-            <option value="">{t("common.none")}</option>
-            {options.colours.map((row) => (
-              <option key={row.id} value={row.id}>
-                {codeLabel(row, locale)}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-
-      {/* The rare RAL/Pantone special `[12 §12]`. Specials stay off the lookup
-          so one-off customer colours do not pollute the list every rep picks
-          from. */}
-      <div hidden={colourKind !== "custom"}>
-        <Field
-          htmlFor={id("customColour")}
-          label={t("quotations.detail.customColour")}
-        >
-          <Input
-            id={id("customColour")}
-            name="customColour"
-            dir="ltr"
-            defaultValue={defaults?.customColour ?? ""}
-            placeholder="RAL 9016"
-            className="text-start"
-          />
-        </Field>
-      </div>
 
       {/* Standard values offered as defaults, both editable — constraining
           them would block real orders `[08 D3]`. */}

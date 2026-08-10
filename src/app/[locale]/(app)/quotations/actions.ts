@@ -42,9 +42,10 @@ import { readFields, ruleErrorState, type FormState } from "@/lib/validation";
 /**
  * One product line, from a row of repeated inputs.
  *
- * The colour arrives as a radio (`colourKind`) plus two fields, so the
- * "one or the other, never both" rule `[12 §12]` is unreachable in the UI and
- * the `num_nonnulls` CHECK stays a backstop rather than an error users hit.
+ * **The colour is one typed value** `[17 §2]` — a code like `168` or a RAL or
+ * Pantone special, both into `custom_colour`. `colour_id` is written null from
+ * every form, so `12 §12`'s "one or the other, never both" is unreachable here
+ * and the `num_nonnulls` CHECK stays a backstop rather than an error users hit.
  *
  * `sqm`, `line_total` and `vat_amount` are not read from the form at all —
  * FACET computes them `[16 §1]`.
@@ -62,13 +63,12 @@ function readLine(
   const supplierId = at("supplierId");
   if (!supplierId) return null; // an untouched spare row
 
-  const custom = at("colourKind") === "custom";
   const line: QuotationLineInput = {
     supplierId,
     classId: at("classId"),
     fireRatingId: at("fireRatingId"),
-    colourId: custom ? null : at("colourId") || null,
-    customColour: custom ? at("customColour") || null : null,
+    colourId: null,
+    customColour: at("customColour") || null,
     thicknessId: at("thicknessId"),
     widthM: at("widthM"),
     lengthM: at("lengthM"),

@@ -22,7 +22,6 @@ import { can, requireSession } from "@/lib/authz";
 import { bilingualName } from "@/lib/lookups";
 import {
   listProductClasses,
-  listProductColours,
   listProductFireRatings,
   listProductSuppliers,
   listProductThicknesses,
@@ -52,12 +51,12 @@ export default async function QuotationDetailPage({
   const format = await getFormatter();
   const dash = t("common.none");
 
-  const [suppliers, classes, fireRatings, colours, thicknesses, services] =
+  // No colour list `[17 §2]` — the colour is typed on the line.
+  const [suppliers, classes, fireRatings, thicknesses, services] =
     await Promise.all([
       listProductSuppliers(),
       listProductClasses(),
       listProductFireRatings(),
-      listProductColours(),
       listProductThicknesses(),
       listServiceTypes(),
     ]);
@@ -255,7 +254,7 @@ export default async function QuotationDetailPage({
             threadId={thread.id}
             lines={live.lines}
             serviceLines={live.serviceLines}
-            options={{ suppliers, classes, fireRatings, colours, thicknesses }}
+            options={{ suppliers, classes, fireRatings, thicknesses }}
             services={services}
             locale={locale}
             editable={editable}

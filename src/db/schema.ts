@@ -823,8 +823,11 @@ export const productFireRatings = pgTable("product_fire_ratings", {
   createdAt: createdAt(),
 });
 
-/** Many values `[08 B1]`. The standard codes only — specials live on the
- *  quotation line as `custom_colour`, closing `08 E6` per `12 §12`. */
+/**
+ * **Unused since `17 §2`** — the colour is typed on the quotation line, not
+ * picked, so this stays empty and no screen reads it. Kept because no document
+ * asks for it to be dropped, and `quotation_lines.colour_id` still points here.
+ */
 export const productColours = pgTable("product_colours", {
   id: pk(),
   code: text("code").notNull(),
@@ -904,10 +907,11 @@ export const productSpecifications = pgTable(
  * `[08 D2]` — the same rule the project README states. `12 §11` confirms this
  * column unchanged and cancels the proposed `entered_sqm` / `COALESCE` change.
  *
- * Colour is one of two things, never both and never neither `[12 §12]`: a code
- * from the lookup, or — rarely — a specific RAL/Pantone written into
- * `custom_colour`. Specials stay out of the lookup so one-off customer colours
- * do not pollute the list every rep picks from.
+ * Colour is one of two things, never both and never neither `[12 §12]`. Since
+ * `17 §2` it is always the second: **`custom_colour` carries every line** — an
+ * ordinary code like `168` as readily as a RAL or Pantone special — and
+ * `colour_id` stays null. The CHECK is unchanged and still requires exactly
+ * one.
  */
 export const quotationLines = pgTable(
   "quotation_lines",
@@ -925,9 +929,9 @@ export const quotationLines = pgTable(
     fireRatingId: uuid("fire_rating_id")
       .notNull()
       .references(() => productFireRatings.id),
-    /** Null when the line carries a custom colour instead `[12 §12]`. */
+    /** Always null since `17 §2` — the lookup is no longer offered. */
     colourId: uuid("colour_id").references(() => productColours.id),
-    /** The rare RAL/Pantone case `[12 §12]`. Null when a lookup colour is used. */
+    /** The colour, typed `[17 §2]`: a code, or a RAL/Pantone special. */
     customColour: text("custom_colour"),
     thicknessId: uuid("thickness_id")
       .notNull()

@@ -29,7 +29,6 @@ import {
   companyCategories,
   leadSources,
   productClasses,
-  productColours,
   productFireRatings,
   productSuppliers,
   productThicknesses,
@@ -182,12 +181,14 @@ export async function assertLeadSourceSelectable(
  * selectability rule either: nothing in any document restricts who may quote
  * which supplier.
  *
- * **Two of these are deliberately empty** and the screens must survive it.
- * `product_suppliers` has the seven codes from `08 B1` but no factory names in
- * any document, and `product_colours` is described only as "many"
- * (`scripts/seed/products.ts`). A quotation line cannot be saved until
- * suppliers exist, because `supplier_id` is `NOT NULL` — that is a missing
- * decision surfacing as an empty dropdown, not a bug to code around.
+ * **There is no colour reader here.** `17 §2` makes the colour free text on
+ * the line, so `product_colours` is never read by a screen and stays empty; the
+ * value lives in `quotation_lines.custom_colour`. `src/lib/quotations.ts` still
+ * joins the table, for a row a non-form caller wrote with a `colour_id`.
+ *
+ * Suppliers are seeded `[17 §1]`, which is what makes a quotation line saveable
+ * at all — `supplier_id` is `NOT NULL`. The screens still handle an empty list,
+ * because an unseeded database is a real state.
  * ------------------------------------------------------------------ */
 
 /** A product attribute whose `code` is the token in the generated name. */
@@ -234,18 +235,6 @@ export async function listProductFireRatings(): Promise<ProductCodeRow[]> {
     })
     .from(productFireRatings)
     .orderBy(asc(productFireRatings.code));
-}
-
-export async function listProductColours(): Promise<ProductCodeRow[]> {
-  return db
-    .select({
-      id: productColours.id,
-      code: productColours.code,
-      nameEn: productColours.nameEn,
-      nameAr: productColours.nameAr,
-    })
-    .from(productColours)
-    .orderBy(asc(productColours.code));
 }
 
 export async function listProductThicknesses(): Promise<ThicknessRow[]> {

@@ -36,9 +36,11 @@
  * statement in this file runs.
  *
  * **It refuses to run outside development** `[15 §7]`, for the same reason
- * `dev-fixtures.ts` does: it writes real rows, including dev-only product
- * suppliers and colours that must never reach a real database.
+ * `dev-fixtures.ts` does: it writes real rows, including a dev-only colour that
+ * must never reach a real database.
  *
+ * It needs a seeded database — `npm run db:seed`. Suppliers come from the seed
+ * since `17 §1`, so the supplier fixture this script used to insert is gone.
  * It also needs the fixture accounts, including the Sales Coordinator that
  * `16 §8` turns on: `DEV_FIXTURE_PASSWORD=… npm run dev:fixtures`.
  */
@@ -132,27 +134,15 @@ async function sessionFor(email: string): Promise<AuthSession> {
 }
 
 /**
- * Dev-only product rows.
+ * One dev-only colour row.
  *
- * `scripts/seed/products.ts` leaves suppliers and colours empty on purpose —
- * no document names a factory or a colour code, and a placeholder in the seed
- * would be invented product data shipped to production. These live here
- * instead, marked as fixtures, in a script that cannot run outside
- * development.
+ * `product_colours` is empty by decision `[17 §2]` — the colour is typed into
+ * `custom_colour`, and no screen offers the lookup. This row exists purely so
+ * the "never both" half of the CHECK can still be exercised below; it is a
+ * fixture, in a script that cannot run outside development, and it is the one
+ * thing here the seed will never create.
  */
-async function ensureProductFixtures(): Promise<void> {
-  const [supplier] = await db
-    .select()
-    .from(productSuppliers)
-    .where(eq(productSuppliers.code, "N"))
-    .limit(1);
-  if (!supplier) {
-    await db.insert(productSuppliers).values({
-      code: "N",
-      nameEn: "Supplier N (dev fixture)",
-      nameAr: "المورّد N (بيانات تجريبية)",
-    });
-  }
+async function ensureColourFixture(): Promise<void> {
   const [colour] = await db
     .select()
     .from(productColours)
@@ -176,13 +166,17 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  await ensureProductFixtures();
+  await ensureColourFixture();
 
   const repA = await sessionFor("rep-a@example.test");
   const repB = await sessionFor("rep-b@example.test");
   const coordinator = await sessionFor("coordinator@example.test");
 
-  const [supplier] = await db.select().from(productSuppliers).limit(1);
+  const [supplier] = await db
+    .select()
+    .from(productSuppliers)
+    .where(eq(productSuppliers.code, "N"))
+    .limit(1);
   const [productClass] = await db.select().from(productClasses).limit(1);
   const [fireRating] = await db.select().from(productFireRatings).limit(1);
   const [colour] = await db.select().from(productColours).limit(1);
@@ -194,9 +188,16 @@ async function main(): Promise<void> {
   const [thickThickness] = await db
     .select()
     .from(productThicknesses)
-    .where(eq(productThicknesses.isStandard, false))
+    .where(eq(productThicknesses.thicknessMm, "5.00"))
     .limit(1);
   const [service] = await db.select().from(serviceTypes).limit(1);
+
+  // Everything above except the colour comes from `npm run db:seed`. Say so
+  // rather than failing later on an undefined `.id`.
+  if (!supplier || !productClass || !fireRating || !thickness || !thickThickness || !service) {
+    console.error("The lookups are not seeded. Run: npm run db:seed");
+    process.exit(1);
+  }
 
   /* --- A company and a project owned by rep A -------------------- */
 
@@ -302,8 +303,9 @@ async function main(): Promise<void> {
         supplierId: supplier.id,
         classId: productClass.id,
         fireRatingId: fireRating.id,
-        colourId: colour.id,
-        customColour: null,
+        // Typed, not picked `[17 §2]` — this is what every form now writes.
+        colourId: null,
+        customColour: "168",
         thicknessId: thickness.id,
         // Quotation 9592, verbatim: 12 × 1.24 × 5.8 = 86.3040 m².
         widthM: "1.2400",
@@ -413,8 +415,8 @@ async function main(): Promise<void> {
         supplierId: supplier.id,
         classId: productClass.id,
         fireRatingId: fireRating.id,
-        colourId: colour.id,
-        customColour: null,
+        colourId: null,
+        customColour: "168",
         thicknessId: thickness.id,
         widthM: "1.2400",
         lengthM: "5.8000",
@@ -607,8 +609,8 @@ async function main(): Promise<void> {
             supplierId: supplier.id,
             classId: productClass.id,
             fireRatingId: fireRating.id,
-            colourId: colour.id,
-            customColour: null,
+            colourId: null,
+            customColour: "168",
             thicknessId: thickness.id,
             widthM: "1.2400",
             lengthM: "5.8000",
@@ -663,8 +665,8 @@ async function main(): Promise<void> {
         supplierId: supplier.id,
         classId: productClass.id,
         fireRatingId: fireRating.id,
-        colourId: colour.id,
-        customColour: null,
+        colourId: null,
+        customColour: "168",
         thicknessId: thickness.id,
         widthM: "1.2400",
         lengthM: "5.8000",

@@ -205,16 +205,17 @@ export type ProductNameParts = {
  *
  * `08 B1` decomposes one real code — `N- CA FR 168` — into supplier, class,
  * fire rating and colour, and says the standard 4 mm thickness is omitted from
- * the printed name and written only for 5 mm and 6 mm.
+ * the printed name and written only for the thicker sheets.
  *
- * **The separator and the thickness's position are the one thing in this slice
- * that needs checking against a real 5 mm quotation** `[16 §9]`: `08 A` lists
- * `Product Name · thickness` as two columns, which reads against `08 B1`'s
- * "written". It is deliberately all in this function, so the correction is one
- * line and not a search.
+ * **`17 §4` settles the layout question `16 §10` left open.** `08 A` lists
+ * `Product Name · thickness` as two columns on the SMAC form, which read
+ * against `08 B1`'s "written" — but this name is FACET's own and does not
+ * reproduce SMAC's form. The thickness joins the name, and 4 mm is omitted.
+ * No real 5 mm quotation needs to be found first.
  *
- * A custom colour `[12 §12]` takes the colour code's place — the line uses one
- * or the other, and the database refuses every other reading.
+ * The colour is the typed value `[17 §2]`, so in practice it always arrives as
+ * `customColour`; `colourCode` is still read first for a row a non-form caller
+ * wrote against the lookup.
  */
 export function productDisplayName(parts: ProductNameParts): string {
   const colour = parts.colourCode ?? parts.customColour ?? "";
@@ -870,12 +871,17 @@ async function assertContactOnCompany(
   }
 }
 
-/** `12 §12` — a line uses a lookup colour or a custom one, never both and
- *  never neither. The database refuses the other cases; this names the field. */
+/**
+ * `12 §12` — exactly one colour: a lookup code or a typed one, never both and
+ * never neither. The database refuses the other cases; this names the field.
+ *
+ * Since `17 §2` every form writes the typed one, so in practice this is the
+ * "you left the colour blank" message — hence `customColour` as the field.
+ */
 function assertColourChoice(line: QuotationLineInput): void {
   const chosen = [line.colourId, line.customColour].filter(Boolean).length;
   if (chosen !== 1) {
-    throw new RuleError("quotations.errors.colourChoice", "colourId");
+    throw new RuleError("quotations.errors.colourChoice", "customColour");
   }
 }
 

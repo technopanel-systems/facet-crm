@@ -19,35 +19,45 @@ Current phase and model/skill routing: `docs/05-roadmap.md`.
 When sources disagree, higher wins.
 
 **User truth** — stated directly by the founder:
-1. `docs/16-slice2-decisions.md` — latest; the quotation chain. FACET computes
-   the money, VAT defaults to 15%, expiry is a sweep, and **`accepted` is
-   internal approval, never a won deal**
-2. `docs/15-lookup-decisions.md` — reverses 14 §5's control choice for the city
+1. `docs/17-product-lookup-decisions.md` — latest; seeds the suppliers, makes
+   **colour free text rather than a lookup**, reseeds the thicknesses, and frees
+   the quotation screen from SMAC's layout
+2. `docs/16-slice2-decisions.md` — the quotation chain. FACET computes the
+   money, VAT defaults to 15%, expiry is a sweep, and **`accepted` is internal
+   approval, never a won deal**
+3. `docs/15-lookup-decisions.md` — reverses 14 §5's control choice for the city
    field, and makes region derived rather than entered
-3. `docs/14-slice1-decisions.md` — corrects 12 §3 and 13 §2's scope rule
-4. `docs/12-closing-open-items.md` — corrects 07, 08, 09, 10, 11
-5. `docs/11-architectural-decisions.md` §1–3
-6. `docs/04-founder-answers.md`
-7. `docs/07-phase4-answers.md`
-8. `docs/08-quotation-model.md` §A–C
+4. `docs/14-slice1-decisions.md` — corrects 12 §3 and 13 §2's scope rule
+5. `docs/12-closing-open-items.md` — corrects 07, 08, 09, 10, 11
+6. `docs/11-architectural-decisions.md` §1–3
+7. `docs/04-founder-answers.md`
+8. `docs/07-phase4-answers.md`
+9. `docs/08-quotation-model.md` §A–C
 
 **Settled decisions** — agreed, do not re-litigate:
-9. `docs/13-data-model-decisions.md` — §3 is **LOCKED**; §1–2 explain the
-   schema, they do not govern it
-10. `docs/10-schema-decisions.md`
-11. `docs/09-schema-design.md`
-12. `docs/03-stack.md`
-13. `docs/01-business-model.md`
+10. `docs/13-data-model-decisions.md` — §3 is **LOCKED**; §1–2 explain the
+    schema, they do not govern it
+11. `docs/10-schema-decisions.md`
+12. `docs/09-schema-design.md`
+13. `docs/03-stack.md`
+14. `docs/01-business-model.md`
 
 **Reference only** — never authority:
-14. `docs/06-strategic-review.md` — proposals, explicitly not truth
-15. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
+15. `docs/06-strategic-review.md` — proposals, explicitly not truth
+16. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
     whole; cite sections)
-16. `docs/02-history-extract.md` — mined from old chat transcripts
-17. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
-18. `legacy/**`
+17. `docs/02-history-extract.md` — mined from old chat transcripts
+18. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
+19. `legacy/**`
 
-**Later decisions correct earlier ones.** `16` settles who fills the quotation
+**Later decisions correct earlier ones.** `17` fills the supplier lookup with
+four codes — **N, K, D, C; `08 B1`'s G, G1 and Y are dropped** — which is what
+finally lets a quotation line be saved; makes the colour a typed value rather
+than a list, so `colour_id` is always null and `custom_colour` carries every
+line; reseeds the thicknesses as 2–8 mm with **4 mm the only standard row**;
+and closes `16 §10`'s naming question — the generated product name is FACET's
+own, 4 mm is omitted, and the screen is not a copy of SMAC's form. `16` settles
+who fills the quotation
 money columns (FACET computes them) and draws the line `07 D4` and `10 §11`
 will otherwise blur: **`end_state = 'accepted'` is internal approval, not a won
 deal** — the customer commits at payment. `15` reverses `14`'s "native select,
@@ -132,7 +142,9 @@ There is **no test harness**. What is automated, and what is not:
   carries them forward; every `can_approve_quotation` gate refuses a rep **with
   its own message**, not merely by throwing; payment ordering; expiry marks an
   overdue thread, skips a paid one, and audits under a null actor; and
-  qualification is derived. It found two real bugs on its first run.
+  qualification is derived. It found two real bugs on its first run. Since
+  `17 §1` it needs `npm run db:seed` first — the supplier fixture it used to
+  insert for itself is gone, because suppliers are seeded.
 - **Almost nothing else tests behaviour.** The auth checklist and Slice 1's
   visibility rules were checked with throwaway scripts, which is not the same
   as a suite. `verify:slice2` is the shape the rest should take.
@@ -164,21 +176,33 @@ Still manual, still owed:
 
 - **RTL**: no lint rule enforces logical utilities. Grep before calling a
   screen done, and open `/ar`.
-- **Client-side interaction is untested.** The city combobox `[15 §5]`, the
-  quotation line editors and the colour standard/custom switch were checked
-  only as rendered markup in both locales — served over HTTP, asserted on the
-  DOM, `200` for the raiser and the coordinator and `404` for an unrelated rep.
-  Their keyboard navigation, filtering, row add/remove and RTL popup behaviour
-  have never been driven in a browser.
+- **Client-side interaction is untested.** The city combobox `[15 §5]` and the
+  quotation line editors were checked only as rendered markup in both locales —
+  served over HTTP, asserted on the DOM, `200` for the raiser and the
+  coordinator and `404` for an unrelated rep. Their keyboard navigation,
+  filtering, row add/remove and RTL popup behaviour have never been driven in a
+  browser. (`17 §2` deleted one of the things on this list: the colour
+  standard/custom switch is now a plain text input with no state.)
   **Two traps when asserting on that markup**, both hit on 2026-08-09:
   next-intl ships the whole message catalogue to every page, so grepping for a
   translated string proves nothing about what rendered — assert on a DOM marker
   like `name="smacReference"`. And a panel may be legitimately absent because
   of record state, not permissions.
-- **`product_suppliers` and `product_colours` are still empty**, so no
-  quotation line can be saved against a fresh database. `verify:slice2` inserts
-  dev-only fixture rows for its own use; the seed still refuses to invent
-  factory names `[16 §10]`.
+- **A quotation line now saves against a clean database, and that was driven
+  rather than assumed** `[17 §1]`. On 2026-08-10, in a scratch database created
+  beside the dev one — `drizzle-kit migrate`, `db:seed`, `dev:fixtures`,
+  dropped afterwards — `verify:slice2` passed in full, and the **real form POST
+  was replayed over HTTP**: Next renders the no-JS action envelope as
+  `$ACTION_*` hidden inputs, so re-posting those with the line fields drives
+  `createQuotationAction` for real. It returned `303` to the new thread and
+  wrote `custom_colour = '168'`, `colour_id` null, supplier `N`, 4 mm,
+  `86.3040 m²` / `10,356.48` / `1,553.47` / `11,909.95`.
+  **That replay is the one piece not kept** — `scripts/verify-slice2.ts` still
+  stops at the data layer, so the form's own parsing (`readLine`) has no
+  standing check.
+- **`product_colours` is empty on purpose and permanently** `[17 §2]` — the
+  colour is typed. `verify:slice2` inserts one dev-only colour row, solely to
+  exercise the "never both" half of the CHECK that no screen can reach.
 
 Automating the auth checklist is still the highest-value test to write — the
 throwaway script that produced the results above was deleted, which is exactly

@@ -2,33 +2,38 @@
  * Product attribute lookups `[08 D1]`, `[09 §5.6]`.
  *
  * Rule for this file: **only values a document states**. `08 B1` decomposes a
- * real product code (`N- CA FR 168`) and lists the classes, the fire ratings
- * and the thicknesses outright, so those three seed with their real values.
- * The other two do not, and are therefore seeded empty:
+ * real product code (`N- CA FR 168`) and lists the classes and the fire
+ * ratings outright; `17 §1` and `17 §3` give the suppliers and the thicknesses.
  *
- *  - **Suppliers.** The seven codes are known — N, K, D, C, G, G1, Y — but no
- *    document says which factory each one is, and `product_suppliers`
- *    requires a bilingual name. A placeholder name would be invented product
- *    data. Fill this array in when the factory names are confirmed; the code
- *    below needs no change.
- *  - **Colours.** `08 B1` says only "many", and no document lists them. Note
- *    that specials never belong here: a RAL or Pantone one-off goes in
- *    `quotation_lines.custom_colour` `[12 §12]`, which is exactly what keeps
- *    this list clean enough to pick from.
+ * **Colours are the one list still empty, and now permanently so** `[17 §2]`:
+ * the colour is typed, not picked. `quotation_lines.custom_colour` carries
+ * every line — a plain code like `168` as readily as a RAL or Pantone special
+ * — and `colour_id` stays null. The table is left in place because no document
+ * asks for it to be dropped.
  *
  * `12 §8` also settles what is NOT here: no constraint ties a class to a fire
  * rating, because which combinations are real varies by factory. What exists
  * is defined by the `product_specifications` rows that get seeded — keyed on
- * supplier + class + fire rating + thickness `[12 §9]` — and those need the
- * supplier names too, so they are not seeded here either.
+ * supplier + class + fire rating + thickness `[12 §9]` — and no document lists
+ * those combinations, so they are not seeded here either.
  */
 
-/** Codes N, K, D, C, G, G1, Y `[08 B1]` — names not in any document. */
-export const PRODUCT_SUPPLIER_SEED: readonly {
-  code: string;
-  nameEn: string;
-  nameAr: string;
-}[] = [];
+/**
+ * `17 §1` — four codes. `08 B1`'s G, G1 and Y are dropped: *"we dont need them
+ * anymore."* They were never seeded, so nothing is deleted and no line can
+ * point at them.
+ *
+ * **The code is the name**, deliberately — the founder says no factory name is
+ * needed, and this is the same treatment `08 B1` already forced on the classes:
+ * an invented longer form would be fiction. The code is also the first token of
+ * the generated product name, so it is what everyone recognises anyway.
+ */
+export const PRODUCT_SUPPLIER_SEED = [
+  { code: "N", nameEn: "N", nameAr: "N" },
+  { code: "K", nameEn: "K", nameAr: "K" },
+  { code: "D", nameEn: "D", nameAr: "D" },
+  { code: "C", nameEn: "C", nameAr: "C" },
+] as const;
 
 /** `08 B1`. The code is the name — an invented longer form would be fiction. */
 export const PRODUCT_CLASS_SEED = [
@@ -46,17 +51,32 @@ export const PRODUCT_FIRE_RATING_SEED = [
   { code: "Normal", nameEn: "Normal", nameAr: "عادي" },
 ] as const;
 
-/** No document lists a colour code `[08 B1: "many"]`. */
+/**
+ * Empty, and staying empty `[17 §2]`. The colour is free text on the line, not
+ * a lookup — `08 B1` says only "many" about colours, and a list nobody
+ * maintains would be a dropdown that is always missing the colour in front of
+ * the coordinator.
+ */
 export const PRODUCT_COLOUR_SEED: readonly {
   code: string;
   nameEn: string;
   nameAr: string;
 }[] = [];
 
-/** `08 B1` — 4, 5 or 6 mm; 4 mm is standard and is omitted from the printed
- *  product name, which is what `isStandard` drives `[08 D1]`. */
+/**
+ * `17 §3` — 2 to 8 mm. **4 mm is the default and the only `isStandard` row**,
+ * which is the single flag that keeps the thickness out of the generated
+ * product name; every other thickness appends it `[08 B1]`, `[08 D1]`.
+ *
+ * 2, 3, 7 and 8 mm are not quoted today — they are there so the list does not
+ * have to be edited the first time a future product needs one.
+ */
 export const PRODUCT_THICKNESS_SEED = [
+  { thicknessMm: "2.00", isStandard: false },
+  { thicknessMm: "3.00", isStandard: false },
   { thicknessMm: "4.00", isStandard: true },
   { thicknessMm: "5.00", isStandard: false },
   { thicknessMm: "6.00", isStandard: false },
+  { thicknessMm: "7.00", isStandard: false },
+  { thicknessMm: "8.00", isStandard: false },
 ] as const;
