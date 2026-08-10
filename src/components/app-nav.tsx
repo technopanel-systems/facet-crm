@@ -17,7 +17,20 @@ const SECTIONS = [
   { href: "/contacts", key: "contacts" },
   { href: "/projects", key: "projects" },
   { href: "/quotations", key: "quotations" },
+  { href: "/dispatches", key: "dispatches" },
+  { href: "/targets", key: "targets" },
 ] as const;
+
+/*
+ * These entries are NOT permission-gated, and need not be: both new screens
+ * are meaningful for every role. A rep opening `/dispatches` sees the
+ * dispatches that credit them; a rep opening `/targets` sees their own target
+ * and achievement. What each role may DO is decided in the data layer.
+ *
+ * The next screen that is meaningless without a flag will need a different
+ * answer — this component is `"use client"` and cannot call `can()`, so the
+ * flags would have to be passed down from the `(app)` layout as booleans.
+ */
 
 export function AppNav() {
   const t = useTranslations("nav");

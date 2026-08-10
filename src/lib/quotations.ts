@@ -60,6 +60,15 @@ import {
 } from "@/db/schema";
 import { withAudit, type AuditActor, type AuditEntry } from "@/lib/audit";
 import {
+  MONEY_SCALE,
+  SQM_SCALE,
+  ZERO,
+  divideRounded,
+  fromScaled,
+  pow10,
+  toScaled,
+} from "@/lib/decimal";
+import {
   can,
   canViewRecord,
   visibleProjectsFilter,
@@ -117,57 +126,12 @@ export type {
 const PAGE_SIZE = 25;
 
 /* ------------------------------------------------------------------ *
- * Exact decimal arithmetic `[16 §1]`
+ * Quotation arithmetic `[16 §1]`
  *
- * `numeric` columns arrive as strings and leave as strings. Everything in
- * between is scaled `bigint`, so no money or square-metre figure is ever a
- * float. The scales are the ones the schema declares: SQM(14,4), MONEY(14,2),
- * vat_rate(5,2).
+ * The engine itself lives in `@/lib/decimal` — scaled `bigint`, never a float,
+ * one implementation for the three features that need it `[18 §5]`. What stays
+ * here is the arithmetic that is specifically about a quotation line.
  * ------------------------------------------------------------------ */
-
-const MONEY_SCALE = 2;
-const SQM_SCALE = 4;
-
-// `BigInt(0)` rather than `0n`, throughout: `tsconfig.json` targets ES2017 and
-// bigint *literals* need ES2020. The calls are equivalent and cost nothing;
-// they are here so nobody has to change the whole app's compile target to read
-// this file. Do not "tidy" them back to `0n` without bumping that target.
-const ZERO = BigInt(0);
-const pow10 = (exponent: number): bigint => BigInt(10) ** BigInt(exponent);
-
-/** `"86.3040"` at scale 4 → `863040`. Inputs come from columns already at or
- *  below their declared scale, so nothing is silently truncated here. */
-function toScaled(value: string, scale: number): bigint {
-  const negative = value.startsWith("-");
-  const body = negative ? value.slice(1) : value;
-  const [whole, fraction = ""] = body.split(".");
-  const padded = `${fraction}${"0".repeat(scale)}`.slice(0, scale);
-  const magnitude =
-    BigInt(whole || "0") * pow10(scale) + BigInt(padded || "0");
-  return negative ? -magnitude : magnitude;
-}
-
-/** `863040` at scale 4 → `"86.3040"`. */
-function fromScaled(value: bigint, scale: number): string {
-  const negative = value < ZERO;
-  const magnitude = negative ? -value : value;
-  const divisor = pow10(scale);
-  const whole = magnitude / divisor;
-  const fraction = (magnitude % divisor).toString().padStart(scale, "0");
-  const sign = negative ? "-" : "";
-  return scale === 0 ? `${sign}${whole}` : `${sign}${whole}.${fraction}`;
-}
-
-/** Half-up, on the magnitude, sign restored. Bankers' rounding would be a
- *  surprise on an invoice a customer reads. */
-function divideRounded(numerator: bigint, denominator: bigint): bigint {
-  const negative = numerator < ZERO !== denominator < ZERO;
-  const n = numerator < ZERO ? -numerator : numerator;
-  const d = denominator < ZERO ? -denominator : denominator;
-  const two = BigInt(2);
-  const quotient = (n * two + d) / (d * two);
-  return negative ? -quotient : quotient;
-}
 
 /**
  * `unit_price × sqm`, rounded to money scale.

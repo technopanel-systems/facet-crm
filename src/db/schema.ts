@@ -633,9 +633,20 @@ export const recordShares = pgTable(
 /**
  * `09 §4.2` — the split is set when sharing is approved, and each dispatch
  * uses whatever split is in force on its date, so these are dated rows, not a
- * field `[07 D3]`. A single-owner project has no rows and credits 100% to the
- * owner. A null percentage is a contributor — visible, not credited.
- * Recording a dispatch never sets a split.
+ * field `[07 D3]`. Recording a dispatch never sets a split `[12 §1]`.
+ *
+ * **A project with no rows is the normal case** `[18 §1]`, `[18 §3]`: splits
+ * are rare, and the dispatch's own rep takes 100%. `07 D3`'s "credits 100% to
+ * the owner" resolves to `dispatches.user_id`, not `projects.owner_user_id`,
+ * because the owner is a mutable undated field and crediting it would let a
+ * reassignment rewrite past months.
+ *
+ * **`percentage` is computed and always non-null** `[18 §3]`, `[18 §5]`. The
+ * manager or coordinator sets the split's MEMBERSHIP; FACET divides equally,
+ * leftover units to the earliest rows, so a generation sums to exactly 100.00.
+ * `18 §6` **withdraws `07 D3`'s contributor** — the null-percentage row is
+ * never written, and the column stays nullable only because no document asks
+ * for a migration.
  */
 export const projectCreditSplits = pgTable(
   "project_credit_splits",
@@ -647,7 +658,8 @@ export const projectCreditSplits = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id),
-    /** Null = contributor row. */
+    /** Computed equal share, never typed. Nullable in the column, unreachable
+     *  in practice — `18 §6` withdrew the contributor row that used null. */
     percentage: numeric("percentage", { precision: 5, scale: 2 }),
     effectiveFrom: date("effective_from").notNull(),
     setBy: uuid("set_by")

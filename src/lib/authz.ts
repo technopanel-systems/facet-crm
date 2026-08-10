@@ -40,6 +40,7 @@ import {
   companies,
   companyReps,
   contacts,
+  dispatches,
   projects,
   quotationThreads,
   recordShares,
@@ -77,8 +78,23 @@ export type AuthSession = {
   actor: AuditActor;
 };
 
-/** Record kinds whose visibility is answerable today (others arrive with
- *  their feature phases and must be added HERE, nowhere else). */
+/**
+ * Record kinds whose visibility is answerable today (others arrive with
+ * their feature phases and must be added HERE, nowhere else).
+ *
+ * **`"dispatch"` is deliberately absent, though the `record_type` enum has
+ * it.** Adding it forces an exhaustive `canViewRecord` case, and Slice 3 has
+ * nothing to call one: `canViewRecord` exists for WRITE paths, "where an id
+ * arrives from a form and must be checked before it is written into another
+ * record", and dispatches are append-only — no document asks for an edit, and
+ * deletion is a `delete_request`. The dispatch screens compose
+ * `visibleDispatchesFilter` into the WHERE, exactly as the quotation screens
+ * do. A dead branch here is the failure CLAUDE.md names.
+ *
+ * **The trigger for adding it:** the first write path that takes a dispatch id
+ * from a form — a void/correct action, or per-dispatch sharing. Add the value
+ * and a real case together, in the same change.
+ */
 export type ViewableRecordType =
   | "company"
   | "contact"
@@ -464,9 +480,133 @@ export function visibleQuotationThreadsFilter(
   );
 }
 
+/**
+ * Dispatches `[18 §2]`: the coordinator who records them, the rep they credit,
+ * or the quotation thread they were dispatched against.
+ *
+ * **`can_dispatch` sees every dispatch** `[18 §2]` — the founder's answer, and
+ * the same shape `16 §10` gives `can_approve_quotation`. State the delta
+ * honestly: terms 3 and 4 already give a coordinator every *linked* dispatch
+ * (they see every thread, and term 4 cascades that) plus any naming them. What
+ * this term actually adds is **another coordinator's direct dispatches** — a
+ * small delta, and a real hole when one coordinator covers for another.
+ *
+ * **The credited rep** (term 3) must see the event that credits their target:
+ * `04 C1` makes the dispatch the only source of achieved SQM, and `07 G3`'s
+ * success criterion is that every dispatched sqm traces to a rep. One they
+ * cannot see is one they cannot check.
+ *
+ * **The thread cascade** (term 4) extends `11 §2` by one step in the direction
+ * `11 §2` already went: project visibility cascades to the threads raised on
+ * it because a quotation is part of that deal rather than a separate secret,
+ * and a dispatch against that quotation is equally part of it. It exists for
+ * exactly one population — a rep who owns or is shared a project, seeing a
+ * dispatch on that project's quotation that names a *different* rep. That is
+ * the shared-credit case `[18 §3]`: without this term a rep credited by a split
+ * cannot see the dispatch that credited them.
+ *
+ * **No share term, deliberately.** `record_shares` could carry a `dispatch`
+ * row and the enum has the value, but nothing writes one and no document asks
+ * for per-dispatch sharing — the same reasoning already written above
+ * `visibleContactsFilter`. Wiring it up on speculation is what produced v1's
+ * dead approval gate.
+ */
+export function visibleDispatchesFilter(
+  session: AuthSession,
+): SQL | undefined {
+  if (session.user.role.seesAllReps) return undefined;
+  if (session.user.role.canDispatch) return undefined;
+  const userId = session.user.id;
+  return or(
+    eq(dispatches.userId, userId),
+    exists(
+      subquery
+        .select({ one: sql`1` })
+        .from(quotationThreads)
+        .where(
+          and(
+            // Column-to-column: this is what correlates the subquery.
+            eq(quotationThreads.id, dispatches.quotationThreadId),
+            // `and(x, undefined)` is `x` in Drizzle, so an identity that sees
+            // every thread degrades correctly to "any thread".
+            visibleQuotationThreadsFilter(session),
+          ),
+        ),
+    ),
+  );
+}
+
+/**
+ * Whose target and achievement this identity may read `[07 D1]`, `[07 D2]`.
+ *
+ * `sees_all_reps` — manager, executive, super admin — reads everyone's;
+ * everybody else reads their own and nobody else's. Note the correct
+ * consequence for the coordinator: they hold `can_dispatch` but not
+ * `sees_all_reps`, so they see only their own target, which is right —
+ * `04 Q12` says a coordinator may carry one, not that they supervise others.
+ *
+ * This is the predicate that decides ACCESS on the targets screen. It scopes
+ * by PERSON, not by dispatch row: a person's achieved sqm is the sum of what
+ * credits them, whether or not the viewer could open each underlying dispatch.
+ * Filtering the rows as well would understate the number, and a silently wrong
+ * total is worse than a refused screen.
+ */
+export function visibleMeasuredUsersFilter(
+  session: AuthSession,
+): SQL | undefined {
+  if (session.user.role.seesAllReps) return undefined;
+  return eq(users.id, session.user.id);
+}
+
+/**
+ * Companies a `can_dispatch` holder may NAME on the dispatch form `[18 §2]`.
+ *
+ * A direct dispatch `[07 C6]` requires a company, and the only role holding
+ * `can_dispatch` — Sales Coordinator — has `sees_all_reps: false` and no
+ * `company_reps` membership, so `visibleCompaniesFilter` returns nothing for
+ * them. Without this the flag is dead on arrival, which is precisely the
+ * situation `16 §10` was asked about and fixed for quotations.
+ *
+ * **The grant stops at the name.** `18 §2` is explicit: no company record, no
+ * address, no contacts, no projects, no link to open it. `canViewRecord` and
+ * `visibleCompaniesFilter` are untouched, so `/companies` and every other
+ * screen behave exactly as before; the dispatch screens render a company as
+ * plain text unless the viewer may open it on their own. Callers pair this
+ * with a typed query and a small limit — a lookup, not a directory dump.
+ */
+export function dispatchCompanyLookupFilter(
+  session: AuthSession,
+): SQL | undefined {
+  if (session.user.role.canDispatch) return undefined;
+  return visibleCompaniesFilter(session);
+}
+
 /* ------------------------------------------------------------------ *
  * User management — gated on `can_manage_users`, audited by the data layer
  * ------------------------------------------------------------------ */
+
+/**
+ * The active-user directory, for the pickers that name a person: the rep on a
+ * direct dispatch, the members of a credit split `[18 §3]`, the subject of a
+ * target `[07 D1]`.
+ *
+ * Names only, and no visibility filter — a list of colleagues is not a record.
+ * Every screen that calls this is already behind `can_dispatch`,
+ * `can_set_credit_split` or `can_set_targets`, and the write each one feeds
+ * re-checks that flag in the data layer.
+ *
+ * Deactivated accounts are excluded: they may not be given new work. History
+ * keeps pointing at them `[04 C2]` — this is the *picker*, not the display.
+ */
+export async function listActiveUsers(): Promise<
+  { id: string; name: string }[]
+> {
+  return db
+    .select({ id: users.id, name: users.name })
+    .from(users)
+    .where(eq(users.isActive, true))
+    .orderBy(users.name);
+}
 
 export type NewUserInput = {
   name: string;

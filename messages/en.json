@@ -12,7 +12,9 @@
     "companies": "Companies",
     "contacts": "Contacts",
     "projects": "Projects",
-    "quotations": "Quotations"
+    "quotations": "Quotations",
+    "dispatches": "Dispatches",
+    "targets": "Targets"
   },
   "common": {
     "create": "Create",
@@ -54,7 +56,9 @@
     "no": "No",
     "confirm": "Confirm",
     "date": "Date",
-    "view": "View"
+    "view": "View",
+    "filter": "Filter",
+    "apply": "Apply"
   },
   "enums": {
     "region": {
@@ -344,6 +348,117 @@
     "impersonation": {
       "banner": "{real} acting as {target}",
       "stop": "Stop impersonating"
+    }
+  },
+  "dispatches": {
+    "title": "Dispatches",
+    "new": "Record dispatch",
+    "newTitle": "Record a dispatch",
+    "empty": "Nothing has been dispatched yet.",
+    "emptyFiltered": "No dispatches match that search.",
+    "searchPlaceholder": "Search by company or rep",
+    "fields": {
+      "quotation": "Quotation",
+      "quotationPlaceholder": "Select a paid quotation",
+      "company": "Company",
+      "companyPlaceholder": "Select a company",
+      "companySearch": "Find the company",
+      "companySearchPlaceholder": "Type at least two letters",
+      "companySearchFirst": "Search for a company first",
+      "rep": "Rep",
+      "repPlaceholder": "Select a rep",
+      "sqm": "Square metres",
+      "dispatchDate": "Dispatch date",
+      "source": "Source",
+      "recordedBy": "Recorded by",
+      "direct": "Direct sale",
+      "approvedBy": "Approved by",
+      "project": "Project",
+      "paymentGate": "Payment",
+      "mode": "How this was sold",
+      "modeLinked": "Against a quotation",
+      "modeDirect": "Direct sale",
+      "filterAll": "All",
+      "filterLinked": "Against a quotation",
+      "filterDirect": "Direct sales",
+      "dispatchedSoFar": "dispatched so far:"
+    },
+    "detail": {
+      "title": "Dispatch",
+      "credit": "Credit",
+      "creditsTargets": "What actually went out. This is what credits a target.",
+      "derivedHint": "The company and the rep come from the quotation — they are not asked for.",
+      "companySearchHint": "You may search company names here. Opening the company record is a separate permission.",
+      "directNotice": "A direct sale has no quotation, so it is approved by the coordinator and is reported as a direct sale.",
+      "linkedNotice": "Dispatch against a quotation is only possible once payment has been confirmed.",
+      "noneDispatchable": "No quotation has a confirmed payment yet, so there is nothing to dispatch against.",
+      "partialHint": "One quotation can produce several partial dispatches. Quoted, paid and dispatched quantities are three different numbers.",
+      "paymentConfirmed": "Confirmed",
+      "creditBySplit": "Divided equally by the credit split in force since {date}.",
+      "creditByRep": "No credit split is in force, so the whole amount credits the rep on this dispatch."
+    },
+    "actions": {
+      "record": "Record dispatch"
+    },
+    "errors": {
+      "dispatchOnly": "Only internal sales may record a dispatch.",
+      "paymentNotConfirmed": "Payment has not been confirmed on this quotation yet.",
+      "companyNotOnThread": "The company does not match the quotation.",
+      "threadNotVisible": "That quotation cannot be found.",
+      "companyNotVisible": "That company cannot be found.",
+      "companyRequired": "A direct sale needs a company.",
+      "repRequired": "A direct sale needs a rep.",
+      "sqmPositive": "Enter the square metres that actually went out."
+    }
+  },
+  "credit": {
+    "title": "Credit split",
+    "fields": {
+      "share": "Share",
+      "effectiveFrom": "Effective from"
+    },
+    "detail": {
+      "inForceSince": "In force since {date}. Divided equally.",
+      "noSplit": "No credit split. Each dispatch credits the rep named on it in full."
+    },
+    "actions": {
+      "setSplit": "Set the credit split",
+      "setSplitHint": "Choose who shares the credit. It divides equally, and it applies from the date below onward — earlier dispatches keep the credit they already have."
+    },
+    "errors": {
+      "creditSplitOnly": "Only a sales manager or the sales coordinator may set a credit split.",
+      "projectNotVisible": "That project cannot be found.",
+      "splitNeedsRow": "Choose at least one person.",
+      "splitDuplicateUser": "The same person was listed twice.",
+      "splitNotBackdated": "A credit split cannot be backdated — it would rewrite credit already given.",
+      "userUnknown": "One of the people chosen no longer exists."
+    }
+  },
+  "targets": {
+    "title": "Targets",
+    "empty": "Nobody is measured for this month.",
+    "fields": {
+      "period": "Month",
+      "person": "Person",
+      "targetSqm": "Target",
+      "achievedSqm": "Achieved",
+      "ofWhich": "Of which",
+      "progress": "Progress",
+      "notMeasured": "Not measured",
+      "linkedShort": "quoted:",
+      "directShort": "direct:"
+    },
+    "detail": {
+      "derivedNotice": "Achievement is derived from what was dispatched, and from nothing else. Targets are square metres only.",
+      "activityPending": "Activity is not recorded yet. When it is, it will be shown beside target progress — never combined with it into a single score."
+    },
+    "actions": {
+      "setTarget": "Set"
+    },
+    "errors": {
+      "setTargetsOnly": "Only a manager or an executive may set targets.",
+      "userNotMeasurable": "That person cannot carry a target.",
+      "sqmPositive": "Enter a target above zero."
     }
   }
 }

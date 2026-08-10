@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { redirect } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
+import { setCreditSplit } from "@/lib/credit-splits";
 import { PROJECT_END_STATES, REGIONS } from "@/lib/enums";
 import {
   addProjectCompany,
@@ -162,5 +163,36 @@ export async function removeProjectCompanyAction(
   }
 
   revalidatePath(`/projects/${projectId}`);
+  return {};
+}
+
+/**
+ * Set the project's credit split `[07 D3]`, `[12 §1]`, `[18 §3]`.
+ *
+ * The form posts a checkbox list — WHO shares — and a date. No percentage is
+ * read, because none is typed: `setCreditSplit` divides equally and computes
+ * the shares itself.
+ */
+export async function setCreditSplitAction(
+  projectId: string,
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const session = await requireSession();
+  const fields = readFields(formData);
+
+  const effectiveFrom = fields.date("effectiveFrom", { required: true });
+  const userIds = fields.list("userIds").filter((id) => id.length > 0);
+
+  if (!fields.ok || !effectiveFrom) return fields.state;
+
+  try {
+    await setCreditSplit(session, projectId, { effectiveFrom, userIds });
+  } catch (error) {
+    return ruleErrorState(error, fields.values);
+  }
+
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/targets");
   return {};
 }

@@ -19,38 +19,49 @@ Current phase and model/skill routing: `docs/05-roadmap.md`.
 When sources disagree, higher wins.
 
 **User truth** — stated directly by the founder:
-1. `docs/17-product-lookup-decisions.md` — latest; seeds the suppliers, makes
+1. `docs/18-slice3-decisions.md` — latest; dispatch, credit splits and targets.
+   Credit with no split goes to **the rep on the dispatch**, splits divide
+   **equally and are rare**, and **the contributor is withdrawn**
+2. `docs/17-product-lookup-decisions.md` — seeds the suppliers, makes
    **colour free text rather than a lookup**, reseeds the thicknesses, and frees
    the quotation screen from SMAC's layout
-2. `docs/16-slice2-decisions.md` — the quotation chain. FACET computes the
+3. `docs/16-slice2-decisions.md` — the quotation chain. FACET computes the
    money, VAT defaults to 15%, expiry is a sweep, and **`accepted` is internal
    approval, never a won deal**
-3. `docs/15-lookup-decisions.md` — reverses 14 §5's control choice for the city
+4. `docs/15-lookup-decisions.md` — reverses 14 §5's control choice for the city
    field, and makes region derived rather than entered
-4. `docs/14-slice1-decisions.md` — corrects 12 §3 and 13 §2's scope rule
-5. `docs/12-closing-open-items.md` — corrects 07, 08, 09, 10, 11
-6. `docs/11-architectural-decisions.md` §1–3
-7. `docs/04-founder-answers.md`
-8. `docs/07-phase4-answers.md`
-9. `docs/08-quotation-model.md` §A–C
+5. `docs/14-slice1-decisions.md` — corrects 12 §3 and 13 §2's scope rule
+6. `docs/12-closing-open-items.md` — corrects 07, 08, 09, 10, 11
+7. `docs/11-architectural-decisions.md` §1–3
+8. `docs/04-founder-answers.md`
+9. `docs/07-phase4-answers.md`
+10. `docs/08-quotation-model.md` §A–C
 
 **Settled decisions** — agreed, do not re-litigate:
-10. `docs/13-data-model-decisions.md` — §3 is **LOCKED**; §1–2 explain the
+11. `docs/13-data-model-decisions.md` — §3 is **LOCKED**; §1–2 explain the
     schema, they do not govern it
-11. `docs/10-schema-decisions.md`
-12. `docs/09-schema-design.md`
-13. `docs/03-stack.md`
-14. `docs/01-business-model.md`
+12. `docs/10-schema-decisions.md`
+13. `docs/09-schema-design.md`
+14. `docs/03-stack.md`
+15. `docs/01-business-model.md`
 
 **Reference only** — never authority:
-15. `docs/06-strategic-review.md` — proposals, explicitly not truth
-16. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
+16. `docs/06-strategic-review.md` — proposals, explicitly not truth
+17. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
     whole; cite sections)
-17. `docs/02-history-extract.md` — mined from old chat transcripts
-18. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
-19. `legacy/**`
+18. `docs/02-history-extract.md` — mined from old chat transcripts
+19. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
+20. `legacy/**`
 
-**Later decisions correct earlier ones.** `17` fills the supplier lookup with
+**Later decisions correct earlier ones.** `18` closes the last open item in
+`04 D2` — shared credit divides **equally**, and the manager sets a split's
+**membership**, never its proportions; makes **the rep named on the dispatch**
+take 100% when no split is in force, because a project's owner is a mutable
+field and crediting it would rewrite past months; **withdraws `07 D3`'s
+contributor** and `09 §4.2`'s null percentage with it; forbids backdating a
+split; and extends `16 §8`'s shape by one step so `can_dispatch` can search
+company **names** and see every dispatch — without which the only role holding
+the flag could not record a direct dispatch at all. `17` fills the supplier lookup with
 four codes — **N, K, D, C; `08 B1`'s G, G1 and Y are dropped** — which is what
 finally lets a quotation line be saved; makes the colour a typed value rather
 than a list, so `colour_id` is always null and `custom_colour` carries every
@@ -145,9 +156,29 @@ There is **no test harness**. What is automated, and what is not:
   qualification is derived. It found two real bugs on its first run. Since
   `17 §1` it needs `npm run db:seed` first — the supplier fixture it used to
   insert for itself is gone, because suppliers are seeded.
+- `npm run verify:slice3` — the same shape, for dispatch, credit splits and
+  targets. Development only; needs `db:seed` and `dev:fixtures`. It drives
+  `src/lib/{dispatches,credit-splits,targets}.ts` in process and asserts, in
+  thirteen sections: every gate refuses **with its own message**; the payment
+  gate `[07 C3]`, and that company and rep are **derived from the thread**, not
+  typed `[18 §7]`; a direct dispatch needs no payment but is stamped with the
+  coordinator's approval `[07 C6]` and reads back as direct; **recording a
+  dispatch writes no split row** `[12 §1]`; with no split the dispatch's own rep
+  takes 100% `[18 §1]`; **a later generation does not change an earlier
+  dispatch's credit** — the central claim `[07 D3]`; equal division loses
+  nothing, asserted as a pure function `[18 §5]`; a same-month target
+  correction writes a **second row**, and no target row means `null`, never
+  zero; achievement ignores service m², quoted m² and `accepted` alike; and the
+  `18 §2` visibility grant in **both** directions — the coordinator sees every
+  dispatch and the company *name*, and still cannot open the company record.
+  **It found two real bugs on its first run**, both recorded below.
+  It creates its own reps per run, because achievement is a whole-database
+  monthly total and the script keeps its rows `[12 §7]` — reusing the shared
+  fixture accounts made the second run count the first run's square metres.
 - **Almost nothing else tests behaviour.** The auth checklist and Slice 1's
   visibility rules were checked with throwaway scripts, which is not the same
-  as a suite. `verify:slice2` is the shape the rest should take.
+  as a suite. `verify:slice2` and `verify:slice3` are the shape the rest should
+  take.
 
 **Auth bridge** (`11 §4.1`) — re-run after any upgrade of `next-auth`,
 `@auth/core`, `@auth/drizzle-adapter` or `next`. Failure here is **silent**:
@@ -203,6 +234,29 @@ Still manual, still owed:
 - **`product_colours` is empty on purpose and permanently** `[17 §2]` — the
   colour is typed. `verify:slice2` inserts one dev-only colour row, solely to
   exercise the "never both" half of the CHECK that no screen can reach.
+- **Slice 3's screens were driven over HTTP on 2026-08-10**, not merely
+  compiled: both locales `200` for a coordinator and a rep; `/dispatches/new`
+  `404` for a rep and `200` for the coordinator; the linked form offering no
+  company or rep field at all `[18 §7]`; the direct form finding companies by
+  name `[18 §2]`; and **the real form POST replayed**, which returned `303` and
+  wrote a direct dispatch of `12.5000 m²` with `quotation_thread_id` null and
+  the coordinator stamped in `approved_by_user_id` `[07 C6]`. The project
+  screen showed the credit-split checkbox list with **no percentage input
+  anywhere** `[18 §3]`, and `/targets` offered the set-target control to the
+  manager and not to the rep. **A trap worth keeping:** `$ACTION_ID_…` and
+  `$ACTION_REF_n` carry **no `value` attribute** — a scraper that requires one
+  drops them and Next answers *"Failed to find Server Action"*. And on
+  `/targets`, `name="period"` belongs to the month filter as well as the
+  set-target form; `name="sqm"` is the marker that distinguishes them.
+  That replay is **not kept** — `verify-slice3.ts` stops at the data layer, so
+  the form's own parsing has no standing check, exactly as for Slice 2.
+- **Two bugs `verify:slice3` caught on its first run**, both real:
+  `setCreditSplit` asked project visibility before the flag, which made
+  `12 §1`'s grant to the **sales coordinator** unusable — `16 §8` gives that
+  role no project visibility, so a founder-granted flag was dead. And the
+  stored percentages were assigned in submission order while the read ordered
+  by name, so the rep holding `33.34%` need not have been the rep credited
+  `33.3334 m²`. Both are fixed and both are now asserted.
 
 Automating the auth checklist is still the highest-value test to write — the
 throwaway script that produced the results above was deleted, which is exactly
