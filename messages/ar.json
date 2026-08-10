@@ -14,6 +14,9 @@
     "projects": "المشاريع",
     "quotations": "عروض الأسعار",
     "dispatches": "التوريدات",
+    "reports": "التقارير",
+    "coverage": "التغطية",
+    "activity": "النشاط",
     "targets": "الأهداف",
     "team": "الفريق"
   },
@@ -106,6 +109,54 @@
     "smacVerification": {
       "unverified": "غير مُتحقق منه",
       "verified": "مُتحقق منه"
+    },
+    "reportEntryType": {
+      "interaction": "تفاعل",
+      "field_note": "ملاحظة ميدانية"
+    },
+    "reportChannel": {
+      "visit": "زيارة",
+      "call": "اتصال",
+      "whatsapp": "واتساب",
+      "email": "بريد إلكتروني",
+      "meeting": "اجتماع"
+    },
+    "reportOutcome": {
+      "introduced": "تعريف بالشركة",
+      "catalogue_sent": "إرسال الكتالوج",
+      "samples_sent": "إرسال عينات",
+      "documents_sent": "إرسال مستندات",
+      "discussed_pricing": "مناقشة الأسعار",
+      "no_answer": "لا يوجد رد",
+      "not_interested": "غير مهتم",
+      "on_hold": "مؤجل",
+      "other": "أخرى"
+    },
+    "fieldNoteCategory": {
+      "market_research": "بحث السوق",
+      "scouting": "استكشاف",
+      "exhibition": "معرض",
+      "training": "تدريب",
+      "internal": "عمل داخلي"
+    },
+    "reportSignal": {
+      "price_too_high": "السعر مرتفع",
+      "competitor_cheaper": "منافس أرخص",
+      "colour_unavailable": "اللون أو المنتج غير متوفر",
+      "lead_time_too_long": "مدة التوريد طويلة",
+      "quality_concern": "ملاحظة على الجودة",
+      "payment_terms": "شروط الدفع",
+      "specification_unavailable": "مواصفة لا نوفرها",
+      "project_delayed": "المشروع مؤجل",
+      "other": "أخرى"
+    },
+    "timelineEvent": {
+      "report": "تسجيل",
+      "company_added": "إضافة شركة",
+      "quotation_raised": "طلب عرض سعر",
+      "quotation_issued": "إصدار عرض السعر",
+      "payment_confirmed": "تأكيد الدفع",
+      "dispatched": "تم التوريد"
     }
   },
   "errors": {
@@ -451,7 +502,8 @@
     },
     "detail": {
       "derivedNotice": "المحقق مشتق مما تم توريده، ولا شيء غيره. والأهداف بالأمتار المربعة فقط.",
-      "activityPending": "النشاط غير مسجل بعد. وعند تسجيله سيُعرض بجانب نسبة الهدف — ولن يُدمج معه في رقم واحد أبدًا."
+      "activityElsewhere": "للنشاط شاشة خاصة به ويبقى فيها. يُعرض بجانب نسبة الهدف، ولا يُدمج معه في رقم واحد أبدًا.",
+      "viewActivity": "فتح النشاط"
     },
     "actions": {
       "setTarget": "تحديد"
@@ -540,6 +592,145 @@
       "userStillActive": "عطّل الحساب قبل تسليم أعماله.",
       "itemNotHeld": "أحد العناصر في هذه القائمة انتقل بالفعل. أعد تحميل الصفحة وحاول مجددًا.",
       "cannotDeactivateSelf": "لا يمكنك تعطيل حسابك الخاص."
+    }
+  },
+  "reports": {
+    "title": "التقارير",
+    "new": "تسجيل",
+    "newTitle": "تسجيل تفاعل",
+    "newFieldNoteTitle": "تسجيل ملاحظة ميدانية",
+    "editTitle": "تصحيح هذا التقرير",
+    "empty": "لم يُسجَّل شيء بعد.",
+    "emptyFiltered": "لا توجد تقارير تطابق هذا البحث.",
+    "searchPlaceholder": "ابحث في النص أو باسم الشركة",
+    "fields": {
+      "entryType": "نوع التسجيل",
+      "company": "الشركة",
+      "companyPlaceholder": "اختر شركة",
+      "contact": "جهة الاتصال",
+      "contactPlaceholder": "لا أحد بعينه",
+      "project": "المشروع",
+      "projectNone": "بدون مشروع",
+      "channel": "الوسيلة",
+      "channelPlaceholder": "اختر واحدة",
+      "outcome": "ما الذي حدث",
+      "outcomePlaceholder": "اختر واحدًا",
+      "narrative": "ما الذي قيل",
+      "narrativePlaceholder": "بكلماتك أنت. هذا هو الجزء الذي يبقى.",
+      "onHoldUntil": "مؤجل حتى",
+      "category": "نوع العمل",
+      "categoryPlaceholder": "اختر واحدًا",
+      "city": "المدينة",
+      "cityPlaceholder": "هل كان في مكان بعينه؟",
+      "reportDate": "التاريخ",
+      "signals": "ما الذي قاله العميل",
+      "author": "سجّله",
+      "filterAll": "الكل",
+      "filterInteractions": "التفاعلات",
+      "filterFieldNotes": "الملاحظات الميدانية",
+      "filterOutcome": "النتيجة",
+      "filterAnyOutcome": "أي نتيجة"
+    },
+    "signalReference": {
+      "competitor_cheaper": "أي منافس؟",
+      "colour_unavailable": "أي رمز لون؟",
+      "specification_unavailable": "أي فئة أو تصنيف حريق؟",
+      "other": "ما هو؟"
+    },
+    "detail": {
+      "title": "تقرير",
+      "interactionHint": "مرتبط بشركة. جهة الاتصال والمشروع اختياريان.",
+      "fieldNoteHint": "الملاحظة الميدانية لا تخص أي عميل. تُحتسب نشاطًا ولا تظهر في أي جدول زمني.",
+      "signalsHint": "ما قاله العميل، منفصلًا عما حدث في المسار. يستحق التسجيل سواء خسرنا الصفقة أم لا.",
+      "onHoldHint": "لن تُطلب أي متابعة لهذه الشركة حتى التاريخ أعلاه.",
+      "onHoldFieldHint": "يُستخدم فقط عندما تكون النتيجة «مؤجل».",
+      "noSignals": "لا توجد إشارات.",
+      "raiseQuotation": "طلب عرض سعر",
+      "raiseQuotationHint": "«طلب عرض سعر» ليست نتيجة. أنشئ الطلب الحقيقي، والتأهيل يُشتق منه.",
+      "narrativeAlways": "املأ هذا دائمًا، مهما كانت الخيارات أعلاه.",
+      "authorOnlyHint": "لا يصحح التقرير إلا من كتبه.",
+      "correctionHint": "هذا يصحح التقرير في مكانه. يبقى تسجيلًا واحدًا، والتغيير مسجَّل."
+    },
+    "actions": {
+      "log": "سجّل",
+      "save": "حفظ التصحيح",
+      "logInteraction": "تسجيل تفاعل",
+      "logFieldNote": "تسجيل ملاحظة ميدانية"
+    },
+    "errors": {
+      "narrativeRequired": "اكتب ما حدث، ولو في سطر واحد.",
+      "companyRequired": "التفاعل يكون دائمًا مع شركة.",
+      "channelRequired": "حدّد كيف حدث هذا.",
+      "outcomeRequired": "اختر ما الذي حدث.",
+      "categoryRequired": "اختر نوع العمل.",
+      "onHoldDateRequired": "التأجيل يحتاج تاريخًا يُؤجَّل إليه.",
+      "signalDuplicated": "تم اختيار الإشارة نفسها مرتين.",
+      "signalReferenceTooLong": "هذا المرجع طويل جدًا.",
+      "companyNotVisible": "تعذر العثور على تلك الشركة.",
+      "contactNotOnCompany": "جهة الاتصال هذه لا تتبع تلك الشركة.",
+      "projectNotVisible": "تعذر العثور على ذلك المشروع.",
+      "projectNotOnCompany": "ذلك المشروع غير مرتبط بتلك الشركة.",
+      "notFound": "لم يعد هذا التقرير موجودًا.",
+      "authorOnly": "لا يصحح هذا التقرير إلا من كتبه."
+    }
+  },
+  "timeline": {
+    "title": "الجدول الزمني",
+    "fullTitle": "السجل الكامل",
+    "empty": "لم يحدث شيء هنا بعد.",
+    "showingRecent": "عرض أحدث {shown} من أصل {total}.",
+    "viewAll": "السجل الكامل",
+    "byWhom": "بواسطة {name}",
+    "hint": "كل ما حدث هنا، سواء كتبه شخص أو سجّله فاسِت بنفسه."
+  },
+  "activity": {
+    "title": "النشاط",
+    "empty": "لا يوجد نشاط ظاهر لهذه الفترة.",
+    "fields": {
+      "from": "من",
+      "to": "إلى",
+      "person": "الشخص",
+      "reportsLogged": "المسجَّل",
+      "companiesTouched": "الشركات",
+      "systemEvents": "سجّله فاسِت",
+      "signalsRaised": "الإشارات"
+    },
+    "detail": {
+      "hint": "ما سجّله الأشخاص، بجانب ما سجّله فاسِت بنفسه. يُعرضان جنبًا إلى جنب ولا يُجمعان أبدًا.",
+      "attribution": "كل حدث يُحتسب لمن قام به، لا لمن نُسب إليه الرصيد. عمود «سجّله فاسِت» يبدو قليلًا لدى المندوب لأن منسق المبيعات يقوم بمعظم سلسلة عروض الأسعار — وهذا صحيح وليس خللًا.",
+      "expand": "عرض التسجيلات",
+      "collapse": "إخفاء التسجيلات",
+      "entriesFor": "ما قام به {name}",
+      "noEntries": "لا شيء في هذه الفترة.",
+      "teamTotal": "إجمالي الفريق",
+      "notACombinedScore": "لا يُدمج النشاط مع نسبة الهدف في رقم واحد أبدًا."
+    }
+  },
+  "coverage": {
+    "title": "التغطية",
+    "empty": "لا توجد شركات للتغطية.",
+    "emptyFiltered": "لا توجد شركات تطابق هذا البحث.",
+    "searchPlaceholder": "ابحث باسم الشركة",
+    "fields": {
+      "company": "الشركة",
+      "reps": "المندوبون",
+      "lastInteraction": "آخر تفاعل",
+      "daysSince": "الأيام",
+      "status": "الحالة",
+      "person": "المندوب",
+      "allReps": "الجميع",
+      "never": "لا يوجد",
+      "quiet": "صامتة",
+      "covered": "مغطاة",
+      "onHold": "مؤجلة",
+      "filterAll": "كل الشركات",
+      "filterQuiet": "الصامتة فقط"
+    },
+    "detail": {
+      "hint": "أي الشركات صمتت. لا شيء يُسلَّم هنا، فلا شيء يُفوَّت ولا عقوبة على شيء.",
+      "thresholds": "الصمت يعني {qualified} يومًا دون تفاعل للشركة التي طلبت عرض سعر، و{unqualified} يومًا لمن لم تطلب.",
+      "onHoldUntil": "مؤجلة حتى {date}",
+      "yours": "تسجيل الزيارة هو ما يُخرج الشركة من هذه القائمة."
     }
   }
 }

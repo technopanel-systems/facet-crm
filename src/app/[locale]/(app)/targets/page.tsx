@@ -156,12 +156,17 @@ export default async function TargetsPage({
       )}
 
       {/* `07 D2` — target progress and activity side by side, NEVER combined
-          into one score. Activity cannot be shown yet because nothing writes
-          the `activities` table until Phase 9, and a zero would read as "did
-          nothing". Saying so is the honest option. */}
-      <p className="text-muted-foreground text-start text-sm">
-        {t("targets.detail.activityPending")}
-      </p>
+          into one score. Since Phase 9 activity is real and derived `[20 §8]`,
+          so this is a link rather than an apology — and it stays a link,
+          because folding a number in here is the thing `07 D2` forbids. */}
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-muted-foreground text-start text-sm">
+          {t("targets.detail.activityElsewhere")}
+        </p>
+        <Button asChild size="xs" variant="outline">
+          <Link href="/activity">{t("targets.detail.viewActivity")}</Link>
+        </Button>
+      </div>
     </main>
   );
 }

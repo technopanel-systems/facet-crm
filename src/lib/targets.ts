@@ -23,10 +23,10 @@
  *  2. **`accepted` is not won** `[16 §5]`. It never reads `end_state`. An
  *     accepted, paid, undispatched thread contributes exactly zero.
  *  3. **No combined score** `[07 D2]`. Target progress and activity are shown
- *     side by side, never merged. Nothing here multiplies or weights them —
- *     and activity cannot be shown at all yet, because nothing writes the
- *     `activities` table until Phase 9. The screen says so rather than
- *     rendering a zero, which would read as "did nothing".
+ *     side by side, never merged. Nothing here multiplies or weights them, and
+ *     nothing here reads activity at all: since Phase 9 it lives on its own
+ *     screen, `/activity`, derived from real events `[20 §6]`, `[20 §8]`. The
+ *     targets screen links to it rather than folding a number in.
  */
 
 import { and, asc, desc, eq, inArray } from "drizzle-orm";

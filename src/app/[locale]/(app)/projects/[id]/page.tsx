@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getFormatter, getTranslations, setRequestLocale } from "next-intl/server";
 
 import { DetailRow, PageHeader } from "@/components/page-header";
+import { Timeline } from "@/components/timeline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +12,7 @@ import { listCompanyOptions } from "@/lib/companies";
 import { getCreditSplitInForce } from "@/lib/credit-splits";
 import { bilingualName, pickName } from "@/lib/lookups";
 import { getProject } from "@/lib/projects";
+import { projectTimeline, TIMELINE_CARD_LIMIT } from "@/lib/timeline";
 
 import { setCreditSplitAction } from "../actions";
 import { CreditSplit } from "./credit-split";
@@ -37,9 +39,10 @@ export default async function ProjectDetailPage({
   const companies = await listCompanyOptions(session);
 
   // `18 §3` — the split names people, so the picker is the user directory.
-  const [split, people] = await Promise.all([
+  const [split, people, timeline] = await Promise.all([
     getCreditSplitInForce(session, project.id),
     listActiveUsers(),
+    projectTimeline(session, project.id, { limit: TIMELINE_CARD_LIMIT }),
   ]);
   const inForceIds = new Set(split?.rows.map((row) => row.userId) ?? []);
   const candidates = people.map((person) => ({
@@ -157,6 +160,17 @@ export default async function ProjectDetailPage({
           />
         </CardContent>
       </Card>
+
+      {/* `20 §6` — the project's own history. A report naming this project
+          appears here AND on its company's timeline; a direct dispatch has no
+          project and appears only on the company's `[07 C6]`. There is no Log
+          button here: an interaction is anchored to a COMPANY `[20 §2]`, and
+          the company page is where one starts. */}
+      <Timeline
+        events={timeline.events}
+        total={timeline.total}
+        fullHistoryHref={`/projects/${project.id}/timeline`}
+      />
     </main>
   );
 }

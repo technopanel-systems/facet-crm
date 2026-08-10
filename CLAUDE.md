@@ -19,46 +19,71 @@ Current phase and model/skill routing: `docs/05-roadmap.md`.
 When sources disagree, higher wins.
 
 **User truth** — stated directly by the founder:
-1. `docs/19-phase11-decisions.md` — latest; team, user management and
+1. `docs/20-phase9-decisions.md` — latest; activity reporting. Reporting exists
+   so knowledge is **company property**; a report's visibility **follows its
+   anchor**, superseding "private to the rep"; compliance is **coverage, not
+   submission**; the timeline is **derived, not stored**; and every event is
+   attributed to **whoever performed it**
+2. `docs/19-phase11-decisions.md` — team, user management and
    offboarding. A handed-over thread **rewrites its raiser**, region on a user
    is **asked not derived**, handover **opens only after deactivation**, nav
    gates a section by **boolean prop**, **self-deactivation is refused**, and
    **email is editable**
-2. `docs/18-slice3-decisions.md` — dispatch, credit splits and targets.
+3. `docs/18-slice3-decisions.md` — dispatch, credit splits and targets.
    Credit with no split goes to **the rep on the dispatch**, splits divide
    **equally and are rare**, and **the contributor is withdrawn**
-3. `docs/17-product-lookup-decisions.md` — seeds the suppliers, makes
+4. `docs/17-product-lookup-decisions.md` — seeds the suppliers, makes
    **colour free text rather than a lookup**, reseeds the thicknesses, and frees
    the quotation screen from SMAC's layout
-4. `docs/16-slice2-decisions.md` — the quotation chain. FACET computes the
+5. `docs/16-slice2-decisions.md` — the quotation chain. FACET computes the
    money, VAT defaults to 15%, expiry is a sweep, and **`accepted` is internal
    approval, never a won deal**
-5. `docs/15-lookup-decisions.md` — reverses 14 §5's control choice for the city
+6. `docs/15-lookup-decisions.md` — reverses 14 §5's control choice for the city
    field, and makes region derived rather than entered
-6. `docs/14-slice1-decisions.md` — corrects 12 §3 and 13 §2's scope rule
-7. `docs/12-closing-open-items.md` — corrects 07, 08, 09, 10, 11
-8. `docs/11-architectural-decisions.md` §1–3
-9. `docs/04-founder-answers.md`
-10. `docs/07-phase4-answers.md`
-11. `docs/08-quotation-model.md` §A–C
+7. `docs/14-slice1-decisions.md` — corrects 12 §3 and 13 §2's scope rule
+8. `docs/12-closing-open-items.md` — corrects 07, 08, 09, 10, 11
+9. `docs/11-architectural-decisions.md` §1–3
+10. `docs/04-founder-answers.md`
+11. `docs/07-phase4-answers.md`
+12. `docs/08-quotation-model.md` §A–C
 
 **Settled decisions** — agreed, do not re-litigate:
-12. `docs/13-data-model-decisions.md` — §3 is **LOCKED**; §1–2 explain the
+13. `docs/13-data-model-decisions.md` — §3 is **LOCKED**; §1–2 explain the
     schema, they do not govern it
-13. `docs/10-schema-decisions.md`
-14. `docs/09-schema-design.md`
-15. `docs/03-stack.md`
-16. `docs/01-business-model.md`
+14. `docs/10-schema-decisions.md`
+15. `docs/09-schema-design.md`
+16. `docs/03-stack.md`
+17. `docs/01-business-model.md`
 
 **Reference only** — never authority:
-17. `docs/06-strategic-review.md` — proposals, explicitly not truth
-18. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
+18. `docs/06-strategic-review.md` — proposals, explicitly not truth
+19. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
     whole; cite sections)
-19. `docs/02-history-extract.md` — mined from old chat transcripts
-20. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
-21. `legacy/**`
+20. `docs/02-history-extract.md` — mined from old chat transcripts
+21. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
+22. `legacy/**`
 
-**Later decisions correct earlier ones.** `19` settles how a departing rep's
+**Later decisions correct earlier ones.** `20` states what reporting is *for* —
+customer knowledge becomes **company property**, which is the test every other
+rule in it is settled against — and that answer **supersedes `04 Q6`'s
+"activities are private to the rep, without exception"**: a report's visibility
+**follows its anchor**, the company and, when one is named, the project too, or
+a shared company would leak a project name `04 Q7` forbids. It **supersedes
+`07 D6`'s submission model and its two-day grace** — compliance is **coverage,
+not submission**, there is nothing to hand in and therefore nothing to miss, and
+no working-day arithmetic is needed anywhere. Coverage is **scoped, not gated**:
+the rep sees their own quiet companies, which is what they get back for logging.
+The timeline is **derived on read**, so `activities` stays permanently empty the
+way `product_colours` does `[17 §2]`, and it must be readable in **full**, not
+only as a capped card. A report is **one row** that editing corrects, author
+only, anchor included. `20 §8` fixes attribution — every event lands on
+**whoever performed it**, which makes "quotation raised" read
+`quotation_versions.created_by` rather than the raiser `19 §1` rewrites, and a
+dispatch count the **recorder** rather than the credited rep — and `20 §8.2`
+adds the rule that **`audit_log` is never read directly for a user-facing
+view**: an audit-sourced event joins to the record it describes and applies that
+record's filter, because an audit row is not access-controlled.
+`19` settles how a departing rep's
 work moves: a handed-over quotation thread **rewrites `raised_by_user_id`**
 while authorship columns stay put, and because `18 §1` fixes credit to the
 dispatch, no past month can move with it. It confirms **`12 §7` supersedes
@@ -221,10 +246,56 @@ There is **no test harness**. What is automated, and what is not:
   credit** `[18 §1]`; that visibility follows the work in both directions with
   **no new predicate written**; and that an impersonated identity loses the
   flag `[07 A6]`. It found one real framing error on its first run — see below.
+- `npm run verify:phase9` — the same shape, for activity reporting.
+  Development only; needs `db:seed` (which since `20 §11` also writes the two
+  `settings` thresholds) and `dev:fixtures`. It drives
+  `src/lib/{reports,timeline,daily-activity,coverage,settings}.ts` in process
+  and asserts, in seventeen sections: the seed grants `sees_all_reps` to
+  exactly three roles and **only the two thresholds Phase 9 reads are seeded**,
+  because rows nothing reads are v1's dead approval gate; every gate refuses
+  with its own key — **and the negative claim that coverage and the daily view
+  refuse nobody**, because both are scoped `[20 §7, §8]`; both CHECK
+  constraints refuse **at the database** `[13 §1]`; **editing corrects one row
+  and never double-counts**, replacing the signal set rather than appending —
+  the phase's first central claim; re-anchoring moves a report between
+  timelines; "asked for a quotation" is not an outcome and qualification stays
+  derived; `on hold` is derived on read and the current row wins; the timeline
+  merges both halves and **a field note appears on none**; **the 20-entry cap
+  is the card's, not the data's**, with the full history paging past it;
+  coverage crosses at 30 days qualified and 60 unqualified; coverage is scoped
+  in both directions; **the daily view shows real activity beside logged
+  activity** — a rep who logged nothing but pushed a dispatch out still shows a
+  non-zero row — the second central claim; **attribution**, in four ways a
+  number lands on the wrong person; visibility in both directions including
+  **a rep who cannot see a thread getting no `quotation issued` event though
+  the audit row exists** `[20 §8.2]`; that handover needs no report bucket; and
+  that every write is audited.
+  **It found three real bugs on its first run**, all recorded below.
+  It creates its own reps, because the daily view and coverage are
+  whole-database figures over a range — the trap `verify:slice3` hit.
 - **Almost nothing else tests behaviour.** Slice 1's visibility rules were
   checked with throwaway scripts, which is not the same as a suite.
-  `verify:slice2`, `verify:slice3` and `verify:phase11` are the shape the rest
-  should take.
+  `verify:slice2`, `verify:slice3`, `verify:phase9` and `verify:phase11` are
+  the shape the rest should take.
+
+- **Three bugs `verify:phase9` caught on its first run**, all real. Two were in
+  `coverage.ts`: a correlated subquery written inside a `sql` template for
+  `last_interaction_on`, and another for `is_qualified`, both silently returned
+  the empty answer for **every** row — so a company logged against yesterday
+  read as never contacted, and a company with a live quotation read as
+  unqualified. Both are now plain grouped queries over the page's ids, which is
+  the third time this codebase has chosen two readable queries over one clever
+  one. The third was in the script itself: `databaseRefuses` matched only
+  `error.message`, and Drizzle wraps the driver error so the constraint name
+  lives on the `cause` — it failed all four CHECK assertions while the
+  constraints were working perfectly.
+- **A pre-existing flaw in `verify:phase11` §16, found by running the scripts
+  back to back and fixed here.** Its "every entry names an actor" check scanned
+  the whole audit log for the last ten minutes, so running `verify:slice2`
+  first put a **legitimately** null-actor row in range — the expiry sweep
+  audits under a null actor on purpose `[16 §3]`. The assertion was claiming
+  something FACET does not claim; it is now scoped to the actions that script
+  writes. All four verify scripts now pass back to back in one run.
 
 **Auth bridge** (`11 §4.1`) — re-run after any upgrade of `next-auth`,
 `@auth/core`, `@auth/drizzle-adapter` or `next`. Failure here is **silent**:
@@ -330,6 +401,30 @@ Still manual, still owed:
   instead. Same family as the `name="period"` trap on `/targets`.
   That replay is **not kept** — `verify-phase11.ts` stops at the data layer, so
   the form's own parsing has no standing check, exactly as for Slices 2 and 3.
+
+- **Phase 9's screens were driven over HTTP on 2026-08-10**, not merely
+  compiled: `/reports`, `/reports/new`, `/coverage` and `/activity` all `200`
+  in **both locales for a rep and for a manager**, and the nav offering
+  coverage and activity to the rep — the visible half of `20 §7`'s
+  scoped-not-gated rule, which would look identical to a bug if it were wrong.
+  `/reports/new?companyId=` `404` for a rep who cannot see the company; the
+  full-history routes `200` for the holder and `404` for an unrelated rep; the
+  project page carrying a timeline and **no** Log button `[20 §2]`; and the
+  company page carrying the Log button, the on-hold date `[20 §5]`, and — once
+  past twenty entries — the "showing the 20 most recent of N" line and the
+  full-history link `[20 §6]`. **Both real form POSTs were replayed**: creating
+  returned `303` and stored the narrative and a signal reference, proving the
+  per-signal field name (`signalReference.<signal>`) survives the round trip;
+  editing returned `303` and **corrected in place** — the new outcome present,
+  the old narrative gone, the dropped signal's reference gone with it.
+  A manager could open the report and got `404` on its edit screen `[20 §9]`.
+  **The trap this pass hit:** an assertion written with `|| true` in it, and one
+  matching a link that only renders past a threshold — both "passed" while
+  proving nothing. A marker that appears only in some states is not a marker;
+  the project timeline was finally proved by the report row inside it.
+  That replay is **not kept** — `verify-phase9.ts` stops at the data layer, so
+  `readReport`'s own field parsing has no standing check, exactly as for
+  slices 2 and 3 and phase 11.
 
 Automating the **rest** of the auth checklist is still the highest-value test
 to write. `verify:phase11` §6 took the deactivation half; login, the cookie

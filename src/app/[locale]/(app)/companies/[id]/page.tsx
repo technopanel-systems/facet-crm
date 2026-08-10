@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getFormatter, getTranslations, setRequestLocale } from "next-intl/server";
 
 import { DetailRow, PageHeader } from "@/components/page-header";
+import { Timeline } from "@/components/timeline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +12,8 @@ import { getCompany, listCompanyReps } from "@/lib/companies";
 import { listContacts } from "@/lib/contacts";
 import { bilingualName, pickName } from "@/lib/lookups";
 import { listProjects } from "@/lib/projects";
+import { companyOnHoldUntil } from "@/lib/reports";
+import { companyTimeline, TIMELINE_CARD_LIMIT } from "@/lib/timeline";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +31,7 @@ export default async function CompanyDetailPage({
 
   const t = await getTranslations();
   const format = await getFormatter();
-  const [reps, contacts, projects] = await Promise.all([
+  const [reps, contacts, projects, timeline, onHoldUntil] = await Promise.all([
     listCompanyReps(company.id),
     // Scoped like any other contact read. Seeing the company is what grants
     // these `[14 §1]`, so on a shared company the second rep sees them too.
@@ -38,6 +41,9 @@ export default async function CompanyDetailPage({
     // membership. A rep holding this company through a share sees the company
     // and an EMPTY projects list `[04 Q7]`.
     listProjects(session, { companyId: company.id }),
+    companyTimeline(session, company.id, { limit: TIMELINE_CARD_LIMIT }),
+    // Derived on read, never stored on the company `[20 §5]`.
+    companyOnHoldUntil(session, company.id),
   ]);
 
   const dash = t("common.none");
@@ -46,7 +52,15 @@ export default async function CompanyDetailPage({
     <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
       <PageHeader
         title={bilingualName(company, locale)}
-        description={company.archivedAt ? t("companies.detail.archived") : undefined}
+        description={
+          company.archivedAt
+            ? t("companies.detail.archived")
+            : // `20 §5` — suppressed follow-ups are worth saying on the record
+              // itself, not only on the coverage screen.
+              onHoldUntil
+              ? t("coverage.detail.onHoldUntil", { date: onHoldUntil })
+              : undefined
+        }
         action={
           <Button asChild size="sm" variant="outline">
             <Link href={`/companies/${company.id}/edit`}>{t("common.edit")}</Link>
@@ -234,6 +248,21 @@ export default async function CompanyDetailPage({
           )}
         </CardContent>
       </Card>
+
+      {/* `20 §6` — the rep's payoff for logging, and the reason the log button
+          sits in its header rather than at the top of the page. */}
+      <Timeline
+        events={timeline.events}
+        total={timeline.total}
+        fullHistoryHref={`/companies/${company.id}/timeline`}
+        action={
+          <Button asChild size="xs">
+            <Link href={`/reports/new?companyId=${company.id}`}>
+              {t("reports.new")}
+            </Link>
+          </Button>
+        }
+      />
     </main>
   );
 }

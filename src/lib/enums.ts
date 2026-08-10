@@ -64,6 +64,100 @@ export type QuotationVersionOrigin =
 export const SMAC_VERIFICATIONS = ["unverified", "verified"] as const;
 export type SmacVerification = (typeof SMAC_VERIFICATIONS)[number];
 
+/** `[20 §2]` — an interaction has a company; a field note has nobody. */
+export const REPORT_ENTRY_TYPES = ["interaction", "field_note"] as const;
+export type ReportEntryType = (typeof REPORT_ENTRY_TYPES)[number];
+
+/** `[20 §3]` — how the interaction happened. */
+export const REPORT_CHANNELS = [
+  "visit",
+  "call",
+  "whatsapp",
+  "email",
+  "meeting",
+] as const;
+export type ReportChannel = (typeof REPORT_CHANNELS)[number];
+
+/**
+ * `[20 §3]` — what happened in the funnel. Exactly one per interaction.
+ *
+ * **There is deliberately no "asked for a quotation".** Qualification is
+ * derived from a real quotation thread `[10 §1]`; an outcome claiming it would
+ * be a second, softer definition that no thread backs. The form offers a button
+ * that raises the request instead. Do not add the value — add a link.
+ */
+export const REPORT_OUTCOMES = [
+  "introduced",
+  "catalogue_sent",
+  "samples_sent",
+  "documents_sent",
+  "discussed_pricing",
+  "no_answer",
+  "not_interested",
+  "on_hold",
+  "other",
+] as const;
+export type ReportOutcome = (typeof REPORT_OUTCOMES)[number];
+
+/** `[20 §5]` — the one outcome that requires a date and suppresses follow-ups. */
+export const ON_HOLD_OUTCOME = "on_hold" satisfies ReportOutcome;
+
+/** `[20 §2]` — what a field note was for. */
+export const FIELD_NOTE_CATEGORIES = [
+  "market_research",
+  "scouting",
+  "exhibition",
+  "training",
+  "internal",
+] as const;
+export type FieldNoteCategory = (typeof FIELD_NOTE_CATEGORIES)[number];
+
+/**
+ * `[20 §4]` — what the customer said that the business needs to know. Distinct
+ * from the outcome, optional, many per report, and allowed on **any** report
+ * rather than only a loss: a customer can say a competitor is cheaper and still
+ * buy.
+ */
+export const REPORT_SIGNALS = [
+  "price_too_high",
+  "competitor_cheaper",
+  "colour_unavailable",
+  "lead_time_too_long",
+  "quality_concern",
+  "payment_terms",
+  "specification_unavailable",
+  "project_delayed",
+  "other",
+] as const;
+export type ReportSignal = (typeof REPORT_SIGNALS)[number];
+
+/**
+ * `[20 §4]` — the four signals that invite a reference, so they aggregate:
+ * competitor cheaper → the competitor's name, colour not available → the colour
+ * code, specification we do not offer → the class or fire rating, other → free
+ * text.
+ *
+ * This is a **form** concern, not a constraint. Every signal may carry a
+ * reference in the database; these are the ones whose input is rendered, and
+ * each has its own placeholder key so the rep is asked for the right thing.
+ */
+export const SIGNALS_WITH_REFERENCE = [
+  "competitor_cheaper",
+  "colour_unavailable",
+  "specification_unavailable",
+  "other",
+] as const satisfies readonly ReportSignal[];
+
+export function signalTakesReference(signal: ReportSignal): boolean {
+  return (SIGNALS_WITH_REFERENCE as readonly ReportSignal[]).includes(signal);
+}
+
+/** The longest a signal reference may be — a name or a code, not a narrative. */
+export const SIGNAL_REFERENCE_MAX = 200;
+
+/** `[20 §12]` — a lobby, not a desk. Applied only to the log form. */
+export const TOUCH_INPUT_CLASS = "h-11 text-base";
+
 /**
  * `[16 §2]` — the Saudi rate, as a **default** and nothing more. FACET does
  * not do tax; SMAC does `[04 A1]`. The value lives here so a client form and

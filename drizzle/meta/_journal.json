@@ -36,6 +36,13 @@
       "when": 1786273299965,
       "tag": "0004_lookup_selectability",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786361446258,
+      "tag": "0005_activity_reporting",
+      "breakpoints": true
     }
   ]
 }

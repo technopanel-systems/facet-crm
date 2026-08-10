@@ -14,6 +14,9 @@
     "projects": "Projects",
     "quotations": "Quotations",
     "dispatches": "Dispatches",
+    "reports": "Reports",
+    "coverage": "Coverage",
+    "activity": "Activity",
     "targets": "Targets",
     "team": "Team"
   },
@@ -106,6 +109,54 @@
     "smacVerification": {
       "unverified": "Unverified",
       "verified": "Verified"
+    },
+    "reportEntryType": {
+      "interaction": "Interaction",
+      "field_note": "Field note"
+    },
+    "reportChannel": {
+      "visit": "Visit",
+      "call": "Call",
+      "whatsapp": "WhatsApp",
+      "email": "Email",
+      "meeting": "Meeting"
+    },
+    "reportOutcome": {
+      "introduced": "Introduced",
+      "catalogue_sent": "Catalogue sent",
+      "samples_sent": "Samples sent",
+      "documents_sent": "Documents sent",
+      "discussed_pricing": "Discussed pricing",
+      "no_answer": "No answer",
+      "not_interested": "Not interested",
+      "on_hold": "On hold",
+      "other": "Other"
+    },
+    "fieldNoteCategory": {
+      "market_research": "Market research",
+      "scouting": "Scouting",
+      "exhibition": "Exhibition",
+      "training": "Training",
+      "internal": "Internal"
+    },
+    "reportSignal": {
+      "price_too_high": "Price too high",
+      "competitor_cheaper": "Competitor cheaper",
+      "colour_unavailable": "Colour or product not available",
+      "lead_time_too_long": "Lead time too long",
+      "quality_concern": "Quality concern",
+      "payment_terms": "Payment terms",
+      "specification_unavailable": "Specification we do not offer",
+      "project_delayed": "Project delayed",
+      "other": "Other"
+    },
+    "timelineEvent": {
+      "report": "Logged",
+      "company_added": "Company added",
+      "quotation_raised": "Quotation raised",
+      "quotation_issued": "Quotation issued",
+      "payment_confirmed": "Payment confirmed",
+      "dispatched": "Dispatched"
     }
   },
   "errors": {
@@ -451,7 +502,8 @@
     },
     "detail": {
       "derivedNotice": "Achievement is derived from what was dispatched, and from nothing else. Targets are square metres only.",
-      "activityPending": "Activity is not recorded yet. When it is, it will be shown beside target progress — never combined with it into a single score."
+      "activityElsewhere": "Activity has its own screen and stays there. It is shown beside target progress, never combined with it into a single score.",
+      "viewActivity": "Open activity"
     },
     "actions": {
       "setTarget": "Set"
@@ -540,6 +592,145 @@
       "userStillActive": "Deactivate the account before handing over their work.",
       "itemNotHeld": "Something on this list has already moved. Reload the page and try again.",
       "cannotDeactivateSelf": "You cannot deactivate your own account."
+    }
+  },
+  "reports": {
+    "title": "Reports",
+    "new": "Log",
+    "newTitle": "Log an interaction",
+    "newFieldNoteTitle": "Log a field note",
+    "editTitle": "Correct this report",
+    "empty": "Nothing logged yet.",
+    "emptyFiltered": "No reports match this search.",
+    "searchPlaceholder": "Search the text or a company name",
+    "fields": {
+      "entryType": "What is this",
+      "company": "Company",
+      "companyPlaceholder": "Choose a company",
+      "contact": "Contact",
+      "contactPlaceholder": "Nobody in particular",
+      "project": "Project",
+      "projectNone": "No project",
+      "channel": "How",
+      "channelPlaceholder": "Choose one",
+      "outcome": "What happened",
+      "outcomePlaceholder": "Choose one",
+      "narrative": "What was said",
+      "narrativePlaceholder": "In your own words. This is the part that lasts.",
+      "onHoldUntil": "On hold until",
+      "category": "Kind of work",
+      "categoryPlaceholder": "Choose one",
+      "city": "City",
+      "cityPlaceholder": "Anywhere in particular?",
+      "reportDate": "Date",
+      "signals": "What the customer told us",
+      "author": "Logged by",
+      "filterAll": "All",
+      "filterInteractions": "Interactions",
+      "filterFieldNotes": "Field notes",
+      "filterOutcome": "Outcome",
+      "filterAnyOutcome": "Any outcome"
+    },
+    "signalReference": {
+      "competitor_cheaper": "Which competitor?",
+      "colour_unavailable": "Which colour code?",
+      "specification_unavailable": "Which class or fire rating?",
+      "other": "What was it?"
+    },
+    "detail": {
+      "title": "Report",
+      "interactionHint": "Anchored to a company. The contact and the project are optional.",
+      "fieldNoteHint": "A field note belongs to no customer. It counts as activity and appears on no timeline.",
+      "signalsHint": "What the customer said, kept separate from what happened in the funnel. Worth recording whether or not the deal was lost.",
+      "onHoldHint": "This company raises no follow-up until the date above.",
+      "onHoldFieldHint": "Only used when the outcome is “On hold”.",
+      "noSignals": "No signals.",
+      "raiseQuotation": "Ask for a quotation",
+      "raiseQuotationHint": "“Asked for a quotation” is not an outcome. Raise the real request, and qualification follows from it.",
+      "narrativeAlways": "Always fill this in, whatever the choices above say.",
+      "authorOnlyHint": "Only the person who wrote a report may correct it.",
+      "correctionHint": "This corrects the report in place. There is still one entry, and the change is recorded."
+    },
+    "actions": {
+      "log": "Log it",
+      "save": "Save the correction",
+      "logInteraction": "Log an interaction",
+      "logFieldNote": "Log a field note"
+    },
+    "errors": {
+      "narrativeRequired": "Write what happened, even if it is one line.",
+      "companyRequired": "An interaction is always about a company.",
+      "channelRequired": "Say how this happened.",
+      "outcomeRequired": "Choose what happened.",
+      "categoryRequired": "Choose the kind of work.",
+      "onHoldDateRequired": "On hold needs a date to hold until.",
+      "signalDuplicated": "The same signal was chosen twice.",
+      "signalReferenceTooLong": "That reference is too long.",
+      "companyNotVisible": "That company cannot be found.",
+      "contactNotOnCompany": "That contact does not belong to that company.",
+      "projectNotVisible": "That project cannot be found.",
+      "projectNotOnCompany": "That project is not linked to that company.",
+      "notFound": "That report no longer exists.",
+      "authorOnly": "Only the person who wrote this report may correct it."
+    }
+  },
+  "timeline": {
+    "title": "Timeline",
+    "fullTitle": "Full history",
+    "empty": "Nothing has happened here yet.",
+    "showingRecent": "Showing the {shown} most recent of {total}.",
+    "viewAll": "Full history",
+    "byWhom": "by {name}",
+    "hint": "Everything that has happened here, whether somebody typed it or FACET recorded it on its own."
+  },
+  "activity": {
+    "title": "Activity",
+    "empty": "No activity is visible for this range.",
+    "fields": {
+      "from": "From",
+      "to": "To",
+      "person": "Person",
+      "reportsLogged": "Logged",
+      "companiesTouched": "Companies",
+      "systemEvents": "Recorded by FACET",
+      "signalsRaised": "Signals"
+    },
+    "detail": {
+      "hint": "What people logged, beside what FACET recorded on its own. The two are shown side by side and never added together.",
+      "attribution": "Every event counts for whoever performed it, not for whoever was credited. A rep's recorded column looks thin because the coordinator does much of the quotation chain — that is correct, not a fault.",
+      "expand": "Show entries",
+      "collapse": "Hide entries",
+      "entriesFor": "What {name} did",
+      "noEntries": "Nothing in this range.",
+      "teamTotal": "Team total",
+      "notACombinedScore": "Activity is never combined with target progress into a single score."
+    }
+  },
+  "coverage": {
+    "title": "Coverage",
+    "empty": "No companies to cover.",
+    "emptyFiltered": "No companies match this search.",
+    "searchPlaceholder": "Search by company name",
+    "fields": {
+      "company": "Company",
+      "reps": "Reps",
+      "lastInteraction": "Last interaction",
+      "daysSince": "Days",
+      "status": "Status",
+      "person": "Rep",
+      "allReps": "Everyone",
+      "never": "Never",
+      "quiet": "Quiet",
+      "covered": "Covered",
+      "onHold": "On hold",
+      "filterAll": "All companies",
+      "filterQuiet": "Quiet only"
+    },
+    "detail": {
+      "hint": "Which companies have gone quiet. There is nothing to submit here, so there is nothing to miss and nothing is penalised.",
+      "thresholds": "Quiet means {qualified} days without an interaction for a company that has asked for a quotation, and {unqualified} days for one that has not.",
+      "onHoldUntil": "On hold until {date}",
+      "yours": "Logging a visit is what takes a company off this list."
     }
   }
 }

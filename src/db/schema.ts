@@ -195,8 +195,72 @@ export const notificationChannelEnum = pgEnum("notification_channel", [
   "in_app",
 ]);
 
-/** `[04 B3 confirmed]` */
-export const repReportKindEnum = pgEnum("rep_report_kind", ["visit", "call"]);
+/**
+ * `[20 §2]` — the two things a rep writes. An interaction is anchored to a
+ * company; a field note is anchored to nobody and touches no customer timeline.
+ *
+ * This replaces `09 §8.2`'s `rep_report_kind` (visit / call), which `20 §13`
+ * drops: two values were the channel, not the entry type.
+ */
+export const repReportEntryTypeEnum = pgEnum("rep_report_entry_type", [
+  "interaction",
+  "field_note",
+]);
+
+/** `[20 §3]` — how the interaction happened. */
+export const repReportChannelEnum = pgEnum("rep_report_channel", [
+  "visit",
+  "call",
+  "whatsapp",
+  "email",
+  "meeting",
+]);
+
+/**
+ * `[20 §3]` — what happened in the funnel. Exactly one per interaction.
+ *
+ * There is deliberately no "asked for a quotation" value: qualification is
+ * derived from a real quotation thread `[10 §1]` and an outcome saying
+ * otherwise would be a second, softer definition of qualified that no thread
+ * backs. The form offers a button that raises the request instead.
+ */
+export const repReportOutcomeEnum = pgEnum("rep_report_outcome", [
+  "introduced",
+  "catalogue_sent",
+  "samples_sent",
+  "documents_sent",
+  "discussed_pricing",
+  "no_answer",
+  "not_interested",
+  "on_hold",
+  "other",
+]);
+
+/** `[20 §2]` — what a field note was for. */
+export const fieldNoteCategoryEnum = pgEnum("field_note_category", [
+  "market_research",
+  "scouting",
+  "exhibition",
+  "training",
+  "internal",
+]);
+
+/**
+ * `[20 §4]` — what the customer told us that the business needs to know.
+ * Distinct from the outcome, optional, many per report, and allowed on any
+ * report rather than only on a loss.
+ */
+export const reportSignalEnum = pgEnum("report_signal", [
+  "price_too_high",
+  "competitor_cheaper",
+  "colour_unavailable",
+  "lead_time_too_long",
+  "quality_concern",
+  "payment_terms",
+  "specification_unavailable",
+  "project_delayed",
+  "other",
+]);
 
 /* ------------------------------------------------------------------ *
  * 2. Identity and authorization — `09 §2`
@@ -1138,6 +1202,16 @@ export const nonDuplicates = pgTable(
  * `activity_type` is free text: the documents give examples (lead added,
  * catalogue sent, dispatch) but never a closed list, and no document makes it
  * a lookup — unlike notification type `[10 §10]`.
+ *
+ * **This table is empty on purpose and permanently `[20 §6]`**, the way
+ * `product_colours` is `[17 §2]`. Phase 9's timeline derives the system events
+ * on read from the tables that already hold them — `companies.created_at`,
+ * `quotation_versions`, `quotation_threads.payment_confirmed_at`, `dispatches`
+ * — so every record already in the database has a full history with no
+ * backfill, and there is no second copy to keep in step. `09 §8.1`'s "written
+ * by the system" is satisfied by deriving rather than duplicating, which is
+ * what `04 C1` asks for anyway. Do not start writing rows here without a new
+ * user-truth document: half a table is worse than none.
  */
 export const activities = pgTable(
   "activities",
@@ -1158,10 +1232,29 @@ export const activities = pgTable(
 );
 
 /**
- * `09 §8.2` — the second reporting layer, never merged with the first
- * `[04 B3 confirmed]`. Required only for what the system cannot see — a visit,
- * a call outcome, something said `[07 D6]`. Compliance is a diagnostic with a
- * two-day grace and no automatic penalty: a reporting rule, not a column.
+ * `09 §8.2`, reshaped by `20 §2` and `20 §13` — the second reporting layer,
+ * never merged with the first `[04 B3 confirmed]`. Required only for what the
+ * system cannot see — a visit, a call outcome, something said `[07 D6]`.
+ *
+ * **Not a polymorphic record reference, unlike every other pointer in this
+ * schema `[09 §1.5]`.** One interaction anchors to a company AND optionally a
+ * contact AND optionally a project at the same time `[20 §2]`, and a
+ * `record_type` / `record_id` pair can only name one of them. The three columns
+ * are explicit for that reason, and they are what `visibleRepReportsFilter`
+ * reads: a report follows its anchor `[20 §10]`.
+ *
+ * **A report is one row `[20 §9]`.** Editing is an UPDATE, never a second row,
+ * because counts read the current outcome and a correction must not
+ * double-count. Only the author may edit, and the audit log carries the change.
+ *
+ * `on_hold_until` is the date the rep sets when the outcome is `on_hold`
+ * `[20 §5]`. Nothing is stored on the company: suppression is derived on read
+ * as the greatest such date that is not in the past, so correcting the report
+ * corrects the suppression with nothing to keep in step.
+ *
+ * Compliance is coverage rather than submission `[20 §7]`, which supersedes
+ * `07 D6`'s two-day grace: there is nothing to hand in and so nothing to miss,
+ * and no working-day column exists or is needed.
  */
 export const repReports = pgTable(
   "rep_reports",
@@ -1170,16 +1263,97 @@ export const repReports = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id),
-    recordType: recordTypeEnum("record_type").notNull(),
-    recordId: uuid("record_id").notNull(),
-    kind: repReportKindEnum("kind").notNull(),
+    entryType: repReportEntryTypeEnum("entry_type").notNull(),
+    /** Interaction only, and then required `[20 §2]`. */
+    companyId: uuid("company_id").references(() => companies.id),
+    /** Optional, and must belong to `company_id` — checked in the data layer. */
+    contactId: uuid("contact_id").references(() => contacts.id),
+    /** Optional, never required, and must be linked to `company_id` `[20 §2]`. */
+    projectId: uuid("project_id").references(() => projects.id),
+    channel: repReportChannelEnum("channel"),
+    outcome: repReportOutcomeEnum("outcome"),
+    /** Field note only, and then required `[20 §2]`. */
+    category: fieldNoteCategoryEnum("category"),
+    /** Field note only, optional. */
+    cityId: uuid("city_id").references(() => cities.id),
     narrative: text("narrative").notNull(),
+    /** Set exactly when the outcome is `on_hold` `[20 §5]`. */
+    onHoldUntil: date("on_hold_until"),
     reportDate: date("report_date").notNull(),
     createdAt: createdAt(),
   },
   (t) => [
     index("rep_reports_user_date_idx").on(t.userId, t.reportDate),
-    index("rep_reports_record_idx").on(t.recordType, t.recordId),
+    index("rep_reports_company_idx").on(t.companyId, t.reportDate),
+    index("rep_reports_project_idx").on(t.projectId, t.reportDate),
+    /**
+     * `13 §1` — what a row may contain, which belongs in the database, as
+     * distinct from who may write it, which stays in one application layer.
+     * That the contact and project belong to the company is a cross-table rule
+     * and stays in `src/lib/reports.ts` as a `RuleError`, exactly as
+     * `dispatches.ts` handles a company not on a thread.
+     */
+    check(
+      "rep_reports_shape",
+      sql`(
+        entry_type = 'interaction'
+        and company_id is not null
+        and channel is not null
+        and outcome is not null
+        and category is null
+        and city_id is null
+      ) or (
+        entry_type = 'field_note'
+        and company_id is null
+        and contact_id is null
+        and project_id is null
+        and channel is null
+        and outcome is null
+        and category is not null
+      )`,
+    ),
+    /**
+     * `20 §5` — the date is required for `on_hold` and forbidden otherwise.
+     * `is distinct from` never returns null, so this also holds for a field
+     * note, whose outcome is null. A plain `outcome = 'on_hold'` would evaluate
+     * to null there and the constraint would pass on anything.
+     */
+    check(
+      "rep_reports_on_hold",
+      sql`(outcome is distinct from 'on_hold') = (on_hold_until is null)`,
+    ),
+  ],
+);
+
+/**
+ * `20 §4` — the signals raised on a report. Separate from the outcome because
+ * they answer a different question: the outcome is what happened in the funnel,
+ * a signal is what the customer said that the business needs to know.
+ *
+ * `reference` is what makes them aggregate — a competitor's name, a colour
+ * code, a class or fire rating. It is optional and free text; only four of the
+ * nine values invite one, and which four is a form concern, not a constraint.
+ *
+ * Editing a report replaces its signal set rather than appending to it
+ * `[20 §9]`, which is the one place this phase deletes a row. It is a component
+ * of its parent, not history: the same reading under which `quotations.ts`
+ * deletes a line off an unissued version.
+ */
+export const repReportSignals = pgTable(
+  "rep_report_signals",
+  {
+    id: pk(),
+    reportId: uuid("report_id")
+      .notNull()
+      .references(() => repReports.id),
+    signal: reportSignalEnum("signal").notNull(),
+    reference: text("reference"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("rep_report_signals_key").on(t.reportId, t.signal),
+    /** So `20 §4`'s aggregation needs no migration when Phase 12 asks. */
+    index("rep_report_signals_signal_idx").on(t.signal),
   ],
 );
 

@@ -22,6 +22,9 @@ const SECTIONS = [
   { href: "/projects", key: "projects" },
   { href: "/quotations", key: "quotations" },
   { href: "/dispatches", key: "dispatches" },
+  { href: "/reports", key: "reports" },
+  { href: "/coverage", key: "coverage" },
+  { href: "/activity", key: "activity" },
   { href: "/targets", key: "targets" },
   { href: "/users", key: "team", requires: "canManageUsers" },
 ] as const;
@@ -38,6 +41,14 @@ const SECTIONS = [
  * session; this component is `"use client"` and must never call `can()` or
  * import from `@/lib/authz` — not even a type, because a type-only import is
  * one careless edit away from shipping the Postgres driver to the browser.
+ *
+ * Phase 9 added three entries and **gated none of them** `[20 §7]`, `[20 §8]`.
+ * `/coverage` and `/activity` look like manager screens and are not: both are
+ * SCOPED, so a rep opening either sees their own companies and their own row.
+ * Coverage is deliberately the rep's own work tool — "which of my companies
+ * have gone quiet" is the clearest answer to what they get back for logging,
+ * and a diagnostic only a supervisor can see is a scoreboard rather than a
+ * queue.
  *
  * Hiding the link is cosmetic. `/users` returns `notFound()` on its own and
  * every write re-checks the flag in the data layer; the nav is not the gate.

@@ -1049,7 +1049,7 @@ async function main(): Promise<void> {
     .from(auditLog)
     .where(sql`${auditLog.createdAt} >= now() - interval '10 minutes'`);
   const actions = new Set(entries.map((row) => row.action));
-  for (const action of [
+  const OWNED = [
     "user.created",
     "user.updated",
     "user.deactivated",
@@ -1060,12 +1060,25 @@ async function main(): Promise<void> {
     "quotation_thread.reassigned",
     "task.reassigned",
     "user.handover",
-  ]) {
+  ];
+  for (const action of OWNED) {
     check(`\`${action}\` was audited`, actions.has(action));
   }
+  /*
+   * Scoped to the actions this script owns, and that is not a weakening.
+   *
+   * A null actor is CORRECT for a system-run write `[16 §3]`: the expiry sweep
+   * audits under one, so that the person who happened to open a list is not
+   * recorded as having expired a quotation. The window above is the whole audit
+   * log, so running `verify:slice2` within ten minutes put a legitimate
+   * null-actor row in range and this check failed on it. It was asserting
+   * something FACET does not claim.
+   */
   check(
-    "every entry names an actor",
-    entries.every((row) => row.actor !== null),
+    "every entry this script wrote names an actor",
+    entries
+      .filter((row) => OWNED.includes(row.action))
+      .every((row) => row.actor !== null),
   );
   console.log(`        actions seen: ${[...actions].sort().join(", ")}`);
 

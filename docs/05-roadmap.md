@@ -19,7 +19,7 @@ work completes.
 | 7 | Slice 1 — companies, contacts, projects | working screens | |
 | 8 | Slice 2 — quotation chain | working screens | ✅ done |
 | 8b | Slice 3 — dispatch, credit splits, targets | working screens | ✅ done |
-| 9 | Activities and reporting | | |
+| 9 | Activities and reporting | working screens | ✅ done |
 | 10 | Follow-ups, duplicates, notifications | | |
 | 11 | Team, roles, offboarding, bulk import | working screens | ✅ done bar **bulk import** |
 | 12 | Dashboards, targets, performance | | |

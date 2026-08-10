@@ -56,6 +56,7 @@ import {
   projects,
   quotationThreads,
   recordShares,
+  repReports,
   roles,
   sessions,
   users,
@@ -107,6 +108,12 @@ export type AuthSession = {
  * **The trigger for adding it:** the first write path that takes a dispatch id
  * from a form — a void/correct action, or per-dispatch sharing. Add the value
  * and a real case together, in the same change.
+ *
+ * **Phase 9 tested that rule and added nothing** `[20 §13]`. A rep report is
+ * editable, so a report id does arrive from a form — but only its author may
+ * edit `[20 §9]`, which is an identity question, not a visibility one. Reads
+ * compose `visibleRepReportsFilter` into the WHERE like every other list. A
+ * `"rep_report"` case would have had no caller.
  */
 export type ViewableRecordType =
   | "company"
@@ -552,6 +559,86 @@ export function visibleDispatchesFilter(
             visibleQuotationThreadsFilter(session),
           ),
         ),
+    ),
+  );
+}
+
+/**
+ * `exists (select 1 from projects ...)`, correlated on a project column.
+ *
+ * The SQL twin of `visibleProjectsFilter`, for the tables that reference a
+ * project rather than being one. The two are ONE rule — a change to either is a
+ * change to both — and the terms are deliberately identical: owner, or an
+ * explicit project share. Company membership is not a term here either
+ * `[04 Q7]`.
+ */
+function projectVisibleExists(
+  projectIdColumn: AnyPgColumn,
+  userId: string,
+): SQL {
+  return exists(
+    subquery
+      .select({ one: sql`1` })
+      .from(projects)
+      .where(
+        and(
+          // Column-to-column: this is what correlates the subquery.
+          eq(projects.id, projectIdColumn),
+          or(
+            eq(projects.ownerUserId, userId),
+            activeShareExists("project", projects.id, userId),
+          ),
+        ),
+      ),
+  );
+}
+
+/**
+ * Rep reports: a report follows its anchor `[20 §10]`.
+ *
+ * **This supersedes `04 Q6`'s "activities are private to the rep, without
+ * exception"**, restated in `01 §4.1` and `09 §8.1`. `20 §1` makes the point of
+ * the whole phase that this knowledge stops being personal property, and a
+ * report only the writer can read hands nothing over when they leave.
+ *
+ * Three terms, and the second is the one that is easy to get wrong:
+ *
+ *  1. **A field note has no anchor, so it follows its author.** It names no
+ *     company and touches no customer timeline `[20 §2]`; there is nothing else
+ *     for its visibility to hang on.
+ *  2. **A company-level report follows the company** — the same two terms as
+ *     `visibleCompaniesFilter`, substituting `rep_reports.company_id`.
+ *  3. **A report naming a project must clear the project TOO** — `and`, not
+ *     `or`. Without this a rep who has been shared a company would read the
+ *     name of a project they are not allowed to see, which is exactly what
+ *     `04 Q7` forbids and the one rule Slice 1 exists to get right.
+ *
+ * **Consequence, and it is intended:** a rep removed from a company loses sight
+ * of reports they wrote themselves. That is `20 §1` working — the history
+ * belonged to the company. It is also why handover needs no report bucket
+ * `[20 §10]`: visibility moves the moment the membership does, and `19 §1`
+ * leaves the author column alone.
+ *
+ * **No share term of its own.** `record_shares` could carry a report and
+ * nothing writes such a row — the same reasoning as `visibleContactsFilter` and
+ * `visibleDispatchesFilter`. A report is reached through its anchor's share.
+ */
+export function visibleRepReportsFilter(
+  session: AuthSession,
+): SQL | undefined {
+  if (session.user.role.seesAllReps) return undefined;
+  const userId = session.user.id;
+  return or(
+    and(isNull(repReports.companyId), eq(repReports.userId, userId)),
+    and(
+      or(
+        activeMembershipExists(repReports.companyId, userId),
+        activeShareExists("company", repReports.companyId, userId),
+      ),
+      or(
+        isNull(repReports.projectId),
+        projectVisibleExists(repReports.projectId, userId),
+      ),
     ),
   );
 }
