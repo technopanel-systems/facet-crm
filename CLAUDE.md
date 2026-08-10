@@ -19,51 +19,85 @@ Current phase and model/skill routing: `docs/05-roadmap.md`.
 When sources disagree, higher wins.
 
 **User truth** — stated directly by the founder:
-1. `docs/20-phase9-decisions.md` — latest; activity reporting. Reporting exists
+1. `docs/21-phase10a-decisions.md` — latest; follow-ups and notifications.
+   A follow-up is a **condition, not a record**, and materialises as a
+   notification and **never as a task**; five notification types are seeded and
+   **no sixth**; **persistence belongs only to a type whose condition can
+   clear**; a handover raises **one** summary, not one per record; the rep
+   re-includes a dormant company while the manager reassigns or archives it;
+   and working days skip **Friday and Saturday, globally**
+2. `docs/20-phase9-decisions.md` — activity reporting. Reporting exists
    so knowledge is **company property**; a report's visibility **follows its
    anchor**, superseding "private to the rep"; compliance is **coverage, not
    submission**; the timeline is **derived, not stored**; and every event is
    attributed to **whoever performed it**
-2. `docs/19-phase11-decisions.md` — team, user management and
+3. `docs/19-phase11-decisions.md` — team, user management and
    offboarding. A handed-over thread **rewrites its raiser**, region on a user
    is **asked not derived**, handover **opens only after deactivation**, nav
    gates a section by **boolean prop**, **self-deactivation is refused**, and
    **email is editable**
-3. `docs/18-slice3-decisions.md` — dispatch, credit splits and targets.
+4. `docs/18-slice3-decisions.md` — dispatch, credit splits and targets.
    Credit with no split goes to **the rep on the dispatch**, splits divide
    **equally and are rare**, and **the contributor is withdrawn**
-4. `docs/17-product-lookup-decisions.md` — seeds the suppliers, makes
+5. `docs/17-product-lookup-decisions.md` — seeds the suppliers, makes
    **colour free text rather than a lookup**, reseeds the thicknesses, and frees
    the quotation screen from SMAC's layout
-5. `docs/16-slice2-decisions.md` — the quotation chain. FACET computes the
+6. `docs/16-slice2-decisions.md` — the quotation chain. FACET computes the
    money, VAT defaults to 15%, expiry is a sweep, and **`accepted` is internal
    approval, never a won deal**
-6. `docs/15-lookup-decisions.md` — reverses 14 §5's control choice for the city
+7. `docs/15-lookup-decisions.md` — reverses 14 §5's control choice for the city
    field, and makes region derived rather than entered
-7. `docs/14-slice1-decisions.md` — corrects 12 §3 and 13 §2's scope rule
-8. `docs/12-closing-open-items.md` — corrects 07, 08, 09, 10, 11
-9. `docs/11-architectural-decisions.md` §1–3
-10. `docs/04-founder-answers.md`
-11. `docs/07-phase4-answers.md`
-12. `docs/08-quotation-model.md` §A–C
+8. `docs/14-slice1-decisions.md` — corrects 12 §3 and 13 §2's scope rule
+9. `docs/12-closing-open-items.md` — corrects 07, 08, 09, 10, 11
+10. `docs/11-architectural-decisions.md` §1–3
+11. `docs/04-founder-answers.md`
+12. `docs/07-phase4-answers.md`
+13. `docs/08-quotation-model.md` §A–C
 
 **Settled decisions** — agreed, do not re-litigate:
-13. `docs/13-data-model-decisions.md` — §3 is **LOCKED**; §1–2 explain the
+14. `docs/13-data-model-decisions.md` — §3 is **LOCKED**; §1–2 explain the
     schema, they do not govern it
-14. `docs/10-schema-decisions.md`
-15. `docs/09-schema-design.md`
-16. `docs/03-stack.md`
-17. `docs/01-business-model.md`
+15. `docs/10-schema-decisions.md`
+16. `docs/09-schema-design.md`
+17. `docs/03-stack.md`
+18. `docs/01-business-model.md`
 
 **Reference only** — never authority:
-18. `docs/06-strategic-review.md` — proposals, explicitly not truth
-19. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
+19. `docs/06-strategic-review.md` — proposals, explicitly not truth
+20. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
     whole; cite sections)
-20. `docs/02-history-extract.md` — mined from old chat transcripts
-21. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
-22. `legacy/**`
+21. `docs/02-history-extract.md` — mined from old chat transcripts
+22. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
+23. `legacy/**`
 
-**Later decisions correct earlier ones.** `20` states what reporting is *for* —
+**Later decisions correct earlier ones.** `21` separates three things that were
+one careless session away from being collapsed into each other. **A follow-up is
+a condition, not a record** — computed on read, the pattern the expiry sweep
+`[16 §3]`, coverage and `on hold` `[20 §5]` already use — so it materialises as
+**one digest notification per recipient per day** `[07 E5]` and **never as a
+task**. That **overrules `10 §9`'s self-closing system task**, because `20 §9`
+says the timers are never fired and stored, a task row is a second copy of a
+derived fact, and a row written the instant a condition becomes true is exactly
+the correction failure the end-of-day rule exists to prevent. **`tasks` stays
+empty and `system_trigger` stays permanently unused**, kept rather than dropped
+the way `13 §2` keeps `form_factor`. It closes `01 §13.2 #24`, open since the
+business model: **five notification types, and no sixth**, each named in a
+document and each with a real producer — except `share.granted`, which is seeded
+complete and cannot fire until `07 B1`'s sharing screen exists, and is named as
+such so it is not mistaken for a dead gate. It adds a rule `07 G1` needed and
+never stated: **persistence belongs only to a type whose resolution condition
+can actually become true**, and every persistent type must state its rule for
+**every anchor it can carry** — so `record.handed_over` is act-now and **not**
+persistent, and a handover raises **one** summary naming the departing rep and
+the counts rather than one undismissable badge per record. A share notification
+is raised on **three** anchors only, because `visibleContactsFilter`,
+`visibleDispatchesFilter` and `visibleRepReportsFilter` carry no share term and
+announcing access somebody did not receive would be a badge over nothing. It
+settles `07 E6`: the **rep** re-includes their own quiet company, the manager
+reassigns or archives it, and each decision is a **dated row** — `07 E6`'s "with
+a warning" *is* the record. And working-day arithmetic returns for the two
+thresholds `07 D5` states that way, **Friday and Saturday globally, with no
+holiday calendar**. `20` states what reporting is *for* —
 customer knowledge becomes **company property**, which is the test every other
 rule in it is settled against — and that answer **supersedes `04 Q6`'s
 "activities are private to the rep, without exception"**: a report's visibility
@@ -273,10 +307,42 @@ There is **no test harness**. What is automated, and what is not:
   **It found three real bugs on its first run**, all recorded below.
   It creates its own reps, because the daily view and coverage are
   whole-database figures over a range — the trap `verify:slice3` hit.
+- `npm run verify:phase10a` — the same shape, for follow-ups and notifications.
+  Development only; needs `db:seed` (which since `21 §2` also writes the five
+  `notification_types` and the three remaining thresholds) and `dev:fixtures`.
+  It drives `src/lib/{follow-ups,notifications,dormancy,working-days,team}.ts`
+  in process and asserts, in sixteen sections: the seed carries **five types and
+  no sixth**, each with the right tier and persistence — including that
+  `record.handed_over` is **not** persistent `[21 §4]` — and all five of
+  `07 D5`'s thresholds, every one of which now has a reader; every dormancy gate
+  refuses with its own key, **and the negative claim that follow-ups and
+  notifications refuse nobody**; the dormancy CHECK refuses **at the database**;
+  working days as a **pure function with no database**, where a fortnight is
+  always ten and the four excluded days are exactly the Fridays and Saturdays;
+  **that computing follow-ups writes no `tasks` row and no `notifications`
+  row** — the phase's first central claim, asserted as *no task anywhere carries
+  `origin 'system'`* rather than *the table is empty*, which is a claim FACET
+  does not make; each of the four kinds firing at its threshold and **not a day
+  early**, with the boundary moving when the `settings` row moves; `on hold`
+  suppressing every kind while a **passed** hold suppresses nothing; archived and
+  re-included companies raising nothing, and a **stale** re-inclusion stopping
+  shielding; **that the digest is dated yesterday and three sweeps write one
+  row** — the second central claim `[20 §9]`; that reading is not resolving;
+  **every persistent type × every anchor it can carry having a stated rule**,
+  checked in both directions so a future anchor cannot be added with no way to
+  clear it, and each rule then exercised until `resolved_at` fills; **that a
+  handover raises ONE notification while a single assignment is per-record**;
+  that a rep's list holds none of another rep's rows and `markRead` across
+  recipients changes nothing `[00 §1.13]`; visibility both ways; dormancy's
+  three routes with exactly one live membership after a reassignment; and that
+  every write is audited, the sweep's own entries naming **no actor** on purpose.
+  **It found two flaws in its own first draft and one real bug**, all recorded
+  below.
 - **Almost nothing else tests behaviour.** Slice 1's visibility rules were
   checked with throwaway scripts, which is not the same as a suite.
-  `verify:slice2`, `verify:slice3`, `verify:phase9` and `verify:phase11` are
-  the shape the rest should take.
+  `verify:slice2`, `verify:slice3`, `verify:phase9`, `verify:phase11` and
+  `verify:phase10a` are the shape the rest should take. **All five pass back to
+  back in one run**, verified on 2026-08-10.
 
 - **Three bugs `verify:phase9` caught on its first run**, all real. Two were in
   `coverage.ts`: a correlated subquery written inside a `sql` template for
@@ -289,6 +355,32 @@ There is **no test harness**. What is automated, and what is not:
   `error.message`, and Drizzle wraps the driver error so the constraint name
   lives on the `cause` — it failed all four CHECK assertions while the
   constraints were working perfectly.
+- **One real bug in Phase 10a, and it was the HTTP pass that found it.**
+  `isCompanyQuiet` — which decides whether the company page renders a dormancy
+  panel at all — wrote `current_date - $2` with the threshold as a bound
+  parameter. Postgres cannot infer a type for `date - unknown`, so **every
+  company detail page answered 500**, and nothing in the data-layer script
+  touched that function. It now computes both cut-offs in TypeScript the way
+  `follow-ups.ts` does, and `verify:phase10a` §6 asserts it agrees with the
+  queue in both directions. **The lesson is the one already on this list**: a
+  script that stops at the data layer does not cover a function only a screen
+  calls.
+- **Two flaws in `verify:phase10a`'s own first draft**, both over-claims rather
+  than code faults, and both the family `verify:phase11` §16 already
+  demonstrated. It asserted `tasks` was **empty across the whole database** and
+  failed on 21 `origin: 'assigned'` rows that `verify-phase11.ts` inserts as
+  handover scaffolding and `12 §7` keeps — FACET's claim is that it never writes
+  a **system** task, and that is what it asserts now. And it asserted a
+  hand-picked date was a working day without checking which weekday it fell on;
+  the no-holiday-calendar claim is now made over a fortnight.
+- **A latent flaw in `verify:slice3` §12, found by running the five scripts back
+  to back and fixed here.** It asked `listDispatches(coordinator, {})` and
+  looked for two ids **on page one**. That list pages at 25 and orders by
+  `dispatch_date desc`, and the script writes hard-coded September dates, so
+  once a dev database had accumulated enough runs the earliest of them fell off
+  page one and `18 §2` "failed" while working perfectly. It is now scoped by
+  `companyId`. Same family as the two below: **an assertion that drifts as the
+  database grows was never asserting what it claimed.**
 - **A pre-existing flaw in `verify:phase11` §16, found by running the scripts
   back to back and fixed here.** Its "every entry names an actor" check scanned
   the whole audit log for the last ten minutes, so running `verify:slice2`
@@ -425,6 +517,26 @@ Still manual, still owed:
   That replay is **not kept** — `verify-phase9.ts` stops at the data layer, so
   `readReport`'s own field parsing has no standing check, exactly as for
   slices 2 and 3 and phase 11.
+
+- **Phase 10a's screens were driven over HTTP on 2026-08-10**, not merely
+  compiled: `/follow-ups` and `/notifications` both `200` in **both locales for
+  a rep and for a manager**, and the nav offering both **to the rep** — the
+  visible half of `21 §9`'s scoped-not-gated rule, which would look identical to
+  a bug if it were wrong. The dormancy panel appeared on a quiet company for a
+  holder of `can_assign`, carrying `name="toUserId"` and `id="archiveNote"`, and
+  the same company `404`ed for an unrelated rep. **Both real form POSTs were
+  replayed**: mark-as-read returned `200` and set `read_at` while leaving
+  `resolved_at` **null** — `07 G1`'s "reading is not resolving", proved through
+  the form rather than asserted at the data layer — and the re-include POST
+  wrote a `company_dormancy_reviews` row whose note then rendered back in the
+  company's own history.
+  **The trap this pass hit** is the one that found the 500 above: the screens
+  compiled, typechecked and built, and the data-layer script passed in full,
+  while a page every rep opens was broken. Driving the screens is not optional
+  even when the suite is green.
+  That replay is **not kept** — `verify-phase10a.ts` stops at the data layer, so
+  the forms' own parsing has no standing check, exactly as for slices 2 and 3
+  and phases 9 and 11.
 
 Automating the **rest** of the auth checklist is still the highest-value test
 to write. `verify:phase11` §6 took the deactivation half; login, the cookie

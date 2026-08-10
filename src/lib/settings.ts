@@ -6,10 +6,10 @@
  * system behaves, not anybody's customers. Same reasoning as `lookups.ts`.
  *
  * `07 D5` names five follow-up thresholds and says they are settings rather
- * than code. `20 §11` seeds the two that Phase 9's coverage screen reads and
- * deliberately not the other three, which chase quotations and catalogues —
- * Phase 10's work. Three rows nothing reads is the shape of v1's dead approval
- * gate.
+ * than code. `20 §11` seeded the two that Phase 9's coverage screen reads and
+ * deliberately not the other three; `21 §2` adds those three, because
+ * `src/lib/follow-ups.ts` now reads them. All five are here and all five have a
+ * reader — which is the test `20 §11` set and the reason it held three back.
  *
  * **A missing row is not an error.** Every reader takes a fallback, because a
  * database seeded before this phase is a normal state and a coverage screen
@@ -33,9 +33,38 @@ export const QUIET_DAYS_QUALIFIED_DEFAULT = 30;
 export const QUIET_DAYS_UNQUALIFIED_KEY = "followup.quiet_days.unqualified";
 export const QUIET_DAYS_UNQUALIFIED_DEFAULT = 60;
 
+/**
+ * `07 D5` — an issued quotation with no response. **Working days** `[21 §8]`:
+ * Friday and Saturday are skipped, for everyone, with no holiday calendar.
+ */
+export const QUOTATION_NO_RESPONSE_KEY =
+  "followup.quotation_no_response.working_days";
+export const QUOTATION_NO_RESPONSE_DEFAULT = 5;
+
+/** `07 D5` — a catalogue sent with no response. Working days, as above. */
+export const CATALOGUE_NO_RESPONSE_KEY =
+  "followup.catalogue_no_response.working_days";
+export const CATALOGUE_NO_RESPONSE_DEFAULT = 10;
+
+/**
+ * `07 D5` — a project whose stage has not moved. **Calendar** days, as `07 D5`
+ * writes it. Stage is derived from events `[10 §1]`; there is no stage column,
+ * so "unchanged" means no stage-advancing event `[21 §10]`.
+ */
+export const PROJECT_STAGE_UNCHANGED_KEY =
+  "followup.project_stage_unchanged.days";
+export const PROJECT_STAGE_UNCHANGED_DEFAULT = 21;
+
 export type QuietThresholds = {
   qualified: number;
   unqualified: number;
+};
+
+/** All five of `07 D5`'s thresholds. */
+export type FollowUpThresholds = QuietThresholds & {
+  quotationNoResponse: number;
+  catalogueNoResponse: number;
+  projectStageUnchanged: number;
 };
 
 export async function getSetting(key: string): Promise<unknown> {
@@ -73,4 +102,40 @@ export async function getQuietThresholds(): Promise<QuietThresholds> {
     ),
   ]);
   return { qualified, unqualified };
+}
+
+/** All five of `07 D5`'s thresholds, for `src/lib/follow-ups.ts` `[21 §2]`. */
+export async function getFollowUpThresholds(): Promise<FollowUpThresholds> {
+  const [
+    qualified,
+    unqualified,
+    quotationNoResponse,
+    catalogueNoResponse,
+    projectStageUnchanged,
+  ] = await Promise.all([
+    getPositiveIntSetting(QUIET_DAYS_QUALIFIED_KEY, QUIET_DAYS_QUALIFIED_DEFAULT),
+    getPositiveIntSetting(
+      QUIET_DAYS_UNQUALIFIED_KEY,
+      QUIET_DAYS_UNQUALIFIED_DEFAULT,
+    ),
+    getPositiveIntSetting(
+      QUOTATION_NO_RESPONSE_KEY,
+      QUOTATION_NO_RESPONSE_DEFAULT,
+    ),
+    getPositiveIntSetting(
+      CATALOGUE_NO_RESPONSE_KEY,
+      CATALOGUE_NO_RESPONSE_DEFAULT,
+    ),
+    getPositiveIntSetting(
+      PROJECT_STAGE_UNCHANGED_KEY,
+      PROJECT_STAGE_UNCHANGED_DEFAULT,
+    ),
+  ]);
+  return {
+    qualified,
+    unqualified,
+    quotationNoResponse,
+    catalogueNoResponse,
+    projectStageUnchanged,
+  };
 }

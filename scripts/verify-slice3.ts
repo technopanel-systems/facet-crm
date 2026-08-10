@@ -817,11 +817,29 @@ async function main(): Promise<void> {
   /* --- 12. Visibility [18 §2] ------------------------------------ */
 
   console.log("\n12. Visibility — and the negative half [16 §8], [18 §2]");
-  const coordinatorList = await listDispatches(coordinator, {});
+  /*
+   * Scoped to THIS RUN's company, deliberately.
+   *
+   * The first version asked `listDispatches(coordinator, {})` and looked for
+   * these two ids on page one. `listDispatches` pages at 25 and orders by
+   * `dispatch_date desc`, and this script writes hard-coded September dates, so
+   * once a dev database had accumulated enough runs the earliest of them fell
+   * off page one and the check failed while `18 §2` was working perfectly.
+   *
+   * That is the same family as the two traps already recorded — the whole-log
+   * audit scan in `verify:phase11` §16, and this script's own reuse of shared
+   * fixture accounts. A page-one question is not the question `18 §2` asks; the
+   * claim is that the coordinator can see them at all, and `companyId` narrows
+   * to exactly this run without weakening it.
+   */
+  const coordinatorList = await listDispatches(coordinator, {
+    companyId: company.id,
+  });
   check(
     "the coordinator sees every dispatch [18 §2]",
     coordinatorList.rows.some((row) => row.id === direct.id) &&
       coordinatorList.rows.some((row) => row.id === linked.id),
+    `saw ${coordinatorList.rows.length} of ${coordinatorList.total} for this run's company`,
   );
   check(
     "…while sees_all_reps is still false",

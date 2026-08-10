@@ -107,6 +107,17 @@ export const companyRepOriginEnum = pgEnum("company_rep_origin", [
   "merge",
 ]);
 
+/**
+ * `[07 E6]`, `[21 §6]` — the three routes out of dormancy. A quiet company is
+ * notified and then re-included with the same rep, reassigned, or archived as
+ * out of scope. Nothing is ever deleted `[12 §7]`.
+ */
+export const dormancyOutcomeEnum = pgEnum("dormancy_outcome", [
+  "reincluded",
+  "reassigned",
+  "archived",
+]);
+
 /** `[07 C5]` */
 export const projectEndStateEnum = pgEnum("project_end_state", [
   "won",
@@ -551,6 +562,54 @@ export const companyReps = pgTable(
       .on(t.companyId, t.userId)
       .where(sql`removed_at is null`),
     index("company_reps_user_idx").on(t.userId),
+  ],
+);
+
+/**
+ * `07 E6` + `21 §7` — the dormancy lifecycle. A company past its quiet
+ * threshold is notified and then takes one of three routes; this records which,
+ * who decided, and when.
+ *
+ * **Dated rows, never a mutable field on the company.** The same shape targets
+ * `[07 D1]` and credit splits `[18 §4]` already use, and for the same reason:
+ * changing one must not rewrite history. A `suppressed_until` column would also
+ * lose who re-included what, which is the whole content of `07 E6`'s "with a
+ * warning" — the warning IS the record, and a company re-included three times
+ * running is visible as such.
+ *
+ * The latest row wins on read, and a `reincluded` row suppresses that company's
+ * quiet follow-up for one further threshold period. Nothing here is ever
+ * deleted `[12 §7]`; `archived` additionally sets `companies.archived_at`.
+ */
+export const companyDormancyReviews = pgTable(
+  "company_dormancy_reviews",
+  {
+    id: pk(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id),
+    outcome: dormancyOutcomeEnum("outcome").notNull(),
+    decidedByUserId: uuid("decided_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    /** The receiving rep. Present only on a reassignment `[21 §6]`. */
+    toUserId: uuid("to_user_id").references(() => users.id),
+    note: text("note"),
+    /** A calendar day in Riyadh, like `rep_reports.report_date` `[20 §9]`. */
+    decidedAt: date("decided_at").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("company_dormancy_reviews_company_idx").on(t.companyId, t.decidedAt),
+    /**
+     * `13 §1` — what a row may contain in isolation belongs in the database.
+     * That the recipient can actually hold the company is a cross-table rule
+     * and stays in `src/lib/dormancy.ts` as a `RuleError`.
+     */
+    check(
+      "company_dormancy_reviews_recipient",
+      sql`(outcome = 'reassigned') = (to_user_id is not null)`,
+    ),
   ],
 );
 
@@ -1422,6 +1481,11 @@ export const notificationTypes = pgTable(
  * from day one `[04 Q17, C3]`. Resolution is by condition, not by click
  * `[10 §10]`: `resolved_at` is written by the completing action, which is what
  * makes persistence safe rather than maddening `[07 G1]`.
+ *
+ * **Recipient filtering is in the application layer**, in every query's own
+ * `WHERE` — `src/lib/notifications.ts`. v1's bug was selecting and bulk-updating
+ * this table with no recipient filter and relying on RLS `[00 §1.13]`, and
+ * FACET has no RLS `[03]`, so a missing filter here is no defence at all.
  */
 export const notifications = pgTable(
   "notifications",
@@ -1436,12 +1500,38 @@ export const notifications = pgTable(
     channel: notificationChannelEnum("channel").notNull().default("in_app"),
     recordType: recordTypeEnum("record_type"),
     recordId: uuid("record_id"),
+    /**
+     * `[21 §5, §10]` — the ICU variables a summary message needs. Used by
+     * exactly one type: `record.handed_over` carries the departing rep and the
+     * four bucket counts, because a handover raises one notification rather
+     * than one per record and this table has no title or body column by design.
+     */
+    payload: jsonb("payload"),
+    /**
+     * `[21 §10]` — the calendar day a digest summarises, and the key that makes
+     * generation idempotent under sweep-on-read. A stored column rather than an
+     * expression index because `(created_at AT TIME ZONE 'Asia/Riyadh')::date`
+     * is STABLE, not IMMUTABLE, and Postgres will not index it.
+     */
+    digestDate: date("digest_date"),
     readAt: timestamp("read_at", { withTimezone: true }),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [
     index("notifications_recipient_idx").on(t.recipientUserId, t.createdAt),
+    /** One digest per recipient per day, however many times the sweep runs. */
+    uniqueIndex("notifications_digest_key")
+      .on(t.recipientUserId, t.notificationTypeId, t.digestDate)
+      .where(sql`${t.digestDate} is not null`),
+    /**
+     * A persistent notification is raised at most once while unresolved
+     * `[07 G1]`. This is what makes re-deriving on every sweep safe rather than
+     * duplicating: the raise is an `on conflict do nothing`.
+     */
+    uniqueIndex("notifications_live_key")
+      .on(t.recipientUserId, t.notificationTypeId, t.recordType, t.recordId)
+      .where(sql`${t.resolvedAt} is null and ${t.recordId} is not null`),
   ],
 );
 

@@ -43,6 +43,13 @@
       "when": 1786361446258,
       "tag": "0005_activity_reporting",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786365500632,
+      "tag": "0006_notifications_and_dormancy",
+      "breakpoints": true
     }
   ]
 }

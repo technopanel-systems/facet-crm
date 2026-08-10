@@ -4,6 +4,7 @@ import { AppNav } from "@/components/app-nav";
 import { Button } from "@/components/ui/button";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { can, requireSession } from "@/lib/authz";
+import { unresolvedCount } from "@/lib/notifications";
 
 import { logoutAction, stopImpersonationAction } from "./actions";
 
@@ -30,6 +31,8 @@ export default async function AppLayout({
 
   const session = await requireSession();
   const t = await getTranslations();
+  // `19 §4` — the layout computes, the client component receives primitives.
+  const unresolved = await unresolvedCount(session);
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -63,7 +66,10 @@ export default async function AppLayout({
             {/* `19 §4` — the nav is a client component and cannot ask
                 `can()`; the flags it needs are computed here, where the
                 session already lives, and passed down as booleans. */}
-            <AppNav canManageUsers={can(session, "canManageUsers")} />
+            <AppNav
+              canManageUsers={can(session, "canManageUsers")}
+              unresolvedCount={unresolved}
+            />
           </div>
           <div className="flex items-center gap-2">
             <LocaleSwitcher />

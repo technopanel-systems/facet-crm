@@ -18,7 +18,9 @@
     "coverage": "التغطية",
     "activity": "النشاط",
     "targets": "الأهداف",
-    "team": "الفريق"
+    "team": "الفريق",
+    "notifications": "الإشعارات",
+    "followUps": "المتابعات"
   },
   "common": {
     "create": "إنشاء",
@@ -157,6 +159,24 @@
       "quotation_issued": "إصدار عرض السعر",
       "payment_confirmed": "تأكيد الدفع",
       "dispatched": "تم التوريد"
+    },
+    "notificationType": {
+      "quotationExpired": "انتهت صلاحية عرض السعر",
+      "recordAssigned": "أُسند إليك",
+      "recordHandedOver": "تم تسليم عمل إليك",
+      "shareGranted": "تمت مشاركته معك",
+      "followUpDigest": "المتابعات اليومية"
+    },
+    "followUpKind": {
+      "quotation_no_response": "عرض سعر بلا رد",
+      "catalogue_no_response": "كتالوج مُرسَل بلا رد",
+      "project_stage_unchanged": "مرحلة المشروع لم تتغير",
+      "company_quiet": "شركة توقف التواصل معها"
+    },
+    "dormancyOutcome": {
+      "reincluded": "أُعيد إدراجها",
+      "reassigned": "أُعيد إسنادها",
+      "archived": "مؤرشفة"
     }
   },
   "errors": {
@@ -731,6 +751,91 @@
       "thresholds": "الصمت يعني {qualified} يومًا دون تفاعل للشركة التي طلبت عرض سعر، و{unqualified} يومًا لمن لم تطلب.",
       "onHoldUntil": "مؤجلة حتى {date}",
       "yours": "تسجيل الزيارة هو ما يُخرج الشركة من هذه القائمة."
+    }
+  },
+  "notifications": {
+    "title": "الإشعارات",
+    "empty": "لا يوجد شيء بانتظارك.",
+    "fields": {
+      "what": "ماذا",
+      "about": "بخصوص",
+      "when": "متى",
+      "status": "الحالة",
+      "waiting": "بالانتظار",
+      "done": "مكتمل",
+      "unread": "غير مقروء"
+    },
+    "detail": {
+      "hint": "ما ينتظرك يبقى هنا حتى يُنجَز. وأسفله ملخص يومي لما توقف التواصل بشأنه.",
+      "actNow": "بانتظارك",
+      "digest": "الملخص اليومي",
+      "persistent": "يبقى هذا حتى يُنجَز العمل — ولا يمكن تجاهله.",
+      "anchorHidden": "لم يعد بإمكانك فتح السجل المشار إليه.",
+      "handover": "سلَّم {name} إليك {companies} شركات و{projects} مشاريع و{threads} عروض أسعار و{tasks} مهام.",
+      "handoverUnknown": "تم تسليم عمل إليك.",
+      "digestSummary": "{total} متابعات في {date}.",
+      "digestLink": "فتح المتابعات",
+      "clearsThreadNoLongerExpired": "يزول عند تمديد عرض السعر أو مراجعته.",
+      "clearsInteractionAgainstCompany": "يزول عند تسجيلك تواصلاً مع الشركة."
+    },
+    "actions": {
+      "markRead": "تعليم كمقروء",
+      "markAllRead": "تعليم الكل كمقروء"
+    },
+    "errors": {
+      "notFound": "هذا الإشعار ليس لك."
+    }
+  },
+  "followUps": {
+    "title": "المتابعات",
+    "empty": "لا شيء يحتاج متابعة.",
+    "emptyFiltered": "لا شيء يطابق هذا البحث.",
+    "searchPlaceholder": "ابحث باسم الشركة أو السجل",
+    "fields": {
+      "kind": "المتابعة",
+      "record": "السجل",
+      "company": "الشركة",
+      "reps": "المندوبون",
+      "since": "منذ",
+      "age": "مدة الانتظار",
+      "allKinds": "كل المتابعات",
+      "days": "{count} يوم",
+      "workingDays": "{count} يوم عمل"
+    },
+    "detail": {
+      "hint": "كل ما تجاوز حدَّه، الأقدم أولاً. لا شيء هنا مُخزَّن — يُحسَب في كل مرة تُفتح فيها الصفحة.",
+      "thresholds": "عرض السعر {quotation} أيام عمل · الكتالوج {catalogue} أيام عمل · مرحلة المشروع {project} يوماً · الشركة الصامتة {qualified}/{unqualified} يوماً.",
+      "suppressed": "لا تظهر الشركات المؤجَّلة أو المؤرشفة أو المُعاد إدراجها حديثاً."
+    }
+  },
+  "dormancy": {
+    "title": "الركود",
+    "detail": {
+      "hint": "توقف التواصل مع هذه الشركة. أبقِها، أو سلِّمها لغيرك، أو أخرجها من النطاق.",
+      "quiet": "توقف التواصل",
+      "archived": "مؤرشفة — خارج النطاق.",
+      "history": "القرارات",
+      "by": "بواسطة {name}",
+      "to": "إلى {name}",
+      "none": "لا توجد قرارات مسجَّلة بعد."
+    },
+    "fields": {
+      "note": "ملاحظة",
+      "reason": "السبب",
+      "toUser": "إعادة الإسناد إلى"
+    },
+    "actions": {
+      "reinclude": "الإبقاء مع المندوب نفسه",
+      "reassign": "إعادة الإسناد",
+      "archive": "الأرشفة"
+    },
+    "errors": {
+      "companyNotVisible": "هذه الشركة ليست ضمن صلاحيتك للمراجعة.",
+      "cannotAssign": "لا يمكنك إعادة إسناد شركة أو أرشفتها.",
+      "recipientInactive": "هذا الحساب غير نشط.",
+      "alreadyArchived": "هذه الشركة مؤرشفة بالفعل.",
+      "noteRequired": "يلزم سبب مكتوب لأرشفة الشركة.",
+      "noteTooLong": "هذه الملاحظة طويلة جداً."
     }
   }
 }

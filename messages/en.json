@@ -18,7 +18,9 @@
     "coverage": "Coverage",
     "activity": "Activity",
     "targets": "Targets",
-    "team": "Team"
+    "team": "Team",
+    "notifications": "Notifications",
+    "followUps": "Follow-ups"
   },
   "common": {
     "create": "Create",
@@ -157,6 +159,24 @@
       "quotation_issued": "Quotation issued",
       "payment_confirmed": "Payment confirmed",
       "dispatched": "Dispatched"
+    },
+    "notificationType": {
+      "quotationExpired": "Quotation expired",
+      "recordAssigned": "Assigned to you",
+      "recordHandedOver": "Work handed over to you",
+      "shareGranted": "Shared with you",
+      "followUpDigest": "Daily follow-ups"
+    },
+    "followUpKind": {
+      "quotation_no_response": "Quotation, no response",
+      "catalogue_no_response": "Catalogue sent, no response",
+      "project_stage_unchanged": "Project stage unchanged",
+      "company_quiet": "Company gone quiet"
+    },
+    "dormancyOutcome": {
+      "reincluded": "Re-included",
+      "reassigned": "Reassigned",
+      "archived": "Archived"
     }
   },
   "errors": {
@@ -731,6 +751,91 @@
       "thresholds": "Quiet means {qualified} days without an interaction for a company that has asked for a quotation, and {unqualified} days for one that has not.",
       "onHoldUntil": "On hold until {date}",
       "yours": "Logging a visit is what takes a company off this list."
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "Nothing waiting for you.",
+    "fields": {
+      "what": "What",
+      "about": "About",
+      "when": "When",
+      "status": "Status",
+      "waiting": "Waiting",
+      "done": "Done",
+      "unread": "Unread"
+    },
+    "detail": {
+      "hint": "Things waiting on you stay here until they are done. A daily summary of what has gone quiet sits below them.",
+      "actNow": "Waiting on you",
+      "digest": "Daily summary",
+      "persistent": "This stays until the work is done — it cannot be dismissed.",
+      "anchorHidden": "The record this points at is no longer yours to open.",
+      "handover": "{name} handed over {companies} companies, {projects} projects, {threads} quotations and {tasks} tasks.",
+      "handoverUnknown": "Work was handed over to you.",
+      "digestSummary": "{total} follow-ups on {date}.",
+      "digestLink": "Open follow-ups",
+      "clearsThreadNoLongerExpired": "Clears when the quotation is extended or revised.",
+      "clearsInteractionAgainstCompany": "Clears when you log an interaction with the company."
+    },
+    "actions": {
+      "markRead": "Mark read",
+      "markAllRead": "Mark all read"
+    },
+    "errors": {
+      "notFound": "That notification is not yours."
+    }
+  },
+  "followUps": {
+    "title": "Follow-ups",
+    "empty": "Nothing needs chasing.",
+    "emptyFiltered": "Nothing matches this search.",
+    "searchPlaceholder": "Search by company or record",
+    "fields": {
+      "kind": "Follow-up",
+      "record": "Record",
+      "company": "Company",
+      "reps": "Reps",
+      "since": "Since",
+      "age": "Waiting",
+      "allKinds": "All follow-ups",
+      "days": "{count} days",
+      "workingDays": "{count} working days"
+    },
+    "detail": {
+      "hint": "Everything past its threshold, oldest first. Nothing here is stored — it is worked out each time the page is opened.",
+      "thresholds": "Quotation {quotation} working days · catalogue {catalogue} working days · project stage {project} days · quiet company {qualified}/{unqualified} days.",
+      "suppressed": "Companies on hold, archived, or re-included recently do not appear."
+    }
+  },
+  "dormancy": {
+    "title": "Dormancy",
+    "detail": {
+      "hint": "This company has gone quiet. Keep it, hand it to somebody else, or take it out of scope.",
+      "quiet": "Gone quiet",
+      "archived": "Archived — out of scope.",
+      "history": "Decisions",
+      "by": "by {name}",
+      "to": "to {name}",
+      "none": "No decisions recorded yet."
+    },
+    "fields": {
+      "note": "Note",
+      "reason": "Reason",
+      "toUser": "Reassign to"
+    },
+    "actions": {
+      "reinclude": "Keep with the same rep",
+      "reassign": "Reassign",
+      "archive": "Archive"
+    },
+    "errors": {
+      "companyNotVisible": "That company is not yours to review.",
+      "cannotAssign": "You may not reassign or archive a company.",
+      "recipientInactive": "That account is not active.",
+      "alreadyArchived": "That company is already archived.",
+      "noteRequired": "A written reason is required to archive a company.",
+      "noteTooLong": "That note is too long."
     }
   }
 }

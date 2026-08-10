@@ -49,6 +49,8 @@ import {
 } from "@/db/schema";
 import { withAudit } from "@/lib/audit";
 import { can, type AuthSession } from "@/lib/authz";
+import { NOTIFICATION_TYPES } from "@/lib/enums";
+import { raise } from "@/lib/notifications";
 import { RuleError } from "@/lib/validation";
 
 export type HandoverCompany = {
@@ -448,6 +450,39 @@ export async function reassignHandover(
       entityId: fromUserId,
       after: { toUserId, ...outcome },
     });
+
+    /* --- One notification, not one per record `[21 §5]` ------------- *
+     * A handover routinely moves dozens of records. Raising a persistent
+     * act-now notification for each would hand the recipient fifty
+     * undismissable badges, which is what makes a tier get ignored — the
+     * opposite of what `07 G1` wanted from persistence.
+     *
+     * `record.handed_over` is therefore act-now and NOT persistent: it has no
+     * anchor and no completion condition. It is news. The work items are the
+     * individual records, and they already reach the recipient through their
+     * own lists, timelines and follow-ups.                                     */
+    const moved =
+      outcome.companiesMoved +
+      outcome.projectsMoved +
+      outcome.threadsMoved +
+      outcome.tasksMoved;
+    if (moved > 0) {
+      await raise(tx, log, {
+        typeKey: NOTIFICATION_TYPES.recordHandedOver,
+        recipientUserId: toUserId,
+        // No anchor: the payload names the departing rep, because
+        // `notifications` has no title or body column by design `[21 §10]`.
+        payload: {
+          fromUserId,
+          counts: {
+            companies: outcome.companiesMoved,
+            projects: outcome.projectsMoved,
+            quotationThreads: outcome.threadsMoved,
+            tasks: outcome.tasksMoved,
+          },
+        },
+      });
+    }
 
     return outcome;
   });

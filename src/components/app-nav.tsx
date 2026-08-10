@@ -24,7 +24,9 @@ const SECTIONS = [
   { href: "/dispatches", key: "dispatches" },
   { href: "/reports", key: "reports" },
   { href: "/coverage", key: "coverage" },
+  { href: "/follow-ups", key: "followUps" },
   { href: "/activity", key: "activity" },
+  { href: "/notifications", key: "notifications" },
   { href: "/targets", key: "targets" },
   { href: "/users", key: "team", requires: "canManageUsers" },
 ] as const;
@@ -50,11 +52,21 @@ const SECTIONS = [
  * and a diagnostic only a supervisor can see is a scoreboard rather than a
  * queue.
  *
+ * Phase 10a added two more and gated neither `[21 §9]`. `/follow-ups` is the
+ * same scoped-not-gated shape as coverage; `/notifications` is addressed to one
+ * person, so there is nothing a flag could usefully decide.
+ *
  * Hiding the link is cosmetic. `/users` returns `notFound()` on its own and
  * every write re-checks the flag in the data layer; the nav is not the gate.
  */
 
-type NavFlags = { canManageUsers: boolean };
+/**
+ * `19 §4` — the `(app)` layout computes these and passes primitives down.
+ * `unresolvedCount` is a number rather than a flag, which is the same rule
+ * extended by one step: still no `can()` call and still no `@/lib/authz` import
+ * in a client component.
+ */
+type NavFlags = { canManageUsers: boolean; unresolvedCount: number };
 
 export function AppNav(flags: NavFlags) {
   const t = useTranslations("nav");
@@ -83,6 +95,17 @@ export function AppNav(flags: NavFlags) {
             )}
           >
             {t(section.key)}
+            {/* Act-now notifications persist until the condition clears
+                `[07 G1]`, so this count is a queue length, not an unread
+                tally — it does not fall when the page is opened. */}
+            {section.href === "/notifications" && flags.unresolvedCount > 0 ? (
+              <span
+                className="bg-destructive text-destructive-foreground ms-1.5 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-xs"
+                dir="ltr"
+              >
+                {flags.unresolvedCount}
+              </span>
+            ) : null}
           </Link>
         );
       })}

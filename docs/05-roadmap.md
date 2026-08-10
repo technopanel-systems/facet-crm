@@ -20,7 +20,8 @@ work completes.
 | 8 | Slice 2 — quotation chain | working screens | ✅ done |
 | 8b | Slice 3 — dispatch, credit splits, targets | working screens | ✅ done |
 | 9 | Activities and reporting | working screens | ✅ done |
-| 10 | Follow-ups, duplicates, notifications | | |
+| 10a | Follow-ups and notifications | working screens | ✅ done |
+| 10b | Duplicates and merge | | |
 | 11 | Team, roles, offboarding, bulk import | working screens | ✅ done bar **bulk import** |
 | 12 | Dashboards, targets, performance | | |
 | — | Later: production, warehouse, marketing, n8n/AI | | |

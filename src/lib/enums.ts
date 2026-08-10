@@ -155,6 +155,63 @@ export function signalTakesReference(signal: ReportSignal): boolean {
 /** The longest a signal reference may be — a name or a code, not a narrative. */
 export const SIGNAL_REFERENCE_MAX = 200;
 
+/** `[07 E6]`, `[21 §6]` — the three routes out of dormancy. */
+export const DORMANCY_OUTCOMES = [
+  "reincluded",
+  "reassigned",
+  "archived",
+] as const;
+export type DormancyOutcome = (typeof DORMANCY_OUTCOMES)[number];
+
+/**
+ * `[21 §2]` — the five seeded notification types, and no sixth. The type is a
+ * lookup row `[10 §10]`, so these are the **keys** of rows in
+ * `notification_types`, not an enum in the database. They live here because the
+ * seed, the raising code and the screen all need the same list, and this module
+ * imports nothing.
+ *
+ * The database key is dotted; the property name is what the message catalogue
+ * keys off (`notifications.types.<name>`), because a dotted message id would
+ * nest into an accidental object tree.
+ */
+export const NOTIFICATION_TYPES = {
+  quotationExpired: "quotation.expired",
+  recordAssigned: "record.assigned",
+  recordHandedOver: "record.handed_over",
+  shareGranted: "share.granted",
+  followUpDigest: "followup.digest",
+} as const;
+
+export type NotificationTypeName = keyof typeof NOTIFICATION_TYPES;
+export type NotificationTypeKey =
+  (typeof NOTIFICATION_TYPES)[NotificationTypeName];
+
+export const NOTIFICATION_TYPE_NAMES = Object.keys(
+  NOTIFICATION_TYPES,
+) as NotificationTypeName[];
+
+/** Database key back to the message-catalogue name, for rendering a row. */
+export function notificationTypeName(
+  key: string,
+): NotificationTypeName | undefined {
+  return NOTIFICATION_TYPE_NAMES.find(
+    (name) => NOTIFICATION_TYPES[name] === key,
+  );
+}
+
+/**
+ * `[07 D5]` — the four follow-up conditions `src/lib/follow-ups.ts` derives.
+ * `07 D5` lists five thresholds; the last two — qualified and unqualified —
+ * are the same condition read at two different numbers, so they are one kind.
+ */
+export const FOLLOW_UP_KINDS = [
+  "quotation_no_response",
+  "catalogue_no_response",
+  "project_stage_unchanged",
+  "company_quiet",
+] as const;
+export type FollowUpKind = (typeof FOLLOW_UP_KINDS)[number];
+
 /** `[20 §12]` — a lobby, not a desk. Applied only to the log form. */
 export const TOUCH_INPUT_CLASS = "h-11 text-base";
 

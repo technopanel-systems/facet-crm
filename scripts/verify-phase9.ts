@@ -290,15 +290,18 @@ async function main(): Promise<void> {
     thresholds.unqualified === 60,
     `got ${thresholds.unqualified}`,
   );
-  // The other three of `07 D5`'s five are Phase 10's and must NOT be seeded:
-  // rows nothing reads are the shape of v1's dead approval gate.
+  // `20 §11` held three of `07 D5`'s five back because nothing read them — rows
+  // nothing reads are the shape of v1's dead approval gate. `21 §2` adds them,
+  // because `src/lib/follow-ups.ts` now reads all five. The claim is unchanged;
+  // the number it resolves to is not, and this assertion moves with it rather
+  // than being deleted.
   const followupRows = await db
     .select({ key: settings.key })
     .from(settings)
     .where(sql`${settings.key} like 'followup.%'`);
   check(
-    "only the two thresholds Phase 9 reads are seeded [20 §11]",
-    followupRows.length === 2,
+    "every seeded threshold has a reader — five since Phase 10a [20 §11], [21 §2]",
+    followupRows.length === 5,
     `got ${followupRows.map((row) => row.key).join(", ")}`,
   );
 

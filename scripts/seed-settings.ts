@@ -10,10 +10,11 @@
  * them, and a seed run that quietly reset the number to 30 would undo that
  * without saying so.
  *
- * Only two of `07 D5`'s five thresholds are here. The other three chase
- * quotations, catalogues and stalled projects — Phase 10's work `[20 §11]`.
- * Seeding them now would leave three rows nothing reads, which is the shape of
- * v1's dead approval gate.
+ * **All five of `07 D5`'s thresholds are now here.** `20 §11` held three back
+ * because nothing read them, which is the shape of v1's dead approval gate;
+ * `21 §2` adds them because `src/lib/follow-ups.ts` reads all five. The test
+ * `20 §11` set is unchanged — a row is seeded when, and only when, something
+ * reads it.
  */
 
 process.loadEnvFile(".env");
@@ -23,15 +24,24 @@ import { eq } from "drizzle-orm";
 import { closeDatabase, db } from "@/db";
 import { settings } from "@/db/schema";
 import {
+  CATALOGUE_NO_RESPONSE_DEFAULT,
+  CATALOGUE_NO_RESPONSE_KEY,
+  PROJECT_STAGE_UNCHANGED_DEFAULT,
+  PROJECT_STAGE_UNCHANGED_KEY,
   QUIET_DAYS_QUALIFIED_DEFAULT,
   QUIET_DAYS_QUALIFIED_KEY,
   QUIET_DAYS_UNQUALIFIED_DEFAULT,
   QUIET_DAYS_UNQUALIFIED_KEY,
+  QUOTATION_NO_RESPONSE_DEFAULT,
+  QUOTATION_NO_RESPONSE_KEY,
 } from "@/lib/settings";
 
 const SETTING_SEED: { key: string; value: unknown }[] = [
   { key: QUIET_DAYS_QUALIFIED_KEY, value: QUIET_DAYS_QUALIFIED_DEFAULT },
   { key: QUIET_DAYS_UNQUALIFIED_KEY, value: QUIET_DAYS_UNQUALIFIED_DEFAULT },
+  { key: QUOTATION_NO_RESPONSE_KEY, value: QUOTATION_NO_RESPONSE_DEFAULT },
+  { key: CATALOGUE_NO_RESPONSE_KEY, value: CATALOGUE_NO_RESPONSE_DEFAULT },
+  { key: PROJECT_STAGE_UNCHANGED_KEY, value: PROJECT_STAGE_UNCHANGED_DEFAULT },
 ];
 
 export async function seedSettings(): Promise<void> {

@@ -13,6 +13,11 @@ import {
   type CompanyInput,
 } from "@/lib/companies";
 import {
+  archiveCompany,
+  reassignCompany,
+  reincludeCompany,
+} from "@/lib/dormancy";
+import {
   readFields,
   ruleErrorState,
   type FormState,
@@ -85,4 +90,81 @@ export async function updateCompanyAction(
   revalidatePath("/companies");
   redirect({ href: `/companies/${companyId}`, locale });
   throw new Error("unreachable"); // redirect() never returns
+}
+
+/* ------------------------------------------------------------------ *
+ * Dormancy — `07 E6`'s three routes `[21 §6]`
+ * ------------------------------------------------------------------ */
+
+/**
+ * Each route re-checks its own permission in the data layer: the rep may
+ * re-include their own company, and reassigning or archiving needs
+ * `can_assign`. Rendering the control is presentation; `dormancy.ts` is the
+ * gate.
+ *
+ * `revalidatePath("/companies", "layout")` rather than the detail path alone,
+ * because a decision here changes `/follow-ups` and `/coverage` too — a
+ * re-included company leaves the queue, and an archived one leaves both.
+ */
+export async function reincludeCompanyAction(
+  companyId: string,
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const session = await requireSession();
+  const fields = readFields(formData);
+  const note = fields.text("note", { max: 500 });
+  if (!fields.ok) return fields.state;
+
+  try {
+    await reincludeCompany(session, companyId, note ?? undefined);
+  } catch (error) {
+    return ruleErrorState(error, fields.values);
+  }
+
+  revalidatePath("/companies", "layout");
+  revalidatePath("/follow-ups");
+  return {};
+}
+
+export async function reassignCompanyAction(
+  companyId: string,
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const session = await requireSession();
+  const fields = readFields(formData);
+  const toUserId = fields.uuid("toUserId", { required: true });
+  if (!fields.ok || !toUserId) return fields.state;
+
+  try {
+    await reassignCompany(session, companyId, toUserId);
+  } catch (error) {
+    return ruleErrorState(error, fields.values);
+  }
+
+  revalidatePath("/companies", "layout");
+  revalidatePath("/follow-ups");
+  return {};
+}
+
+export async function archiveCompanyAction(
+  companyId: string,
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const session = await requireSession();
+  const fields = readFields(formData);
+  const note = fields.text("note", { required: true, max: 500 });
+  if (!fields.ok || !note) return fields.state;
+
+  try {
+    await archiveCompany(session, companyId, note);
+  } catch (error) {
+    return ruleErrorState(error, fields.values);
+  }
+
+  revalidatePath("/companies", "layout");
+  revalidatePath("/follow-ups");
+  return {};
 }

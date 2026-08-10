@@ -1,0 +1,758 @@
+/**
+ * Notifications — `09 §9`, `07 E5`, `07 G1`, `10 §10`, `21 §2–§5`.
+ *
+ * The tables have existed since migration `0000` and nothing has ever written
+ * either. This module is the writer and the reader.
+ *
+ * **Two tiers, and they do different jobs `[07 E5]`.** Act-now is something
+ * waiting on you and interrupts; digest is one daily summary of what went stale
+ * and does not. Without the split, reps mute everything and miss what mattered.
+ *
+ * **Act-now is persistent and resolution is by condition, not by click**
+ * `[07 G1]`, `[10 §10]`. A notification clears when the thing it points at is
+ * done. `markRead` sets `read_at` and never `resolved_at` — reading is not
+ * doing.
+ *
+ * **Persistence belongs only to a type whose condition can clear** `[21 §4]`.
+ * `record.handed_over` is act-now and NOT persistent: it has no anchor and no
+ * completion condition, so persistence would make it permanent. A badge the rep
+ * can never clear is what makes the whole tier get ignored — the opposite of
+ * what `07 G1` wanted from persistence. Every persistent type states its rule
+ * for every anchor it can carry `[21 §3]`, and
+ * `scripts/verify-phase10a.ts` §11 fails if one is missing.
+ *
+ * **The recipient filter is in this file, in every query's own `WHERE`.**
+ * `00 §1.13` records v1's bug exactly: neither notifications page filtered by
+ * `recipient_id`; both selected `*` and relied on RLS. FACET has no RLS `[03]`,
+ * so a missing filter is not a weakened defence — it is none. There is
+ * deliberately no `visibleNotificationsFilter` in `authz`: a notification is
+ * addressed to one person, which is an equality, not a visibility question.
+ *
+ * **A notification row is not access-controlled proof of anything.** The anchor
+ * is rendered as a link only when `canViewRecord` still passes — `20 §8.2`'s
+ * rule about the audit log, which holds for the same reason wherever a row
+ * names a record it does not gate.
+ *
+ * **The sweep is `expireOverdueThreads`'s shape** `[16 §3]`: idempotent,
+ * system actor, run on read, and the one function a scheduled job will call
+ * when Phase 12 adds one. There is no second code path.
+ */
+
+import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
+
+import { db } from "@/db";
+import {
+  companies,
+  notificationTypes,
+  notifications,
+  quotationThreads,
+  users,
+} from "@/db/schema";
+import { withAudit, type AuditActor, type AuditEntry } from "@/lib/audit";
+import {
+  canViewRecord,
+  scopeForUser,
+  type AuthSession,
+  type ViewableRecordType,
+} from "@/lib/authz";
+import {
+  NOTIFICATION_TYPES,
+  notificationTypeName,
+  type NotificationTypeKey,
+  type NotificationTypeName,
+} from "@/lib/enums";
+import { followUpsForRecipient, type FollowUpRow } from "@/lib/follow-ups";
+import { expireOverdueThreads } from "@/lib/quotations";
+import { today } from "@/lib/reports";
+import { shiftDays } from "@/lib/working-days";
+
+/** `16 §3` — the sweep acts; whoever opened the screen did not. */
+const SYSTEM_ACTOR: AuditActor = { actorUserId: null, actingAsUserId: null };
+
+const PAGE_SIZE = 25;
+
+/** The anchors a notification may carry, matching `record_type` `[09 §1]`. */
+export type NotificationAnchorType = ViewableRecordType;
+
+export type HandoverCounts = {
+  companies: number;
+  projects: number;
+  quotationThreads: number;
+  tasks: number;
+};
+
+/**
+ * What `notifications.payload` holds, per type `[21 §5]`.
+ *
+ * The id is what is stored; the name is resolved on read. Storing the name
+ * would be a second copy of a column that `19 §6` makes editable, and a
+ * handover summary naming somebody's old spelling forever is exactly the drift
+ * `04 C1` warns about.
+ */
+export type HandoverPayload = {
+  fromUserId: string;
+  fromUserName: string | null;
+  counts: HandoverCounts;
+};
+
+export type NotificationRow = {
+  id: string;
+  typeKey: string;
+  /** Null when a row points at a type this build does not know — never thrown
+   *  away, because `10 §10` lets a type be added as data. */
+  typeName: NotificationTypeName | null;
+  tier: "act_now" | "digest";
+  isPersistent: boolean;
+  anchorType: NotificationAnchorType | null;
+  anchorId: string | null;
+  /** Only set when the viewer may still open it `[20 §8.2]`. */
+  anchorViewable: boolean;
+  anchorLabel: string | null;
+  payload: HandoverPayload | null;
+  digestDate: string | null;
+  /** How many follow-ups the digest covered, by kind. */
+  digestCounts: Record<string, number> | null;
+  readAt: Date | null;
+  resolvedAt: Date | null;
+  createdAt: Date;
+};
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/* ------------------------------------------------------------------ *
+ * Raising — always inside the caller's transaction
+ * ------------------------------------------------------------------ */
+
+export type RaiseInput = {
+  typeKey: NotificationTypeKey;
+  recipientUserId: string;
+  anchorType?: NotificationAnchorType;
+  anchorId?: string;
+  payload?: unknown;
+  digestDate?: string;
+};
+
+/**
+ * Raise one notification, or do nothing if the same live one already exists.
+ *
+ * Takes the caller's `tx` so the notification and the act that caused it commit
+ * together — a rep must never be told about an assignment that rolled back.
+ *
+ * The idempotence is the database's, not a read-then-write: `notifications_live_key`
+ * for a persistent anchor and `notifications_digest_key` for a digest day, both
+ * partial unique indexes, both resolved by `on conflict do nothing`. A sweep
+ * that runs twice in the same second writes one row.
+ *
+ * **A recipient who is inactive gets nothing.** Deactivation revokes access
+ * immediately `[07 B7]`, and a notification is new work.
+ */
+export async function raise(
+  tx: Tx,
+  log: (entry: AuditEntry) => void,
+  input: RaiseInput,
+): Promise<string | null> {
+  const [type] = await tx
+    .select({ id: notificationTypes.id, channel: notificationTypes.defaultChannel })
+    .from(notificationTypes)
+    .where(eq(notificationTypes.key, input.typeKey))
+    .limit(1);
+
+  // A type nothing seeded cannot be raised. Silently skipping is right: the
+  // caller's act is not invalidated by a missing lookup row, and `db:seed` is
+  // the fix. `verify-phase10a.ts` §1 is what stops it going unnoticed.
+  if (!type) return null;
+
+  const [recipient] = await tx
+    .select({ isActive: users.isActive })
+    .from(users)
+    .where(eq(users.id, input.recipientUserId))
+    .limit(1);
+  if (!recipient?.isActive) return null;
+
+  const [row] = await tx
+    .insert(notifications)
+    .values({
+      recipientUserId: input.recipientUserId,
+      notificationTypeId: type.id,
+      channel: type.channel,
+      recordType: input.anchorType,
+      recordId: input.anchorId,
+      payload: input.payload ?? null,
+      digestDate: input.digestDate,
+    })
+    .onConflictDoNothing()
+    .returning({ id: notifications.id });
+
+  if (!row) return null;
+
+  log({
+    action: "notification.raised",
+    entityType: "notification",
+    entityId: row.id,
+    after: {
+      type: input.typeKey,
+      recipientUserId: input.recipientUserId,
+      recordType: input.anchorType ?? null,
+      recordId: input.anchorId ?? null,
+    },
+  });
+  return row.id;
+}
+
+/* ------------------------------------------------------------------ *
+ * The sweep `[16 §3]`
+ * ------------------------------------------------------------------ */
+
+export type SweepResult = { raised: number; resolved: number; digests: number };
+
+/**
+ * Bring the notification table in step with the world, idempotently.
+ *
+ * Three steps, in order — resolve first, so a condition that cleared and became
+ * true again in the same sweep ends up correctly raised rather than correctly
+ * resolved:
+ *
+ *  1. **Resolve**, by condition and nothing else `[07 G1]`, `[10 §10]`. Every
+ *     live `quotation.expired` whose thread is no longer expired — `07 C7`
+ *     offers extend and revise as the two remedies and `extendValidity` already
+ *     clears the end state, so that is the whole condition — and every live
+ *     `record.assigned` or `share.granted` whose recipient has since logged an
+ *     interaction against the anchor's company `[21 §3]`.
+ *  2. **Raise** one `quotation.expired` per expired thread, to its raiser.
+ *     `expireOverdueThreads` runs first so a thread that came due this minute
+ *     is included in the same pass.
+ *  3. **Digest** — one `followup.digest` per recipient for the most recent
+ *     COMPLETED day.
+ *
+ * **Resolution is re-derived here rather than written at the completing call
+ * site**, which is what "by condition, not by click" actually asks for: the
+ * sweep asks whether the condition holds now. It also keeps `reports.ts`
+ * unaware of notifications — a report is a record of what happened, not a
+ * notification mechanism, and the import would have been a cycle.
+ *
+ * **Why the digest is generated for yesterday and never today** `[20 §9]`:
+ * *"Anything firing outward reads the day's settled state at end of day, not
+ * the moment of entry, so a correction made minutes later cannot produce a
+ * notification that should not have been sent."* A report corrected during a
+ * day changes what that day's digest says, because the digest for that day is
+ * not written until the day is over.
+ */
+export async function sweepNotifications(): Promise<SweepResult> {
+  await expireOverdueThreads();
+
+  return withAudit(SYSTEM_ACTOR, async (tx, log) => {
+    const resolved =
+      (await resolveExpiredQuotations(tx, log)) +
+      (await resolveOnInteraction(tx, log));
+    const raised = await raiseExpiredQuotations(tx, log);
+    const digests = await generateDigests(tx, log);
+    return { raised, resolved, digests };
+  });
+}
+
+async function expiredTypeId(tx: Tx): Promise<string | null> {
+  const [type] = await tx
+    .select({ id: notificationTypes.id })
+    .from(notificationTypes)
+    .where(eq(notificationTypes.key, NOTIFICATION_TYPES.quotationExpired))
+    .limit(1);
+  return type?.id ?? null;
+}
+
+/** `21 §3` — extended, revised, or ended some other way. */
+async function resolveExpiredQuotations(
+  tx: Tx,
+  log: (entry: AuditEntry) => void,
+): Promise<number> {
+  const typeId = await expiredTypeId(tx);
+  if (!typeId) return 0;
+
+  const cleared = await tx
+    .update(notifications)
+    .set({ resolvedAt: new Date() })
+    .where(
+      and(
+        eq(notifications.notificationTypeId, typeId),
+        isNull(notifications.resolvedAt),
+        eq(notifications.recordType, "quotation_thread"),
+        sql`not exists (
+          select 1 from quotation_threads qt
+           where qt.id = ${notifications.recordId}
+             and qt.end_state = 'expired'
+        )`,
+      ),
+    )
+    .returning({ id: notifications.id });
+
+  for (const row of cleared) {
+    log({
+      action: "notification.resolved",
+      entityType: "notification",
+      entityId: row.id,
+      after: { reason: "quotation_no_longer_expired" },
+    });
+  }
+  return cleared.length;
+}
+
+/**
+ * `21 §3` — the recipient has since logged an interaction against the anchor's
+ * company, which is what "worked it" means for an assignment or a share.
+ *
+ * One statement covering all three anchors a share can carry, in the same order
+ * `RESOLUTION_RULES` lists them. A **first view is deliberately not** a
+ * resolution: opening a record is a click by another name, and `07 G1` refuses
+ * the click because *"a notification that can be swiped away is a notification
+ * that gets swiped away."*
+ *
+ * `contact`, `quotation_version` and `dispatch` are absent because no
+ * notification is ever raised for them — `visibleContactsFilter`,
+ * `visibleDispatchesFilter` and `visibleRepReportsFilter` carry no share term,
+ * so a share on one grants nothing and announcing it would be a permanent badge
+ * over nothing `[21 §3]`.
+ */
+async function resolveOnInteraction(
+  tx: Tx,
+  log: (entry: AuditEntry) => void,
+): Promise<number> {
+  const cleared = await tx
+    .update(notifications)
+    .set({ resolvedAt: new Date() })
+    .where(
+      and(
+        isNull(notifications.resolvedAt),
+        sql`${notifications.recordId} is not null`,
+        sql`${notifications.notificationTypeId} in (
+          select nt.id from notification_types nt
+           where nt.key in (${NOTIFICATION_TYPES.recordAssigned},
+                            ${NOTIFICATION_TYPES.shareGranted})
+        )`,
+        sql`exists (
+          select 1 from rep_reports r
+           where r.user_id = ${notifications.recipientUserId}
+             and r.entry_type = 'interaction'
+             and r.created_at > ${notifications.createdAt}
+             and (
+               (${notifications.recordType} = 'company'
+                  and r.company_id = ${notifications.recordId})
+               or (${notifications.recordType} = 'quotation_thread'
+                  and r.company_id = (select qt.company_id from quotation_threads qt
+                                       where qt.id = ${notifications.recordId}))
+               or (${notifications.recordType} = 'project'
+                  and exists (select 1 from project_companies pc
+                               where pc.project_id = ${notifications.recordId}
+                                 and pc.removed_at is null
+                                 and pc.company_id = r.company_id))
+             )
+        )`,
+      ),
+    )
+    .returning({ id: notifications.id });
+
+  for (const row of cleared) {
+    log({
+      action: "notification.resolved",
+      entityType: "notification",
+      entityId: row.id,
+      after: { reason: "interaction_against_company" },
+    });
+  }
+  return cleared.length;
+}
+
+/** `07 C7` — "on expiry, notify the rep". The raiser is the rep on the thread. */
+async function raiseExpiredQuotations(
+  tx: Tx,
+  log: (entry: AuditEntry) => void,
+): Promise<number> {
+  const threads = await tx
+    .select({
+      id: quotationThreads.id,
+      raisedBy: quotationThreads.raisedByUserId,
+    })
+    .from(quotationThreads)
+    .where(eq(quotationThreads.endState, "expired"));
+
+  let raised = 0;
+  for (const thread of threads) {
+    const id = await raise(tx, log, {
+      typeKey: NOTIFICATION_TYPES.quotationExpired,
+      recipientUserId: thread.raisedBy,
+      anchorType: "quotation_thread",
+      anchorId: thread.id,
+    });
+    if (id) raised += 1;
+  }
+  return raised;
+}
+
+/**
+ * One digest per recipient for the most recent completed day.
+ *
+ * Every active user is asked, and each one's follow-ups are computed **in that
+ * user's own scope** — `scopeForUser` — never the caller's. A user with nothing
+ * open gets no row: a daily notification saying "nothing" is noise, and
+ * `07 D6`'s rule against writing to satisfy a process applies to the system
+ * too.
+ */
+async function generateDigests(
+  tx: Tx,
+  log: (entry: AuditEntry) => void,
+): Promise<number> {
+  const digestDate = shiftDays(today(), -1);
+
+  const active = await tx
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.isActive, true));
+
+  let written = 0;
+  for (const user of active) {
+    const scope = await scopeForUser(user.id);
+    if (!scope) continue;
+
+    const rows = await followUpsForRecipient(scope);
+    if (rows.length === 0) continue;
+
+    const id = await raise(tx, log, {
+      typeKey: NOTIFICATION_TYPES.followUpDigest,
+      recipientUserId: user.id,
+      payload: { counts: countByKind(rows), total: rows.length },
+      digestDate,
+    });
+    if (id) written += 1;
+  }
+  return written;
+}
+
+function countByKind(rows: FollowUpRow[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const row of rows) counts[row.kind] = (counts[row.kind] ?? 0) + 1;
+  return counts;
+}
+
+/* ------------------------------------------------------------------ *
+ * Reading — recipient-filtered, every time `[00 §1.13]`
+ * ------------------------------------------------------------------ */
+
+/** Unresolved act-now notifications for this person, for the nav badge. */
+export async function unresolvedCount(session: AuthSession): Promise<number> {
+  const [row] = await db
+    .select({ total: count() })
+    .from(notifications)
+    .innerJoin(
+      notificationTypes,
+      eq(notificationTypes.id, notifications.notificationTypeId),
+    )
+    .where(
+      and(
+        eq(notifications.recipientUserId, session.user.id),
+        eq(notificationTypes.tier, "act_now"),
+        isNull(notifications.resolvedAt),
+      ),
+    );
+  return row?.total ?? 0;
+}
+
+export type NotificationList = {
+  rows: NotificationRow[];
+  total: number;
+  page: number;
+};
+
+/**
+ * This person's notifications, newest first, act-now above digest.
+ *
+ * The recipient term is written here rather than composed from `authz` on
+ * purpose: it is an equality on one column, not a visibility question, and a
+ * builder that could return `undefined` for a privileged role is precisely the
+ * wrong shape — no role reads somebody else's notifications.
+ */
+export async function listNotifications(
+  session: AuthSession,
+  options: { page?: number } = {},
+): Promise<NotificationList> {
+  const page = Math.max(1, options.page ?? 1);
+  const where = eq(notifications.recipientUserId, session.user.id);
+
+  const rows = await db
+    .select({
+      id: notifications.id,
+      typeKey: notificationTypes.key,
+      tier: notificationTypes.tier,
+      isPersistent: notificationTypes.isPersistent,
+      recordType: notifications.recordType,
+      recordId: notifications.recordId,
+      payload: notifications.payload,
+      digestDate: notifications.digestDate,
+      readAt: notifications.readAt,
+      resolvedAt: notifications.resolvedAt,
+      createdAt: notifications.createdAt,
+    })
+    .from(notifications)
+    .innerJoin(
+      notificationTypes,
+      eq(notificationTypes.id, notifications.notificationTypeId),
+    )
+    .where(where)
+    .orderBy(
+      // Unresolved first, then newest. An act-now entry that is still waiting
+      // sits above a digest from the same hour `[07 E5]`.
+      sql`${notifications.resolvedAt} is not null`,
+      desc(notifications.createdAt),
+    )
+    .limit(PAGE_SIZE)
+    .offset((page - 1) * PAGE_SIZE);
+
+  const [totals] = await db
+    .select({ total: count() })
+    .from(notifications)
+    .where(where);
+
+  const decorated = await Promise.all(
+    rows.map(async (row) => decorate(session, row)),
+  );
+
+  return { rows: decorated, total: totals?.total ?? 0, page };
+}
+
+type RawNotification = {
+  id: string;
+  typeKey: string;
+  tier: "act_now" | "digest";
+  isPersistent: boolean;
+  recordType: string | null;
+  recordId: string | null;
+  payload: unknown;
+  digestDate: string | null;
+  readAt: Date | null;
+  resolvedAt: Date | null;
+  createdAt: Date;
+};
+
+const ANCHOR_TYPES: NotificationAnchorType[] = [
+  "company",
+  "contact",
+  "project",
+  "quotation_thread",
+];
+
+function asAnchorType(value: string | null): NotificationAnchorType | null {
+  return ANCHOR_TYPES.find((type) => type === value) ?? null;
+}
+
+/**
+ * Turn a stored row into something a screen can render.
+ *
+ * **The anchor is checked, not trusted** `[20 §8.2]`. A share can be revoked
+ * and a company can be handed on; the notification row survives either, and
+ * rendering its link would leak a name the viewer may no longer read. When the
+ * check fails the entry still shows — what happened is not a secret from the
+ * person it happened to — but it carries no link and no name.
+ */
+async function decorate(
+  session: AuthSession,
+  row: RawNotification,
+): Promise<NotificationRow> {
+  const anchorType = asAnchorType(row.recordType);
+  const anchorViewable =
+    anchorType && row.recordId
+      ? await canViewRecord(session, anchorType, row.recordId)
+      : false;
+
+  return {
+    id: row.id,
+    typeKey: row.typeKey,
+    typeName: notificationTypeName(row.typeKey) ?? null,
+    tier: row.tier,
+    isPersistent: row.isPersistent,
+    anchorType,
+    anchorId: row.recordId,
+    anchorViewable,
+    anchorLabel:
+      anchorViewable && anchorType && row.recordId
+        ? await anchorName(anchorType, row.recordId)
+        : null,
+    payload: await handoverPayload(row.payload),
+    digestDate: row.digestDate,
+    digestCounts: digestCounts(row.payload),
+    readAt: row.readAt,
+    resolvedAt: row.resolvedAt,
+    createdAt: row.createdAt,
+  };
+}
+
+async function anchorName(
+  anchorType: NotificationAnchorType,
+  id: string,
+): Promise<string | null> {
+  if (anchorType === "company") {
+    const [row] = await db
+      .select({ name: companies.nameEn })
+      .from(companies)
+      .where(eq(companies.id, id))
+      .limit(1);
+    return row?.name ?? null;
+  }
+  if (anchorType === "quotation_thread") {
+    const [row] = await db
+      .select({ name: companies.nameEn })
+      .from(quotationThreads)
+      .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
+      .where(eq(quotationThreads.id, id))
+      .limit(1);
+    return row?.name ?? null;
+  }
+  return null;
+}
+
+async function handoverPayload(
+  value: unknown,
+): Promise<HandoverPayload | null> {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.fromUserId !== "string") return null;
+  const counts = record.counts;
+  if (!counts || typeof counts !== "object") return null;
+  const c = counts as Record<string, unknown>;
+
+  // A name, not an id — and read now rather than stored, because `19 §6` makes
+  // the account editable. A departed rep's row is still here `[04 C2]`, so this
+  // resolves for as long as the notification does.
+  const [from] = await db
+    .select({ name: users.name })
+    .from(users)
+    .where(eq(users.id, record.fromUserId))
+    .limit(1);
+
+  return {
+    fromUserId: record.fromUserId,
+    fromUserName: from?.name ?? null,
+    counts: {
+      companies: Number(c.companies ?? 0),
+      projects: Number(c.projects ?? 0),
+      quotationThreads: Number(c.quotationThreads ?? 0),
+      tasks: Number(c.tasks ?? 0),
+    },
+  };
+}
+
+function digestCounts(value: unknown): Record<string, number> | null {
+  if (!value || typeof value !== "object") return null;
+  const counts = (value as Record<string, unknown>).counts;
+  if (!counts || typeof counts !== "object") return null;
+  const entries = Object.entries(counts as Record<string, unknown>).filter(
+    ([, n]) => typeof n === "number",
+  ) as [string, number][];
+  return entries.length > 0 ? Object.fromEntries(entries) : null;
+}
+
+/**
+ * Mark one notification read.
+ *
+ * **Reading is not resolving** `[07 G1]`: `resolved_at` is untouched, so a
+ * persistent entry stays in the badge until the condition clears. The recipient
+ * term is in the `WHERE`, not checked beforehand — a mismatched id updates zero
+ * rows rather than somebody else's `[00 §1.13]`.
+ */
+export async function markRead(
+  session: AuthSession,
+  notificationId: string,
+): Promise<boolean> {
+  return withAudit(session.actor, async (tx, log) => {
+    const [row] = await tx
+      .update(notifications)
+      .set({ readAt: new Date() })
+      .where(
+        and(
+          eq(notifications.id, notificationId),
+          eq(notifications.recipientUserId, session.user.id),
+          isNull(notifications.readAt),
+        ),
+      )
+      .returning({ id: notifications.id });
+
+    if (!row) return false;
+    log({
+      action: "notification.read",
+      entityType: "notification",
+      entityId: row.id,
+    });
+    return true;
+  });
+}
+
+/**
+ * Mark every unread notification read.
+ *
+ * The recipient term is the first thing in the `WHERE`. This is the exact
+ * statement v1 got wrong `[00 §1.13]` — a bulk update over the whole table —
+ * and it is the reason this module has no generic update helper.
+ */
+export async function markAllRead(session: AuthSession): Promise<number> {
+  return withAudit(session.actor, async (tx, log) => {
+    const rows = await tx
+      .update(notifications)
+      .set({ readAt: new Date() })
+      .where(
+        and(
+          eq(notifications.recipientUserId, session.user.id),
+          isNull(notifications.readAt),
+        ),
+      )
+      .returning({ id: notifications.id });
+
+    if (rows.length > 0) {
+      log({
+        action: "notification.read_all",
+        entityType: "notification",
+        after: { count: rows.length },
+      });
+    }
+    return rows.length;
+  });
+}
+
+/**
+ * `21 §3` — the resolution rule for every persistent type and every anchor it
+ * can carry, as data rather than prose.
+ *
+ * It exists so `verify-phase10a.ts` §11 can iterate it and fail when a
+ * persistent type has an anchor with no rule: `21 §4` makes that a rule rather
+ * than a hope, because an anchor with no reachable condition is a badge the rep
+ * can never clear.
+ */
+export const RESOLUTION_RULES: {
+  typeKey: NotificationTypeKey;
+  anchorType: NotificationAnchorType;
+  /** How the condition clears, as a translation key on the screen. */
+  rule: "thread_no_longer_expired" | "interaction_against_company";
+}[] = [
+  {
+    typeKey: NOTIFICATION_TYPES.quotationExpired,
+    anchorType: "quotation_thread",
+    rule: "thread_no_longer_expired",
+  },
+  {
+    typeKey: NOTIFICATION_TYPES.recordAssigned,
+    anchorType: "company",
+    rule: "interaction_against_company",
+  },
+  {
+    typeKey: NOTIFICATION_TYPES.shareGranted,
+    anchorType: "company",
+    rule: "interaction_against_company",
+  },
+  {
+    typeKey: NOTIFICATION_TYPES.shareGranted,
+    anchorType: "project",
+    rule: "interaction_against_company",
+  },
+  {
+    typeKey: NOTIFICATION_TYPES.shareGranted,
+    anchorType: "quotation_thread",
+    rule: "interaction_against_company",
+  },
+];
+
+export type { NotificationTypeKey };

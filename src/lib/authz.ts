@@ -195,6 +195,36 @@ export async function getSession(): Promise<AuthSession | null> {
   };
 }
 
+/**
+ * The visibility scope of one user, built without a request `[21 §2]`.
+ *
+ * **This is not a login.** It writes no `sessions` row, produces no cookie, and
+ * grants nobody anything: it assembles the same shape the filter builders read
+ * so a background sweep can ask *"what would this rep see"* for each recipient
+ * in turn. That question is the recipient filter the daily digest needs, and
+ * `00 §1.13` records v1 answering it by not asking — both notification pages
+ * selected every row and left the filtering to RLS, which FACET does not have
+ * `[03]`.
+ *
+ * A deactivated account returns null: it may not be given new work `[07 B7]`,
+ * and a digest is new work.
+ *
+ * `actor` is the **system** actor `[16 §3]`, not the user — the sweep acts, the
+ * recipient does not, and the audit log must not say otherwise.
+ */
+export async function scopeForUser(
+  userId: string,
+): Promise<AuthSession | null> {
+  const user = await loadUserWithRole(userId);
+  if (!user || !user.isActive) return null;
+  return {
+    user,
+    realUser: user,
+    isImpersonating: false,
+    actor: { actorUserId: null, actingAsUserId: null },
+  };
+}
+
 /** Session or a locale-aware redirect to the login page. */
 export async function requireSession(): Promise<AuthSession> {
   const session = await getSession();
