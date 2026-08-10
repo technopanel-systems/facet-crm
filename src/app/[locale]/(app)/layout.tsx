@@ -3,7 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { AppNav } from "@/components/app-nav";
 import { Button } from "@/components/ui/button";
 import { LocaleSwitcher } from "@/components/locale-switcher";
-import { requireSession } from "@/lib/authz";
+import { can, requireSession } from "@/lib/authz";
 
 import { logoutAction, stopImpersonationAction } from "./actions";
 
@@ -60,7 +60,10 @@ export default async function AppLayout({
                 {t("auth.signedInAs", { name: session.user.name })}
               </p>
             </div>
-            <AppNav />
+            {/* `19 §4` — the nav is a client component and cannot ask
+                `can()`; the flags it needs are computed here, where the
+                session already lives, and passed down as booleans. */}
+            <AppNav canManageUsers={can(session, "canManageUsers")} />
           </div>
           <div className="flex items-center gap-2">
             <LocaleSwitcher />

@@ -19,41 +19,58 @@ Current phase and model/skill routing: `docs/05-roadmap.md`.
 When sources disagree, higher wins.
 
 **User truth** — stated directly by the founder:
-1. `docs/18-slice3-decisions.md` — latest; dispatch, credit splits and targets.
+1. `docs/19-phase11-decisions.md` — latest; team, user management and
+   offboarding. A handed-over thread **rewrites its raiser**, region on a user
+   is **asked not derived**, handover **opens only after deactivation**, nav
+   gates a section by **boolean prop**, **self-deactivation is refused**, and
+   **email is editable**
+2. `docs/18-slice3-decisions.md` — dispatch, credit splits and targets.
    Credit with no split goes to **the rep on the dispatch**, splits divide
    **equally and are rare**, and **the contributor is withdrawn**
-2. `docs/17-product-lookup-decisions.md` — seeds the suppliers, makes
+3. `docs/17-product-lookup-decisions.md` — seeds the suppliers, makes
    **colour free text rather than a lookup**, reseeds the thicknesses, and frees
    the quotation screen from SMAC's layout
-3. `docs/16-slice2-decisions.md` — the quotation chain. FACET computes the
+4. `docs/16-slice2-decisions.md` — the quotation chain. FACET computes the
    money, VAT defaults to 15%, expiry is a sweep, and **`accepted` is internal
    approval, never a won deal**
-4. `docs/15-lookup-decisions.md` — reverses 14 §5's control choice for the city
+5. `docs/15-lookup-decisions.md` — reverses 14 §5's control choice for the city
    field, and makes region derived rather than entered
-5. `docs/14-slice1-decisions.md` — corrects 12 §3 and 13 §2's scope rule
-6. `docs/12-closing-open-items.md` — corrects 07, 08, 09, 10, 11
-7. `docs/11-architectural-decisions.md` §1–3
-8. `docs/04-founder-answers.md`
-9. `docs/07-phase4-answers.md`
-10. `docs/08-quotation-model.md` §A–C
+6. `docs/14-slice1-decisions.md` — corrects 12 §3 and 13 §2's scope rule
+7. `docs/12-closing-open-items.md` — corrects 07, 08, 09, 10, 11
+8. `docs/11-architectural-decisions.md` §1–3
+9. `docs/04-founder-answers.md`
+10. `docs/07-phase4-answers.md`
+11. `docs/08-quotation-model.md` §A–C
 
 **Settled decisions** — agreed, do not re-litigate:
-11. `docs/13-data-model-decisions.md` — §3 is **LOCKED**; §1–2 explain the
+12. `docs/13-data-model-decisions.md` — §3 is **LOCKED**; §1–2 explain the
     schema, they do not govern it
-12. `docs/10-schema-decisions.md`
-13. `docs/09-schema-design.md`
-14. `docs/03-stack.md`
-15. `docs/01-business-model.md`
+13. `docs/10-schema-decisions.md`
+14. `docs/09-schema-design.md`
+15. `docs/03-stack.md`
+16. `docs/01-business-model.md`
 
 **Reference only** — never authority:
-16. `docs/06-strategic-review.md` — proposals, explicitly not truth
-17. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
+17. `docs/06-strategic-review.md` — proposals, explicitly not truth
+18. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
     whole; cite sections)
-18. `docs/02-history-extract.md` — mined from old chat transcripts
-19. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
-20. `legacy/**`
+19. `docs/02-history-extract.md` — mined from old chat transcripts
+20. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
+21. `legacy/**`
 
-**Later decisions correct earlier ones.** `18` closes the last open item in
+**Later decisions correct earlier ones.** `19` settles how a departing rep's
+work moves: a handed-over quotation thread **rewrites `raised_by_user_id`**
+while authorship columns stay put, and because `18 §1` fixes credit to the
+dispatch, no past month can move with it. It confirms **`12 §7` supersedes
+`04 Q8.1`'s "or delete them"** — only redistribution is built — and that
+**contacts are not a bucket**, because `14 §1` makes them follow their company.
+It declines to extend `15 §4`'s city-derived region to `users`, whose region is
+the rep's **base** `[10 §7]` rather than a site. It answers `app-nav`'s own
+question — the `(app)` layout passes flags down as **booleans**. And it adds two
+guards no earlier document states: **self-deactivation is refused**, because the
+actor would lose their own session and possibly the last `can_manage_users`
+holder with it, and **email is editable**, because `11 §5` leaves no password
+reset and a typo would otherwise be unrecoverable. `18` closes the last open item in
 `04 D2` — shared credit divides **equally**, and the manager sets a split's
 **membership**, never its proportions; makes **the rep named on the dispatch**
 take 100% when no split is in force, because a project's owner is a mutable
@@ -129,12 +146,17 @@ kept to understand what was attempted, not what should be built.
 
 - **Every user-facing string goes through the translation layer** (EN + AR).
   No hardcoded text, from the first screen.
-- **RTL: logical Tailwind utilities only** — `ms-*` not `ml-*`, `pe-*` not
-  `pr-*`, `text-start` not `text-left`. See the README substitution table.
-  This is the convention that rots fastest if unenforced.
+- **RTL: logical Tailwind utilities only** — `ms-*` not `ml-*`, `text-start`
+  not `text-left`. The convention that rots fastest if unenforced.
 - Square metres are always **generated**, never hand-entered:
   `quantity_pcs × width_m × length_m`. Quotation lines are sheets; the
   application writes `form_factor = 'sheet'` (`13 §2`).
+
+**The rest of the UI conventions live in the `facet-ui` skill** — the page and
+form shapes, the substitution table, `SelectField` vs `Combobox`, server-action
+validation, and the pre-flight checklist. Load it for any work under
+`src/app` or `src/components` rather than rediscovering them from the code.
+The verify-script shape is the `facet-verify` skill.
 
 ## Verification debt
 
@@ -175,10 +197,34 @@ There is **no test harness**. What is automated, and what is not:
   It creates its own reps per run, because achievement is a whole-database
   monthly total and the script keeps its rows `[12 §7]` — reusing the shared
   fixture accounts made the second run count the first run's square metres.
-- **Almost nothing else tests behaviour.** The auth checklist and Slice 1's
-  visibility rules were checked with throwaway scripts, which is not the same
-  as a suite. `verify:slice2` and `verify:slice3` are the shape the rest should
-  take.
+- `npm run verify:phase11` — the same shape, for team, user management and
+  offboarding. Development only; needs `db:seed` and `dev:fixtures`. It drives
+  `src/lib/{authz,team}.ts` in process and asserts, in sixteen sections: that
+  the seed grants `can_manage_users` to exactly super admin, executive and
+  sales manager `[12 §3]` **and to no other role**; that all eight gates refuse
+  a rep and a coordinator, each with its own key — the section that pins the
+  defect this phase fixed, where `createUser` used to throw raw English that
+  `ruleErrorState` would rethrow as a 500; that creation normalises the email,
+  hashes the password, and turns a duplicate into a field message; that editing
+  the email works `[19 §6]` and a no-op save audits nothing; that
+  **self-deactivation is refused** `[19 §5]`; that **deactivation kills a live
+  session and releases an impersonating one in the same transaction** — this is
+  **the first automated half of the auth checklist**, which had existed only in
+  a deleted throwaway script; that reactivation restores the flag and
+  **restores no session**; that handover is shut while the account is active
+  `[19 §3]` and that **deactivating moves nothing** `[07 B7]`; that the book is
+  exactly four buckets and **contacts are not one** `[14 §1]`; that
+  reassignment soft-removes a membership and inserts one with `origin
+  'assigned'`, **and that a recipient who is already a member ends with exactly
+  one live row** — the partial-unique-index trap; that every refusal rolls the
+  whole call back rather than half-applying it; that **a handover moves no past
+  credit** `[18 §1]`; that visibility follows the work in both directions with
+  **no new predicate written**; and that an impersonated identity loses the
+  flag `[07 A6]`. It found one real framing error on its first run — see below.
+- **Almost nothing else tests behaviour.** Slice 1's visibility rules were
+  checked with throwaway scripts, which is not the same as a suite.
+  `verify:slice2`, `verify:slice3` and `verify:phase11` are the shape the rest
+  should take.
 
 **Auth bridge** (`11 §4.1`) — re-run after any upgrade of `next-auth`,
 `@auth/core`, `@auth/drizzle-adapter` or `next`. Failure here is **silent**:
@@ -193,6 +239,10 @@ passed:
   cleanup — still redirects the next request to login and destroys every
   session row, so `getSession`'s re-check is doing the work on its own; and
   `deactivateUser()` also clears them in its transaction.
+  **This half is now automated** — `verify:phase11` §6 inserts a real session
+  row plus a second session impersonating the subject, calls `deactivateUser`,
+  and asserts the first is gone and `acting_as_user_id` is cleared. It is the
+  first piece of this checklist that survives the session it was written in.
 - **Impersonation** sets `acting_as_user_id`, and the banner then renders,
   names both identities, offers "Stop impersonating", and the header greets the
   impersonated user. Clearing the column takes all of that back. All four of
@@ -200,8 +250,10 @@ passed:
   reason (not merely "it threw").
   **One gap, stated rather than papered over:** `startImpersonation`'s final
   UPDATE could not be executed in-process — it needs `getSessionToken()` and so
-  a request context, and no UI starts impersonation until Phase 11. Its guards
-  and its effect are verified; the single statement between them is not.
+  a request context, and **no UI starts impersonation.** Phase 11 deliberately
+  did not add one: it was not asked for, and `19 §8` records the decision, so
+  this gap is now open-ended rather than due in a named phase. Its guards and
+  its effect are verified; the single statement between them is not.
 
 Still manual, still owed:
 
@@ -258,9 +310,32 @@ Still manual, still owed:
   by name, so the rep holding `33.34%` need not have been the rep credited
   `33.3334 m²`. Both are fixed and both are now asserted.
 
-Automating the auth checklist is still the highest-value test to write — the
-throwaway script that produced the results above was deleted, which is exactly
-the problem. `scripts/verify-slice2.ts` is the pattern to copy.
+- **Phase 11's screens were driven over HTTP on 2026-08-10**, not merely
+  compiled: both locales `200` for a holder of `can_manage_users` and `404` for
+  a rep on every `/users` route; **the nav entry present for the holder and
+  absent for the rep** `[19 §4]`; `/users/[id]/handover` **`404` while the
+  account is active and `200` once deactivated** `[19 §3]`; and the manager's
+  own record offering no deactivate control `[19 §5]`. **Both real form POSTs
+  were replayed** — user creation returned `303` to the new detail screen, and
+  the handover returned `303` and actually moved the work: the project owner
+  changed, the departing membership was kept with `removed_at` set, a new one
+  appeared with `origin 'assigned'` and `is_primary` carried across, and the
+  audit log showed `user.handover`.
+  **Two traps worth keeping, both hit on 2026-08-10:**
+  a **bound** server action renders `$ACTION_REF_n` + `$ACTION_n:0`, **not**
+  `$ACTION_ID_…` — so counting forms by `$ACTION_ID_` finds only the layout's
+  unbound sign-out form and misses every bound one. Match `$ACTION_`. And the
+  layout's sign-out form puts an action envelope on **every** page, so "an
+  action form exists" proves nothing about the screen under test; count them
+  instead. Same family as the `name="period"` trap on `/targets`.
+  That replay is **not kept** — `verify-phase11.ts` stops at the data layer, so
+  the form's own parsing has no standing check, exactly as for Slices 2 and 3.
+
+Automating the **rest** of the auth checklist is still the highest-value test
+to write. `verify:phase11` §6 took the deactivation half; login, the cookie
+shape, impersonation's own UPDATE and sign-out are still manual, and the
+throwaway script that produced those results was deleted, which is exactly the
+problem. `scripts/verify-slice2.ts` is the pattern to copy.
 
 ## Working style
 

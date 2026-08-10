@@ -30,7 +30,19 @@
  * the answer is that the question needs no flag.
  */
 
-import { and, eq, exists, isNull, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  eq,
+  exists,
+  ilike,
+  isNull,
+  ne,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { QueryBuilder, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { getLocale } from "next-intl/server";
 
@@ -51,6 +63,7 @@ import {
 import { redirect } from "@/i18n/navigation";
 import { withAudit, type AuditActor } from "@/lib/audit";
 import { hashPassword } from "@/lib/passwords";
+import { RuleError } from "@/lib/validation";
 
 export type Role = typeof roles.$inferSelect;
 export type User = typeof users.$inferSelect;
@@ -195,14 +208,21 @@ export function can(session: AuthSession, flag: PermissionFlag): boolean {
   return session.user.role[flag];
 }
 
-/** `requireSession` plus a flag check. Throws on denial — server actions
- *  surface this as a failure, never as silent success. */
+/**
+ * `requireSession` plus a flag check. Throws on denial — server actions
+ * surface this as a failure, never as silent success.
+ *
+ * The refusal is a `RuleError` carrying a translation key, not a raw string:
+ * `ruleErrorState` RETHROWS anything else, so a plain `Error` here would reach
+ * the user as a 500 instead of a message `[19 §7]`. Currently unused — kept
+ * because it is correct, harmless structure `[13 §2]`.
+ */
 export async function requirePermission(
   flag: PermissionFlag,
 ): Promise<AuthSession> {
   const session = await requireSession();
   if (!can(session, flag)) {
-    throw new Error(`Permission denied: ${flag}`);
+    throw new RuleError("team.errors.permissionDenied");
   }
   return session;
 }
@@ -608,6 +628,172 @@ export async function listActiveUsers(): Promise<
     .orderBy(users.name);
 }
 
+/* --- The management screens `[19]` -------------------------------- */
+
+/** `09 §3.1` — no document sets a page size; 25 is a display detail. */
+const PAGE_SIZE = 25;
+
+/** The minimum a password may be, matching `scripts/bootstrap-admin.ts`. */
+const MIN_PASSWORD_LENGTH = 8;
+
+/**
+ * A person as user management sees them.
+ *
+ * **`password_hash` is never selected.** `canSignIn` is derived from whether
+ * one exists `[11 §1]` — "Null = cannot log in" — so a screen can say so
+ * without the hash ever leaving the database.
+ */
+export type ManagedUserRow = {
+  id: string;
+  name: string;
+  email: string;
+  roleId: string;
+  roleNameEn: string;
+  roleNameAr: string;
+  region: User["region"];
+  isActive: boolean;
+  canSignIn: boolean;
+  deactivatedAt: Date | null;
+  createdAt: Date;
+};
+
+/** Structurally a `LookupRow`, so `bilingualName` renders it. */
+export type RoleOption = { id: string; nameEn: string; nameAr: string };
+
+const MANAGED_USER_COLUMNS = {
+  id: users.id,
+  name: users.name,
+  email: users.email,
+  roleId: users.roleId,
+  roleNameEn: roles.nameEn,
+  roleNameAr: roles.nameAr,
+  region: users.region,
+  isActive: users.isActive,
+  canSignIn: sql<boolean>`${users.passwordHash} is not null`,
+  deactivatedAt: users.deactivatedAt,
+  createdAt: users.createdAt,
+};
+
+/**
+ * Every role, for the user form's `<select>`.
+ *
+ * Role *names* are data here, not logic: this returns them for display and the
+ * form posts back an id. Nothing in this module branches on a name `[07 A5 C1]`.
+ */
+export async function listRoles(): Promise<RoleOption[]> {
+  return db
+    .select({ id: roles.id, nameEn: roles.nameEn, nameAr: roles.nameAr })
+    .from(roles)
+    .orderBy(asc(roles.nameEn));
+}
+
+/**
+ * The flag every user-management read and write asks for, in one place.
+ *
+ * The reads are gated too, and throw rather than returning an empty list: a
+ * mis-wired screen must not be indistinguishable from an empty database, and a
+ * thrown key is something `verify:phase11` can assert.
+ */
+function requireManageUsers(session: AuthSession): void {
+  if (!can(session, "canManageUsers")) {
+    throw new RuleError("team.errors.manageUsersOnly");
+  }
+}
+
+export type ManagedUserListOptions = {
+  q?: string;
+  page?: number;
+  /** Default `"active"`. Inactive users are history, not gone `[04 C2]`. */
+  status?: "active" | "inactive" | "all";
+};
+
+/**
+ * The user list `[19]`. Unlike a record list there is no per-row visibility
+ * question — user management is all-or-nothing on `can_manage_users`, so no
+ * filter from this module is composed in.
+ */
+export async function listUsers(
+  session: AuthSession,
+  options: ManagedUserListOptions = {},
+): Promise<{ rows: ManagedUserRow[]; total: number; page: number }> {
+  requireManageUsers(session);
+
+  const page = Math.max(1, options.page ?? 1);
+  const status = options.status ?? "active";
+  const trimmed = options.q?.trim();
+
+  const where = and(
+    status === "all" ? undefined : eq(users.isActive, status === "active"),
+    trimmed
+      ? or(
+          ilike(users.name, `%${trimmed}%`),
+          ilike(users.email, `%${trimmed}%`),
+        )
+      : undefined,
+  );
+
+  const rows = await db
+    .select(MANAGED_USER_COLUMNS)
+    .from(users)
+    .innerJoin(roles, eq(users.roleId, roles.id))
+    .where(where)
+    .orderBy(asc(users.name))
+    .limit(PAGE_SIZE)
+    .offset((page - 1) * PAGE_SIZE);
+
+  // Same WHERE, so the count can never disagree with the page.
+  const [totals] = await db
+    .select({ total: count() })
+    .from(users)
+    .innerJoin(roles, eq(users.roleId, roles.id))
+    .where(where);
+
+  return { rows, total: totals?.total ?? 0, page };
+}
+
+/** One user for the management screens. `null` = no such user (→ `notFound`). */
+export async function getManagedUser(
+  session: AuthSession,
+  userId: string,
+): Promise<ManagedUserRow | null> {
+  requireManageUsers(session);
+  const [row] = await db
+    .select(MANAGED_USER_COLUMNS)
+    .from(users)
+    .innerJoin(roles, eq(users.roleId, roles.id))
+    .where(eq(users.id, userId))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * `users_email_key` is unique. Checking first turns a collision into a field
+ * message; the insert/update still catches the race, because a check-then-write
+ * is not atomic.
+ */
+async function assertEmailFree(email: string, exceptUserId?: string) {
+  const [clash] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(
+      exceptUserId
+        ? and(eq(users.email, email), ne(users.id, exceptUserId))
+        : eq(users.email, email),
+    )
+    .limit(1);
+  if (clash) throw new RuleError("team.errors.emailTaken", "email");
+}
+
+/** The FK would refuse anyway — this refuses against the field instead. */
+async function assertRoleExists(roleId: string) {
+  const [role] = await db
+    .select({ id: roles.id })
+    .from(roles)
+    .where(eq(roles.id, roleId))
+    .limit(1);
+  if (!role) throw new RuleError("team.errors.roleUnknown", "roleId");
+}
+
 export type NewUserInput = {
   name: string;
   email: string;
@@ -618,15 +804,20 @@ export type NewUserInput = {
   cityId?: string | null;
 };
 
-/** Create a user. There is no self-registration anywhere in FACET. */
+/** Create a user. There is no self-registration anywhere in FACET `[11 §1]`. */
 export async function createUser(
   session: AuthSession,
   input: NewUserInput,
 ): Promise<User> {
-  if (!can(session, "canManageUsers")) {
-    throw new Error("Permission denied: canManageUsers");
-  }
+  requireManageUsers(session);
+
   const email = input.email.trim().toLowerCase();
+  if (input.password && input.password.length < MIN_PASSWORD_LENGTH) {
+    throw new RuleError("team.errors.passwordTooShort", "password");
+  }
+  await assertRoleExists(input.roleId);
+  await assertEmailFree(email);
+
   const passwordHash = input.password
     ? await hashPassword(input.password)
     : null;
@@ -654,6 +845,72 @@ export async function createUser(
   });
 }
 
+export type UserUpdateInput = {
+  name: string;
+  /**
+   * Editable `[19 §6]`. It is the login identity — `11 §5` leaves no password
+   * reset UI, so a typo at creation would otherwise be unrecoverable.
+   */
+  email: string;
+  roleId: string;
+  region: User["region"];
+};
+
+/**
+ * Edit a user's name, email, role and region `[19 §6]`.
+ *
+ * A no-op save writes no audit row: only changed keys are compared and logged,
+ * the shape `updateProject` already uses. `is_active` is not editable here —
+ * that is `deactivateUser` / `reactivateUser`, which also own the session
+ * consequences.
+ */
+export async function updateUser(
+  session: AuthSession,
+  userId: string,
+  input: UserUpdateInput,
+): Promise<User> {
+  requireManageUsers(session);
+
+  const email = input.email.trim().toLowerCase();
+  await assertRoleExists(input.roleId);
+  await assertEmailFree(email, userId);
+
+  return withAudit(session.actor, async (tx, log) => {
+    const [before] = await tx
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (!before) throw new RuleError("team.errors.userNotFound");
+
+    const next = {
+      name: input.name,
+      email,
+      roleId: input.roleId,
+      region: input.region ?? null,
+    };
+    const changed = (Object.keys(next) as (keyof typeof next)[]).filter(
+      (key) => before[key] !== next[key],
+    );
+    if (changed.length === 0) return before;
+
+    const [after] = await tx
+      .update(users)
+      .set(next)
+      .where(eq(users.id, userId))
+      .returning();
+
+    log({
+      action: "user.updated",
+      entityType: "user",
+      entityId: userId,
+      before: Object.fromEntries(changed.map((key) => [key, before[key]])),
+      after: Object.fromEntries(changed.map((key) => [key, after[key]])),
+    });
+    return after;
+  });
+}
+
 /**
  * Deactivate — never delete `[04 C2]`. Every session belonging to the user,
  * and every session currently impersonating them, dies in the same
@@ -663,16 +920,22 @@ export async function deactivateUser(
   session: AuthSession,
   userId: string,
 ): Promise<void> {
-  if (!can(session, "canManageUsers")) {
-    throw new Error("Permission denied: canManageUsers");
+  requireManageUsers(session);
+
+  // `19 §5` — the actor would lose their own session mid-request, and if they
+  // hold the only active `can_manage_users` nobody could reactivate them:
+  // `12 §7` forbids deleting the row and starting again.
+  if (userId === session.user.id) {
+    throw new RuleError("team.errors.cannotDeactivateSelf");
   }
+
   await withAudit(session.actor, async (tx, log) => {
     const [before] = await tx
       .select()
       .from(users)
       .where(eq(users.id, userId))
       .limit(1);
-    if (!before) throw new Error("User not found");
+    if (!before) throw new RuleError("team.errors.userNotFound");
     if (!before.isActive) return; // already deactivated — idempotent
 
     const [after] = await tx
@@ -689,6 +952,48 @@ export async function deactivateUser(
 
     log({
       action: "user.deactivated",
+      entityType: "user",
+      entityId: userId,
+      before: { isActive: before.isActive, deactivatedAt: before.deactivatedAt },
+      after: { isActive: after.isActive, deactivatedAt: after.deactivatedAt },
+    });
+  });
+}
+
+/**
+ * The inverse of `deactivateUser` `[19 §7]`.
+ *
+ * **It restores no session.** Deactivation destroyed them; the person logs in
+ * again, which is the only thing that should mint a session row. `getSession`
+ * re-reads `is_active` on every request, so nothing else is needed to let them
+ * back in.
+ *
+ * `deactivated_at` is cleared: `is_active` is the state, and the audit log is
+ * what preserves that a break happened.
+ */
+export async function reactivateUser(
+  session: AuthSession,
+  userId: string,
+): Promise<void> {
+  requireManageUsers(session);
+
+  await withAudit(session.actor, async (tx, log) => {
+    const [before] = await tx
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (!before) throw new RuleError("team.errors.userNotFound");
+    if (before.isActive) return; // already active — idempotent
+
+    const [after] = await tx
+      .update(users)
+      .set({ isActive: true, deactivatedAt: null })
+      .where(eq(users.id, userId))
+      .returning();
+
+    log({
+      action: "user.reactivated",
       entityType: "user",
       entityId: userId,
       before: { isActive: before.isActive, deactivatedAt: before.deactivatedAt },

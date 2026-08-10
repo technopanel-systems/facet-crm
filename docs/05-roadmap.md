@@ -21,7 +21,7 @@ work completes.
 | 8b | Slice 3 — dispatch, credit splits, targets | working screens | ✅ done |
 | 9 | Activities and reporting | | |
 | 10 | Follow-ups, duplicates, notifications | | |
-| 11 | Team, roles, offboarding, bulk import | | |
+| 11 | Team, roles, offboarding, bulk import | working screens | ✅ done bar **bulk import** |
 | 12 | Dashboards, targets, performance | | |
 | — | Later: production, warehouse, marketing, n8n/AI | | |
 

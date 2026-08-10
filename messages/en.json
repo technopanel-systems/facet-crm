@@ -14,7 +14,8 @@
     "projects": "Projects",
     "quotations": "Quotations",
     "dispatches": "Dispatches",
-    "targets": "Targets"
+    "targets": "Targets",
+    "team": "Team"
   },
   "common": {
     "create": "Create",
@@ -459,6 +460,86 @@
       "setTargetsOnly": "Only a manager or an executive may set targets.",
       "userNotMeasurable": "That person cannot carry a target.",
       "sqmPositive": "Enter a target above zero."
+    }
+  },
+  "team": {
+    "title": "Team",
+    "new": "New user",
+    "newTitle": "New user",
+    "editTitle": "Edit user",
+    "empty": "No users yet.",
+    "emptyFiltered": "No users match this search.",
+    "searchPlaceholder": "Search by name or email",
+    "fields": {
+      "name": "Name",
+      "email": "Email",
+      "emailHint": "This is the login identity. Changing it changes how the person signs in.",
+      "role": "Role",
+      "rolePlaceholder": "Choose a role",
+      "region": "Base region",
+      "regionPlaceholder": "Choose a region",
+      "password": "Password",
+      "passwordHint": "At least 8 characters. Set once, here — there is no reset screen.",
+      "status": "Status",
+      "statusActive": "Active",
+      "statusInactive": "Deactivated",
+      "deactivatedAt": "Deactivated",
+      "filterStatus": "Status",
+      "filterActive": "Active",
+      "filterInactive": "Deactivated",
+      "filterAll": "All"
+    },
+    "detail": {
+      "account": "Account",
+      "cannotSignIn": "No password set — this account cannot sign in yet.",
+      "targets": "Targets",
+      "targetsHint": "Targets and achievement live on the targets screen, for everyone at once.",
+      "viewTargets": "Open targets",
+      "handover": "Handover",
+      "handoverHint": "Review everything this person still holds and pass it to a colleague.",
+      "handoverClosed": "Handover opens once the account is deactivated."
+    },
+    "actions": {
+      "edit": "Edit",
+      "deactivate": "Deactivate",
+      "deactivateHint": "Access ends immediately and every open session is closed. The account is kept, never deleted.",
+      "reactivate": "Reactivate",
+      "reactivateHint": "The person can sign in again. No previous session is restored.",
+      "handover": "Handover"
+    },
+    "handover": {
+      "title": "Handover",
+      "subtitle": "Everything still held by {name}",
+      "description": "Nothing moves on its own. Tick what should change hands, choose who receives it, and every move is recorded.",
+      "companies": "Companies",
+      "projects": "Projects",
+      "quotations": "Quotation threads",
+      "tasks": "Open tasks",
+      "noCompanies": "No company memberships.",
+      "noProjects": "No projects owned.",
+      "noQuotations": "No quotation threads raised.",
+      "noTasks": "No open tasks.",
+      "nothing": "Nothing is left to hand over.",
+      "primary": "Primary",
+      "noDueDate": "No due date",
+      "reassignTo": "Hand over to",
+      "reassignToPlaceholder": "Choose a colleague",
+      "reassign": "Hand over selected",
+      "reassignHint": "A colleague who already holds a company keeps their single membership — nothing is duplicated."
+    },
+    "errors": {
+      "manageUsersOnly": "Only a manager, an executive or a super admin may manage users.",
+      "permissionDenied": "You do not have permission to do that.",
+      "userNotFound": "That user no longer exists.",
+      "emailTaken": "That email already belongs to another user.",
+      "roleUnknown": "Choose a role from the list.",
+      "passwordTooShort": "Use at least 8 characters.",
+      "nothingSelected": "Choose at least one item to hand over.",
+      "recipientIsSource": "Choose somebody other than this person.",
+      "recipientInactive": "Work can only be handed to an active colleague.",
+      "userStillActive": "Deactivate the account before handing over their work.",
+      "itemNotHeld": "Something on this list has already moved. Reload the page and try again.",
+      "cannotDeactivateSelf": "You cannot deactivate your own account."
     }
   }
 }

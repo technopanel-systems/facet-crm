@@ -12,6 +12,10 @@ import { cn } from "@/lib/utils";
  * the locale prefix and `/en/companies` and `/ar/companies` both match
  * `/companies`.
  */
+/**
+ * `requires` names a permission the viewer must hold for the entry to appear.
+ * Absent means everyone sees it.
+ */
 const SECTIONS = [
   { href: "/companies", key: "companies" },
   { href: "/contacts", key: "contacts" },
@@ -19,26 +23,39 @@ const SECTIONS = [
   { href: "/quotations", key: "quotations" },
   { href: "/dispatches", key: "dispatches" },
   { href: "/targets", key: "targets" },
+  { href: "/users", key: "team", requires: "canManageUsers" },
 ] as const;
 
 /*
- * These entries are NOT permission-gated, and need not be: both new screens
- * are meaningful for every role. A rep opening `/dispatches` sees the
- * dispatches that credit them; a rep opening `/targets` sees their own target
- * and achievement. What each role may DO is decided in the data layer.
+ * Most entries are NOT permission-gated, and need not be: they are meaningful
+ * for every role. A rep opening `/dispatches` sees the dispatches that credit
+ * them; a rep opening `/targets` sees their own target and achievement. What
+ * each role may DO is decided in the data layer.
  *
- * The next screen that is meaningless without a flag will need a different
- * answer — this component is `"use client"` and cannot call `can()`, so the
- * flags would have to be passed down from the `(app)` layout as booleans.
+ * `/users` is the first screen that is meaningless without a flag, and `19 §4`
+ * is the answer this comment used to ask for: **the `(app)` layout computes the
+ * flags and passes them down as booleans.** The layout already holds the
+ * session; this component is `"use client"` and must never call `can()` or
+ * import from `@/lib/authz` — not even a type, because a type-only import is
+ * one careless edit away from shipping the Postgres driver to the browser.
+ *
+ * Hiding the link is cosmetic. `/users` returns `notFound()` on its own and
+ * every write re-checks the flag in the data layer; the nav is not the gate.
  */
 
-export function AppNav() {
+type NavFlags = { canManageUsers: boolean };
+
+export function AppNav(flags: NavFlags) {
   const t = useTranslations("nav");
   const pathname = usePathname();
 
+  const visible = SECTIONS.filter(
+    (section) => !("requires" in section) || flags[section.requires],
+  );
+
   return (
     <nav className="flex items-center gap-1">
-      {SECTIONS.map((section) => {
+      {visible.map((section) => {
         // Prefix match so a detail page keeps its section highlighted.
         const active =
           pathname === section.href || pathname.startsWith(`${section.href}/`);
