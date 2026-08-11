@@ -150,6 +150,14 @@ System-generated tasks carry the trigger that created them, so a follow-up can
 close itself when the underlying condition clears — a quotation that gets a
 response should not leave a stale task behind.
 
+> **Overruled by `21 §1`.** A follow-up is a condition computed on read, not a
+> record: **no task is written for one**, `tasks` stays empty and
+> `system_trigger` stays permanently unused. The paragraph above describes a
+> design FACET declined — `20 §9` fixes the timers as never fired and stored,
+> and a task row would be a second copy of a derived fact. The shape and the
+> three origins in this section still stand for the other two kinds, which are
+> unbuilt. `21 §1` holds the reasoning.
+
 ---
 
 ## 10. Notifications — closes §15.8 **[delegated]**

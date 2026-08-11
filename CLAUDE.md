@@ -554,6 +554,14 @@ problem. `scripts/verify-slice2.ts` is the pattern to copy.
   optional and `typecheck` does not stand in for it:** typecheck passed while
   a client component imported a data module, and only `build` caught the
   Postgres driver being bundled for the browser. `next dev` tolerates it too.
+- **A phase is not done until its screens have been driven over HTTP, in both
+  locales.** The four checks above prove a screen compiles, not that it works.
+  Phase 10a is the case that settles it: typecheck, lint, `build` and the whole
+  sixteen-section `verify:phase10a` were green while **every company detail page
+  returned 500** — `isCompanyQuiet` wrote `current_date - $2`, Postgres cannot
+  infer a type for `date - unknown`, and no data-layer script called that
+  function because only a screen does. Log in, fetch the routes, assert on DOM
+  markers rather than translated strings, and replay the real form POSTs.
 - Commit after every working slice.
 - Ask before adding a dependency.
 - Host-side `db:*` scripts read `DATABASE_URL` from `.env`; the app container
