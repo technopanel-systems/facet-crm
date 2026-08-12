@@ -54,7 +54,7 @@
 
 process.loadEnvFile(".env");
 
-import { and, count, eq, isNull, sql } from "drizzle-orm";
+import { and, count, eq, inArray, isNull, like } from "drizzle-orm";
 
 import { closeDatabase, db } from "@/db";
 import {
@@ -1044,10 +1044,68 @@ async function main(): Promise<void> {
 
   console.log("\n16. Every write is audited");
 
+  /*
+   * Scoped to THIS RUN'S OWN RECORDS — the third version of this check, and
+   * the one that stops it failing on rows FACET writes correctly.
+   *
+   * The first scanned the whole audit log over a ten-minute window, and failed
+   * on `verify:slice2`'s expiry sweep, which audits under a null actor ON
+   * PURPOSE `[16 §3]` so that whoever opened a list is not recorded as having
+   * expired a quotation. The second kept the window and filtered to a list of
+   * action names — and failed again, on `dev:fixtures`, which creates its four
+   * users under a null actor, correctly, because nobody is signed in during a
+   * seed, and `user.created` was on the list.
+   *
+   * Both were asserting something FACET does not claim. A window says WHEN a
+   * row was written; an action name says WHAT it did. Neither says WHOSE it
+   * is. So this resolves the run's own records from the stamp every fixture
+   * already carries, and asks only about audit rows anchored to them: no
+   * window, no action list, and nothing another process writes can enter the
+   * set. Threads and memberships carry no name of their own, so they are
+   * reached through the project and the company that do — which also catches
+   * the membership rows the handover CREATES, whose ids the script never sees.
+   */
+  const stamped = `${stamp}%`;
+  const [ownUsers, ownCompanies, ownProjects, ownTasks] = await Promise.all([
+    db.select({ id: users.id }).from(users).where(like(users.email, stamped)),
+    db
+      .select({ id: companies.id })
+      .from(companies)
+      .where(like(companies.nameNormalized, stamped)),
+    db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(like(projects.nameNormalized, stamped)),
+    db.select({ id: tasks.id }).from(tasks).where(like(tasks.title, stamped)),
+  ]);
+  const companyIds = ownCompanies.map((row) => row.id);
+  const projectIds = ownProjects.map((row) => row.id);
+  const [ownThreads, ownMemberships] = await Promise.all([
+    db
+      .select({ id: quotationThreads.id })
+      .from(quotationThreads)
+      .where(inArray(quotationThreads.projectId, projectIds)),
+    db
+      .select({ id: companyReps.id })
+      .from(companyReps)
+      .where(inArray(companyReps.companyId, companyIds)),
+  ]);
+  const ownIds = [
+    ...ownUsers,
+    ...ownCompanies,
+    ...ownProjects,
+    ...ownTasks,
+    ...ownThreads,
+    ...ownMemberships,
+  ].map((row) => row.id);
+  // If the stamp ever stops reaching the fixtures this must fail loudly rather
+  // than pass over an empty set.
+  check("this run's own records were found", ownIds.length > 0);
+
   const entries = await db
     .select({ action: auditLog.action, actor: auditLog.actorUserId })
     .from(auditLog)
-    .where(sql`${auditLog.createdAt} >= now() - interval '10 minutes'`);
+    .where(inArray(auditLog.entityId, ownIds));
   const actions = new Set(entries.map((row) => row.action));
   const OWNED = [
     "user.created",
@@ -1064,21 +1122,9 @@ async function main(): Promise<void> {
   for (const action of OWNED) {
     check(`\`${action}\` was audited`, actions.has(action));
   }
-  /*
-   * Scoped to the actions this script owns, and that is not a weakening.
-   *
-   * A null actor is CORRECT for a system-run write `[16 §3]`: the expiry sweep
-   * audits under one, so that the person who happened to open a list is not
-   * recorded as having expired a quotation. The window above is the whole audit
-   * log, so running `verify:slice2` within ten minutes put a legitimate
-   * null-actor row in range and this check failed on it. It was asserting
-   * something FACET does not claim.
-   */
   check(
-    "every entry this script wrote names an actor",
-    entries
-      .filter((row) => OWNED.includes(row.action))
-      .every((row) => row.actor !== null),
+    "every audit row on this run's own records names an actor",
+    entries.every((row) => row.actor !== null),
   );
   console.log(`        actions seen: ${[...actions].sort().join(", ")}`);
 

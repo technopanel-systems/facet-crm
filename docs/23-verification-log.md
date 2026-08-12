@@ -399,16 +399,60 @@ nothing drifted, and the HTTP pass is the acceptance bar — **a restyle that
   denominator too. Fixing it means moving the derivation into SQL — a
   data-layer change, out of scope for a shell stage, so it is `22 §6.5` and the
   Today screen links to `/coverage` rather than inheriting it.
-- **`verify:phase11` §16 fails if `dev:fixtures` ran within the last ten
-  minutes.** The assertion scans the **whole audit log** for ten minutes and
-  keeps the rows whose action it owns; `dev-fixtures.ts` creates its four users
+- **`verify:phase11` §16 failed if `dev:fixtures` ran within the last ten
+  minutes.** The assertion scanned the **whole audit log** for ten minutes and
+  kept the rows whose action it owned; `dev-fixtures.ts` creates its four users
   under a **null actor**, which is correct — nobody is logged in during a seed —
-  and `user.created` is one of the owned actions. Confirmed by query: four
+  and `user.created` was one of the owned actions. Confirmed by query: four
   null-actor `user.created` rows, all stamped at the second `dev:fixtures` ran.
-  **This is the third time this one assertion has been tripped by a legitimate
-  null-actor row** (`verify:slice2`'s expiry sweep was the first two). Scoping
-  it to action *names* was never enough; it needs scoping to the rows the script
-  itself wrote. Until then, run it more than ten minutes after a seed.
+  **Fixed below** — it was the third false failure from this one assertion.
+
+### `verify:phase11` §16, third and final version (2026-08-12)
+
+Three false failures from one assertion, each from a row FACET writes
+**correctly**. It is now scoped to the run's own records and should not need a
+fourth version.
+
+| # | Scope | Failed on |
+|---|---|---|
+| 1 | The whole audit log, over a ten-minute window | `verify:slice2`'s expiry sweep, which audits under a null actor on purpose `[16 §3]` |
+| 2 | The same window, filtered to a list of action names | `dev:fixtures`, which creates four users under a null actor because nobody is signed in during a seed — and `user.created` was on the list |
+| 3 | **The rows anchored to this run's own records.** No window, no action list | — |
+
+**Why the first two were wrong in the same way.** A window says *when* a row
+was written and an action name says *what* it did. **Neither says whose it
+is**, and whose it is was the entire claim. Both versions asserted something
+FACET does not claim: that no null-actor row exists nearby.
+
+**How version three scopes.** Every fixture already carries the run stamp
+(`verify11-<ms>`) in its email, normalized name or title, so the script
+resolves its own users, companies, projects and tasks from that stamp, then
+reaches **threads through their project and memberships through their company**
+— those two carry no name of their own, and going through the parent also
+catches **the membership rows the handover itself creates**, whose ids the
+script never sees. It then selects audit rows by `entity_id` alone and asserts
+every one names an actor.
+
+**Why no action list is needed any more, and this is load-bearing:**
+`verify-phase11.ts` creates **no quotation versions**, and expiry needs a
+version with a `valid_until`. So the sweep can never touch this script's
+threads, and no legitimately null-actor row can reach its records. **If a
+future edit gives this script a quotation version, that stops being true** and
+§16 will fail for a correct reason — the fix then is to exclude the sweep's own
+actions explicitly, not to widen the scope again.
+
+**Both halves were proved, not assumed** (2026-08-12): a null-actor
+`user.created` injected on `rep-a@example.test` — the shape `dev:fixtures`
+writes — no longer fails the run, and a null-actor row injected on one of the
+run's **own** users is still caught by the same predicate. Both injected rows
+were removed afterwards; they were synthetic, not history. A side benefit worth
+noticing: `actions seen` now prints exactly the ten owned actions instead of
+every action in the database over ten minutes, so the line is finally worth
+reading.
+
+`check("this run's own records were found", ownIds.length > 0)` guards the new
+failure mode — if the stamp ever stops reaching the fixtures, the set goes
+empty and the assertion would otherwise pass over nothing.
 
 ### A `check:messages` trap
 
