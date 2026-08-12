@@ -60,14 +60,23 @@ When sources disagree, higher wins.
 17. `docs/03-stack.md`
 18. `docs/01-business-model.md`
 
+**Presentation only** — how it looks, never what it does:
+19. `docs/22-design-language.md` — the warm-black palette, IBM Plex, the four
+    screen archetypes, and the rule that a row says **whose move it is**, not
+    what the status is. It governs appearance and **nothing else**; where it
+    appears to decide behaviour, every document above outranks it. Its §6 is
+    the redesign's own OPEN register
+
 **Reference only** — never authority:
-19. `docs/06-strategic-review.md` — proposals, explicitly not truth
-20. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
+20. `docs/06-strategic-review.md` — proposals, explicitly not truth
+21. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
     whole; cite sections)
-21. `docs/02-history-extract.md` — mined from old chat transcripts
-22. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
-23. `docs/23-verification-log.md` — what has been verified, not what is true
-24. `legacy/**`
+22. `docs/02-history-extract.md` — mined from old chat transcripts
+23. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
+24. `docs/23-verification-log.md` — what has been verified, not what is true
+25. `docs/24-doc-audit.md` — the disagreements between documents, and the
+    current OPEN register
+26. `legacy/**`
 
 **Later decisions correct earlier ones.** When two documents disagree, the later
 one is the answer — no judgement call needed. Each document states its own

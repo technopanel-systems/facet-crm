@@ -35,6 +35,18 @@ notifications", the form `21`'s scope note still quotes — and is now **10a**
 (built) and **10b** (not started), with duplicates and merge wholly in 10b
 `[24 §1.6]`.
 
+**The redesign runs beside the phase table, not inside it.** Stage 1 — the
+shell — landed on 2026-08-12: the warm-black tokens, IBM Plex, the rail, the
+theme toggle, Today at `/`, `/performance`, and the shared components restyled.
+It is **presentation only**; no phase moved because of it. `docs/22-design-language.md`
+governs it and carries its own OPEN register in §6. The chain strip, kanban,
+calendar, drag-and-drop and charts wait on the redesign-decisions document,
+which needs a number when it is written — `22` is taken.
+
+Stage 1 delivered a **dashboard** and a `/performance` screen, which overlap
+row 12's territory. Row 12 is **not** done: nothing there is charted, and the
+two screens compose existing functions rather than adding analysis.
+
 Phase 3 determined whether this would succeed. Everything after it is typing.
 
 **Build order rule:** the shared core first (organizations, people, users,

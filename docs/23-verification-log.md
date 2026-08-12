@@ -345,6 +345,83 @@ problem. `scripts/verify-slice2.ts` is the pattern to copy.
 
 ---
 
+## Redesign stage 1 — the shell (2026-08-12)
+
+A presentation-only change: warm-black tokens `[22 §1]`, IBM Plex, the rail,
+the theme, Today at `/`, `/performance`, and the shared components restyled.
+No data-layer module changed, so the five suites are the regression check that
+nothing drifted, and the HTTP pass is the acceptance bar — **a restyle that
+500s a screen is this stage's failure mode.**
+
+- **The four checks passed**, and `grep` for physical Tailwind utilities across
+  `src` still returns zero — a restyle is exactly where `ml-`/`text-left`
+  creep back in.
+- **The five suites pass**, with one caveat below that is not a code fault.
+- **Every screen was driven over HTTP on 2026-08-12** against the production
+  build, not `next dev`: **62 checks**, every `(app)` route in **both locales**,
+  for a **rep**, a **manager** and a **coordinator**, and then **every shared
+  route again under `facet-theme=light`** — a token defined in only one theme
+  would otherwise hide behind the default. Markers were DOM, never translated
+  strings: `data-slot="today-queue"`, `data-slot="today-waiting"`,
+  `aria-current="page"` for the rail, `name="dispatchDate"` for the dispatch
+  form. Dark renders with no cookie, `light` removes the `dark` class, and an
+  unknown cookie value falls back to dark.
+- **Both form POSTs were replayed.** The theme toggle is a server component and
+  a plain form — no JavaScript — and its POST set `facet-theme=light`. Mark-read
+  was replayed **and then checked at the database**: `read_at` set,
+  `resolved_at` still **null**, which is `07 G1`'s "reading is not resolving"
+  proved through the form after a restyle touched every shared component.
+  That replay is **not kept**, exactly as for slices 2 and 3 and phases 9–11.
+- **Three expectations in the first draft of the driving script were wrong, not
+  the app** — worth recording because each looks like a bug: `/dispatches/new`
+  `404`s for a rep *and* a manager because `can_dispatch` belongs to the Sales
+  Coordinator and Super Admin alone; a manager `404`s on a report's edit screen
+  because only the author may edit `[20 §9]`; and a rep's empty contact,
+  dispatch and report lists yield no id to follow, which is a legitimate empty
+  state rather than a broken link. **Asserting only the 404 would have passed on
+  a broken route**, so the coordinator now asserts the 200.
+- **The font assertion failed while the fonts were loading correctly.**
+  `next/font` emits the family as an underscored class —
+  `ibm_plex_sans_<hash>-module__…__variable` — so a marker written `ibm-plex`
+  matches nothing. Same family as the next-intl trap: **a marker that never
+  appears cannot fail loudly**, it just reads as a missing feature.
+
+### Two defects found, neither fixed here
+
+- **`coverage()` paginates before it filters — live on `/coverage` today.**
+  `isQuiet` is derived in TypeScript at `coverage.ts:183-184` from `daysSince`,
+  the threshold and the on-hold date, all resolved *after* the page is fetched,
+  so `quietOnly` filters only the 25 rows already in hand — ordered
+  `asc(companies.nameEn)` at `coverage.ts:136-146`. **Reproduction:**
+  `/coverage?quiet=1` for a rep whose quiet companies sort late in `nameEn`
+  returns an empty screen while the companies are genuinely quiet. `total` at
+  `coverage.ts:190` is the pre-filter count, so pagination pages over the wrong
+  denominator too. Fixing it means moving the derivation into SQL — a
+  data-layer change, out of scope for a shell stage, so it is `22 §6.5` and the
+  Today screen links to `/coverage` rather than inheriting it.
+- **`verify:phase11` §16 fails if `dev:fixtures` ran within the last ten
+  minutes.** The assertion scans the **whole audit log** for ten minutes and
+  keeps the rows whose action it owns; `dev-fixtures.ts` creates its four users
+  under a **null actor**, which is correct — nobody is logged in during a seed —
+  and `user.created` is one of the owned actions. Confirmed by query: four
+  null-actor `user.created` rows, all stamped at the second `dev:fixtures` ran.
+  **This is the third time this one assertion has been tripped by a legitimate
+  null-actor row** (`verify:slice2`'s expiry sweep was the first two). Scoping
+  it to action *names* was never enough; it needs scoping to the rows the script
+  itself wrote. Until then, run it more than ten minutes after a seed.
+
+### A `check:messages` trap
+
+`{count, plural, =0 {nothing needs you today} …}` fails parity against a
+correct Arabic translation. The checker extracts placeholders with
+`/\{\s*(\w+)/g`, which reads the literal `=0` branch as a placeholder named
+`nothing`; the Arabic branch begins with an Arabic letter and matches nothing,
+so the two disagree. **An ICU literal branch must not begin with an ASCII
+word character** — the zero case is a separate key on the Today screen for
+exactly this reason.
+
+---
+
 ## Why the HTTP pass is not optional
 
 Also moved from `CLAUDE.md`, from its **Working style** section, which now

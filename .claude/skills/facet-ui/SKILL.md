@@ -69,7 +69,9 @@ re-checks either way; the UI never is the gate.
 **Structure.** Beside each section: `page.tsx`, `new/page.tsx`,
 `[id]/page.tsx`, `[id]/edit/page.tsx`, `actions.ts` (server actions),
 `thing-form.tsx` (the `"use client"` form). New top-level section → add it to
-`SECTIONS` in `src/components/app-nav.tsx`.
+`GROUPS` in `src/components/app-rail.tsx` — but the rail is deliberately six
+items in two groups `[22 §7]`, so most new screens belong inside an existing
+section rather than beside it.
 
 ## Building blocks
 
@@ -79,6 +81,9 @@ re-checks either way; the UI never is the gate.
 - `SearchForm` / `ListPagination` from `(app)/_components/list-controls` —
   every list uses both. `PAGE_SIZE` there is kept in step with the data
   modules.
+- **Numbers use the `num` utility** `[22 §2]` — mono with tabular figures,
+  for every quantity, square metre, money value, reference, date, count and
+  percentage. It is one class, not `font-mono tabular-nums`.
 - `Card` · `Table` · `Badge` from `@/components/ui`. Tables sit inside
   `<div className="overflow-x-auto rounded-lg border">`, every `TableHead`
   and `TableCell` carries `text-start`.
