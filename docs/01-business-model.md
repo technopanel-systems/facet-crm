@@ -58,6 +58,10 @@ A coordinator sees all companies and projects, read-only, but not rep activity
 detail `[04 Q10]`. This coexists with §4: read-across at the coordinator level
 is a role capability, not a change to per-record ownership.
 
+> **Superseded by `16 §8` and `18 §2`.** The coordinator sees **quotation
+> threads, and company names only** — no company, contact or project
+> read-across. The second half is decided on different grounds by `20 §10`.
+
 Note a tension `04` leaves standing: `[04 Q9]` gives marketing "the ability to
 assign new leads and companies", while `[04 Q19]` says marketing *asks* the
 manager and **the manager decides**. Whether marketing performs the assignment
@@ -149,6 +153,9 @@ On a shared company:
 - Its **projects, quotations and other records stay private to each rep**,
   unless the manager explicitly shares them `[04 Q7]`.
 - **Activities are private to the rep**, without exception `[04 Q6]`.
+
+> **Superseded by `20 §10`.** Knowledge is company property: a report's
+> visibility **follows its anchor**, so "without exception" no longer holds.
 
 Sharing is not one-shaped: several reps may share a company via the same
 contact or via different contacts, and projects are shared the same way,

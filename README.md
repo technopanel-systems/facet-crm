@@ -77,19 +77,60 @@ npm run build        # production build
 
 ## Database
 
-No tables yet — schema is phase 5 (`docs/05-roadmap.md`). `src/db/schema.ts` is
-deliberately empty.
+The schema lives in `src/db/schema.ts`; the phase it belongs to is in
+`docs/05-roadmap.md`.
 
 ```bash
 npm run db:generate   # write a migration from schema.ts changes
 npm run db:migrate    # apply pending migrations
+npm run db:seed       # roles, lookups, settings, notification types
 npm run db:studio     # browse data
 npm run db:push       # push schema without a migration — local scratch only
+npm run db:reset      # development only — destroy the volume and rebuild
 ```
 
 Migrations under `drizzle/` **are committed**. They are the record of how
 production reached its current shape. Never use `db:push` against the office
 PC's database.
+
+### Getting a clean database
+
+**Nothing in FACET deletes** (`docs/12-closing-open-items.md` §7), and the
+verify scripts are held to the same rule. `verify:slice2`, `verify:slice3`,
+`verify:phase9`, `verify:phase11` and `verify:phase10a` all **leave their rows
+behind by design** — they are not fixtures that tear themselves down, and they
+are not meant to be. Three of them go further and create their own reps on
+every run, because achievement, coverage and the daily activity view are
+whole-database totals over a date range: re-using the shared `dev:fixtures`
+accounts made the second run count the first run's square metres.
+
+So a dev database only ever grows, and assertions that quietly depend on how
+much is in it drift as it does. (`verify:slice3` §12 looked for two dispatches
+on page one of a list that pages at 25; it "failed" once a database had
+accumulated enough runs, while working perfectly.)
+
+`npm run db:reset` is how a clean one is obtained:
+
+```bash
+npm run db:reset      # asks for confirmation; --yes to skip
+npm run dev:fixtures  # the test accounts the verify scripts drive
+```
+
+It runs `docker compose down -v`, `docker compose up -d`, waits for the `db`
+container's own healthcheck, then `db:migrate`, `db:seed` and
+`bootstrap:admin`.
+
+- **Development only.** It refuses unless `NODE_ENV` is exactly `development`,
+  the same guard as `dev:fixtures` (`docs/15-lookup-decisions.md` §7).
+- **It also confirms**, because that guard cannot tell a laptop from the office
+  PC — both copy the same `.env.example`. Type the database name back, or pass
+  `--yes` (required when there is no terminal).
+- **Put the `BOOTSTRAP_ADMIN_*` lines back in `.env` first.** They are checked
+  before anything is destroyed: the chain ends by creating the first super
+  admin, and a reset that cannot do that leaves a database with no way in.
+- `docker compose up -d` starts the app container too, which means an image
+  build on a checkout that has never made one — and that build needs the
+  internet for fonts.
 
 ---
 

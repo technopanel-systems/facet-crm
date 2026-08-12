@@ -38,12 +38,18 @@ during final adjustments `[Q4]`.
 | Role | Notes |
 |---|---|
 | Super admin | Yes to everything. Can open any role's view for testing, and log in as a rep when needed `[Q5]` |
-| **Executive** | **New.** For the two CEOs, between super admin and sales manager. Monitoring, changing targets, seeing everything. No operational data entry `[26.1]` |
+| **Executive** | **New.** For the two CEOs, between super admin and sales manager. Monitoring, changing targets, seeing everything. No operational data entry `[26.1]` — but see the note below |
 | Sales manager | Approves shares, assignments, deletes, duplicate resolution, offboarding |
 | Sales coordinator | Internal sales. Quotations, dispatch, invoicing in SMAC. May carry a target |
 | Marketing | Works as a rep, plus can assign leads and companies directly |
 | Sales rep | Field sales |
 | **Desk rep** | **New, provisional.** Works like a rep but does not go outside, and is not internal sales. Filters dump/imported leads, works some, assigns or shares the rest `[28.1]` |
+
+> **"No operational data entry" is corrected by `12 §3` and `14 §3`.** The
+> executive creates users, approves deletes, exports and sets credit splits
+> `[12 §3]`, and **may edit records** `[14 §3]` — each an operational act by this
+> sentence's own wording. `11 §1`'s narrow reading is amended by `12 §3`
+> `[24 §1.2]`.
 
 **Decision (C1) — roles are data, not code.** Two roles were added in a single
 planning message; more will follow. A role is a **named set of permission

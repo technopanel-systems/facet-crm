@@ -186,6 +186,10 @@ Columns: project, company, role reference, buyer flag.
 Starting vocabulary for `project_company_roles` is OPEN `[07 F6]`; the real
 category list is OPEN `[07 F5]`.
 
+> **Corrected by `12 §5` and migration `0002`.** The role is **free text**, not a
+> lookup: `project_company_roles` was dropped. `company_categories` and `cities`
+> stand.
+
 ---
 
 ## 4. Visibility, sharing, credit, deletion
@@ -421,6 +425,10 @@ written by the system, typed by no one `[04 B3 confirmed]`. **Private to the
 rep**, without exception; where reps overlap, a light notification is enough
 — avoid complexity `[04 Q6]`.
 
+> **Superseded by `20 §10`.** Visibility **follows the anchor**, not the rep, so
+> "without exception" no longer holds; `activities` itself stays permanently
+> empty `[20]`.
+
 Columns: acting rep, activity type, record reference (company / contact /
 project / quotation), timestamp. Qualification is detected from these events
 — the customer asking for a quotation — never set by a human `[04
@@ -626,6 +634,11 @@ design; where a table shape depended on one, the dependency is stated.
 ## 16. Table inventory at a glance
 
 Thirty-five tables (excluding Auth.js library tables), grouped:
+
+> **Corrected by `12 §5` and migration `0002`.** The count and the list below are
+> stale: `project_company_roles` was dropped, and `company_dormancy_reviews`
+> `[21 §10]`, `rep_report_signals` `[20 §13]` and `notification_types`
+> `[10 §10]` were added. `src/db/schema.ts` is the inventory `[24 §1.3]`.
 
 | Group | Tables |
 |---|---|

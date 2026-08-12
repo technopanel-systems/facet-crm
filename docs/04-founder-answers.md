@@ -101,6 +101,11 @@ leads and companies. More marketing-team features may follow later.
 
 **10.** Yes.
 
+> **Superseded by `16 §8` and `18 §2`.** `02 §5`'s question 10 asked whether the
+> coordinator sees all companies and projects read-only; the coordinator instead
+> sees **quotation threads, and company names only**. Its second half — not rep
+> activity detail — is decided on different grounds by `20 §10`.
+
 **11.** Yes.
 
 **12. Role and target are separate concepts**

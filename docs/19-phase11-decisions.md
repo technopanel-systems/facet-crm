@@ -175,8 +175,10 @@ Three readings this document settles, recorded so nobody re-derives them:
 - **Password reset / change UI**, carried forward unchanged from `11 §5` and
   `12 §15`.
 - **The impersonation UI.** `startImpersonation` is built and guarded, and
-  `CLAUDE.md` records that its final UPDATE is the one statement never executed
-  in process because no screen starts impersonation. Phase 11 does not add one —
+  `docs/23-verification-log.md` records that its final UPDATE is the one
+  statement never executed in process because no screen starts impersonation.
+  (That passage moved out of `CLAUDE.md` when `23` was created on 2026-08-12;
+  the claim is unchanged `[24 §1.5]`.) Phase 11 does not add one —
   it was not asked for, and the gap stays recorded as verification debt.
 - Carried forward unchanged from `18 §8`: the dispatch-after-cancellation
   question, same-day split generations, whether uncredited help is recorded, and

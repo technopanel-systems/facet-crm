@@ -18,6 +18,7 @@
     "db:seed:lookups": "tsx scripts/seed-lookups.ts",
     "db:seed:settings": "tsx scripts/seed-settings.ts",
     "db:seed:notifications": "tsx scripts/seed-notification-types.ts",
+    "db:reset": "tsx scripts/db-reset.ts",
     "bootstrap:admin": "tsx scripts/bootstrap-admin.ts",
     "dev:fixtures": "tsx scripts/dev-fixtures.ts",
     "verify:slice2": "tsx --env-file=.env scripts/verify-slice2.ts",
