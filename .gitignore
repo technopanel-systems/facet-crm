@@ -40,3 +40,20 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# installed agent skills — dependencies, not project files
+#
+# `npx skills add` writes the skill under /.agents/ and symlinks it into
+# /.claude/skills/. A symlink does not survive a clone onto another machine,
+# and this repo is deployed to the company PC, so committing either half
+# would ship something broken. Reinstall instead — the README names all three
+# and where they come from.
+#
+# The two PROJECT skills are committed and must stay so: everything directly
+# inside /.claude/skills/ is ignored, then facet-ui and facet-verify are put
+# back. Anything installed later is ignored without editing this file again.
+/.agents/
+/skills-lock.json
+/.claude/skills/*
+!/.claude/skills/facet-ui/
+!/.claude/skills/facet-verify/
