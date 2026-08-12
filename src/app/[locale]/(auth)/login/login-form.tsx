@@ -3,43 +3,47 @@
 import { useActionState } from "react";
 import { useTranslations } from "next-intl";
 
+import { FormField } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 import { loginAction, type LoginState } from "./actions";
 
 const initialState: LoginState = {};
 
+/**
+ * Login.
+ *
+ * It used to hand-roll its own `<label>` and `<input>` with a private class
+ * string, which drifted from `Input` the moment `Input` changed. It uses the
+ * shared components now, so a restyle reaches it too `[22 §7]`.
+ */
 export function LoginForm() {
   const t = useTranslations();
   const [state, action, pending] = useActionState(loginAction, initialState);
 
-  const inputClasses =
-    "border-input bg-background w-full rounded-md border px-3 py-2 text-sm " +
-    "outline-none focus-visible:ring-2 focus-visible:ring-ring";
-
   return (
     <form action={action} className="flex flex-col gap-4">
-      <label className="flex flex-col gap-1.5 text-start">
-        <span className="text-sm font-medium">{t("auth.login.email")}</span>
-        <input
+      <FormField name="email" label={t("auth.login.email")} required>
+        <Input
+          id="email"
           name="email"
           type="email"
           autoComplete="email"
           required
           dir="ltr"
-          className={`${inputClasses} text-start`}
+          className="text-start"
         />
-      </label>
-      <label className="flex flex-col gap-1.5 text-start">
-        <span className="text-sm font-medium">{t("auth.login.password")}</span>
-        <input
+      </FormField>
+      <FormField name="password" label={t("auth.login.password")} required>
+        <Input
+          id="password"
           name="password"
           type="password"
           autoComplete="current-password"
           required
-          className={inputClasses}
         />
-      </label>
+      </FormField>
       {state.error ? (
         <p role="alert" className="text-destructive text-start text-sm">
           {t(state.error)}

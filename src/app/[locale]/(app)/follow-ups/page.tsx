@@ -14,9 +14,10 @@ import {
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
 import { FOLLOW_UP_KINDS } from "@/lib/enums";
-import { followUps, type FollowUpRow } from "@/lib/follow-ups";
+import { followUps } from "@/lib/follow-ups";
 import { bilingualName } from "@/lib/lookups";
 
+import { anchorHref } from "../_components/anchors";
 import { ListPagination, SearchForm } from "../_components/list-controls";
 
 export const dynamic = "force-dynamic";
@@ -159,7 +160,7 @@ export default async function FollowUpsPage({
                       </Badge>
                     </TableCell>
                     <TableCell className="text-start font-medium">
-                      <Link href={anchorHref(row)} className="hover:underline">
+                      <Link href={anchorHref(row.anchorType, row.anchorId)} className="hover:underline">
                         {bilingualName(
                           { nameEn: row.anchorNameEn, nameAr: row.anchorNameAr },
                           locale,
@@ -229,11 +230,4 @@ export default async function FollowUpsPage({
       )}
     </main>
   );
-}
-
-/** Where the row's own record lives. Every anchor type has a screen already. */
-function anchorHref(row: FollowUpRow): string {
-  if (row.anchorType === "quotation_thread") return `/quotations/${row.anchorId}`;
-  if (row.anchorType === "project") return `/projects/${row.anchorId}`;
-  return `/companies/${row.anchorId}`;
 }

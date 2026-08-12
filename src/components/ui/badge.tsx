@@ -19,6 +19,12 @@ const badgeVariants = cva(
         ghost:
           "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
         link: "text-primary underline-offset-4 hover:underline",
+        // `22 §1`'s accent pairs. These describe a TONE, never an outcome —
+        // `16 §5` forbids a success-coloured pill for `accepted`.
+        red: "bg-tone-red text-tone-red-fg",
+        blue: "bg-tone-blue text-tone-blue-fg",
+        amber: "bg-tone-amber text-tone-amber-fg",
+        green: "bg-tone-green text-tone-green-fg",
       },
     },
     defaultVariants: {

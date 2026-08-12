@@ -1,21 +1,12 @@
-import { getFormatter, getTranslations, setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { PageHeader } from "@/components/page-header";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
 import { coverage, coverageRepOptions } from "@/lib/coverage";
-import { bilingualName } from "@/lib/lookups";
 
+import { CoverageTable } from "../_components/coverage-table";
 import { ListPagination, SearchForm } from "../_components/list-controls";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +40,6 @@ export default async function CoveragePage({
 
   const session = await requireSession();
   const t = await getTranslations();
-  const format = await getFormatter();
 
   const currentPage = Number(page) || 1;
   const quietOnly = quiet === "1";
@@ -128,116 +118,22 @@ export default async function CoveragePage({
         ) : null}
       </nav>
 
-      {rows.length === 0 ? (
-        <p className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-          {q || rep || quietOnly
+      <CoverageTable
+        rows={rows}
+        locale={locale}
+        empty={
+          q || rep || quietOnly
             ? t("coverage.emptyFiltered")
-            : t("coverage.empty")}
-        </p>
-      ) : (
-        <>
-          <div className="overflow-x-auto rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-start">
-                    {t("coverage.fields.company")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("coverage.fields.reps")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("coverage.fields.lastInteraction")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("coverage.fields.daysSince")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("common.qualified")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("coverage.fields.status")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("common.actions")}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.companyId}>
-                    <TableCell className="text-start font-medium">
-                      <Link
-                        href={`/companies/${row.companyId}`}
-                        className="hover:underline"
-                      >
-                        {bilingualName(
-                          {
-                            nameEn: row.companyNameEn,
-                            nameAr: row.companyNameAr,
-                          },
-                          locale,
-                        )}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-start">
-                      {row.repNames.length > 0
-                        ? row.repNames.join(", ")
-                        : t("common.none")}
-                    </TableCell>
-                    <TableCell className="text-start" dir="ltr">
-                      {row.lastInteractionOn
-                        ? format.dateTime(
-                            new Date(`${row.lastInteractionOn}T00:00:00Z`),
-                            { dateStyle: "medium", timeZone: "UTC" },
-                          )
-                        : t("coverage.fields.never")}
-                    </TableCell>
-                    <TableCell className="text-start" dir="ltr">
-                      {/* Never logged is not zero days. */}
-                      {row.daysSince ?? t("common.none")}
-                    </TableCell>
-                    <TableCell className="text-start">
-                      {row.isQualified ? t("common.yes") : t("common.no")}
-                    </TableCell>
-                    <TableCell className="text-start">
-                      {row.onHoldUntil ? (
-                        <Badge variant="outline">
-                          {t("coverage.detail.onHoldUntil", {
-                            date: row.onHoldUntil,
-                          })}
-                        </Badge>
-                      ) : row.isQuiet ? (
-                        <Badge variant="destructive">
-                          {t("coverage.fields.quiet")}
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary">
-                          {t("coverage.fields.covered")}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-start">
-                      <Button asChild size="xs" variant="outline">
-                        <Link href={`/reports/new?companyId=${row.companyId}`}>
-                          {t("reports.new")}
-                        </Link>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+            : t("coverage.empty")
+        }
+      />
 
-          <ListPagination
-            basePath={basePath}
-            page={currentPage}
-            total={total}
-            query={q}
-          />
-        </>
-      )}
+      <ListPagination
+        basePath={basePath}
+        page={currentPage}
+        total={total}
+        query={q}
+      />
     </main>
   );
 }

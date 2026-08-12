@@ -3,20 +3,11 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
 import { can, requireSession } from "@/lib/authz";
 import { achievementForPeriod, currentPeriod, periodStart } from "@/lib/targets";
 
-import { setTargetAction } from "./actions";
-import { TargetRow } from "./target-row";
+import { AttainmentTable } from "../_components/attainment-table";
 
 export const dynamic = "force-dynamic";
 
@@ -72,88 +63,11 @@ export default async function TargetsPage({
         </Button>
       </form>
 
-      {rows.length === 0 ? (
-        <p className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-          {t("targets.empty")}
-        </p>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-start">
-                  {t("targets.fields.person")}
-                </TableHead>
-                <TableHead className="text-start">
-                  {t("targets.fields.targetSqm")}
-                </TableHead>
-                <TableHead className="text-start">
-                  {t("targets.fields.achievedSqm")}
-                </TableHead>
-                <TableHead className="text-start">
-                  {t("targets.fields.ofWhich")}
-                </TableHead>
-                <TableHead className="text-start">
-                  {t("targets.fields.progress")}
-                </TableHead>
-                {maySetTargets ? (
-                  <TableHead className="text-start">
-                    {t("common.actions")}
-                  </TableHead>
-                ) : null}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.userId}>
-                  <TableCell className="text-start font-medium">
-                    {row.userName}
-                  </TableCell>
-                  {/* Null is NOT zero `[07 D1]`: someone with no row is not
-                      measured this month, which a `0` would misreport. */}
-                  <TableCell className="text-start" dir="ltr">
-                    {row.targetSqm ?? (
-                      <span className="text-muted-foreground" dir="auto">
-                        {t("targets.fields.notMeasured")}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-start" dir="ltr">
-                    <Link
-                      href={`/dispatches?userId=${row.userId}`}
-                      className="hover:underline"
-                    >
-                      {row.achievedSqm}
-                    </Link>
-                  </TableCell>
-                  {/* `07 C6` — the direct route, countable. */}
-                  <TableCell className="text-start text-xs" dir="ltr">
-                    {t("targets.fields.linkedShort")} {row.linkedSqm}
-                    {" · "}
-                    {t("targets.fields.directShort")} {row.directSqm}
-                  </TableCell>
-                  <TableCell className="text-start" dir="ltr">
-                    {row.targetSqm
-                      ? `${Math.round(
-                          (Number(row.achievedSqm) / Number(row.targetSqm)) * 100,
-                        )}%`
-                      : t("common.none")}
-                  </TableCell>
-                  {maySetTargets ? (
-                    <TableCell className="text-start">
-                      <TargetRow
-                        action={setTargetAction.bind(null, row.userId)}
-                        period={period}
-                        currentSqm={row.targetSqm}
-                      />
-                    </TableCell>
-                  ) : null}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      <AttainmentTable
+        rows={rows}
+        period={period}
+        maySetTargets={maySetTargets}
+      />
 
       {/* `07 D2` — target progress and activity side by side, NEVER combined
           into one score. Since Phase 9 activity is real and derived `[20 §8]`,

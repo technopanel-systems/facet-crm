@@ -3,12 +3,32 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ──────────────────────────────────────────────────────────────────────
+   FACET design language — `docs/22-design-language.md`.
+
+   Warm black: every neutral carries a red undertone, not blue. Both
+   themes are designed, not inverted, and the rail is dark in both.
+   Dark is the default; the theme is a cookie read on the server, so
+   there is no flash and no inline script.
+
+   §1's tokens are mapped onto the SEMANTIC names shadcn already uses
+   (`--background`, `--card`, `--muted`…), which is why restyling six
+   shared components repaints thirty-six screens: the pages say
+   `bg-card` and `text-muted-foreground`, never a raw palette class.
+
+   The one deliberate divergence from `docs/design/facet-concept-v2.html`
+   is the name of the red: the concept calls it `--accent`, but shadcn
+   already owns that name for the muted hover background. Here the red
+   is `--brand`, and `--accent` keeps its shadcn meaning `[22 §1]`.
+   ────────────────────────────────────────────────────────────────────── */
+
 /* Latin text uses --font-latin, Arabic uses --font-arabic. Both are set on
    <html> by the locale layout, so `font-sans` resolves correctly per locale. */
 @theme inline {
   --font-sans: var(--font-app), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-mono-app), ui-monospace, monospace;
 
+  /* Semantic — what the 36 existing screens already say. */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -31,60 +51,150 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
+  /* `22 §1`'s own names, for new shell work. */
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-faint: var(--text-faint);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+
+  --color-rail: var(--rail);
+  --color-rail-text: var(--rail-text);
+  --color-rail-strong: var(--rail-text-strong);
+  --color-rail-active: var(--rail-active);
+
+  --color-tone-red: var(--a-red-bg);
+  --color-tone-red-fg: var(--a-red-fg);
+  --color-tone-blue: var(--a-blue-bg);
+  --color-tone-blue-fg: var(--a-blue-fg);
+  --color-tone-amber: var(--a-amber-bg);
+  --color-tone-amber-fg: var(--a-amber-fg);
+  --color-tone-green: var(--a-green-bg);
+  --color-tone-green-fg: var(--a-green-fg);
+
+  /* `--radius` is 10px and `rounded-xl` computes to 14px, so Card already
+     matches `22 §1`'s --radius-lg. Do not "fix" these. */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* Every number is mono with tabular figures `[22 §2]` — quantities, square
+   metres, money, references, dates, counts, percentages, durations. One
+   utility rather than two classes remembered separately. */
+@utility num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Light ────────────────────────────────────────────────────────────── */
 :root {
   --radius: 0.625rem;
 
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.596 0.145 163.225);
-  --success-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* Fixed, theme-independent `[22 §1]`. These are the colours that must not
+     move when the theme does — the rail is dark in BOTH themes, so anything
+     sitting on it needs a red that stays legible against #171311/#0E0C0B. */
+  --red-600: #c8102e;
+  --red-500: #e5233c;
+  --blue-600: #2b5ca8;
+  --amber-600: #b45309;
+  --green-600: #15803d;
+
+  --canvas: #f8f6f4;
+  --surface: #ffffff;
+  --surface-2: #faf8f6;
+  --line: #e8e3de;
+  --line-strong: #d6cfc9;
+  --text: #1a1614;
+  --text-muted: #6b615c;
+  --text-faint: #9a908a;
+
+  /* The rail is dark in BOTH themes: it recedes, it is not a surface. */
+  --rail: #171311;
+  --rail-text: #b5aba6;
+  --rail-text-strong: #ffffff;
+  --rail-active: #26201d;
+
+  --brand: #c8102e;
+  --brand-ink: #ffffff;
+
+  --a-red-bg: #fdf1f2;
+  --a-red-fg: #c8102e;
+  --a-blue-bg: #eef4fc;
+  --a-blue-fg: #2b5ca8;
+  --a-amber-bg: #fdf4e6;
+  --a-amber-fg: #b45309;
+  --a-green-bg: #eff9f1;
+  --a-green-fg: #15803d;
+
+  --shadow:
+    0 1px 2px rgba(26, 22, 20, 0.05), 0 6px 20px -12px rgba(26, 22, 20, 0.18);
+  --glow: 0 0 0 4px rgba(200, 16, 46, 0.1);
+
+  --background: var(--canvas);
+  --foreground: var(--text);
+  --card: var(--surface);
+  --card-foreground: var(--text);
+  --popover: var(--surface);
+  --popover-foreground: var(--text);
+  --primary: var(--brand);
+  --primary-foreground: var(--brand-ink);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--text);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--text-muted);
+  /* shadcn's --accent is the muted hover background, NOT the red `[22 §1]`. */
+  --accent: var(--surface-2);
+  --accent-foreground: var(--text);
+  /* Both Badge and Button render destructive as `bg-destructive/10
+     text-destructive` — a tint plus coloured text, never a solid fill — so
+     this is a foreground red, and the *-foreground pair is near-unused. */
+  --destructive: var(--a-red-fg);
+  --destructive-foreground: var(--brand-ink);
+  --success: var(--a-green-fg);
+  --success-foreground: var(--brand-ink);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--brand);
 }
 
+/* ── Dark (the default) ───────────────────────────────────────────────── */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.696 0.17 162.48);
-  --success-foreground: oklch(0.205 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --canvas: #151211;
+  --surface: #1d1a18;
+  --surface-2: #252120;
+  --line: #302b29;
+  --line-strong: #403a37;
+  --text: #f0ebe8;
+  --text-muted: #a29996;
+  --text-faint: #756c69;
+
+  /* Deeper than the canvas, so the rail reads as behind the page. */
+  --rail: #0e0c0b;
+  --rail-text: #918885;
+  --rail-text-strong: #fff8f5;
+  --rail-active: #211d1b;
+
+  /* #C8102E is the brand red and holds on white; on #151211 it is too dark
+     to read, so dark lifts it. Same colour, same job `[22 §1]`. */
+  --brand: #f2566b;
+  --brand-ink: #ffffff;
+
+  --a-red-bg: #2e1418;
+  --a-red-fg: #f98a98;
+  --a-blue-bg: #141f31;
+  --a-blue-fg: #7fadee;
+  --a-amber-bg: #2b1f0c;
+  --a-amber-fg: #e3a63e;
+  --a-green-bg: #0f2417;
+  --a-green-fg: #57c57e;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --glow: 0 0 0 4px rgba(242, 86, 107, 0.14);
 }
 
 @layer base {

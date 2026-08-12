@@ -99,9 +99,9 @@ export function SelectField({
       aria-invalid={invalid || undefined}
       aria-describedby={invalid ? `${name}-error` : undefined}
       className={cn(
-        "border-input bg-background text-foreground h-9 w-full rounded-md border",
+        "border-input bg-background text-foreground h-8 w-full rounded-lg border",
         "ps-3 pe-8 text-start text-sm shadow-xs outline-none",
-        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3",
         "aria-invalid:border-destructive aria-invalid:ring-destructive/20",
         "disabled:cursor-not-allowed disabled:opacity-50",
       )}

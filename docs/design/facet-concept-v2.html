@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FACET — concept v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* ════════════════════════════════════════════════════════════
+   TOKENS — v2
+   Dark is now the primary theme and the black is WARM: every
+   neutral carries a trace of red, so it reads as ink rather than
+   as slate. Light mode is the same palette turned up.
+   ════════════════════════════════════════════════════════════ */
+:root{
+  --red-600:#C8102E; --red-500:#E5233C;
+  --blue-600:#2B5CA8;
+  --amber-600:#B45309;
+  --green-600:#15803D;
+  --radius:10px; --radius-lg:14px;
+  --font:'IBM Plex Sans',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',monospace;
+  --ease:cubic-bezier(.2,.7,.3,1);
+}
+html[lang="ar"]{ --font:'IBM Plex Sans Arabic','IBM Plex Sans',sans-serif; }
+
+html[data-theme="dark"]{
+  --canvas:#151211;          /* warm near-black, red undertone */
+  --surface:#1D1A18;
+  --surface-2:#252120;
+  --line:#302B29;
+  --line-strong:#403A37;
+  --text:#F0EBE8;
+  --text-muted:#A29996;
+  --text-faint:#756C69;
+  --rail:#0E0C0B;            /* deeper than canvas: the rail recedes */
+  --rail-text:#918885;
+  --rail-text-strong:#FFF8F5;
+  --rail-active:#211D1B;
+  --accent:#F2566B;
+  --accent-ink:#FFF;
+  --a-red-bg:#2E1418; --a-red-fg:#F98A98;
+  --a-blue-bg:#141F31; --a-blue-fg:#7FADEE;
+  --a-amber-bg:#2B1F0C; --a-amber-fg:#E3A63E;
+  --a-green-bg:#0F2417; --a-green-fg:#57C57E;
+  --shadow:0 1px 2px rgba(0,0,0,.5);
+  --glow:0 0 0 4px rgba(242,86,107,.14);
+}
+html[data-theme="light"]{
+  --canvas:#F8F6F4;
+  --surface:#FFFFFF;
+  --surface-2:#FAF8F6;
+  --line:#E8E3DE;
+  --line-strong:#D6CFC9;
+  --text:#1A1614;
+  --text-muted:#6B615C;
+  --text-faint:#9A908A;
+  --rail:#171311;
+  --rail-text:#B5ABA6;
+  --rail-text-strong:#FFFFFF;
+  --rail-active:#26201D;
+  --accent:#C8102E;
+  --accent-ink:#FFF;
+  --a-red-bg:#FDF1F2; --a-red-fg:#C8102E;
+  --a-blue-bg:#EEF4FC; --a-blue-fg:#2B5CA8;
+  --a-amber-bg:#FDF4E6; --a-amber-fg:#B45309;
+  --a-green-bg:#EFF9F1; --a-green-fg:#15803D;
+  --shadow:0 1px 2px rgba(26,22,20,.05),0 6px 20px -12px rgba(26,22,20,.18);
+  --glow:0 0 0 4px rgba(200,16,46,.1);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--canvas);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;transition:background .3s var(--ease),color .3s var(--ease)}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+.app{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
+@media (max-width:900px){.app{grid-template-columns:1fr}.rail{display:none}}
+
+/* ════════ RAIL ════════ */
+.rail{background:var(--rail);display:flex;flex-direction:column;padding:18px 12px;gap:3px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 8px 18px}
+.mark{width:30px;height:30px;border-radius:8px;background:linear-gradient(140deg,var(--red-500),#7A1020);display:grid;place-items:center;flex:none;box-shadow:0 2px 8px rgba(229,35,60,.25)}
+.mark span{color:#fff;font-weight:700;font-size:14px;letter-spacing:-.02em}
+.brand b{color:var(--rail-text-strong);font-size:14.5px;font-weight:600;letter-spacing:-.01em;display:block}
+.brand small{color:var(--rail-text);font-size:11px;opacity:.7}
+.rail-group{color:var(--rail-text);opacity:.45;font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:16px 10px 6px}
+.nav{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;color:var(--rail-text);font-size:13.5px;font-weight:500;transition:background .15s,color .15s}
+.nav:hover{background:var(--rail-active);color:var(--rail-text-strong)}
+.nav[aria-current]{background:var(--rail-active);color:var(--rail-text-strong)}
+.nav[aria-current] .ic{color:var(--red-500)}
+.ic{width:17px;height:17px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+.nav .count{margin-inline-start:auto;font-size:11px;font-weight:600;background:var(--red-600);color:#fff;border-radius:20px;padding:1px 6px;min-width:19px;text-align:center}
+.me{margin-top:auto;border-top:1px solid rgba(255,255,255,.06);padding-top:14px;display:flex;align-items:center;gap:10px}
+.av{width:32px;height:32px;border-radius:50%;background:linear-gradient(140deg,#8A3244,#4A1622);display:grid;place-items:center;color:#fff;font-weight:600;font-size:12.5px;flex:none}
+.av.sm{width:22px;height:22px;font-size:10px}
+.av.blue{background:linear-gradient(140deg,#31527F,#1B2F4C)}
+.me b{color:var(--rail-text-strong);font-size:13px;font-weight:600;display:block;line-height:1.3}
+.me small{color:var(--rail-text);font-size:11px;opacity:.8}
+
+/* ════════ TOP ════════ */
+.main{display:flex;flex-direction:column;min-width:0}
+.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--canvas) 86%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);padding:11px 26px;display:flex;align-items:center;gap:12px}
+.search{flex:1;max-width:420px;display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:8px 12px;color:var(--text-faint);font-size:13px}
+.search:hover{border-color:var(--line-strong)}
+.kbd{margin-inline-start:auto;font-family:var(--mono);font-size:10.5px;border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+.tbtn{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;color:var(--text-muted);border:1px solid transparent;position:relative}
+.tbtn:hover{background:var(--surface);border-color:var(--line);color:var(--text)}
+.dot{position:absolute;top:6px;inset-inline-end:7px;width:7px;height:7px;border-radius:50%;background:var(--accent);border:2px solid var(--canvas)}
+.add{background:var(--accent);color:var(--accent-ink);border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px;transition:transform .12s var(--ease),filter .15s}
+.add:hover{filter:brightness(1.09)}.add:active{transform:scale(.97)}
+.seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px}
+.seg button{font-size:12px;font-weight:600;padding:4px 9px;border-radius:6px;color:var(--text-faint)}
+.seg button[aria-pressed="true"]{background:var(--surface-2);color:var(--text)}
+
+/* ════════ PAGE ════════ */
+.page{padding:22px 26px 40px;max-width:1320px;width:100%}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:22px}
+.tab{font-size:13.5px;font-weight:600;padding:9px 14px;color:var(--text-faint);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
+.view{display:none}.view.on{display:block;animation:in .3s var(--ease)}
+@keyframes in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:20px;flex-wrap:wrap}
+h1{font-size:25px;font-weight:600;letter-spacing:-.025em;line-height:1.15}
+.sub{color:var(--text-muted);font-size:13px;margin-top:3px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:var(--shadow)}
+.card-h{padding:15px 18px 0;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.card-h h2{font-size:14px;font-weight:600;letter-spacing:-.01em}
+.card-h .note{font-size:12px;color:var(--text-faint)}
+.link{font-size:12.5px;font-weight:600;color:var(--a-blue-fg)}
+
+/* signature: target as panel area */
+.target{padding:20px 22px 22px;margin-bottom:16px}
+.target-top{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:15px}
+.label{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint)}
+.big{font-family:var(--mono);font-size:34px;font-weight:600;letter-spacing:-.035em;line-height:1;font-variant-numeric:tabular-nums}
+.big em{font-style:normal;font-size:15px;color:var(--text-muted);font-family:var(--font);font-weight:500;margin-inline-start:5px}
+.of{font-size:13px;color:var(--text-muted);font-family:var(--mono);font-variant-numeric:tabular-nums}
+.panels{height:34px;border-radius:7px;background:var(--surface-2);border:1px solid var(--line);overflow:hidden;position:relative;display:flex}
+.panels .fill{height:100%;width:0;transition:width 1.2s var(--ease);
+  background:repeating-linear-gradient(90deg,transparent 0 27px,rgba(255,255,255,.22) 27px 28px),
+             linear-gradient(90deg,var(--red-600),#D8452C 55%,#C97A17)}
+.legend{display:flex;justify-content:space-between;margin-top:7px;font-size:11px;color:var(--text-faint);font-family:var(--mono)}
+.pace{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--a-amber-fg);background:var(--a-amber-bg);border-radius:20px;padding:4px 11px}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:12px;margin-bottom:16px}
+.kpi{padding:15px 16px;text-align:start;display:block;width:100%;transition:transform .14s var(--ease),border-color .15s}
+.kpi:hover{transform:translateY(-2px);border-color:var(--line-strong)}
+.tag{font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;border-radius:5px;padding:2.5px 7px;display:inline-block}
+.t-red{background:var(--a-red-bg);color:var(--a-red-fg)}
+.t-blue{background:var(--a-blue-bg);color:var(--a-blue-fg)}
+.t-amber{background:var(--a-amber-bg);color:var(--a-amber-fg)}
+.t-green{background:var(--a-green-bg);color:var(--a-green-fg)}
+.kpi .n{font-family:var(--mono);font-size:26px;font-weight:600;letter-spacing:-.03em;margin:9px 0 2px;font-variant-numeric:tabular-nums}
+.kpi .c{font-size:12px;color:var(--text-muted)}
+
+.cols{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;align-items:start}
+@media (max-width:1040px){.cols{grid-template-columns:1fr}}
+.rows{padding:6px 0 8px}
+.row{display:flex;align-items:center;gap:12px;padding:11px 18px;border-top:1px solid var(--line);transition:background .13s}
+.row:first-child{border-top:none}
+.row:hover{background:var(--surface-2)}
+.pin{width:3px;align-self:stretch;border-radius:3px;flex:none;margin-inline-start:-6px}
+.p-red{background:var(--accent)}.p-amber{background:var(--a-amber-fg)}.p-blue{background:var(--a-blue-fg)}
+.row .body{min-width:0;flex:1}
+.row .t{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .m{font-size:12px;color:var(--text-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.when{font-size:11.5px;font-weight:600;font-family:var(--mono);white-space:nowrap;flex:none}
+.late{color:var(--a-red-fg)}.soon{color:var(--a-amber-fg)}.okc{color:var(--text-faint)}
+.act{font-size:11.5px;font-weight:600;border:1px solid var(--line-strong);border-radius:7px;padding:4px 10px;flex:none;color:var(--text-muted);transition:.14s}
+.act:hover{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.pill{font-size:11px;font-weight:600;border-radius:20px;padding:2px 9px;white-space:nowrap;flex:none}
+.s-lead{background:var(--surface-2);color:var(--text-muted);border:1px solid var(--line)}
+.s-cat{background:var(--a-blue-bg);color:var(--a-blue-fg)}
+.s-quo{background:var(--a-amber-bg);color:var(--a-amber-fg)}
+
+.tl{padding:14px 18px 18px}
+.ev{display:grid;grid-template-columns:24px 1fr;gap:11px;padding-bottom:15px;position:relative}
+.ev:not(:last-child)::before{content:"";position:absolute;inset-inline-start:11px;top:22px;bottom:0;width:1.5px;background:var(--line)}
+.ev .d{width:23px;height:23px;border-radius:50%;display:grid;place-items:center;font-size:11px;flex:none;z-index:1;border:1px solid var(--line);background:var(--surface-2)}
+.ev.auto .d{background:var(--a-blue-bg);border-color:transparent;color:var(--a-blue-fg)}
+.ev.human .d{background:var(--a-red-bg);border-color:transparent;color:var(--a-red-fg)}
+.ev .txt{font-size:13px;line-height:1.45}
+.ev .txt b{font-weight:600}
+.ev .meta{font-size:11.5px;color:var(--text-faint);margin-top:2px}
+.ev .quote{font-size:12.5px;color:var(--text-muted);background:var(--surface-2);border-inline-start:2px solid var(--line-strong);border-radius:0 6px 6px 0;padding:6px 10px;margin-top:6px}
+html[dir="rtl"] .ev .quote{border-radius:6px 0 0 6px}
+.foot{padding:11px 18px;border-top:1px solid var(--line);font-size:12px;color:var(--text-faint);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+
+/* ════════ THE CHAIN — the workflow explainer ════════ */
+.deal-h{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:18px}
+.ref{font-family:var(--mono);font-size:12px;color:var(--text-faint);letter-spacing:.02em}
+.chain-card{padding:20px 22px 8px;margin-bottom:16px}
+.turn{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;background:var(--a-amber-bg);margin-bottom:22px}
+.turn .who{width:34px;height:34px;border-radius:50%;background:linear-gradient(140deg,#31527F,#1B2F4C);display:grid;place-items:center;color:#fff;font-weight:600;font-size:12.5px;flex:none}
+.turn .l1{font-size:13.5px;font-weight:600;color:var(--a-amber-fg)}
+.turn .l2{font-size:12.5px;color:var(--text-muted);margin-top:1px}
+
+.chain{display:flex;list-style:none;margin:0 0 6px;padding:0}
+.step{flex:1;position:relative;text-align:center;padding-top:26px;min-width:0}
+.step::before{content:"";position:absolute;top:9px;inset-inline-start:-50%;width:100%;height:2px;background:var(--line);border-radius:2px}
+.step:first-child::before{display:none}
+.step.done::before{background:var(--accent)}
+.step .node{position:absolute;top:2px;inset-inline-start:50%;transform:translateX(-50%);width:17px;height:17px;border-radius:50%;background:var(--surface);border:2px solid var(--line-strong);z-index:2;display:grid;place-items:center}
+html[dir="rtl"] .step .node{transform:translateX(50%)}
+.step.done .node{background:var(--accent);border-color:var(--accent)}
+.step.done .node::after{content:"";width:5px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:translateY(-1px) rotate(45deg)}
+.step.now .node{background:var(--surface);border-color:var(--a-amber-fg);box-shadow:0 0 0 4px var(--a-amber-bg);animation:pulse 2.4s var(--ease) infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 4px var(--a-amber-bg)}50%{box-shadow:0 0 0 8px transparent}}
+.step .nm{font-size:12px;font-weight:600;letter-spacing:-.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px}
+.step.todo .nm{color:var(--text-faint);font-weight:500}
+.step.now .nm{color:var(--a-amber-fg)}
+.step .by{font-size:11px;color:var(--text-faint);margin-top:2px}
+.step .dt{font-family:var(--mono);font-size:10.5px;color:var(--text-faint);margin-top:1px}
+.step.now .dt{color:var(--a-amber-fg);font-weight:600}
+.explain{border-top:1px solid var(--line);margin-top:18px;padding:14px 0 12px;font-size:12.5px;color:var(--text-muted);line-height:1.6}
+.explain b{color:var(--text);font-weight:600}
+
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0;border-top:1px solid var(--line)}
+.fact{padding:13px 18px;border-inline-end:1px solid var(--line)}
+.fact:last-child{border-inline-end:none}
+.fact .k{font-size:11px;color:var(--text-faint);margin-bottom:3px}
+.fact .v{font-size:14px;font-weight:600;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.lines{width:100%;border-collapse:collapse;font-size:13px}
+.lines th{text-align:start;font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);padding:10px 18px;border-bottom:1px solid var(--line)}
+.lines td{padding:12px 18px;border-bottom:1px solid var(--line)}
+.lines tr:last-child td{border-bottom:none}
+.lines .num{font-family:var(--mono);text-align:end;font-variant-numeric:tabular-nums}
+.code{font-family:var(--mono);font-size:12.5px;font-weight:600}
+.hint{margin-top:24px;font-size:12px;color:var(--text-faint);text-align:center;line-height:1.8}
+</style>
+</head>
+<body>
+<div class="app">
+
+<aside class="rail">
+  <div class="brand">
+    <div class="mark"><span>T</span></div>
+    <div><b data-t="brand">Technopanel</b><small data-t="brandsub">Operations</small></div>
+  </div>
+  <a class="nav" href="#" aria-current="page"><svg class="ic" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/></svg><span data-t="n1">Today</span><span class="count">7</span></a>
+  <div class="rail-group" data-t="g1">Sell</div>
+  <a class="nav" href="#"><svg class="ic" viewBox="0 0 24 24"><path d="M4 20V7l7-3 7 3v13"/><path d="M9 20v-5h4v5"/></svg><span data-t="n2">Companies</span></a>
+  <a class="nav" href="#"><svg class="ic" viewBox="0 0 24 24"><path d="M3 7h7l2 2h9v11H3z"/></svg><span data-t="n3">Projects</span></a>
+  <a class="nav" href="#"><svg class="ic" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h5"/></svg><span data-t="n4">Quotations</span><span class="count">3</span></a>
+  <a class="nav" href="#"><svg class="ic" viewBox="0 0 24 24"><path d="M2 8h11v9H2z"/><path d="M13 11h4l4 3v3h-8z"/><circle cx="6" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/></svg><span data-t="n5">Dispatches</span></a>
+  <div class="rail-group" data-t="g2">Track</div>
+  <a class="nav" href="#"><svg class="ic" viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg><span data-t="n6">Performance</span></a>
+  <a class="nav" href="#"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M17 11h5M19.5 8.5v5"/></svg><span data-t="n7">Team</span></a>
+  <div class="me">
+    <div class="av">AA</div>
+    <div><b data-t="me">Ahmed Alzaben</b><small data-t="role">Sales rep · Riyadh</small></div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="top">
+    <div class="search">
+      <svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <span data-t="search">Search companies, projects, quotations…</span><span class="kbd">⌘K</span>
+    </div>
+    <button class="add"><svg class="ic" viewBox="0 0 24 24" style="stroke-width:2.2"><path d="M12 5v14M5 12h14"/></svg><span data-t="new">New</span></button>
+    <button class="tbtn" aria-label="Notifications"><svg class="ic" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="dot"></span></button>
+    <div class="seg"><button id="en" aria-pressed="true">EN</button><button id="ar" aria-pressed="false">ع</button></div>
+    <button class="tbtn" id="theme" aria-label="Theme"><svg class="ic" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5"/></svg></button>
+  </div>
+
+  <div class="page">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-v="today" data-t="tab1">Today</button>
+      <button class="tab" role="tab" aria-selected="false" data-v="deal" data-t="tab2">A deal, end to end</button>
+    </div>
+
+    <!-- ══════════════ TODAY ══════════════ -->
+    <section class="view on" id="v-today">
+      <div class="head">
+        <div><h1 data-t="hi">Morning, Ahmed</h1>
+          <div class="sub" data-t="hisub">Sunday, 16 August · 7 things need you today</div></div>
+        <div class="pace" data-t="pace">◷ 4 days behind pace</div>
+      </div>
+
+      <div class="card target">
+        <div class="target-top">
+          <div><div class="label" data-t="tlabel">August target · dispatched</div>
+            <div class="big">2,840<em>m²</em></div></div>
+          <div style="text-align:end">
+            <div class="of"><span data-t="of">of</span> 4,000 m²</div>
+            <div class="of" style="color:var(--text-faint)" data-t="rem">1,160 m² left · 12 working days</div>
+          </div>
+        </div>
+        <div class="panels"><div class="fill" id="fill"></div></div>
+        <div class="legend"><span>0</span><span data-t="pct">71%</span><span>4,000 m²</span></div>
+      </div>
+
+      <div class="kpis">
+        <button class="card kpi"><span class="tag t-red" data-t="k1">Overdue</span><div class="n">4</div><div class="c" data-t="k1c">Follow-ups past due</div></button>
+        <button class="card kpi"><span class="tag t-amber" data-t="k2">Waiting</span><div class="n">3</div><div class="c" data-t="k2c">Quotations with no reply</div></button>
+        <button class="card kpi"><span class="tag t-blue" data-t="k3">Pipeline</span><div class="n">11</div><div class="c" data-t="k3c">Active projects · 6,240 m²</div></button>
+        <button class="card kpi"><span class="tag t-green" data-t="k4">Quiet</span><div class="n">9</div><div class="c" data-t="k4c">Companies not contacted 30d</div></button>
+      </div>
+
+      <div class="cols">
+        <div class="card">
+          <div class="card-h"><h2 data-t="todo">What needs you today</h2><a class="link" href="#" data-t="all">See all 7</a></div>
+          <div class="rows">
+            <div class="row"><div class="pin p-red"></div><div class="body">
+              <div class="t">مؤسسة فاينال فير</div><div class="m" data-t="r1">Quotation 9592 · waiting on Rawan for signatures</div></div>
+              <span class="pill s-quo" data-t="pq">Issued</span><span class="when late" data-t="d1">4d</span><button class="act" data-t="chase">Chase</button></div>
+            <div class="row"><div class="pin p-red"></div><div class="body">
+              <div class="t">ALIOZ ALUMINUM</div><div class="m" data-t="r2">Catalogue sent · no answer</div></div>
+              <span class="pill s-cat" data-t="pc">Catalogue</span><span class="when late" data-t="d2">14d</span><button class="act" data-t="log2">Log</button></div>
+            <div class="row"><div class="pin p-amber"></div><div class="body">
+              <div class="t">مجمع سنابل التجاري</div><div class="m" data-t="r3">Samples requested — 2,496 m² · Jeddah</div></div>
+              <span class="pill s-quo" data-t="pq2">Quoted</span><span class="when soon" data-t="d3">today</span><button class="act" data-t="log3">Log</button></div>
+            <div class="row"><div class="pin p-amber"></div><div class="body">
+              <div class="t">شركة عصر المعرفة للمقاولات</div><div class="m" data-t="r4">Nothing recorded for 23 days</div></div>
+              <span class="pill s-lead" data-t="pl">New lead</span><span class="when soon" data-t="d4">today</span><button class="act" data-t="log4">Log</button></div>
+            <div class="row"><div class="pin p-blue"></div><div class="body">
+              <div class="t">واجهات فنون الواحة</div><div class="m" data-t="r5">Rawan returned the quotation for edits</div></div>
+              <span class="pill s-lead" data-t="pe">Your turn</span><span class="when okc" data-t="d5">2d</span><button class="act" data-t="open">Open</button></div>
+          </div>
+          <div class="foot"><span data-t="foot1">Sorted by how long it has waited</span><span data-t="foot2">Nothing here is hidden by a filter</span></div>
+        </div>
+
+        <div class="card">
+          <div class="card-h"><h2 data-t="actt">مؤسسة فاينال فير</h2><span class="note" data-t="actn">Everything, one thread</span></div>
+          <div class="tl">
+            <div class="ev auto"><div class="d">◈</div><div><div class="txt"><b data-t="e1">Dispatched 1,196 m²</b></div><div class="meta" data-t="e1m">Rawan · 11 Aug · against 9592</div></div></div>
+            <div class="ev auto"><div class="d">✓</div><div><div class="txt"><b data-t="e2">Payment confirmed</b></div><div class="meta" data-t="e2m">Ahmed · 9 Aug</div></div></div>
+            <div class="ev human"><div class="d">◍</div><div><div class="txt" data-t="e3">Visit — asked for a quotation</div><div class="meta" data-t="e3m">Ahmed · 7 Aug · with م. إسلام</div>
+              <div class="quote" data-t="e3q">"Wants A2 for the tower facade. Said Alucobond quoted 8% under us — worth checking before we price."</div></div></div>
+            <div class="ev auto"><div class="d">◇</div><div><div class="txt"><b data-t="e4">Quotation 9592 issued</b> — 100.7 m²</div><div class="meta" data-t="e4m">Rawan · 6 Aug · N- A B1 168, 4 mm</div></div></div>
+            <div class="ev human"><div class="d">◍</div><div><div class="txt" data-t="e5">Call — catalogue sent</div><div class="meta" data-t="e5m">Ahmed · 2 Aug</div></div></div>
+          </div>
+          <div class="foot"><span data-t="foot3">◍ logged by a person · ◈ ◇ ✓ recorded by the system</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ THE DEAL ══════════════ -->
+    <section class="view" id="v-deal">
+      <div class="deal-h">
+        <div>
+          <h1>مؤسسة فاينال فير</h1>
+          <div class="sub"><span data-t="dsub">Tower facade · Riyadh · 2,496 m² expected</span> · <span class="ref">SMAC 9592</span></div>
+        </div>
+        <div class="pace" data-t="stall">◷ Stalled 4 days</div>
+      </div>
+
+      <div class="card chain-card">
+        <div class="turn">
+          <div class="who">R</div>
+          <div>
+            <div class="l1" data-t="turn1">Waiting on Rawan — signatures</div>
+            <div class="l2" data-t="turn2">Sitting here since 6 August. Nothing for you to do until she sends it back.</div>
+          </div>
+        </div>
+
+        <ol class="chain">
+          <li class="step done"><span class="node"></span><div class="nm" data-t="s1">Requested</div><div class="by" data-t="s1b">Ahmed</div><div class="dt">6 Aug</div></li>
+          <li class="step done"><span class="node"></span><div class="nm" data-t="s2">Issued in SMAC</div><div class="by" data-t="s2b">Rawan</div><div class="dt">6 Aug</div></li>
+          <li class="step now"><span class="node"></span><div class="nm" data-t="s3">Signed</div><div class="by" data-t="s3b">Rawan</div><div class="dt" data-t="s3d">4 days</div></li>
+          <li class="step todo"><span class="node"></span><div class="nm" data-t="s4">Accepted</div><div class="by" data-t="s4b">Rawan</div><div class="dt">—</div></li>
+          <li class="step todo"><span class="node"></span><div class="nm" data-t="s5">Paid</div><div class="by" data-t="s5b">Ahmed</div><div class="dt">—</div></li>
+          <li class="step todo"><span class="node"></span><div class="nm" data-t="s6">Dispatched</div><div class="by" data-t="s6b">Rawan</div><div class="dt">—</div></li>
+        </ol>
+
+        <div class="explain" data-t="explain">
+          <b>How this works.</b> You raise the request; Rawan builds the real quotation in SMAC and gets it signed, then accepts it here and sends you the PDF. When the customer pays, you tick <b>Paid</b> — that is what unlocks dispatch. Rawan records what actually left the warehouse, and <b>only that</b> counts toward your target.
+        </div>
+      </div>
+
+      <div class="cols">
+        <div class="card">
+          <div class="card-h"><h2 data-t="lines">What was quoted</h2><span class="note" data-t="linesn">Mirrors SMAC 9592 · v1</span></div>
+          <table class="lines">
+            <thead><tr><th data-t="th1">Product</th><th class="num" data-t="th2">Pcs</th><th class="num" data-t="th3">m²</th><th class="num" data-t="th4">SAR/m²</th><th class="num" data-t="th5">Total</th></tr></thead>
+            <tbody>
+              <tr><td><div class="code">N- CA FR 168</div><div style="font-size:11.5px;color:var(--text-faint)">4 mm · 1.24 × 5.80</div></td>
+                  <td class="num">12</td><td class="num">86.3040</td><td class="num">83.00</td><td class="num">7,163.23</td></tr>
+              <tr><td><div class="code">N- CA FR 375</div><div style="font-size:11.5px;color:var(--text-faint)">4 mm · 1.24 × 5.80</div></td>
+                  <td class="num">2</td><td class="num">14.3840</td><td class="num">105.00</td><td class="num">1,510.32</td></tr>
+            </tbody>
+          </table>
+          <div class="facts">
+            <div class="fact"><div class="k" data-t="f1">Total m²</div><div class="v">100.688</div></div>
+            <div class="fact"><div class="k" data-t="f2">Before VAT</div><div class="v">8,673.55</div></div>
+            <div class="fact"><div class="k" data-t="f3">VAT 15%</div><div class="v">1,301.03</div></div>
+            <div class="fact"><div class="k" data-t="f4">Total SAR</div><div class="v" style="color:var(--a-green-fg)">9,974.58</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-h"><h2 data-t="whatsaid">What the customer said</h2><span class="note" data-t="whatsaidn">From your own reports</span></div>
+          <div class="rows">
+            <div class="row"><div class="pin p-red"></div><div class="body">
+              <div class="t" data-t="sig1">Competitor cheaper — Alucobond</div>
+              <div class="m" data-t="sig1m">7 Aug · visit · 8% under our price</div></div></div>
+            <div class="row"><div class="pin p-amber"></div><div class="body">
+              <div class="t" data-t="sig2">Specification we do not offer — A2</div>
+              <div class="m" data-t="sig2m">7 Aug · visit · wanted for the facade</div></div></div>
+          </div>
+          <div class="foot"><span data-t="sigf">These roll up across every deal — 9 companies cited price this quarter, 6 of them naming the same competitor.</span></div>
+        </div>
+      </div>
+
+      <p class="hint" data-t="hint">Concept only — nothing is wired up. Try <b>EN / ع</b> and the theme toggle.</p>
+    </section>
+  </div>
+</div>
+</div>
+
+<script>
+const AR={
+ brand:"تكنوبانل",brandsub:"العمليات",n1:"اليوم",g1:"البيع",n2:"الشركات",n3:"المشاريع",n4:"عروض الأسعار",n5:"التسليمات",g2:"المتابعة",n6:"الأداء",n7:"الفريق",
+ me:"أحمد الزعبن",role:"مندوب مبيعات · الرياض",search:"ابحث في الشركات والمشاريع وعروض الأسعار…",new:"إضافة",
+ tab1:"اليوم",tab2:"صفقة من البداية للنهاية",
+ hi:"صباح الخير يا أحمد",hisub:"الأحد ١٦ أغسطس · ٧ أمور تحتاج إليك اليوم",pace:"◷ متأخر ٤ أيام عن المعدل",
+ tlabel:"هدف أغسطس · المُسلَّم",of:"من",rem:"باقي ١٬١٦٠ م² · ١٢ يوم عمل",pct:"٧١٪",
+ k1:"متأخر",k1c:"متابعات فات موعدها",k2:"بانتظار الرد",k2c:"عروض أسعار بلا رد",
+ k3:"قيد العمل",k3c:"١١ مشروعاً · ٦٬٢٤٠ م²",k4:"ساكن",k4c:"شركات بلا تواصل ٣٠ يوماً",
+ todo:"ما يحتاج إليك اليوم",all:"عرض الكل (٧)",
+ r1:"عرض سعر ٩٥٩٢ · بانتظار توقيعات روان",pq:"صادر",d1:"٤ أيام",chase:"تذكير",
+ r2:"أُرسل الكتالوج · بلا رد",pc:"كتالوج",d2:"١٤ يوماً",log2:"تسجيل",
+ r3:"طلب عينات — ٢٬٤٩٦ م² · جدة",pq2:"مُسعَّر",d3:"اليوم",log3:"تسجيل",
+ r4:"لا شيء مسجَّل منذ ٢٣ يوماً",pl:"عميل جديد",d4:"اليوم",log4:"تسجيل",
+ r5:"أعادت روان عرض السعر للتعديل",pe:"دورك",d5:"يومان",open:"فتح",
+ foot1:"مرتَّب حسب مدة الانتظار",foot2:"لا شيء مخفي هنا بفلتر",
+ actt:"مؤسسة فاينال فير",actn:"كل شيء في خيط واحد",
+ e1:"تم تسليم ١٬١٩٦ م²",e1m:"روان · ١١ أغسطس · مقابل ٩٥٩٢",e2:"تأكيد الدفع",e2m:"أحمد · ٩ أغسطس",
+ e3:"زيارة — طلب عرض سعر",e3m:"أحمد · ٧ أغسطس · مع م. إسلام",
+ e3q:"«يريد A2 لواجهة البرج. قال إن ألوكوبوند سعّرت أقل بـ ٨٪ — يستحق المراجعة قبل التسعير.»",
+ e4:"صدر عرض السعر ٩٥٩٢",e4m:"روان · ٦ أغسطس · N- A B1 168، ٤ مم",e5:"اتصال — أُرسل الكتالوج",e5m:"أحمد · ٢ أغسطس",
+ foot3:"◍ سجّلها شخص · ◈ ◇ ✓ سجّلها النظام",
+ dsub:"واجهة برج · الرياض · ٢٬٤٩٦ م² متوقعة",stall:"◷ متوقف ٤ أيام",
+ turn1:"بانتظار روان — التوقيعات",turn2:"واقف هنا منذ ٦ أغسطس. لا شيء عليك حتى تعيده إليك.",
+ s1:"طُلب",s1b:"أحمد",s2:"صدر في سماك",s2b:"روان",s3:"التوقيع",s3b:"روان",s3d:"٤ أيام",
+ s4:"مقبول",s4b:"روان",s5:"مدفوع",s5b:"أحمد",s6:"مُسلَّم",s6b:"روان",
+ explain:"<b>كيف تسير الأمور.</b> أنت ترفع الطلب؛ تبني روان عرض السعر الفعلي في سماك وتحصل على التوقيعات، ثم تقبله هنا وترسل لك الملف. وعندما يدفع العميل تضع علامة <b>مدفوع</b> — وهذا ما يفتح التسليم. تسجّل روان ما خرج فعلاً من المستودع، و<b>هذا وحده</b> يُحتسب لهدفك.",
+ lines:"ما تم تسعيره",linesn:"مطابق لسماك ٩٥٩٢ · نسخة ١",
+ th1:"المنتج",th2:"عدد",th3:"م²",th4:"ريال/م²",th5:"الإجمالي",
+ f1:"إجمالي م²",f2:"قبل الضريبة",f3:"ضريبة ١٥٪",f4:"الإجمالي بالريال",
+ whatsaid:"ما قاله العميل",whatsaidn:"من تقاريرك أنت",
+ sig1:"منافس أرخص — ألوكوبوند",sig1m:"٧ أغسطس · زيارة · أقل بـ ٨٪ من سعرنا",
+ sig2:"مواصفة لا نوفرها — A2",sig2m:"٧ أغسطس · زيارة · مطلوبة للواجهة",
+ sigf:"هذه تتجمّع عبر كل الصفقات — ٩ شركات ذكرت السعر هذا الربع، ٦ منها سمّت المنافس نفسه.",
+ hint:"نموذج تصميمي فقط — لا شيء موصول. جرّب <b>EN / ع</b> وزر المظهر."
+};
+const EN={};document.querySelectorAll('[data-t]').forEach(el=>EN[el.dataset.t]=el.innerHTML);
+function setLang(l){const h=document.documentElement,m=l==='ar'?AR:EN;
+  h.lang=l;h.dir=l==='ar'?'rtl':'ltr';
+  document.querySelectorAll('[data-t]').forEach(el=>{if(m[el.dataset.t])el.innerHTML=m[el.dataset.t];});
+  en.setAttribute('aria-pressed',l==='en');ar.setAttribute('aria-pressed',l==='ar');}
+en.onclick=()=>setLang('en');ar.onclick=()=>setLang('ar');
+theme.onclick=()=>{const h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark';};
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected',x===t));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+t.dataset.v));
+});
+requestAnimationFrame(()=>setTimeout(()=>fill.style.width='71%',140));
+</script>
+</body>
+</html>

@@ -12,6 +12,7 @@ import {
   type NotificationRow,
 } from "@/lib/notifications";
 
+import { anchorHref } from "../_components/anchors";
 import { ListPagination } from "../_components/list-controls";
 import { markAllReadAction, markReadAction } from "./actions";
 import { MarkReadButton } from "./mark-read-button";
@@ -173,7 +174,7 @@ function NotificationEntry({
       {row.anchorId ? (
         row.anchorViewable ? (
           <Link
-            href={anchorHref(row)}
+            href={anchorHref(row.anchorType ?? "company", row.anchorId ?? "")}
             className="text-start text-sm hover:underline"
           >
             {row.anchorLabel ?? t("common.view")}
@@ -245,13 +246,4 @@ function NotificationEntry({
       </div>
     </div>
   );
-}
-
-function anchorHref(row: NotificationRow): string {
-  if (row.anchorType === "quotation_thread") {
-    return `/quotations/${row.anchorId}`;
-  }
-  if (row.anchorType === "project") return `/projects/${row.anchorId}`;
-  if (row.anchorType === "contact") return `/contacts/${row.anchorId}`;
-  return `/companies/${row.anchorId}`;
 }

@@ -20,7 +20,14 @@
     "targets": "Targets",
     "team": "Team",
     "notifications": "Notifications",
-    "followUps": "Follow-ups"
+    "followUps": "Follow-ups",
+    "today": "Today",
+    "performance": "Performance",
+    "sell": "Sell",
+    "track": "Track",
+    "brand": "Technopanel",
+    "brandSub": "Operations",
+    "brandMark": "T"
   },
   "common": {
     "create": "Create",
@@ -392,19 +399,6 @@
       "paymentFirst": "Confirm the payment first.",
       "noSuppliers": "No product suppliers have been set up yet, so a line cannot be saved."
     }
-  },
-  "status": {
-    "heading": "System status",
-    "app": "Application",
-    "database": "Database",
-    "up": "Connected",
-    "down": "Unavailable",
-    "running": "Running",
-    "checkedAt": "Checked at {time}"
-  },
-  "skeleton": {
-    "heading": "Project skeleton",
-    "body": "Schema and authentication are in place. Business screens arrive with the next phases."
   },
   "auth": {
     "login": {
@@ -836,6 +830,38 @@
       "alreadyArchived": "That company is already archived.",
       "noteRequired": "A written reason is required to archive a company.",
       "noteTooLong": "That note is too long."
+    }
+  },
+  "theme": {
+    "dark": "Switch to dark",
+    "light": "Switch to light"
+  },
+  "today": {
+    "greeting": "Hello, {name}",
+    "needsYou": "{count, plural, one {# thing needs you today} other {# things need you today}}",
+    "target": {
+      "label": "{month} target · dispatched",
+      "of": "of {target} m²"
+    },
+    "queue": {
+      "title": "What needs you today",
+      "empty": "Nothing is past its threshold.",
+      "seeAll": "See all {count}"
+    },
+    "waiting": {
+      "title": "Waiting on you",
+      "empty": "Nothing is waiting.",
+      "seeAll": "See all"
+    },
+    "needsYouZero": "Nothing needs you today"
+  },
+  "performance": {
+    "title": "Performance",
+    "detail": {
+      "hint": "Targets and coverage, side by side.",
+      "targets": "Target attainment",
+      "coverage": "Coverage",
+      "viewReports": "View reports"
     }
   }
 }

@@ -1,12 +1,16 @@
+import { Bell } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
-import { AppNav } from "@/components/app-nav";
+import { AppRail } from "@/components/app-rail";
 import { Button } from "@/components/ui/button";
 import { LocaleSwitcher } from "@/components/locale-switcher";
-import { can, requireSession } from "@/lib/authz";
-import { unresolvedCount } from "@/lib/notifications";
+import { Link } from "@/i18n/navigation";
+import { can } from "@/lib/authz";
+import { bilingualName } from "@/lib/lookups";
 
 import { logoutAction, stopImpersonationAction } from "./actions";
+import { shellCounts } from "./_components/shell-counts";
+import { ThemeToggle } from "./_components/theme-toggle";
 
 /**
  * The protected shell. Every screen inside (app) exists behind this layout,
@@ -18,6 +22,10 @@ import { logoutAction, stopImpersonationAction } from "./actions";
  * reachable POST endpoint that no layout wraps, so every action calls
  * `requireSession()` itself and every mutation re-checks record visibility in
  * the data layer.
+ *
+ * `22 §7` replaced the horizontal nav with a rail. The page area keeps each
+ * screen's own `max-w-*` container for this stage `[22 §6.1]`; the shell
+ * supplies the frame and nothing else.
  */
 export default async function AppLayout({
   children,
@@ -29,60 +37,70 @@ export default async function AppLayout({
   const { locale } = await params;
   setRequestLocale(locale);
 
-  const session = await requireSession();
   const t = await getTranslations();
   // `19 §4` — the layout computes, the client component receives primitives.
-  const unresolved = await unresolvedCount(session);
+  const { session, follow, unresolved } = await shellCounts();
 
   return (
-    <div className="flex min-h-svh flex-col">
-      {session.isImpersonating ? (
-        <div className="bg-amber-400 text-amber-950">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-2">
-            <p className="text-start text-sm font-medium">
-              {t("auth.impersonation.banner", {
-                real: session.realUser.name,
-                target: session.user.name,
-              })}
-            </p>
-            <form action={stopImpersonationAction}>
-              <Button type="submit" size="sm" variant="outline">
-                {t("auth.impersonation.stop")}
-              </Button>
-            </form>
-          </div>
-        </div>
-      ) : null}
+    <div className="bg-canvas flex min-h-svh flex-col md:flex-row">
+      <AppRail
+        canManageUsers={can(session, "canManageUsers")}
+        todayCount={follow.total}
+        userName={session.user.name}
+        roleLabel={bilingualName(session.user.role, locale)}
+      />
 
-      <header className="border-b">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-6 py-3">
-          <div className="flex items-center gap-6">
-            <div className="text-start">
-              <p className="font-semibold tracking-tight">{t("app.name")}</p>
-              <p className="text-muted-foreground text-xs">
-                {t("auth.signedInAs", { name: session.user.name })}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {session.isImpersonating ? (
+          <div className="bg-tone-amber text-tone-amber-fg">
+            <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-2">
+              <p className="text-start text-sm font-medium">
+                {t("auth.impersonation.banner", {
+                  real: session.realUser.name,
+                  target: session.user.name,
+                })}
               </p>
+              <form action={stopImpersonationAction}>
+                <Button type="submit" size="sm" variant="outline">
+                  {t("auth.impersonation.stop")}
+                </Button>
+              </form>
             </div>
-            {/* `19 §4` — the nav is a client component and cannot ask
-                `can()`; the flags it needs are computed here, where the
-                session already lives, and passed down as booleans. */}
-            <AppNav
-              canManageUsers={can(session, "canManageUsers")}
-              unresolvedCount={unresolved}
-            />
           </div>
-          <div className="flex items-center gap-2">
+        ) : null}
+
+        <header className="border-line bg-canvas/85 sticky top-0 z-20 border-b backdrop-blur-md">
+          <div className="flex flex-wrap items-center justify-end gap-2 px-6 py-2.5">
+            <Link
+              href="/notifications"
+              aria-label={t("nav.notifications")}
+              title={t("nav.notifications")}
+              className="text-muted-foreground hover:bg-surface hover:border-line hover:text-foreground relative grid size-8 place-items-center rounded-lg border border-transparent transition-colors"
+            >
+              <Bell className="size-4" aria-hidden />
+              {unresolved > 0 ? (
+                <span
+                  data-slot="bell-dot"
+                  className="bg-brand border-canvas absolute end-1.5 top-1.5 size-2 rounded-full border-2"
+                  aria-hidden
+                />
+              ) : null}
+              <span className="sr-only" dir="ltr">
+                {unresolved}
+              </span>
+            </Link>
             <LocaleSwitcher />
+            <ThemeToggle />
             <form action={logoutAction}>
               <Button type="submit" size="sm" variant="ghost">
                 {t("auth.signOut")}
               </Button>
             </form>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <div className="flex-1">{children}</div>
+        <div className="flex-1">{children}</div>
+      </div>
     </div>
   );
 }
