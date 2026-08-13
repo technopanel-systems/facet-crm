@@ -19,64 +19,67 @@ Current phase and model/skill routing: `docs/05-roadmap.md`.
 When sources disagree, higher wins.
 
 **User truth** — stated directly by the founder:
-1. `docs/21-phase10a-decisions.md` — latest; follow-ups and notifications.
+1. `docs/25-redesign-decisions.md` — latest; the redesign decisions.
+   Stages are not a sequence; quotations are never summed; comments on
+   every record; coordinators get read-only across everything.
+2. `docs/21-phase10a-decisions.md` — latest; follow-ups and notifications.
    A follow-up is a **condition, not a record**, materialising as a notification
    and **never as a task**; five notification types and **no sixth**;
    **persistence belongs only to a type whose condition can clear**; a handover
    raises **one** summary, not one per record; the rep re-includes a dormant
    company while the manager reassigns or archives it; and working days skip
    **Friday and Saturday, globally**
-2. `docs/20-phase9-decisions.md` — activity reporting. Knowledge is **company
+3. `docs/20-phase9-decisions.md` — activity reporting. Knowledge is **company
    property**; a report's visibility **follows its anchor**; compliance is
    **coverage, not submission**; the timeline is **derived, not stored**; and
    every event is attributed to **whoever performed it**
-3. `docs/19-phase11-decisions.md` — team, user management and offboarding.
+4. `docs/19-phase11-decisions.md` — team, user management and offboarding.
    A handed-over thread **rewrites its raiser**, region on a user is **asked not
    derived**, handover **opens only after deactivation**, nav gates a section by
    **boolean prop**, **self-deactivation is refused**, and **email is editable**
-4. `docs/18-slice3-decisions.md` — dispatch, credit splits and targets. Credit
+5. `docs/18-slice3-decisions.md` — dispatch, credit splits and targets. Credit
    with no split goes to **the rep on the dispatch**, splits divide **equally
    and are rare**, and **the contributor is withdrawn**
-5. `docs/17-product-lookup-decisions.md` — seeds the suppliers, makes **colour
+6. `docs/17-product-lookup-decisions.md` — seeds the suppliers, makes **colour
    free text rather than a lookup**, reseeds the thicknesses (2–8 mm, **4 mm the
    only standard row**), and frees the quotation screen from SMAC's layout
-6. `docs/16-slice2-decisions.md` — the quotation chain. FACET computes the
+7. `docs/16-slice2-decisions.md` — the quotation chain. FACET computes the
    money, VAT defaults to 15%, expiry is a sweep, and **`accepted` is internal
    approval, never a won deal**
-7. `docs/15-lookup-decisions.md` — reverses 14 §5's control choice for the city
+8. `docs/15-lookup-decisions.md` — reverses 14 §5's control choice for the city
    field, and makes region derived rather than entered
-8. `docs/14-slice1-decisions.md` — corrects 12 §3 and 13 §2's scope rule
-9. `docs/12-closing-open-items.md` — corrects 07, 08, 09, 10, 11
-10. `docs/11-architectural-decisions.md` §1–3
-11. `docs/04-founder-answers.md`
-12. `docs/07-phase4-answers.md`
-13. `docs/08-quotation-model.md` §A–C
+9. `docs/14-slice1-decisions.md` — corrects 12 §3 and 13 §2's scope rule
+10. `docs/12-closing-open-items.md` — corrects 07, 08, 09, 10, 11
+11. `docs/11-architectural-decisions.md` §1–3
+12. `docs/04-founder-answers.md`
+13. `docs/07-phase4-answers.md`
+14. `docs/08-quotation-model.md` §A–C
 
 **Settled decisions** — agreed, do not re-litigate:
-14. `docs/13-data-model-decisions.md` — §3 is **LOCKED**; §1–2 explain the
+15. `docs/13-data-model-decisions.md` — §3 is **LOCKED**; §1–2 explain the
     schema, they do not govern it
-15. `docs/10-schema-decisions.md`
-16. `docs/09-schema-design.md`
-17. `docs/03-stack.md`
-18. `docs/01-business-model.md`
+16. `docs/10-schema-decisions.md`
+17. `docs/09-schema-design.md`
+18. `docs/03-stack.md`
+19. `docs/01-business-model.md`
 
 **Presentation only** — how it looks, never what it does:
-19. `docs/22-design-language.md` — the warm-black palette, IBM Plex, the four
+20. `docs/22-design-language.md` — the warm-black palette, IBM Plex, the four
     screen archetypes, and the rule that a row says **whose move it is**, not
     what the status is. It governs appearance and **nothing else**; where it
     appears to decide behaviour, every document above outranks it. Its §6 is
     the redesign's own OPEN register
 
 **Reference only** — never authority:
-20. `docs/06-strategic-review.md` — proposals, explicitly not truth
-21. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
+21. `docs/06-strategic-review.md` — proposals, explicitly not truth
+22. `docs/00-legacy-findings.md` — audit of the failed v1 (~48 KB, never load
     whole; cite sections)
-22. `docs/02-history-extract.md` — mined from old chat transcripts
-23. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
-24. `docs/23-verification-log.md` — what has been verified, not what is true
-25. `docs/24-doc-audit.md` — the disagreements between documents, and the
+23. `docs/02-history-extract.md` — mined from old chat transcripts
+24. `docs/11-architectural-decisions.md` §4 — known fragilities, not decisions
+25. `docs/23-verification-log.md` — what has been verified, not what is true
+26. `docs/24-doc-audit.md` — the disagreements between documents, and the
     current OPEN register
-26. `legacy/**`
+27. `legacy/**`
 
 **Later decisions correct earlier ones.** When two documents disagree, the later
 one is the answer — no judgement call needed. Each document states its own
@@ -175,9 +178,19 @@ There is **no test harness.** `npm run typecheck` · `lint` · `build` ·
 — kept behavioural scripts driven in process against `src/lib`, **development
 only**, each needing `db:seed` and `dev:fixtures` first. **`build` is not
 optional**: typecheck passed while a client component imported a data module.
+
 **A phase is not done until its screens have been driven over HTTP, in both
 locales** — a green suite once sat beside a 500 on every company detail page.
+That pass is now a kept script: **`npm run verify:routes`**, against
+`npm run build && npm run start`, **never `next dev`**. It walks every `(app)`
+route as a rep, a manager and a coordinator, in both locales and both themes.
 Assert on DOM markers, not translated strings, and replay the real form POSTs.
+
+**Check laptop width first — 1366 and 1440 — then wide.** The content column is
+start-aligned and capped at 1320px, so those two are where it is capped by the
+*screen* instead. A wide viewport hides exactly the wrapping defects a laptop
+shows.
+
 **Auth bridge** (`11 §4.1`): re-run after any upgrade of `next-auth`,
 `@auth/core`, `@auth/drizzle-adapter` or `next` — failure is **silent**, login
 works but sessions stop being revocable.

@@ -208,17 +208,20 @@ there is no flash and no inline script.
 
 ## 6. OPEN — not chosen
 
-Recorded rather than filled in. Stage 2 decides these; some need founder input,
-one is a defect.
+Recorded rather than filled in. Some need founder input, one is a defect.
+**6.1 closed in stage 2** and is kept here, struck, so the decision is legible
+where the question was asked.
 
 | # | Open item | Why it is open |
 |---|---|---|
-| 6.1 | **Page-area width.** The concept has a start-aligned 1320px page area; the code has per-page `max-w-6xl` / `4xl` / `3xl` containers, copied into ~35 pages | Changing it touches every page in a stage meant to be shell-only. Kept as-is for stage 1 |
+| ~~6.1~~ | ~~**Page-area width.**~~ **CLOSED — stage 2.** The `(app)` layout owns the content column: `max-w-330` (1320px), `px-6.5 pt-5.5 pb-10`, and **no `mx-auto`** — start-aligned is the proportion, so the page hugs the rail rather than floating. The header's inner row takes the same cap and padding, which is what finally lines the top-bar controls up with page content. Pages carry only their flow, and a narrower measure where the archetype needs one: `max-w-2xl` for a field-stack form, `max-w-4xl` for the two full-history timelines, the full column for lists, detail screens and repeater forms | — |
 | 6.2 | **Global search and the New button** in the top bar | The concept has both. No global search exists in FACET, and a control that does nothing is worse than no control. Not rendered until there is something behind it |
 | 6.3 | **"Everything I logged."** Neither `/activity` nor `/reports` answers it — see §6.5 | A `?rep=me` filter would be a URL param onto `listReports`'s **existing** `userId` option, so no new predicate — but it changes screen behaviour, not presentation |
 | 6.4 | **Where cross-company contact search returns.** `/contacts` leaves the rail; contacts are reached inside a company | Nothing is orphaned — the company detail screen lists contacts and links `/contacts/new?companyId=` — but searching a contact across companies now has no entry point. Likely answered by 6.2 |
 | 6.5 | **`coverage()` paginates before it filters — a real defect**, described below | The fix is a data-layer change. Out of scope for a shell stage |
-| 6.6 | The **chain strip**, kanban, calendar, drag-and-drop and charts | Explicitly deferred by the founder to the redesign-decisions document |
+| 6.6 | The **chain strip**, kanban, calendar, drag-and-drop and charts | Explicitly deferred by the founder to the redesign-decisions document. **When the strip is built it consumes `src/lib/chain.ts`** — stage 2's single definition of `25 §3`'s six positions — rather than re-deriving them from the same three fields. So does the board, whose columns *are* those positions |
+| 6.7 | **The turn column on `/companies` and `/projects`** `[new in stage 2]` | `22 §4` asks every row to say whose move it is. `/quotations`, `/follow-ups` and `/coverage` can: the chain position, the follow-up kind and `daysSince` are already on their rows. `listCompanies` and `listProjects` return **no last-interaction age**, so "Nothing recorded for 23 days" cannot be said there without a data-layer change. Not faked from a second derivation — that is the trap `21 §7` names |
+| 6.8 | **Second person for the rep half of a quotation's turn** `[new in stage 2]` | `22 §4` says second person *where that person is the reader*. The coordinator half can be: `canApproveQuotation` names that identity exactly. The rep half names the raiser instead, because `QuotationThreadListRow` carries `raisedByName` and no id — and two people called Mohammed would read each other's turn as their own. A `raisedById` on the row would close it |
 
 ### 6.5 The coverage defect, in full
 
@@ -265,3 +268,63 @@ The rail replaced a twelve-item horizontal nav with six grouped items plus
 Today. Contacts, Reports, Coverage, Follow-ups, Activity, Notifications and
 Targets stopped being top-level; **every route still works** — the change was
 navigation, not routing.
+
+---
+
+## 8. What stage 2 built **[derived]**
+
+**All four of §3's archetypes are now standing code**, and §6.1 is closed. The
+leverage is the same as stage 1's: six shared components carry the archetypes,
+so the pages mostly lost code rather than gaining it.
+
+| Archetype | What it is, in code |
+|---|---|
+| **List** | `ListCard` (bordered card, table, footer bar) · `FilterNav` (chips that carry the search) · a `numeric` prop on `TableHead`/`TableCell` |
+| **Detail** | `DetailHeader` (name · state · mono reference) · `TurnPanel` · `Facts`/`Fact` · `RecordRow` |
+| **Form** | `FormShell` (single column in a Card, actions in `CardFooter`) |
+| **Dashboard** | the Today screen, now on the concept's own numbers |
+
+Three things are worth knowing before reading the code:
+
+**Two numeric treatments, not one.** §2 says every number is mono; §3 says
+numeric columns are end-aligned. Those are not the same set. Magnitudes, money,
+counts and dates get both — the `numeric` prop. **Identifiers get mono only**: a
+SMAC reference, a phone, an email are read as strings, and end-aligning the
+column a list leads with would read as a magnitude. The concept makes the same
+split, between its `.num` and its `.code`.
+
+**`src/lib/chain.ts` is the single definition** of `25 §3`'s six chain
+positions — see §6.6.
+
+**A turn is named only where a document decides one.** A dispatch, a contact, a
+filed report, a superseded version and a user account owe nobody the next
+action, so they get a header and facts and no panel. Where nothing decides,
+nothing is invented — §6.7 and §6.8 record the two gaps this left.
+
+### 8.1 Three defects it fixed on the way
+
+None of them was introduced by the redesign:
+
+1. **Filter chips dropped the search.** `/reports`, `/dispatches` and `/users`
+   linked to a bare `?type=…`, throwing the user's query away — against §3's
+   own bullet that filters are shareable, reload-proof URL state. `/follow-ups`
+   and `/coverage` each carried a private helper to avoid it; that helper is
+   now `FilterNav`, once.
+2. **Two detail screens named no record.** `/dispatches/[id]` was titled with a
+   *quantity* and `/reports/[id]` with a static string. `DetailHeader` exists
+   because a detail screen's identity is three things and `title | description`
+   is two.
+3. **The handover form had no cancel**, and its submit sat in a mid-form panel.
+
+### 8.2 And one the width check found
+
+The fact grid's rules were first drawn with `gap-px` over a `bg-line` ground.
+The concept can do that: it shows exactly four facts, on one row. **A company
+detail has thirteen**, which at 1366px wraps to seven tracks and then six — and
+the empty seventh track of the last row painted as a solid block of `--line`,
+reading as a broken cell.
+
+The rules are drawn by the cells now, so an empty track is simply blank: there
+is no cell there to draw one. Recorded because it is the general lesson —
+**container-drawn line work assumes a full last row**, and an `auto-fit` grid
+is exactly the thing that cannot promise one.

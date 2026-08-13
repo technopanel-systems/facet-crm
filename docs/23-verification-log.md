@@ -466,6 +466,83 @@ exactly this reason.
 
 ---
 
+## Redesign stage 2 — the screen archetypes (2026-08-13)
+
+`22 §3`'s four archetypes applied to every screen, and `22 §6.1` closed: the
+`(app)` layout took the content column and 38 pages dropped their own
+`mx-auto max-w-*`. Presentation only — **no `src/lib` module changed**, and the
+one new file there, `chain.ts`, imports nothing but types.
+
+- **The four checks passed** at every commit, and `grep` for physical Tailwind
+  utilities across `src` still returns zero. `check:messages`: 684 keys, en and
+  ar agree.
+- **The five suites pass**, which is the regression check that nothing drifted
+  under a stage that was not supposed to touch behaviour.
+- **The HTTP driver is now KEPT** — `scripts/verify-routes.ts`,
+  `npm run verify:routes`. Stage 1 wrote one and threw it away, so its results
+  could not be reproduced; this is that script rebuilt from the record above.
+  **273 checks** against the production build on 2026-08-13: every `(app)`
+  route in both locales for a rep, a manager and a coordinator; every route
+  again under `facet-theme=light`; record ids **discovered from the lists**
+  rather than hard-coded, then followed into detail, edit and timeline; and the
+  theme form POST replayed. Markers are DOM only.
+- **Three expectations were wrong again, not the app** — the same shape as
+  stage 1, and worth recording because each looked like a bug:
+  - The **coordinator's `/companies` and `/coverage` are empty** `[16 §8]`,
+    `[18 §2]` — they see quotation threads and company *names*, not company
+    records. An absent list card there is the empty state working. Archetype
+    markers are now asserted for `sees_all_reps` only, the one identity with
+    rows on every list.
+  - **`/users/[id]/handover` 404s for an active user.** `19 §3` opens it only
+    after deactivation and `team.ts:141` returns null until then. Asserted as a
+    404 now, citing the rule.
+  - **The theme form declares `encType="multipart/form-data"`, and Next means
+    it.** A urlencoded body gets a **404** — which looks exactly like a missing
+    route, not like a rejected content type. The script posts what a browser
+    posts: a `FormData`, no hand-written `content-type`, no `Next-Action`
+    header, because the action id is in the body.
+- **One finding stands rather than an assertion.** A 404 renders
+  `(app)/not-found.tsx` **without the `(app)` layout** — Next replaces the whole
+  subtree with the boundary, so the rail is absent. Not introduced by this
+  stage, and asserting the rail would be asserting a Next.js behaviour FACET
+  does not choose. The script asserts the not-found screen's own shape instead.
+
+### The width check earned its place
+
+`25` and the brief both put laptop first, and the start-aligned column behaves
+differently by viewport: with the 236px rail, content is capped by the *screen*
+at 1366 and 1440 (≈1078 and ≈1152 usable), while at 1920 it stops at 1556 and
+leaves 364px of bare canvas. Checking 1366 first is what found the one real
+visual defect of the stage:
+
+**`Facts` drew its rules with `gap-px` over a `bg-line` ground.** The concept
+can do that — it shows exactly four facts, on one row. A company detail has
+**thirteen**, which at 1366px wraps to seven tracks and then six, and the empty
+seventh track of the last row painted as a solid block of `--line`. The rules
+are drawn by the cells now, so an empty track is blank: there is no cell there
+to draw one.
+
+The general lesson, since it will recur: **container-drawn line work assumes a
+full last row, and an `auto-fit` grid is the one thing that cannot promise
+one.** A wide viewport hides it, because more tracks make a full row likelier.
+
+### Still manual
+
+Mark-read was **not** replayed this stage — the theme POST was, and it is the
+one that exercises the shell every screen sits in. Extending `verify:routes`
+over the remaining form POSTs, and checking their effect at the database the
+way stage 1 did for `read_at` / `resolved_at`, is the next thing to add. The
+auth checklist `[11 §4.1]` is still manual beyond `verify:phase11` §6.
+
+**`dev-fixtures.ts` cannot reset a password.** It is idempotent by email and
+skips an account that already exists, so once the four `@example.test` fixtures
+are created their password can never be changed by re-running it — and
+`DEV_FIXTURE_PASSWORD` is not in `.env`. Stage 2 needed a one-off to log in.
+Teaching the script to update the hash of an account it already created would
+cost three lines and remove a stumble from every future HTTP pass.
+
+---
+
 ## Why the HTTP pass is not optional
 
 Also moved from `CLAUDE.md`, from its **Working style** section, which now

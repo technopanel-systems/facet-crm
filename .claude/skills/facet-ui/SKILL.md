@@ -55,10 +55,22 @@ export default async function ThingPage({ params, searchParams }: {
   const thing = await getThing(session, id);
   if (!thing) notFound();   // hidden and non-existent must look identical
   ...
-  return <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
+  return <div className="flex flex-col gap-6">
 ```
 
-`max-w-6xl` for lists, `max-w-4xl` for forms and detail screens.
+**The `(app)` layout owns the content column** `[22 §6.1]` — width, padding and
+the `<main>` landmark. A page returns a `<div>` carrying only its flow, and
+**never** `mx-auto`, `px-*` or `py-*`: start-aligned is the proportion, and a
+stray `mx-auto` centres one screen inside a start-aligned column.
+
+A narrower measure goes on that same `<div>`, never on the form, because
+`PageHeader` is its sibling:
+
+| Measure | Screens |
+|---|---|
+| the full column | lists, detail screens, `/notifications`, and the repeater forms (quotation lines, handover buckets) |
+| `max-w-2xl` | field-stack forms — company, contact, project, user, dispatch, report |
+| `max-w-4xl` | the two full-history timeline pages, which are a reading surface |
 
 **Permission shapes.** A screen the role may not use returns `notFound()`, not
 a message — a 404 must not confirm that a record or capability exists. An
@@ -75,21 +87,55 @@ section rather than beside it.
 
 ## Building blocks
 
-- `PageHeader` — title, optional description, optional far-side action.
-- `DetailRow` — a labelled value inside a `<dl>`; renders the em dash rather
-  than collapsing when null.
-- `SearchForm` / `ListPagination` from `(app)/_components/list-controls` —
-  every list uses both. `PAGE_SIZE` there is kept in step with the data
-  modules.
-- **Numbers use the `num` utility** `[22 §2]` — mono with tabular figures,
-  for every quantity, square metre, money value, reference, date, count and
-  percentage. It is one class, not `font-mono tabular-nums`.
-- `Card` · `Table` · `Badge` from `@/components/ui`. Tables sit inside
-  `<div className="overflow-x-auto rounded-lg border">`, every `TableHead`
-  and `TableCell` carries `text-start`.
-- Empty list: `<p className="text-muted-foreground rounded-lg border
-  border-dashed p-8 text-center text-sm">`, with a different key when a
-  search filtered it away.
+**Pick an archetype `[22 §3]`; do not invent a fifth.**
+
+*List* — `SearchForm` · `FilterNav` · `ListCard` from
+`(app)/_components/list-controls`. `ListCard` is the bordered card with the
+table inside and pagination in its footer; it replaced the hand-rolled
+`overflow-x-auto rounded-lg border` div, which also double-wrapped `Table`'s own
+scroll container. **`FilterNav` chips carry the current search** — a chip
+linking to a bare `?type=…` silently throws the query away, which is how three
+lists were broken. `PAGE_SIZE` is kept in step with the data modules.
+
+*Detail* — `DetailHeader` (name · state · mono reference) · `TurnPanel` ·
+`Facts` / `Fact` · `RecordRow`, all from `@/components/page-header`, plus
+`Turn` from `(app)/_components/turn`. `DetailRow` survives for a label/value
+list that is genuinely a list — a totals block — but `Facts` is the archetype.
+
+*Form* — `FormShell` from `@/components/form-field`: single column in a Card,
+actions in `CardFooter`. `wide` is the exception, for repeating rows only.
+
+*Dashboard* — the Today screen is the reference.
+
+**Two numeric treatments, not one** `[22 §2, §3]`:
+
+- **Magnitudes, money, counts, dates** → the `numeric` prop on `TableHead` and
+  `TableCell`, or `numeric` on a `Fact`. Mono **and** end-aligned, together,
+  as one prop rather than two classes remembered separately.
+- **Identifiers** — a SMAC reference, a phone, an email → `className="num"`
+  alone. They are read as strings; end-aligning the column a list leads with
+  would read as a magnitude.
+
+**Whose move it is, never only the status** `[22 §4]`. `Turn` and `TurnPanel`
+take a `tone` from `turnTone({ overdue })` — and that boolean must come from a
+derivation the data layer already made (`isQuiet`, a follow-up's existence).
+**Never derive a threshold in a screen**: a second answer to "is this quiet" is
+the trap `21 §7` names. For a quotation, the position comes from
+`chainState()` in `src/lib/chain.ts`, which is the **one** definition of
+`25 §3`'s six chain positions — the deferred chain strip and the board consume
+it too.
+
+**Where no document decides whose move it is, do not invent one.** A dispatch,
+a contact and a filed report owe nobody the next action.
+
+Empty list: `<p className="text-muted-foreground rounded-lg border
+border-dashed p-8 text-center text-sm">`, with a different key when a search
+filtered it away — **outside** the `ListCard`, since an empty state inside a
+card with a pagination footer reads as a broken page rather than an empty one.
+
+**Container-drawn line work assumes a full last row.** An `auto-fit` grid
+cannot promise one, and the empty track paints as a solid rule. Put the borders
+on the cells.
 
 ## Forms
 
@@ -146,8 +192,12 @@ and arrive as `RuleError` — also a key.
    that catches a client component importing a data module.
 2. Grep for physical utilities (currently zero in `src`):
    `ml-|mr-|pl-|pr-|text-left|text-right|border-l-|border-r-`
-3. Open `/ar` and look at it.
-4. Client-side interaction is untested in this repo (`CLAUDE.md`, verification
+3. `npm run build && npm run start`, then **`npm run verify:routes`** — every
+   `(app)` route, three identities, both locales, both themes. Not `next dev`.
+4. Open `/ar` and look at it — **at 1366 or 1440 first**, not wide. The content
+   column is capped at 1320px, so a wide screen hides the wrapping defects a
+   laptop shows.
+5. Client-side interaction is untested in this repo (`CLAUDE.md`, verification
    debt). Asserting on rendered markup proves little: next-intl ships the
    whole catalogue to every page, so grep for a DOM marker like
    `name="smacReference"`, never for a translated string.
