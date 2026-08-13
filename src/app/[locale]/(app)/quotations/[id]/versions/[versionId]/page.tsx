@@ -43,7 +43,7 @@ export default async function QuotationVersionPage({
   const dash = t("common.none");
 
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title={`${t("quotations.fields.version")} ${version.versionNumber}`}
         description={version.smacReference ?? undefined}
@@ -214,6 +214,6 @@ export default async function QuotationVersionPage({
           </div>
         </CardContent>
       </Card>
-    </main>
+    </div>
   );
 }

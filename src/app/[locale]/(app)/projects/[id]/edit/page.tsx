@@ -27,7 +27,7 @@ export default async function EditProjectPage({
   const cities = await listCities();
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-8">
+    <div className="flex max-w-2xl flex-col gap-6">
       <PageHeader title={t("projects.editTitle")} description={project.nameEn} />
       {/* No company field here: links are managed row by row on the detail
           page, where each can be edited or removed on its own `[14 §4]`. */}
@@ -40,6 +40,6 @@ export default async function EditProjectPage({
         companies={[]}
         locale={locale}
       />
-    </main>
+    </div>
   );
 }

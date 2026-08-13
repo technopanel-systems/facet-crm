@@ -28,7 +28,7 @@ export default async function ContactDetailPage({
   const dash = t("common.none");
 
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title={bilingualName(contact, locale)}
         description={contact.position ?? undefined}
@@ -86,6 +86,6 @@ export default async function ContactDetailPage({
           </dl>
         </CardContent>
       </Card>
-    </main>
+    </div>
   );
 }

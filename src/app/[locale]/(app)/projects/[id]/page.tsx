@@ -62,7 +62,7 @@ export default async function ProjectDetailPage({
   const dash = t("common.none");
 
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title={bilingualName(project, locale)}
         action={
@@ -171,6 +171,6 @@ export default async function ProjectDetailPage({
         total={timeline.total}
         fullHistoryHref={`/projects/${project.id}/timeline`}
       />
-    </main>
+    </div>
   );
 }

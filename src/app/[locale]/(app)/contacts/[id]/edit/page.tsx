@@ -27,7 +27,7 @@ export default async function EditContactPage({
   const companies = await listCompanyOptions(session);
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-8">
+    <div className="flex max-w-2xl flex-col gap-6">
       <PageHeader title={t("contacts.editTitle")} description={contact.nameEn} />
       <ContactForm
         action={updateContactAction.bind(null, contact.id)}
@@ -37,6 +37,6 @@ export default async function EditContactPage({
         companies={companies}
         locale={locale}
       />
-    </main>
+    </div>
   );
 }

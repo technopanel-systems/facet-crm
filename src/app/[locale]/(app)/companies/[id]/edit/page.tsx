@@ -39,7 +39,7 @@ export default async function EditCompanyPage({
   ]);
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-8">
+    <div className="flex max-w-2xl flex-col gap-6">
       <PageHeader title={t("companies.editTitle")} description={company.nameEn} />
       <CompanyForm
         action={updateCompanyAction.bind(null, company.id)}
@@ -51,6 +51,6 @@ export default async function EditCompanyPage({
         leadSources={leadSources}
         locale={locale}
       />
-    </main>
+    </div>
   );
 }

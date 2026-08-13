@@ -67,7 +67,7 @@ export default async function PerformancePage({
   ]);
 
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8">
+    <div className="flex flex-col gap-8">
       <PageHeader
         title={t("performance.title")}
         description={t("performance.detail.hint")}
@@ -158,6 +158,6 @@ export default async function PerformancePage({
           <Link href="/reports">{t("performance.detail.viewReports")}</Link>
         </Button>
       </div>
-    </main>
+    </div>
   );
 }

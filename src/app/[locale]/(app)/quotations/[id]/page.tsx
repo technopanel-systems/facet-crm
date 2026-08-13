@@ -69,7 +69,7 @@ export default async function QuotationDetailPage({
   const isCoordinator = can(session, "canApproveQuotation");
 
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title={live.smacReference ?? t("quotations.fields.endStateOpen")}
         description={`${bilingualName(
@@ -383,6 +383,6 @@ export default async function QuotationDetailPage({
           />
         </CardContent>
       </Card>
-    </main>
+    </div>
   );
 }

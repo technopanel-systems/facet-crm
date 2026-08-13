@@ -64,7 +64,7 @@ export default async function EditReportPage({
   ]);
 
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title={t("reports.editTitle")}
         description={t("reports.detail.correctionHint")}
@@ -118,6 +118,6 @@ export default async function EditReportPage({
             : "/quotations/new"
         }
       />
-    </main>
+    </div>
   );
 }

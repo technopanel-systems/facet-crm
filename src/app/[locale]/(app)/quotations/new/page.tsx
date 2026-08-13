@@ -42,7 +42,7 @@ export default async function NewQuotationPage({
     ]);
 
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
+    <div className="flex flex-col gap-6">
       {/* The rep raises the request with the details filled in `[04 flow 6]`,
           and that request IS version 1 `[10 §4]` — there is no separate
           request record and no draft state to promote later. */}
@@ -55,6 +55,6 @@ export default async function NewQuotationPage({
         locale={locale}
         defaultProjectId={projectId}
       />
-    </main>
+    </div>
   );
 }

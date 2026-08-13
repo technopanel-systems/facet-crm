@@ -23,9 +23,22 @@ import { ThemeToggle } from "./_components/theme-toggle";
  * `requireSession()` itself and every mutation re-checks record visibility in
  * the data layer.
  *
- * `22 §7` replaced the horizontal nav with a rail. The page area keeps each
- * screen's own `max-w-*` container for this stage `[22 §6.1]`; the shell
- * supplies the frame and nothing else.
+ * `22 §7` replaced the horizontal nav with a rail. **This layout now owns the
+ * content column** `[22 §6.1, closed]`: the concept's start-aligned 1320px page
+ * area, its padding, and the `<main>` landmark. Pages carry only their own flow
+ * — a `gap`, and a narrower measure where the archetype needs one.
+ *
+ * **No `mx-auto`, deliberately.** Start-aligned is the proportion: the page area
+ * hugs the rail rather than floating in the middle of a wide screen. A capped
+ * block with no margin utility does this in both directions — over-constrained
+ * resolution gives the slack to the inline end for the header's inner row, and
+ * flex cross-axis `stretch` falls back to `flex-start` for `<main>`. Adding
+ * `me-auto` would be a no-op that implies the alignment is fragile.
+ *
+ * The header's inner row takes the SAME cap and the same inline padding as
+ * `<main>`, which is what finally lines the bell / locale / theme cluster up
+ * with page content — before this they were `px-6` at full column width against
+ * `mx-auto max-w-Nxl px-6`, and never matched.
  */
 export default async function AppLayout({
   children,
@@ -50,10 +63,14 @@ export default async function AppLayout({
         roleLabel={bilingualName(session.user.role, locale)}
       />
 
+      {/* `min-w-0` stops a wide table blowing the column out and squeezing the
+          rail. The 1320px cap below does NOT replace it: a max-width on a child
+          clamps that child's box, not the column's min-content contribution. */}
       <div className="flex min-w-0 flex-1 flex-col">
         {session.isImpersonating ? (
           <div className="bg-tone-amber text-tone-amber-fg">
-            <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-2">
+            {/* The band is full-bleed; only its row takes the page measure. */}
+            <div className="flex w-full max-w-330 flex-wrap items-center justify-between gap-4 px-6.5 py-2">
               <p className="text-start text-sm font-medium">
                 {t("auth.impersonation.banner", {
                   real: session.realUser.name,
@@ -69,8 +86,10 @@ export default async function AppLayout({
           </div>
         ) : null}
 
+        {/* Sticky, blur and border stay on <header> — it is a stretched flex
+            item, so the rule spans the full viewport minus the rail. */}
         <header className="border-line bg-canvas/85 sticky top-0 z-20 border-b backdrop-blur-md">
-          <div className="flex flex-wrap items-center justify-end gap-2 px-6 py-2.5">
+          <div className="flex w-full max-w-330 flex-wrap items-center justify-end gap-3 px-6.5 py-2.75">
             <Link
               href="/notifications"
               aria-label={t("nav.notifications")}
@@ -99,7 +118,11 @@ export default async function AppLayout({
           </div>
         </header>
 
-        <div className="flex-1">{children}</div>
+        {/* The concept's `.page`: max-width 1320, padding 22px 26px 40px, and
+            no auto margin. `max-w-330` is 330 × 4px `[22 §6.1]`. */}
+        <main className="w-full max-w-330 flex-1 px-6.5 pt-5.5 pb-10">
+          {children}
+        </main>
       </div>
     </div>
   );

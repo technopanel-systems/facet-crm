@@ -42,7 +42,7 @@ export default async function UserDetailPage({
   const isSelf = user.id === session.user.id;
 
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title={user.name}
         action={
@@ -158,6 +158,6 @@ export default async function UserDetailPage({
           )}
         </CardContent>
       </Card>
-    </main>
+    </div>
   );
 }

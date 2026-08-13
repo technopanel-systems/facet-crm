@@ -52,7 +52,7 @@ export default async function DispatchesPage({
   const basePath = "/dispatches";
 
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title={t("dispatches.title")}
         description={t("dispatches.detail.creditsTargets")}
@@ -193,6 +193,6 @@ export default async function DispatchesPage({
           />
         </>
       )}
-    </main>
+    </div>
   );
 }

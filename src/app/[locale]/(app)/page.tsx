@@ -73,7 +73,7 @@ export default async function TodayPage({
   const queue = follow.rows.slice(0, QUEUE_ROWS);
 
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+    <div className="flex flex-col gap-6">
       <div className="text-start">
         <h1 className="text-2xl font-semibold tracking-tight">
           {t("today.greeting", { name: session.user.name })}
@@ -258,7 +258,7 @@ export default async function TodayPage({
           </CardContent>
         </Card>
       </div>
-    </main>
+    </div>
   );
 }
 

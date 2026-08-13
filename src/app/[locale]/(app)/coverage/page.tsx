@@ -61,7 +61,7 @@ export default async function CoveragePage({
   };
 
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title={t("coverage.title")}
         description={t("coverage.detail.hint")}
@@ -134,6 +134,6 @@ export default async function CoveragePage({
         total={total}
         query={q}
       />
-    </main>
+    </div>
   );
 }

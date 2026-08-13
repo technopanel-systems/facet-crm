@@ -24,7 +24,7 @@ export default async function NewUserPage({
   const roles = await listRoles();
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-8">
+    <div className="flex max-w-2xl flex-col gap-6">
       <PageHeader title={t("team.newTitle")} />
       {/* There is no self-registration anywhere in FACET `[11 §1]`: this form
           is the only way an account comes into being, and the password is set
@@ -37,6 +37,6 @@ export default async function NewUserPage({
         cancelHref="/users"
         withPassword
       />
-    </main>
+    </div>
   );
 }

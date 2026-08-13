@@ -37,7 +37,7 @@ export default async function ContactsPage({
   const { rows, total } = await listContacts(session, { q, page: currentPage });
 
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title={t("contacts.title")}
         action={
@@ -121,6 +121,6 @@ export default async function ContactsPage({
           />
         </>
       )}
-    </main>
+    </div>
   );
 }

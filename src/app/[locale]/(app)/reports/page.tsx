@@ -70,7 +70,7 @@ export default async function ReportsPage({
   const basePath = "/reports";
 
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title={t("reports.title")}
         action={
@@ -223,6 +223,6 @@ export default async function ReportsPage({
           />
         </>
       )}
-    </main>
+    </div>
   );
 }

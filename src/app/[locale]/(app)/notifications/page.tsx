@@ -64,7 +64,7 @@ export default async function NotificationsPage({
   const hasUnread = rows.some((row) => !row.readAt);
 
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title={t("notifications.title")}
         description={t("notifications.detail.hint")}
@@ -124,7 +124,7 @@ export default async function NotificationsPage({
           />
         </>
       )}
-    </main>
+    </div>
   );
 }
 

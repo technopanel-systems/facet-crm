@@ -38,7 +38,7 @@ export default async function TargetsPage({
   const maySetTargets = can(session, "canSetTargets");
 
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title={t("targets.title")}
         description={t("targets.detail.derivedNotice")}
@@ -81,6 +81,6 @@ export default async function TargetsPage({
           <Link href="/activity">{t("targets.detail.viewActivity")}</Link>
         </Button>
       </div>
-    </main>
+    </div>
   );
 }

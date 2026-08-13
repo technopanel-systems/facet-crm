@@ -91,7 +91,7 @@ export default async function HandoverPage({
   ];
 
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title={t("team.handover.title")}
         description={t("team.handover.subtitle", { name: book.user.name })}
@@ -106,6 +106,6 @@ export default async function HandoverPage({
         colleagues={colleagues}
         isEmpty={book.isEmpty}
       />
-    </main>
+    </div>
   );
 }

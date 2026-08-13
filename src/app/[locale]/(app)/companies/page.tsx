@@ -43,7 +43,7 @@ export default async function CompaniesPage({
   const currentPage = Number(page) || 1;
 
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title={t("companies.title")}
         action={
@@ -150,6 +150,6 @@ export default async function CompaniesPage({
           />
         </>
       )}
-    </main>
+    </div>
   );
 }

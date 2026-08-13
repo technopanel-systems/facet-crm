@@ -38,7 +38,7 @@ export default async function ProjectsPage({
   const { rows, total } = await listProjects(session, { q, page: currentPage });
 
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title={t("projects.title")}
         action={
@@ -125,6 +125,6 @@ export default async function ProjectsPage({
           />
         </>
       )}
-    </main>
+    </div>
   );
 }

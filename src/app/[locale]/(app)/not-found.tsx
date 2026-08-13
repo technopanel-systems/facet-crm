@@ -14,7 +14,7 @@ export default async function NotFound() {
   const t = await getTranslations();
 
   return (
-    <main className="mx-auto flex max-w-2xl flex-col items-start gap-4 px-6 py-16">
+    <div className="flex max-w-2xl flex-col items-start gap-4 py-8">
       <h1 className="text-start text-xl font-semibold tracking-tight">
         {t("errors.notFound.title")}
       </h1>
@@ -24,6 +24,6 @@ export default async function NotFound() {
       <Button asChild size="sm" variant="outline">
         <Link href="/">{t("errors.notFound.home")}</Link>
       </Button>
-    </main>
+    </div>
   );
 }

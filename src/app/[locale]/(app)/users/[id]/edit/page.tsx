@@ -27,7 +27,7 @@ export default async function EditUserPage({
   const roles = await listRoles();
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-8">
+    <div className="flex max-w-2xl flex-col gap-6">
       <PageHeader title={t("team.editTitle")} description={user.name} />
       {/* No password field: it is set at creation and there is no reset
           screen `[11 §5]`. The email IS editable `[19 §6]`. */}
@@ -44,6 +44,6 @@ export default async function EditUserPage({
         submitLabel={t("common.save")}
         cancelHref={`/users/${user.id}`}
       />
-    </main>
+    </div>
   );
 }

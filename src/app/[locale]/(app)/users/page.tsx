@@ -51,7 +51,7 @@ export default async function UsersPage({
   const basePath = "/users";
 
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title={t("team.title")}
         action={
@@ -180,6 +180,6 @@ export default async function UsersPage({
           />
         </>
       )}
-    </main>
+    </div>
   );
 }
