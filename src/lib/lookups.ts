@@ -28,6 +28,7 @@ import {
   cities,
   companyCategories,
   leadSources,
+  lossReasons,
   productClasses,
   productFireRatings,
   productSuppliers,
@@ -35,7 +36,7 @@ import {
   serviceTypes,
 } from "@/db/schema";
 import { can, type AuthSession } from "@/lib/authz";
-import type { Region } from "@/lib/enums";
+import { OTHER_LOSS_REASON_CODE, type Region } from "@/lib/enums";
 import { RuleError } from "@/lib/validation";
 
 /** The shape every lookup shares: an id and a name in both languages. */
@@ -99,6 +100,48 @@ export async function listCompanyCategories(): Promise<LookupRow[]> {
     })
     .from(companyCategories)
     .orderBy(asc(companyCategories.nameEn));
+}
+
+/**
+ * The nine loss reasons `[25 §5]`, for the screen that will offer them.
+ *
+ * No selectability filter and no visibility filter: a reason describes the
+ * world, like a city. Ordered by the English name for now, as every other
+ * lookup here is — `25 §5` states the list, not an order to display it in.
+ */
+export async function listLossReasons(): Promise<LookupRow[]> {
+  return db
+    .select({
+      id: lossReasons.id,
+      nameEn: lossReasons.nameEn,
+      nameAr: lossReasons.nameAr,
+    })
+    .from(lossReasons)
+    .orderBy(asc(lossReasons.nameEn));
+}
+
+/**
+ * The id of the `other` loss reason `[25 §5]`.
+ *
+ * `projects.ts` writes it behind every free-text loss reason until the loss
+ * screen offers the nine, because a typed reason with no list to pick from
+ * **is** an `other` reason. It is also what the screen slice will compare
+ * against to require the free text for `other` and forbid it for the rest —
+ * the rule a CHECK cannot hold, because it would have to subquery this table
+ * to read the code behind a uuid.
+ *
+ * A missing row means the database is unseeded rather than that the caller
+ * did anything wrong, so this reports against no field.
+ */
+export async function otherLossReasonId(): Promise<string> {
+  const [reason] = await db
+    .select({ id: lossReasons.id })
+    .from(lossReasons)
+    .where(eq(lossReasons.code, OTHER_LOSS_REASON_CODE))
+    .limit(1);
+
+  if (!reason) throw new RuleError("projects.errors.lossReasonsNotSeeded");
+  return reason.id;
 }
 
 /**

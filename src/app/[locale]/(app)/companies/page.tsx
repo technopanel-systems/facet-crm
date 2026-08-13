@@ -81,13 +81,12 @@ export default async function CompaniesPage({
                 <TableHead className="text-start">
                   {t("common.city")}
                 </TableHead>
-                <TableHead className="text-start">
-                  {t("companies.fields.warmth")}
-                </TableHead>
                 {/* Derived from the quotation event, never set by hand
-                    `[04 qualification]`, `[10 §1]`. Beside warmth, never
-                    merged with it: warmth is what the rep thinks, this is
-                    what has actually happened. */}
+                    `[04 qualification]`, `[10 §1]`. A warmth column stood
+                    beside this one until `25 §6` cut it; qualification is the
+                    half of `10 §1` that survives, because it is what has
+                    actually happened rather than what a rep thinks
+                    `[25 §16]`. */}
                 <TableHead className="text-start">
                   {t("common.qualified")}
                 </TableHead>
@@ -118,15 +117,6 @@ export default async function CompaniesPage({
                   <TableCell className="text-start">
                     {pickName(locale, row.cityNameEn, row.cityNameAr) ??
                       t("common.none")}
-                  </TableCell>
-                  <TableCell className="text-start">
-                    {row.warmth ? (
-                      <Badge variant="secondary">
-                        {t(`enums.warmth.${row.warmth}`)}
-                      </Badge>
-                    ) : (
-                      t("common.none")
-                    )}
                   </TableCell>
                   <TableCell className="text-start">
                     {row.isQualified ? (

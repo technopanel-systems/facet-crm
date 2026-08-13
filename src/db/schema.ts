@@ -80,8 +80,12 @@ export const regionEnum = pgEnum("region", [
   "west",
 ]);
 
-/** `[10 §1]` — the rep's judgement. A short list, deliberately not a percentage. */
-export const warmthEnum = pgEnum("warmth", ["cold", "warm", "hot", "dormant"]);
+/* `warmth` was an enum here until `25 §6`. `10 §1` proposed Cold / Warm / Hot /
+ * Dormant, set by the rep; the founder does not recognise the term and cut it
+ * entirely. Nothing had ever written a value — 0 of 177 companies — so the
+ * columns and the type went with it. `10 §1`'s derived-qualification half
+ * stands `[25 §16]`, and qualification is still a correlated EXISTS over
+ * quotation threads, never a column. */
 
 /** `[09 §1]` — the polymorphic record reference used across the schema. */
 export const recordTypeEnum = pgEnum("record_type", [
@@ -234,12 +238,19 @@ export const repReportChannelEnum = pgEnum("rep_report_channel", [
  * derived from a real quotation thread `[10 §1]` and an outcome saying
  * otherwise would be a second, softer definition of qualified that no thread
  * backs. The form offers a button that raises the request instead.
+ *
+ * `technical_submitting` is `25 §2`'s addition — an activity like the others,
+ * **not a stage**: `25 §1` corrects the single stage dropdown that conflated
+ * unordered, repeatable activities with the strictly ordered quotation chain.
+ * Its position here must match the `ALTER TYPE … ADD VALUE … AFTER` in
+ * migration 0007, or the next generate wants to recreate the type.
  */
 export const repReportOutcomeEnum = pgEnum("rep_report_outcome", [
   "introduced",
   "catalogue_sent",
   "samples_sent",
   "documents_sent",
+  "technical_submitting",
   "discussed_pricing",
   "no_answer",
   "not_interested",
@@ -311,6 +322,23 @@ export const roles = pgTable(
     canApproveDelete: boolean("can_approve_delete").notNull().default(false),
     /** `[07 B5]`, `[12 §3]` — works the duplicate queue. */
     canResolveDuplicate: boolean("can_resolve_duplicate")
+      .notNull()
+      .default(false),
+    /**
+     * `[25 §28]` — reads every record without holding any of them.
+     *
+     * **A third visibility tier, which FACET has never had.** Every rule until
+     * now is all-or-nothing: `14 §2` makes a share grant edit, not merely view,
+     * and `sees_all_reps` is the manager tier that acts as well as sees. This
+     * one is deliberately **not** folded into `sees_all_reps` — `25 §28` is
+     * explicit that read-only is architectural, not a permission tweak.
+     *
+     * It restores and widens `04 Q10`, which `16 §8` and `18 §2` reversed
+     * silently `[24 §1.1]`, so today a coordinator searches company **names**
+     * and can open no company record. Coordinators already have full access to
+     * SMAC, so withholding a read in FACET protects nothing.
+     */
+    seesAllRecordsReadonly: boolean("sees_all_records_readonly")
       .notNull()
       .default(false),
     createdAt: createdAt(),
@@ -493,9 +521,8 @@ export const leadSources = pgTable("lead_sources", {
  * unqualified entry requires only name, phone, source and what they asked
  * about; fields become required progressively in the application layer.
  *
- * Warmth `[10 §1]` is the rep's judgement, stored alongside the derived stage
- * and never merged with it. Changes go to the audit log, which is what makes
- * warmth history visible.
+ * Warmth `[10 §1]` was here until `25 §6` cut it. Nothing had written a value,
+ * so the three columns went with the enum.
  */
 export const companies = pgTable(
   "companies",
@@ -514,9 +541,29 @@ export const companies = pgTable(
     leadSourceId: uuid("lead_source_id").references(() => leadSources.id),
     /** What the customer needs, entered at registration `[04 Q19]`, `[07 B4]`. */
     notes: text("notes"),
-    warmth: warmthEnum("warmth"),
-    warmthSetBy: uuid("warmth_set_by").references(() => users.id),
-    warmthSetAt: timestamp("warmth_set_at", { withTimezone: true }),
+    /**
+     * `[25 §7]` — the exception to `07 C3`'s payment gate. Some customers buy
+     * on credit, so a dispatch against them is allowed and **flagged as such**,
+     * the way a direct dispatch already is. Set by the manager.
+     *
+     * A property of the **company**, deliberately, not a per-dispatch override
+     * tick: an override would let anyone bypass the gate case by case, whereas
+     * this says some customers simply have different terms. Nobody skips a
+     * gate.
+     */
+    hasCreditTerms: boolean("has_credit_terms").notNull().default(false),
+    /**
+     * `[25 §18]` — the rep's own date, which **outranks the automatic clock**:
+     * it suppresses `07 D5`'s chase until it arrives, and then becomes the
+     * follow-up. With no date set the thresholds apply as they do now.
+     *
+     * This is an **input to** the derivation, not a stored timer, so `20 §9`'s
+     * "computed on read, never stored" is intact — `21`'s refusal to write
+     * `tasks` for follow-ups stands `[25 §19]`. A `date`, like
+     * `rep_reports.on_hold_until`, because `25 §18` generalises `20 §5`'s
+     * on-hold mechanism from the company to the record.
+     */
+    nextFollowUpAt: date("next_follow_up_at"),
     /** The dormancy lifecycle keeps the record `[07 E6]`. */
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     /** Tombstone: this record lost a duplicate resolution `[07 B5]`. */
@@ -643,6 +690,36 @@ export const contacts = pgTable(
 );
 
 /**
+ * `25 §5` — why a project was lost. A lookup rather than an enum because the
+ * founder will **collect real "other" entries and promote or prune the list**,
+ * which has to be a row, never a migration.
+ *
+ * Seeded with `25 §5`'s nine values and nothing else. The same shape as
+ * `20 §4`'s signals, so the reasons aggregate the same way and `25 §27`'s
+ * monthly rollup can group the gap by reason, sliced by rep.
+ *
+ * `code` is the stable identifier the application refers to — the shape
+ * `notification_types.key` uses, and for the same reason: exactly one row,
+ * `other`, changes what the form asks for, and matching that on a display name
+ * would break the first time someone edits the English text.
+ *
+ * `25 §25` adds that the reason belongs to the **project**: quotations inherit
+ * it, so a project lost for one reason does not make the rep write that reason
+ * again on each quotation under it.
+ */
+export const lossReasons = pgTable(
+  "loss_reasons",
+  {
+    id: pk(),
+    code: text("code").notNull(),
+    nameEn: text("name_en").notNull(),
+    nameAr: text("name_ar").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("loss_reasons_code_key").on(t.code)],
+);
+
+/**
  * `09 §3.4` — first-class, not a child of company `[04 Q2]`. Requires at least
  * one linked company `[07 A9]`, enforced in the application layer per `09 §1`.
  *
@@ -662,8 +739,42 @@ export const projects = pgTable(
       .references(() => users.id),
     sqmExpected: numeric("sqm_expected", SQM),
     endState: projectEndStateEnum("end_state"),
-    /** Required when the project is marked lost `[04 Q18]`, `[07 C5]`. */
+    /**
+     * `[25 §5]` — which of the nine reasons, required when the project is
+     * marked lost `[04 Q18]`, `[07 C5]`. Takes the card off the board
+     * `[25 §4]`; lost is not a board column, or the board becomes a graveyard
+     * nobody clears `[25 §5]`.
+     */
+    lostReasonId: uuid("lost_reason_id").references(() => lossReasons.id),
+    /**
+     * The detail behind the reason, and **the `other` intake** `[25 §5]` — it
+     * is how the founder collects real entries and finds reasons ten and
+     * eleven, so it is load-bearing rather than a spare notes field. Paired
+     * with `lost_reason_id`, never a rival column: two answers to "why was
+     * this lost" would be two sources of truth.
+     *
+     * **`other` requires `loss_reason`; every other code forbids it.** That
+     * rule is enforced in `src/lib/projects.ts`, not here, because a CHECK
+     * cannot subquery to read the code behind a uuid. The three halves that
+     * *are* intra-row are the CHECKs below.
+     */
     lossReason: text("loss_reason"),
+    /** When the loss was recorded `[25 §5]`. */
+    lostAt: timestamp("lost_at", { withTimezone: true }),
+    /**
+     * `[25 §4]` — one of the three things the system cannot know, set by the
+     * rep. **Deliberately unverified**, and *not* connected to the production
+     * module: production sometimes changes and stock sometimes covers an
+     * order, so FACET must not check it. Recorded here so nobody later builds
+     * a check.
+     *
+     * A plain label, so a boolean; the audit log carries who turned it on and
+     * when, as it does for every other field.
+     */
+    inProduction: boolean("in_production").notNull().default(false),
+    /** `[25 §18]` — the rep's date, outranking the automatic clock. See
+     *  `companies.next_follow_up_at`. */
+    nextFollowUpAt: date("next_follow_up_at"),
     region: regionEnum("region"),
     cityId: uuid("city_id").references(() => cities.id),
     createdBy: uuid("created_by").references(() => users.id),
@@ -672,6 +783,35 @@ export const projects = pgTable(
   (t) => [
     index("projects_owner_idx").on(t.ownerUserId),
     index("projects_name_normalized_idx").on(t.nameNormalized),
+    /**
+     * `13 §1` — what a row may contain, which belongs in the database, as
+     * distinct from who may write it. A loss records both when and why, or
+     * neither.
+     */
+    check(
+      "projects_loss_pair",
+      sql`(lost_reason_id is null) = (lost_at is null)`,
+    ),
+    /** Detail never without a reason `[25 §5]`. */
+    check(
+      "projects_loss_detail",
+      sql`loss_reason is null or lost_reason_id is not null`,
+    ),
+    /**
+     * A project that is not lost may not carry a reason. `is not distinct
+     * from` never returns null, so a project with no end state at all still
+     * refuses one — a plain `end_state = 'lost'` would evaluate to null there
+     * and the constraint would pass on anything, the trap
+     * `rep_reports_on_hold` already documents.
+     *
+     * The converse — *lost requires a reason* — is refused by
+     * `assertLossReason` in `src/lib/projects.ts` and belongs at the database
+     * with the screen that lets a rep pick one of the nine.
+     */
+    check(
+      "projects_loss_state",
+      sql`lost_reason_id is null or end_state is not distinct from 'lost'`,
+    ),
   ],
 );
 
@@ -865,11 +1005,30 @@ export const quotationThreads = pgTable(
     acceptedForProcessingAt: timestamp("accepted_for_processing_at", {
       withTimezone: true,
     }),
+    /**
+     * `[25 §24]` — a quotation closes when the rep knows nothing more is
+     * coming, or when the project is won or lost. Separate from `end_state`,
+     * which records how the quotation itself ended: a thread can be closed
+     * while still `accepted`, because **taking a project in batches is
+     * normal** and partial dispatches are the expected case, not an
+     * exception. Management views filter on this so the numbers are not
+     * misread.
+     */
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    closedByUserId: uuid("closed_by_user_id").references(() => users.id),
+    /** `[25 §18]` — the rep's date, outranking the automatic clock. See
+     *  `companies.next_follow_up_at`. */
+    nextFollowUpAt: date("next_follow_up_at"),
     createdAt: createdAt(),
   },
   (t) => [
     index("quotation_threads_project_idx").on(t.projectId),
     index("quotation_threads_company_idx").on(t.companyId),
+    /** `13 §1` — someone closed it, or nobody did. */
+    check(
+      "quotation_threads_closed",
+      sql`(closed_at is null) = (closed_by_user_id is null)`,
+    ),
   ],
 );
 
@@ -1336,6 +1495,14 @@ export const repReports = pgTable(
     /** Field note only, optional. */
     cityId: uuid("city_id").references(() => cities.id),
     narrative: text("narrative").notNull(),
+    /**
+     * `[25 §34]` — a small reference beside the outcome: a sample number, a
+     * colour code, a document name, so *"Sample #2 → 168"* is a value rather
+     * than a sentence and "how many samples of 168 went out this quarter" is a
+     * query. Same reasoning as `20 §4`'s signal references, and free text for
+     * the same reason.
+     */
+    reference: text("reference"),
     /** Set exactly when the outcome is `on_hold` `[20 §5]`. */
     onHoldUntil: date("on_hold_until"),
     reportDate: date("report_date").notNull(),
@@ -1381,6 +1548,16 @@ export const repReports = pgTable(
       "rep_reports_on_hold",
       sql`(outcome is distinct from 'on_hold') = (on_hold_until is null)`,
     ),
+    /**
+     * `25 §34` puts the reference **beside the outcome**, and a field note has
+     * no outcome — it is anchored to nobody and touches no customer timeline
+     * `[20 §2]`. The narrow reading on purpose: relaxing a constraint later is
+     * a one-line migration, and a column that quietly accepts anything is not.
+     */
+    check(
+      "rep_reports_reference",
+      sql`reference is null or entry_type = 'interaction'`,
+    ),
   ],
 );
 
@@ -1421,6 +1598,18 @@ export const repReportSignals = pgTable(
  * origin `[07 A1]`. System follow-ups are generated from the threshold
  * settings `[07 D5]` and carry the trigger that created them, so a follow-up
  * can close itself when the underlying condition clears `[10 §9]`.
+ *
+ * **`25 §20` adds nothing here, and that is the finding.** Manual tasks are
+ * built small, for the **two human origins only** — a manager assigning a task
+ * to a rep, and a rep writing his own to-do, the human half of `07 A1` that
+ * `21` does not cover. `origin: 'system'` is never written: `21` overruled
+ * `10 §9`'s self-closing system task, and `25 §19` confirms it — the follow-up
+ * queue *is* the automatic task list, already generated, already ordered by
+ * how long each thing has waited, and not stored as rows, which is why it
+ * cannot go stale.
+ *
+ * So `system` and `system_trigger` stay, unused, the way `13 §2` keeps
+ * `form_factor`. The columns already here cover both human origins.
  */
 export const tasks = pgTable(
   "tasks",
@@ -1445,6 +1634,109 @@ export const tasks = pgTable(
   (t) => [
     index("tasks_assignee_status_idx").on(t.assignedToUserId, t.status),
     index("tasks_record_idx").on(t.recordType, t.recordId),
+  ],
+);
+
+/* ------------------------------------------------------------------ *
+ * 8A. Comments — `25 §9`–`§15`
+ * ------------------------------------------------------------------ */
+
+/**
+ * `25 §9` — comments belong on **every** record: projects, companies,
+ * quotations, contacts, dispatches, for all roles. The founder called it
+ * structural rather than a feature, and it is.
+ *
+ * **The distinction that makes it work** `[25 §9]`: a *report* is what happened
+ * with the customer — visit, call, outcome, signals — and it feeds metrics. A
+ * *comment* is what colleagues say to each other about a record. Both land on
+ * the same timeline; one thread per record carrying reports, system events and
+ * conversation.
+ *
+ * What it replaces is WhatsApp `[25 §9]`: the rep and coordinator currently
+ * coordinate a quotation somewhere the negotiation vanishes. `22 §4`'s chain
+ * shows whose move it is; comments let them discuss it in place. That is
+ * `07 G3`'s "one place" criterion, directly. It does not try to become the
+ * conversation `[25 §15]` — it is where a decision gets written down, not
+ * where it has to be made.
+ *
+ * **Counted, never summed with reports** `[25 §14]`. The daily view shows
+ * `reports: 4 · comments: 7` as separate columns: merging them would let a rep
+ * raise his activity count by talking to colleagues. Same principle as
+ * `07 D2`, shown side by side and never combined.
+ *
+ * **Editable by the author, never deleted** `[25 §12]`, consistent with
+ * `12 §7`. So there is no `deleted_at`; `edited_at` is stamped on an edit and
+ * the audit log holds the before and after. Visibility follows the record
+ * `[25 §10]` — manager, coordinator, the owning rep and any shared rep — the
+ * same rule reports follow `[20 §10]`, so no new predicate is needed.
+ *
+ * `25 §13` folds the coordinator's "returned for edits" reason in here: it is
+ * the same act, so no separate field.
+ */
+export const comments = pgTable(
+  "comments",
+  {
+    id: pk(),
+    recordType: recordTypeEnum("record_type").notNull(),
+    recordId: uuid("record_id").notNull(),
+    authorUserId: uuid("author_user_id")
+      .notNull()
+      .references(() => users.id),
+    body: text("body").notNull(),
+    /** Null until the author edits it `[25 §12]`. */
+    editedAt: timestamp("edited_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("comments_record_idx").on(t.recordType, t.recordId, t.createdAt),
+    index("comments_author_idx").on(t.authorUserId, t.createdAt),
+    /**
+     * `13 §1`, `25 §9` — the five kinds §9 names, stated **positively**.
+     *
+     * `record_type` is shared with `record_shares`, `tasks`, `activities`,
+     * `delete_requests`, `duplicate_flags`, `attachments` and
+     * `pipeline_snapshots`, so it will grow for reasons that have nothing to
+     * do with comments. A negative CHECK would silently admit every value
+     * added later; this one refuses until somebody decides. Today that
+     * excludes `quotation_version` — a comment belongs to the thread, which is
+     * the conversation, not to one superseded version of it.
+     */
+    check(
+      "comments_record_type",
+      sql`record_type in ('company', 'contact', 'project', 'quotation_thread', 'dispatch')`,
+    ),
+  ],
+);
+
+/**
+ * `25 §11` — tagging a person raises a notification, which is the difference
+ * between a comment box people ignore and one that replaces WhatsApp.
+ *
+ * **People only, deliberately.** `25 §11` wants `@Rawan`, `@9592` and
+ * `@مؤسسة فاينال فير` all to become links, but ships people first: tagging a
+ * record means an autocomplete across four entity types that respects
+ * visibility — its own piece of work, and not to be bundled in as "comments,
+ * plus mentions". Record-tagging is `25 H2`, still open. When it lands it is a
+ * sibling table or two more columns here, not a reinterpretation of this one.
+ *
+ * One row per mentioned person per comment; re-editing a comment rewrites the
+ * set, the way `20 §9` rewrites a report's signals.
+ */
+export const commentMentions = pgTable(
+  "comment_mentions",
+  {
+    id: pk(),
+    commentId: uuid("comment_id")
+      .notNull()
+      .references(() => comments.id),
+    mentionedUserId: uuid("mentioned_user_id")
+      .notNull()
+      .references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("comment_mentions_key").on(t.commentId, t.mentionedUserId),
+    index("comment_mentions_user_idx").on(t.mentionedUserId, t.createdAt),
   ],
 );
 
@@ -1595,11 +1887,14 @@ export const auditLog = pgTable(
  * ------------------------------------------------------------------ */
 
 /**
- * `10 §11` — period, company or project, derived stage, warmth, owning rep,
- * expected sqm, value. Written by a scheduled job, never edited afterwards
- * `[07 E2]`. `derived_stage` is text because the funnel is computed, not
- * stored `[10 §1]`, and a snapshot captures whatever the computation said at
- * the time.
+ * `10 §11` — period, company or project, derived stage, owning rep, expected
+ * sqm, value. Written by a scheduled job, never edited afterwards `[07 E2]`.
+ * `derived_stage` is text because the funnel is computed, not stored
+ * `[10 §1]`, and a snapshot captures whatever the computation said at the
+ * time.
+ *
+ * `10 §11` also listed warmth. `25 §6` cut it, and this table has never been
+ * written, so the column went with the rest.
  */
 export const pipelineSnapshots = pgTable(
   "pipeline_snapshots",
@@ -1609,7 +1904,6 @@ export const pipelineSnapshots = pgTable(
     recordType: recordTypeEnum("record_type").notNull(),
     recordId: uuid("record_id").notNull(),
     derivedStage: text("derived_stage"),
-    warmth: warmthEnum("warmth"),
     ownerUserId: uuid("owner_user_id").references(() => users.id),
     sqmExpected: numeric("sqm_expected", SQM),
     value: numeric("value", MONEY),

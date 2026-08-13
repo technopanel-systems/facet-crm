@@ -9,7 +9,6 @@ import {
   createCompany,
   updateCompany,
   REGIONS,
-  WARMTHS,
   type CompanyInput,
 } from "@/lib/companies";
 import {
@@ -44,7 +43,6 @@ function readCompanyForm(formData: FormData) {
     cityId: fields.uuid("cityId"),
     leadSourceId: fields.uuid("leadSourceId"),
     notes: fields.text("notes", { max: 4000 }),
-    warmth: fields.option("warmth", WARMTHS),
   };
   return { fields, input };
 }

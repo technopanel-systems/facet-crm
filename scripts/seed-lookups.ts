@@ -2,7 +2,8 @@
  * Seed the lookup tables that `12 §14` calls for after the migration:
  * company categories `[12 §4]`, the product attribute lookups `[08 B1]`, and —
  * since `15` — lead sources `[15 §1]` and Saudi cities `[15 §3]`. `16 §4` adds
- * the service types.
+ * the service types, and `25` adds the loss reasons `[25 §5]` and a tenth
+ * company category `[25 §33]`.
  * `npm run db:seed:lookups`, or `npm run db:seed` for these plus the roles.
  *
  * Idempotent by natural key — name for a category, code for a product
@@ -26,6 +27,7 @@ import {
   cities,
   companyCategories,
   leadSources,
+  lossReasons,
   productClasses,
   productColours,
   productFireRatings,
@@ -37,6 +39,7 @@ import {
 import { CITY_SEED } from "./seed/cities";
 import { COMPANY_CATEGORY_SEED } from "./seed/company-categories";
 import { LEAD_SOURCE_SEED } from "./seed/lead-sources";
+import { LOSS_REASON_SEED } from "./seed/loss-reasons";
 import {
   PRODUCT_CLASS_SEED,
   PRODUCT_COLOUR_SEED,
@@ -57,7 +60,7 @@ function report(label: string, counts: Counts): void {
   );
 }
 
-/** `12 §4` — nine categories, keyed on the English name. */
+/** `12 §4` + `25 §33` — ten categories, keyed on the English name. */
 async function seedCompanyCategories(): Promise<Counts> {
   const counts = zero();
   for (const row of COMPANY_CATEGORY_SEED) {
@@ -147,6 +150,48 @@ async function seedCities(): Promise<Counts> {
         .update(cities)
         .set({ nameAr: row.nameAr, region: row.region })
         .where(eq(cities.id, existing.id));
+      counts.updated += 1;
+    } else {
+      counts.unchanged += 1;
+    }
+  }
+  return counts;
+}
+
+/**
+ * Loss reasons `[25 §5]`, keyed on `code`.
+ *
+ * The one lookup here with a unique index, so this is a true upsert rather
+ * than the read-then-write its siblings use. That is not inconsistency: the
+ * others carry no natural key a document asked for, while `25 §5` makes the
+ * code the identifier `src/lib/projects.ts` branches on, and a second row
+ * called `other` would be a live defect rather than a tidiness problem.
+ *
+ * Nothing deletes. A reason the founder prunes from this list stays in the
+ * database, because projects point at it and FACET does not delete history
+ * `[12 §7]` — pruning means it stops being offered, not that past losses lose
+ * their reason.
+ */
+async function seedLossReasons(): Promise<Counts> {
+  const counts = zero();
+  for (const row of LOSS_REASON_SEED) {
+    const [existing] = await db
+      .select()
+      .from(lossReasons)
+      .where(eq(lossReasons.code, row.code))
+      .limit(1);
+
+    if (!existing) {
+      await db.insert(lossReasons).values(row);
+      counts.inserted += 1;
+    } else if (
+      existing.nameEn !== row.nameEn ||
+      existing.nameAr !== row.nameAr
+    ) {
+      await db
+        .update(lossReasons)
+        .set({ nameEn: row.nameEn, nameAr: row.nameAr })
+        .where(eq(lossReasons.id, existing.id));
       counts.updated += 1;
     } else {
       counts.unchanged += 1;
@@ -323,6 +368,7 @@ async function seedServiceTypes(): Promise<Counts> {
 export async function seedLookups(): Promise<void> {
   report("company categories", await seedCompanyCategories());
   report("lead sources", await seedLeadSources());
+  report("loss reasons", await seedLossReasons());
   report("cities", await seedCities());
   report("product suppliers", await seedSuppliers());
   report("product classes", await seedClasses());

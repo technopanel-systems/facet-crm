@@ -170,19 +170,11 @@ export default async function CompanyDetailPage({
                 company.leadSourceNameAr,
               ) ?? dash}
             </Fact>
-            <Fact label={t("companies.fields.warmth")}>
-              {company.warmth ? (
-                <Badge variant="secondary">
-                  {t(`enums.warmth.${company.warmth}`)}
-                </Badge>
-              ) : (
-                t("companies.fields.warmthUnset")
-              )}
-            </Fact>
-            {/* Two separate things, deliberately `[10 §1]`: warmth is the
-                rep's judgement, qualification is what has actually happened.
-                A company is qualified because a quotation was requested
-                against it — there is nothing here for anyone to tick. */}
+            {/* A warmth Fact stood here until `25 §6` cut it. Qualification is
+                the half of `10 §1` that survives: it is what has actually
+                happened, not what a rep thinks. A company is qualified because
+                a quotation was requested against it — there is nothing here
+                for anyone to tick `[25 §16]`. */}
             <Fact label={t("common.qualified")}>
               {company.isQualified ? (
                 <Badge variant="outline">{t("common.yes")}</Badge>

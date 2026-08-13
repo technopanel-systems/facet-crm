@@ -12,7 +12,10 @@
  *   3. Every archetype's DOM markers are present.
  *   4. Both locales render, and Arabic is `dir="rtl"`.
  *   5. The theme cookie flips the `dark` class, and an unknown value is dark.
- *   6. The two form POSTs replay.
+ *   6. The 404 screen, and the handover gate behind one.
+ *   7. Marking a project lost replays, in both locales `[25 §5]` — the form
+ *      POST whose writer and whose database CHECK shipped in one pass, and
+ *      which nothing else drives.
  *
  * **It replaces a script stage 1 wrote and threw away** `[23]`. A restyle that
  * 500s a screen is the redesign's failure mode, and the four checks cannot see
@@ -448,6 +451,128 @@ async function main(): Promise<void> {
       );
     }
   }
+
+  console.log("\n7. Marking a project lost, over HTTP, in both locales");
+  {
+    // **The one form POST whose writer and whose CHECK shipped together.**
+    // `25 §5` turned the loss reason into a reason plus its detail, and
+    // `projects_loss_detail` refuses the free text `projects.ts` used to write
+    // alone. Zero projects were lost when the constraint landed, so the
+    // migration applied cleanly and the defect would have waited for the first
+    // rep to mark one — which is exactly the class of thing sections 1–6 exist
+    // to catch, and none of them touched this form.
+    //
+    // `verify:schema25` drives `createProject` and `updateProject` in process.
+    // This is the other half: the real browser POST, through `readFields` and
+    // the action, which no in-process script can reach.
+    for (const locale of ["en", "ar"] as const) {
+      const jar = jars["rep-a@example.test"];
+      const list = await get(jar, `/${locale}/projects`);
+      const id = firstId(list.body, "projects");
+      if (!id) {
+        // A rep's empty list is a legitimate empty state `[23]`, not a failure.
+        console.log(`  --    ${locale}: rep-a owns no project to drive`);
+        continue;
+      }
+
+      const page = await get(jar, `/${locale}/projects/${id}/edit`);
+      check(`${locale}: the edit screen renders`, page.status === 200, `got ${page.status}`);
+      // The loss field is hidden until the end state is `lost`, but it is in
+      // the markup — `hidden`, not conditionally rendered — so this asserts the
+      // marker rather than a translated label `[23]`.
+      check(
+        `${locale}: it carries the loss-reason field`,
+        page.body.includes('name="lossReason"'),
+      );
+
+      const form = page.body.match(
+        /<form[^>]*>(?:(?!<\/form>)[\s\S])*?name="endState"[\s\S]*?<\/form>/,
+      )?.[0];
+      check(`${locale}: the project form is a real form`, Boolean(form));
+      if (!form) continue;
+
+      /** The action envelope plus the fields a browser would send. */
+      const fieldsFor = (endState: string, lossReason: string): FormData => {
+        const fields = new FormData();
+        for (const input of form.matchAll(/<input[^>]*>/g)) {
+          const name = input[0].match(/name="([^"]+)"/)?.[1];
+          if (!name?.startsWith("$ACTION")) continue;
+          // **The values must be HTML-UNESCAPED** `[23]`. A bound action's
+          // `$ACTION_n:1` carries JSON, so its quotes arrive as `&quot;`;
+          // replaying them verbatim makes Next answer *"Failed to find Server
+          // Action"*, which reads like a stale deployment and is not one. The
+          // theme toggle above never hit this because its envelope has no JSON.
+          fields.append(
+            name,
+            unescapeHtml(input[0].match(/value="([^"]*)"/)?.[1] ?? ""),
+          );
+        }
+        // `readFields` requires `nameEn` and nothing else here; the rest are
+        // sent empty exactly as an untouched form would send them.
+        fields.set("nameEn", nameOf(page.body) ?? "Project");
+        fields.set("nameAr", "");
+        fields.set("sqmExpected", "");
+        fields.set("cityId", "");
+        fields.set("region", "");
+        fields.set("endState", endState);
+        fields.set("lossReason", lossReason);
+        return fields;
+      };
+
+      const post = async (body: FormData): Promise<number> => {
+        const response = await fetch(`${BASE}/${locale}/projects/${id}/edit`, {
+          method: "POST",
+          headers: { cookie: header(jar), origin: BASE },
+          body,
+          redirect: "manual",
+        });
+        store(jar, response);
+        return response.status;
+      };
+
+      const lost = await post(fieldsFor("lost", `lost via ${locale}`));
+      check(
+        `${locale}: *** POSTing endState=lost answers 303, not 500 *** [25 §5]`,
+        lost === 303,
+        `got ${lost}`,
+      );
+
+      const detail = await get(jar, `/${locale}/projects/${id}`);
+      check(
+        `${locale}: the detail screen still renders once lost`,
+        detail.status === 200,
+        `got ${detail.status}`,
+      );
+
+      // Put it back: the three loss columns must clear together, or
+      // `projects_loss_state` refuses the row — the case a rep hits the first
+      // time he changes his mind. It also leaves the fixture as it was found.
+      const reopened = await post(fieldsFor("", ""));
+      check(
+        `${locale}: re-opening it answers 303, so all three columns cleared`,
+        reopened === 303,
+        `got ${reopened}`,
+      );
+    }
+  }
+}
+
+/** The five entities Next escapes into an attribute value. */
+function unescapeHtml(value: string): string {
+  return value
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
+/** The project's own name, off its edit form, so the POST does not rename it. */
+function nameOf(body: string): string | undefined {
+  const value = body
+    .match(/<input[^>]*name="nameEn"[^>]*>/)?.[0]
+    .match(/value="([^"]*)"/)?.[1];
+  return value === undefined ? undefined : unescapeHtml(value);
 }
 
 main()

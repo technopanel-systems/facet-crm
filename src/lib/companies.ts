@@ -31,13 +31,7 @@ import {
   visibleCompaniesFilter,
   type AuthSession,
 } from "@/lib/authz";
-import {
-  REGIONS,
-  WARMTHS,
-  type Region,
-  type SameValues,
-  type Warmth,
-} from "@/lib/enums";
+import { REGIONS, type Region, type SameValues } from "@/lib/enums";
 import { assertLeadSourceSelectable, regionForCity } from "@/lib/lookups";
 import { normalizedNameFor } from "@/lib/normalize";
 // Qualification is a quotation event, so its predicate lives with quotations
@@ -53,16 +47,15 @@ export type RegionMatchesSchema = SameValues<
   Region,
   NonNullable<Company["region"]>
 >;
-export type WarmthMatchesSchema = SameValues<
-  Warmth,
-  NonNullable<Company["warmth"]>
->;
 
-export { REGIONS, WARMTHS };
-export type { Region, Warmth };
+export { REGIONS };
+export type { Region };
 
-/** Everything a rep may type on the company form. Both enums are nullable —
- *  unqualified entry needs almost nothing `[10 §2]`. */
+/** Everything a rep may type on the company form. The region is nullable —
+ *  unqualified entry needs almost nothing `[10 §2]`.
+ *
+ *  `has_credit_terms` `[25 §7]` is deliberately NOT here: it is the manager's
+ *  to set, not the rep's, and no screen sets it yet. */
 export type CompanyInput = {
   nameEn: string;
   nameAr: string | null;
@@ -73,7 +66,6 @@ export type CompanyInput = {
   cityId: string | null;
   leadSourceId: string | null;
   notes: string | null;
-  warmth: Warmth | null;
 };
 
 export type CompanyListRow = {
@@ -81,7 +73,6 @@ export type CompanyListRow = {
   nameEn: string;
   nameAr: string | null;
   phone: string | null;
-  warmth: Warmth | null;
   region: Region | null;
   categoryNameEn: string | null;
   categoryNameAr: string | null;
@@ -122,7 +113,6 @@ export async function listCompanies(
       nameEn: companies.nameEn,
       nameAr: companies.nameAr,
       phone: companies.phone,
-      warmth: companies.warmth,
       region: companies.region,
       categoryNameEn: companyCategories.nameEn,
       categoryNameAr: companyCategories.nameAr,
@@ -284,8 +274,6 @@ export async function createCompany(
   session: AuthSession,
   input: CompanyInput,
 ): Promise<Company> {
-  const now = new Date();
-
   // Both rules run before the transaction opens: they only read, and a refusal
   // should not have started one.
   await assertLeadSourceSelectable(session, input.leadSourceId);
@@ -300,10 +288,6 @@ export async function createCompany(
         // the form posted is not consulted.
         region,
         nameNormalized: normalizedNameFor(input),
-        // Warmth is the rep's judgement, and who set it is part of the record
-        // `[10 §1]`. Stamped only when a value was actually chosen.
-        warmthSetBy: input.warmth ? session.user.id : null,
-        warmthSetAt: input.warmth ? now : null,
         createdBy: session.user.id,
       })
       .returning();
@@ -348,7 +332,6 @@ const EDITABLE = [
   "cityId",
   "leadSourceId",
   "notes",
-  "warmth",
 ] as const;
 
 export async function updateCompany(
@@ -389,21 +372,11 @@ export async function updateCompany(
     const changed = EDITABLE.filter((key) => before[key] !== values[key]);
     if (changed.length === 0) return before;
 
-    const warmthChanged = values.warmth !== before.warmth;
-
     const [after] = await tx
       .update(companies)
       .set({
         ...values,
         nameNormalized: normalizedNameFor(values),
-        // Only a real change restamps warmth; re-saving the form must not
-        // rewrite who judged the company and when `[10 §1]`.
-        ...(warmthChanged
-          ? {
-              warmthSetBy: input.warmth ? session.user.id : null,
-              warmthSetAt: input.warmth ? new Date() : null,
-            }
-          : {}),
       })
       .where(eq(companies.id, id))
       .returning();

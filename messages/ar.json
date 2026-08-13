@@ -82,12 +82,6 @@
       "east": "الشرقية",
       "west": "الغربية"
     },
-    "warmth": {
-      "cold": "بارد",
-      "warm": "دافئ",
-      "hot": "ساخن",
-      "dormant": "خامل"
-    },
     "projectEndState": {
       "won": "مكتسب",
       "lost": "خاسر",
@@ -136,6 +130,7 @@
       "catalogue_sent": "إرسال الكتالوج",
       "samples_sent": "إرسال عينات",
       "documents_sent": "إرسال مستندات",
+      "technical_submitting": "تقديم فني",
       "discussed_pricing": "مناقشة الأسعار",
       "no_answer": "لا يوجد رد",
       "not_interested": "غير مهتم",
@@ -236,9 +231,7 @@
     "fields": {
       "category": "التصنيف",
       "vatNumber": "الرقم الضريبي",
-      "leadSource": "مصدر العميل",
-      "warmth": "درجة الاهتمام",
-      "warmthUnset": "غير محددة"
+      "leadSource": "مصدر العميل"
     },
     "detail": {
       "details": "التفاصيل",
@@ -310,6 +303,7 @@
       "oneBuyerOnly": "لا يمكن أن تكون أكثر من شركة واحدة هي المشتري.",
       "companyNotVisible": "لا يمكنك استخدام هذه الشركة.",
       "lossReasonRequired": "المشروع الخاسر يحتاج إلى سبب.",
+      "lossReasonsNotSeeded": "لم يتم إعداد أسباب الخسارة بعد. اطلب من المسؤول تشغيل التهيئة.",
       "lastCompany": "يجب أن يحتفظ المشروع بشركة واحدة على الأقل.",
       "notFound": "هذا المشروع غير موجود، أو أنه ليس ضمن سجلاتك."
     }

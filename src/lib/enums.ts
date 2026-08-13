@@ -16,13 +16,27 @@
 export const REGIONS = ["center", "north", "south", "east", "west"] as const;
 export type Region = (typeof REGIONS)[number];
 
-/** `[10 §1]` — the rep's judgement, deliberately not a percentage. */
-export const WARMTHS = ["cold", "warm", "hot", "dormant"] as const;
-export type Warmth = (typeof WARMTHS)[number];
+/* `WARMTHS` was here until `25 §6` cut it. Do not reintroduce it: the founder
+ * does not recognise the term. Qualification is the founder's own word and the
+ * thing warmth was reaching for — see `25 §16`, and `companyIsQualified`. */
 
 /** `[07 C5]` — loss belongs to the project, rejection to the quotation. */
 export const PROJECT_END_STATES = ["won", "lost", "dormant"] as const;
 export type ProjectEndState = (typeof PROJECT_END_STATES)[number];
+
+/**
+ * `[25 §5]` — the one `loss_reasons.code` the application branches on.
+ *
+ * `other` requires the free text in `projects.loss_reason`; every other code
+ * forbids it. That rule cannot be a CHECK — a CHECK may not subquery
+ * `loss_reasons` to read the code behind a uuid — so it is enforced in
+ * `src/lib/projects.ts`, and this is how it finds the row.
+ *
+ * It lives here rather than in the seed file because `src/` must never import
+ * from `scripts/`; the seed imports it back. Same split as
+ * `NOTIFICATION_TYPES`.
+ */
+export const OTHER_LOSS_REASON_CODE = "other";
 
 /**
  * `[07 C5]`, `[07 C4]`, `[07 C7]`.
@@ -85,12 +99,19 @@ export type ReportChannel = (typeof REPORT_CHANNELS)[number];
  * derived from a real quotation thread `[10 §1]`; an outcome claiming it would
  * be a second, softer definition that no thread backs. The form offers a button
  * that raises the request instead. Do not add the value — add a link.
+ *
+ * `technical_submitting` is `25 §2`'s addition, and `25 §1` is why it belongs
+ * here rather than in a stage field: activities are **unordered and
+ * repeatable** — any order, any number of times — while the quotation chain is
+ * strictly ordered. Legacy's single stage dropdown conflated the two, which is
+ * exactly why it went stale.
  */
 export const REPORT_OUTCOMES = [
   "introduced",
   "catalogue_sent",
   "samples_sent",
   "documents_sent",
+  "technical_submitting",
   "discussed_pricing",
   "no_answer",
   "not_interested",

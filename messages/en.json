@@ -82,12 +82,6 @@
       "east": "East",
       "west": "West"
     },
-    "warmth": {
-      "cold": "Cold",
-      "warm": "Warm",
-      "hot": "Hot",
-      "dormant": "Dormant"
-    },
     "projectEndState": {
       "won": "Won",
       "lost": "Lost",
@@ -136,6 +130,7 @@
       "catalogue_sent": "Catalogue sent",
       "samples_sent": "Samples sent",
       "documents_sent": "Documents sent",
+      "technical_submitting": "Technical submitting",
       "discussed_pricing": "Discussed pricing",
       "no_answer": "No answer",
       "not_interested": "Not interested",
@@ -236,9 +231,7 @@
     "fields": {
       "category": "Category",
       "vatNumber": "VAT number",
-      "leadSource": "Lead source",
-      "warmth": "Warmth",
-      "warmthUnset": "Not set"
+      "leadSource": "Lead source"
     },
     "detail": {
       "details": "Details",
@@ -310,6 +303,7 @@
       "oneBuyerOnly": "Only one company can be the buyer.",
       "companyNotVisible": "You cannot use that company.",
       "lossReasonRequired": "A lost project needs a reason.",
+      "lossReasonsNotSeeded": "Loss reasons have not been set up yet. Ask an administrator to run the seed.",
       "lastCompany": "A project must keep at least one company.",
       "notFound": "That project does not exist, or it is not one of yours."
     }

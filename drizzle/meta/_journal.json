@@ -50,6 +50,13 @@
       "when": 1786365500632,
       "tag": "0006_notifications_and_dormancy",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786607448311,
+      "tag": "0007_redesign_schema",
+      "breakpoints": true
     }
   ]
 }

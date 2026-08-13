@@ -137,11 +137,28 @@ There is **no test harness**. What is automated, and what is not:
   every write is audited, the sweep's own entries naming **no actor** on purpose.
   **It found two flaws in its own first draft and one real bug**, all recorded
   below.
+- `npm run verify:schema25` — **not the same shape as the five above**, because
+  `25` Part G lands columns and nothing writes them yet. Development only; needs
+  `db:seed` and `dev:fixtures`. It reads `information_schema` and `pg_catalog`
+  rather than a data module and asserts, in ten sections: every column landed
+  with the right type and nullability; every withdrawn thing is gone, including
+  the `warmth` **type** and the tolerance and sales-desk structures `25` refuses
+  to build; `tasks` gained nothing and no row carries `origin 'system'`; every
+  CHECK refuses **at the database**; the seeds, with the read-only flag on
+  **exactly** two roles and explicitly *not* on Sales Manager or Executive; that
+  a second seed run inserts nothing; that `rep_report_outcome` and
+  `REPORT_OUTCOMES` agree **at runtime**, which the compile-time assertion
+  cannot see; **that nothing writes the new columns yet** — the pass's central
+  claim; the foreign keys; and **that the loss writer and `projects_loss_detail`
+  agree**, which is the one behavioural section and the reason the script
+  exists. §8 also **prints what it deliberately does not assert**. Details and
+  the trap behind it are under *Redesign stage 3* below.
 - **Almost nothing else tests behaviour.** Slice 1's visibility rules were
   checked with throwaway scripts, which is not the same as a suite.
   `verify:slice2`, `verify:slice3`, `verify:phase9`, `verify:phase11` and
   `verify:phase10a` are the shape the rest should take. **All five pass back to
-  back in one run**, verified on 2026-08-10.
+  back in one run**, verified on 2026-08-10, and again on 2026-08-13 after the
+  warmth removal touched `companies.ts`.
 
 - **Three bugs `verify:phase9` caught on its first run**, all real. Two were in
   `coverage.ts`: a correlated subquery written inside a `sql` template for
@@ -538,8 +555,9 @@ one.** A wide viewport hides it, because more tracks make a full row likelier.
 Mark-read was **not** replayed this stage — the theme POST was, and it is the
 one that exercises the shell every screen sits in. Extending `verify:routes`
 over the remaining form POSTs, and checking their effect at the database the
-way stage 1 did for `read_at` / `resolved_at`, is the next thing to add. The
-auth checklist `[11 §4.1]` is still manual beyond `verify:phase11` §6.
+way stage 1 did for `read_at` / `resolved_at`, is the next thing to add — the
+schema stage below took the first of them. The auth checklist `[11 §4.1]` is
+still manual beyond `verify:phase11` §6.
 
 **`dev-fixtures.ts` could not reset a password — fixed in stage 2.** It was
 idempotent by email and *skipped* an account that already existed, so once the
@@ -551,6 +569,116 @@ nothing else — name, email and role are left as they are, because a fixture
 whose role was changed by hand for a test should stay changed — and
 `DEV_FIXTURE_PASSWORD` is in `.env.example` with the development-only note.
 So the next HTTP pass starts with `npm run dev:fixtures`, not a detour.
+
+---
+
+## Redesign stage 3 — the schema (2026-08-13)
+
+`25` Part G's twelve schema changes and one removal, on `redesign/schema`. No
+screens. Migration `0007_redesign_schema`, and a new
+**`npm run verify:schema25`**.
+
+### What `verify:schema25` asserts
+
+A different shape from the other five: Part G lands columns and the slices that
+fill them come after, so there is almost no behaviour to drive. It reads
+`information_schema` and `pg_catalog` instead — the first script here to do so.
+Ten sections:
+
+1. **Every column landed**, table-driven, one row per Part G item — name, type,
+   nullability, and `false` for each defaulted boolean. Existence and type are
+   two checks, not one conjunction, so a missing column and a wrong type say
+   different things.
+2. **Every withdrawn thing is gone** — the three `companies` warmth columns,
+   `pipeline_snapshots.warmth`, and the `warmth` **type** absent from `pg_type`,
+   plus the negative claims `25 §23` and `25 §35` make: no tolerance key in
+   `settings`, no sales-desk table.
+3. **`tasks` gains nothing** — exactly its thirteen existing columns,
+   `task_origin` still carrying `system`, and **no row with that origin**.
+4. **Every CHECK refuses at the database**, by constraint name.
+5. **The seeds** — ten categories, the nine loss reasons and no tenth, and the
+   read-only flag on **exactly** Super Admin and Sales Coordinator. The negative
+   half is the point: Sales Manager and Executive must *not* hold it, or `25
+   §28`'s third tier is a top-up for people who could already see everything.
+6. **The seeds are idempotent**, re-run in process, counts unchanged.
+7. **The outcome enum agrees with `enums.ts` at runtime**, read back from
+   `pg_enum`. `OutcomeMatchesSchema` proves it at compile time and cannot see a
+   database that drifted after the build.
+8. ***Nothing writes the new columns yet*** — every one null or at its default
+   across the whole table, `comments` and `comment_mentions` empty.
+9. **The foreign keys** point where they should.
+10. ***The writer and the CHECK agree*** — the one behavioural section, below.
+
+### The trap: a CHECK shipped without its writer
+
+`projects_loss_detail` — *detail never without a reason* — refuses exactly what
+`src/lib/projects.ts` used to write: `loss_reason` as free text with
+`lost_reason_id` null. **Zero projects were lost**, so the migration applied
+cleanly and every check stayed green; the defect was waiting for the first rep
+to mark a project lost. None of the five suites drives that path, and
+`verify:routes` replayed only the theme toggle.
+
+Two things came out of it, and both are the lesson rather than the fix:
+
+- **The writer changed in the same pass.** `lossFieldsFor()` writes the three
+  loss columns together — `lost_reason_id` defaulting to the `other` code,
+  `lost_at` stamped only on *becoming* lost, and the text — and clears all
+  three when the end state moves off `lost`. A reason typed with no list to
+  pick from **is** an `other` reason, which is what `25 §5` keeps the free text
+  for. This is not a placeholder awaiting the screen.
+- **`verify:routes` gained section 7**, replaying that POST in both locales:
+  mark lost → 303, the detail screen still renders, re-open → 303. It is the
+  third form POST the script replays, and the "still manual" note above is one
+  shorter.
+
+### `25 §5`'s remaining half cannot be a CHECK
+
+*`other` requires `loss_reason`; every other code forbids it* has to read the
+code behind a uuid, and **a CHECK may not subquery**. It goes in
+`src/lib/projects.ts` with the screen that offers the nine reasons. Until then
+every loss carries `other`, so the rule is trivially true and untested.
+
+`verify:schema25` §8 **prints that as a stated non-assertion**, along with two
+others: `projects_loss_state` is deliberately one-way (`assertLossReason` holds
+the converse in the application layer), and nothing *reads* the new columns
+either — `authz.ts` does not consult `sees_all_records_readonly`, so `25 §28`'s
+third tier is not live. A gap recorded in a script that runs is a gap that gets
+closed.
+
+### Traps hit
+
+- **The drizzle-kit TTY prompt, again.** `companies` both gains and loses
+  columns, which is precisely the diff that makes generate ask "created or
+  renamed?" and die without a terminal. Two passes — drops first, then the two
+  additions — merged by hand into one `.sql`, pass 2's snapshot kept with its
+  `prevId` repointed at 0006's, the extra journal entry deleted, and
+  `npx drizzle-kit generate` confirming *No schema changes*.
+- **PowerShell 5.1's `Set-Content -Encoding utf8` writes a BOM**, and
+  drizzle-kit answers `Unexpected token '﻿', "﻿{ "id":"... is not valid JSON`.
+  Edit a snapshot with `[System.IO.File]::WriteAllText` and a
+  `UTF8Encoding($false)`, never `Set-Content`.
+- **A stale `next start` serves stale route modules.** A server left running
+  from an earlier session reported 500 on `/companies` — the removed warmth
+  column — while the fresh build was fine. Check what is on the port before
+  believing a failure: eight of them evaporated on restart.
+- **The `$ACTION` values must be HTML-unescaped before replay.** `[23]` records
+  that those inputs carry no `value` attribute; the other half is that a
+  **bound** action's `$ACTION_n:1` carries JSON, so its quotes arrive as
+  `&quot;` and replaying them verbatim makes Next answer *"Failed to find
+  Server Action"* — a 500 that reads like a stale deployment. The theme toggle
+  never hit this because its envelope has no JSON.
+
+### Verified on an empty database, not only the dev one
+
+`CREATE DATABASE facet_schema25`, `drizzle-kit migrate` and `db:seed` against
+it with `DATABASE_URL` set in the environment (`process.loadEnvFile` does not
+override one that is already set), then `DROP DATABASE … WITH (FORCE)`. The
+eight CHECKs, nine loss reasons, ten categories and the two read-only roles all
+land from zero. The CHECKs are ordered last in the migration for this reason.
+
+**One casualty worth naming:** `npm run build` overwrote the `.next` a dev
+server on port 3000 was holding, which breaks it unrecoverably. Known `[23]`,
+and it happened anyway — check for a dev server before building.
 
 ---
 

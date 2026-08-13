@@ -16,7 +16,7 @@ import { Link } from "@/i18n/navigation";
 import type { CityRow, LookupRow } from "@/lib/lookups";
 // Enums come from `lib/enums`, never from `lib/companies`: importing a data
 // module here would pull the Postgres driver into the browser bundle.
-import { REGIONS, WARMTHS } from "@/lib/enums";
+import { REGIONS } from "@/lib/enums";
 import type { CompanyInput } from "@/lib/companies";
 import { emptyFormState, type FormState } from "@/lib/validation";
 
@@ -236,24 +236,9 @@ export function CompanyForm({
         )}
       </FormField>
 
-      <FormField
-        name="warmth"
-        label={t("companies.fields.warmth")}
-        error={errors.warmth}
-      >
-        <SelectField
-          name="warmth"
-          defaultValue={value("warmth")}
-          placeholder={t("companies.fields.warmthUnset")}
-          invalid={Boolean(errors.warmth)}
-        >
-          {WARMTHS.map((warmth) => (
-            <option key={warmth} value={warmth}>
-              {t(`enums.warmth.${warmth}`)}
-            </option>
-          ))}
-        </SelectField>
-      </FormField>
+      {/* A warmth select sat here until `25 §6` cut it. Credit terms `[25 §7]`
+          do NOT replace it on this form: they are the manager's to set, not
+          the rep's. */}
 
       <FormField name="notes" label={t("common.notes")} error={errors.notes}>
         <Textarea

@@ -47,7 +47,7 @@ import {
   type Region,
   type SameValues,
 } from "@/lib/enums";
-import { regionForCity } from "@/lib/lookups";
+import { otherLossReasonId, regionForCity } from "@/lib/lookups";
 import { normalizedNameFor } from "@/lib/normalize";
 import { RuleError } from "@/lib/validation";
 
@@ -299,6 +299,50 @@ function assertLossReason(input: ProjectInput): void {
   }
 }
 
+/** The three columns a loss writes, which move together `[25 §5]`. */
+type ProjectLossFields = {
+  lostReasonId: string | null;
+  lostAt: Date | null;
+  lossReason: string | null;
+};
+
+/**
+ * What the loss columns become, given the form and the row as it stands.
+ *
+ * `25 §5` turns the loss reason from free text into **a reason plus its
+ * detail**, and three database CHECKs hold the shape: the id and the date move
+ * together, detail never appears without a reason, and a project that is not
+ * lost carries none of them. So the three are decided in one place rather than
+ * three, and both writers call it.
+ *
+ * **The reason defaults to `other`** until the loss screen offers the nine.
+ * That is not a placeholder: a reason typed with no list to pick from *is* an
+ * `other` reason, which is exactly what `25 §5` keeps the free text for — it is
+ * how the founder collects real entries and finds reasons ten and eleven.
+ *
+ * **Only becoming lost stamps the date.** Re-saving a project that is already
+ * lost keeps the id and the date it already had, so an unrelated edit does not
+ * rewrite when the loss happened. Moving off `lost` clears all three, or
+ * `projects_loss_state` refuses the row.
+ *
+ * `assertLossReason` runs first and separately: it says a loss must have a
+ * reason, which is `07 C5`'s rule and stays in the application layer because
+ * the database cannot yet hold it — the current screen posts free text only.
+ */
+async function lossFieldsFor(
+  input: ProjectInput,
+  before?: Pick<Project, "lostReasonId" | "lostAt">,
+): Promise<ProjectLossFields> {
+  if (input.endState !== "lost") {
+    return { lostReasonId: null, lostAt: null, lossReason: null };
+  }
+  return {
+    lostReasonId: before?.lostReasonId ?? (await otherLossReasonId()),
+    lostAt: before?.lostAt ?? new Date(),
+    lossReason: input.lossReason,
+  };
+}
+
 /**
  * Every company id on the form must be one this identity may actually use.
  *
@@ -355,14 +399,16 @@ export async function createProject(
 
   // The city decides the region when there is one `[15 §4]`. Read before the
   // transaction opens — it only reads, and a bad city id should not have
-  // started one.
+  // started one. The loss reason is the same: a lookup read, not a write.
   const region = await regionForCity(input.cityId, input.region);
+  const loss = await lossFieldsFor(input);
 
   return withAudit(session.actor, async (tx, log) => {
     const [project] = await tx
       .insert(projects)
       .values({
         ...input,
+        ...loss,
         region,
         nameNormalized: normalizedNameFor(input),
         // Created by a rep and belongs to him `[07 A8]`.
@@ -402,6 +448,10 @@ const EDITABLE = [
   "region",
   "cityId",
   "endState",
+  // The three loss columns are diffed too `[25 §5]`, so the audit log carries
+  // which reason was recorded and when — not only the text behind it.
+  "lostReasonId",
+  "lostAt",
   "lossReason",
 ] as const;
 
@@ -423,11 +473,14 @@ export async function updateProject(
       .limit(1);
     if (!before) throw new RuleError("projects.errors.notFound");
 
-    // What will actually be written: the region follows the city `[15 §4]`.
-    // The diff compares against this rather than the form, so a region that
-    // changed because the city changed is recorded as the change it is.
-    const values: ProjectInput = {
+    // What will actually be written: the region follows the city `[15 §4]`,
+    // and the three loss columns follow the end state `[25 §5]`. The diff
+    // compares against this rather than the form, so a region that changed
+    // because the city changed — or a loss date stamped because the project
+    // just became lost — is recorded as the change it is.
+    const values = {
       ...input,
+      ...(await lossFieldsFor(input, before)),
       region: await regionForCity(input.cityId, input.region),
     };
 
