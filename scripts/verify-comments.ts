@@ -443,6 +443,14 @@ async function main(): Promise<void> {
   );
 
   // A share is what changes the answer — the rule reports already follow.
+  //
+  // **Still a hand-written row, deliberately.** `grantShare` in
+  // `src/lib/sharing.ts` is the real path as of feature slice 3, and this
+  // fixture is not converted to it: this script asserts nothing about sharing,
+  // so the coupling would buy no assertion and would make a comments run fail
+  // when sharing changed. What the two paths agree is asserted once, in
+  // `verify-sharing.ts` §5, which follows a REAL share through every filter —
+  // including `visibleCommentsFilter`, the one this line exists to exercise.
   await db.insert(recordShares).values({
     recordType: "company",
     recordId: company.id,

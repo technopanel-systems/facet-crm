@@ -211,6 +211,33 @@ export type CommentRecordType = (typeof COMMENT_RECORD_TYPES)[number];
  */
 export const COMMENT_BODY_MAX = 5000;
 
+/**
+ * `[07 B2]`, `[25 §30]` — the three kinds of record a **share** may be granted
+ * on, which is half of what `record_type` carries.
+ *
+ * The other three are refused on the same evidence `21 §3` gives for not
+ * notifying about them: no filter reads a share term for them, so a row there
+ * would grant nothing. `visibleContactsFilter`, `visibleDispatchesFilter` and
+ * `visibleRepReportsFilter` each say so in place in `src/lib/authz.ts`, and
+ * `quotation_version` has no filter of its own at all — a version is reached
+ * through its thread, so a share on one is a share on nothing.
+ *
+ * **This array is the source of truth and `SharedRecordType` derives from it**,
+ * never the other way round. That is the correction `ANCHOR_TYPES` in
+ * `notifications.ts` already carries: a hand-written list typed as the union
+ * goes on compiling after the union grows, and the mismatch surfaces as a
+ * feature that silently does nothing.
+ *
+ * There is no database CHECK to keep in step, unlike `COMMENT_RECORD_TYPES`:
+ * `record_shares.record_type` deliberately carries the whole enum, because a
+ * fourth shareable kind is a filter away rather than a migration away.
+ */
+export const SHARED_RECORD_TYPES = [
+  "company",
+  "project",
+  "quotation_thread",
+] as const;
+
 /** `[07 E6]`, `[21 §6]` — the three routes out of dormancy. */
 export const DORMANCY_OUTCOMES = [
   "reincluded",

@@ -357,6 +357,44 @@ only for `coordinator_direct_edit` ([quotations.ts:1535](src/lib/quotations.ts#L
 `07 C2` describes both routes producing a version without saying who may take
 which.
 
+### 4.14 A revoke withdraws the notification the grant raised
+
+`sweepNotifications` resolves a live `share.granted` once the share behind it has
+been revoked and no live one replaces it
+([notifications.ts](src/lib/notifications.ts)). No document states this.
+
+It is derived from `21 §4` rather than invented against it: that section makes a
+type persistent **only** where its resolution condition *"can actually become
+true"*, and `21 §3`'s single condition for `share.granted` — the grantee logs an
+interaction against the anchor's company — becomes unreachable the moment the
+share is revoked, because `createReport` requires `canViewRecord` on that
+company. Left alone, a revoke produces exactly the badge `21 §4` exists to
+forbid.
+
+**`RESOLUTION_RULES` is deliberately not extended.** That table is what the
+recipient can do and the screen renders it to them as advice; this is the system
+withdrawing an announcement, which is a different kind of thing.
+
+### 4.15 A second live share of one record on one person is refused
+
+`grantShare` throws `sharing.errors.alreadyShared` rather than writing a second
+unrevoked row ([sharing.ts](src/lib/sharing.ts)). No document asks for it. The
+reason is structural rather than a business rule: two live rows for one
+(record, person) make the panel's revoke control ambiguous about which row it
+ends. Re-granting **after** a revoke is unaffected, and is a new row `[12 §7]`.
+
+### 4.16 A grant to somebody who already holds the record is NOT refused
+
+Stated here because it was decided rather than missed. `shareableUsers` does not
+exclude the record's owner, its company members or a thread's raiser, and
+`grantShare` does not refuse them — so a manager can share a company with the
+rep whose company it is, writing a row that grants nothing new and raising a
+persistent notification about access they already had.
+
+No document asks for the refusal, and *"already holds it"* is a different
+question for each of the three record types — membership, ownership, raisership.
+Inventing the rule is what CLAUDE.md forbids, so it is `5.1 #37` instead.
+
 ---
 
 ## 5. The consolidated OPEN register
@@ -400,7 +438,8 @@ as neglected.
 | 26 | **Whether warmth should follow from reports** | `20 §14` (2026-08-10) | 2 d | `21 §11` |
 | 27 | **Whether a merge moves reports** — and, since `21`, notifications and follow-ups | `20 §14` (2026-08-10) | 2 d | `21 §11`; Phase 10b |
 | 28 | **Whether `on hold` should also suppress the daily view** | `20 §14` (2026-08-10) | 2 d | — |
-| 29 | **No share write path** — the one seeded notification type with no producer | `21 §11` (2026-08-10) | 2 d | — |
+| 36 | **Whether a rep may request a share in the system** — `07 B1` has them phone; feature slice 3 kept it that way and built only the manager's side. `07 B4` is the precedent (the assignment call stays a call) and `25 §15` the general rule. Reopening it needs a user-truth document, and a seventh notification type to tell the manager `[21 §2]` | slice 3 (2026-08-13) | 0 d | — |
+| 37 | **Whether a share may be granted to somebody who already holds the record** — its owning rep, a company member, the thread's raiser. Allowed today: it writes a row granting nothing new and raises a persistent notification about access they already had. See §4.16 | slice 3 (2026-08-13) | 0 d | — |
 | 30 | **The overlap notification** `04 Q6` asked for | `21 §2`, `21 §11` (2026-08-10) | 2 d | — |
 | 31 | **A holiday calendar** — Eid and national holidays are not skipped | `21 §8`, `21 §11` (2026-08-10) | 2 d | — |
 | 32 | **Weekly digests** — `07 E5` allows "daily or weekly"; only daily is built | `21 §11` (2026-08-10) | 2 d | — |
@@ -427,7 +466,19 @@ as neglected.
 `09 §15.8` → `21 §2` · `09 §15.9` → `10 §11` · `09 §15.10` → `10 §2` ·
 `09 §15.12` → `10 §8` · `10 §13` (all twelve) → `12 §15` ·
 `16 §10` first item → `17 §4` · `16 §10` empty-lookup item → `17 §6` ·
-`20 §14` "three thresholds not seeded" → `21 §2`.
+`20 §14` "three thresholds not seeded" → `21 §2` ·
+**`21 §11` "no share write path"** → feature slice 3, which built
+`src/lib/sharing.ts` and the panel on the three record types a share grants
+something on. `share.granted` now has a producer, so `21 §2`'s test — a type is
+seeded only where a document names it **and** something raises it — holds again
+for all six seeded types.
+
+**Item 21 sharpens rather than closes.** *"Whether offboarding revokes a
+departing user's `record_shares`"* was theoretical while nothing wrote a share
+row. Shares now exist, `19 §7`'s handover moves four buckets and none of them is
+a share, and a deactivated user keeps every row granted to them —
+`getSession` refuses them a session, so nothing leaks today, but reactivation
+restores access nobody re-granted.
 
 **`09 §15.11` — "where funnel/stage state lives" — is the one `09 §15` item no
 document closes.** `10 §1` settles that qualification is derived and warmth is

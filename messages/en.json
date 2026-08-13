@@ -914,6 +914,32 @@
       "noteTooLong": "That note is too long."
     }
   },
+  "sharing": {
+    "title": "Shared with",
+    "detail": {
+      "hint": "Whoever you share this with can edit it, not only read it.",
+      "none": "Not shared with anyone.",
+      "by": "shared by {name} on {date}",
+      "byUnknown": "shared on {date}"
+    },
+    "fields": {
+      "sharedWith": "Share with"
+    },
+    "actions": {
+      "grant": "Share",
+      "revoke": "Stop sharing"
+    },
+    "errors": {
+      "cannotShare": "You may not share or unshare a record.",
+      "recordNotVisible": "That record is not yours to share.",
+      "recordTypeNotShareable": "That kind of record cannot be shared.",
+      "recipientInactive": "That account is not active.",
+      "alreadyShared": "That person already has this record.",
+      "alreadyRevoked": "That share has already ended.",
+      "shareNotFound": "That share no longer exists.",
+      "noneAvailable": "Everyone active already has this record."
+    }
+  },
   "theme": {
     "dark": "Switch to dark",
     "light": "Switch to light"

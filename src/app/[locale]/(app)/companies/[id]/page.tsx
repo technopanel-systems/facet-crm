@@ -28,6 +28,7 @@ import {
   reincludeCompanyAction,
 } from "../actions";
 import { CommentBox } from "../../_components/comment-box";
+import { SharingPanel } from "../../_components/sharing-panel";
 import {
   TurnPanel,
   daysSince,
@@ -336,6 +337,16 @@ export default async function CompanyDetailPage({
               </ul>
             </CardContent>
           </Card>
+
+          {/* Beside the reps, because both answer "who is on this" — a
+              membership is the rep's own book `[09 §3.2]`, a share is access to
+              a record somebody else still holds `[07 B2]`. Renders nothing at
+              all for a viewer with no shares to see and no flag to act. */}
+          <SharingPanel
+            session={session}
+            recordType="company"
+            recordId={company.id}
+          />
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-4">

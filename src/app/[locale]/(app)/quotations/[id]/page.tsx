@@ -41,6 +41,7 @@ import { recordTimeline } from "@/lib/timeline";
 import { ChainStrip } from "../../_components/chain-strip";
 import { CommentBox } from "../../_components/comment-box";
 import { ListPagination } from "../../_components/list-controls";
+import { SharingPanel } from "../../_components/sharing-panel";
 import {
   TurnPanel,
   chainTurnKey,
@@ -464,6 +465,16 @@ export default async function QuotationDetailPage({
           />
         </CardContent>
       </Card>
+
+      {/* Sharing `[07 B1]`, `[07 B2]`. A thread share is the narrowest of the
+          three: it reveals this conversation and its dispatches `[18 §2]`, and
+          neither the project it was raised on nor the company behind it. A rep
+          brought in to help with one quotation gets one quotation. */}
+      <SharingPanel
+        session={session}
+        recordType="quotation_thread"
+        recordId={thread.id}
+      />
 
       {/* `25 §9` — the thread this screen exists to replace WhatsApp for. The
           rep and the coordinator coordinate a quotation here instead, and

@@ -313,7 +313,8 @@ export async function sweepNotifications(): Promise<SweepResult> {
   return withAudit(SYSTEM_ACTOR, async (tx, log) => {
     const resolved =
       (await resolveExpiredQuotations(tx, log)) +
-      (await resolveOnInteraction(tx, log));
+      (await resolveOnInteraction(tx, log)) +
+      (await resolveRevokedShares(tx, log));
     const raised = await raiseExpiredQuotations(tx, log);
     const digests = await generateDigests(tx, log);
     return { raised, resolved, digests };
@@ -425,6 +426,82 @@ async function resolveOnInteraction(
       entityType: "notification",
       entityId: row.id,
       after: { reason: "interaction_against_company" },
+    });
+  }
+  return cleared.length;
+}
+
+/**
+ * A `share.granted` whose share has been revoked is withdrawn `[21 §4]`.
+ *
+ * **This is not a second way for the grantee to clear it, and that is why it is
+ * not in `RESOLUTION_RULES`.** That table is what the *recipient* can do, and
+ * the notifications screen renders it to them as advice; "clears when somebody
+ * revokes it" is not advice anyone can act on. §3's rule for all three anchors
+ * is unchanged and untouched.
+ *
+ * What this fixes is a badge with no way out. `21 §3` gives `share.granted` one
+ * condition — the grantee logs an interaction against the anchor's company —
+ * and `createReport` requires `canViewRecord` on that company. Revoke the share
+ * and the grantee, holding the record no other way, can no longer log it: the
+ * persistent entry then sits in the tier forever. `21 §4` is explicit that a
+ * type is persistent only where its condition *"can actually become true"*, and
+ * that a badge the rep can never clear is what makes the whole tier get
+ * ignored. So the sweep withdraws the announcement when the thing announced has
+ * gone.
+ *
+ * **The condition is "granted and then revoked", not "holds no live share".**
+ * The looser reading is the one to reach for and it is wrong twice over. It
+ * would resolve any `share.granted` row with no `record_shares` row behind it
+ * at all — which is exactly what `verify-phase10a.ts` §11 plants, deliberately,
+ * to test `21 §3`'s rule without a producer. Those rows would then clear on the
+ * first sweep and that script's *"an interaction resolves the project anchor"*
+ * would go green whether or not `resolveOnInteraction` still worked. An
+ * assertion that passes for the wrong reason is worse than one that fails.
+ *
+ * By condition, like its two neighbours: it asks what is true now, not what
+ * happened. A share revoked and granted again before the sweep runs keeps its
+ * entry, and so does a grantee holding the record through a second live share.
+ */
+async function resolveRevokedShares(
+  tx: Tx,
+  log: (entry: AuditEntry) => void,
+): Promise<number> {
+  const cleared = await tx
+    .update(notifications)
+    .set({ resolvedAt: new Date() })
+    .where(
+      and(
+        isNull(notifications.resolvedAt),
+        sql`${notifications.recordId} is not null`,
+        sql`${notifications.notificationTypeId} = (
+          select nt.id from notification_types nt
+           where nt.key = ${NOTIFICATION_TYPES.shareGranted}
+        )`,
+        sql`exists (
+          select 1 from record_shares rs
+           where rs.record_type = ${notifications.recordType}
+             and rs.record_id = ${notifications.recordId}
+             and rs.shared_with_user_id = ${notifications.recipientUserId}
+             and rs.revoked_at is not null
+        )`,
+        sql`not exists (
+          select 1 from record_shares rs
+           where rs.record_type = ${notifications.recordType}
+             and rs.record_id = ${notifications.recordId}
+             and rs.shared_with_user_id = ${notifications.recipientUserId}
+             and rs.revoked_at is null
+        )`,
+      ),
+    )
+    .returning({ id: notifications.id });
+
+  for (const row of cleared) {
+    log({
+      action: "notification.resolved",
+      entityType: "notification",
+      entityId: row.id,
+      after: { reason: "share_revoked" },
     });
   }
   return cleared.length;

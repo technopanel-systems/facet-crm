@@ -25,6 +25,7 @@ import { projectTimeline, TIMELINE_CARD_LIMIT } from "@/lib/timeline";
 import { setCreditSplitAction } from "../actions";
 import { ChainStrip } from "../../_components/chain-strip";
 import { CommentBox } from "../../_components/comment-box";
+import { SharingPanel } from "../../_components/sharing-panel";
 import {
   TurnPanel,
   daysSince,
@@ -323,6 +324,17 @@ export default async function ProjectDetailPage({
           />
         </CardContent>
       </Card>
+
+      {/* Sharing `[07 B1]`, `[07 B2]`. A project share is the one that carries
+          furthest: `11 §2` cascades it to the threads raised on the project and
+          `18 §2` cascades that to their dispatches. It still does not reach the
+          project's companies — company visibility is its own question `[04 Q7]`
+          — which is why this panel is per record rather than per deal. */}
+      <SharingPanel
+        session={session}
+        recordType="project"
+        recordId={project.id}
+      />
 
       {/* `20 §6` — the project's own history. A report naming this project
           appears here AND on its company's timeline; a direct dispatch has no

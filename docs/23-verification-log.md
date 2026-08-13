@@ -956,6 +956,161 @@ the tag working first.
 
 ---
 
+## Feature slice 3 — the sharing write path (2026-08-13)
+
+`25 §30` built. `07 B1`'s manager-initiated sharing existed on paper since the
+first migration and had never had a writer. `scripts/verify-sharing.ts` is kept,
+and `npm run verify:routes` gained a section that posts the grant and the revoke
+for real.
+
+**All four checks, the whole verify suite and the HTTP pass are green:**
+`typecheck` · `lint` · `build` · `check:messages` (735 keys), then
+`verify:{sharing,comments,slice2,slice3,phase9,phase11,phase10a,schema25}` and
+`verify:routes` — **408 checks**, three identities, both locales, both themes.
+
+**No migration.** `record_shares` has carried `revoked_at`,
+`revoked_by_user_id` and `shared_by_user_id` since `0000`; this slice is the
+first thing to write any of them.
+
+### What `verify-sharing.ts` asserts
+
+Eleven sections. Five are worth naming here:
+
+1. **§1 is scoped to the seeded roles, and that is load-bearing** — see the trap
+   below.
+2. **§2 includes a gate no seeded role can reach.** `revokeShare` checks the
+   anchor's visibility as well as `can_share`. Checking only the flag is safe
+   today *because both roles holding it also hold `sees_all_reps`* — safety by
+   caller, not by function, which is the property `verify-comments` §2 disproved
+   for `commentEvents` in one line. The script constructs a role with
+   `can_share` and no `sees_all_reps` rather than waiting for the seed to grow
+   one.
+3. **§5 is the centre of the script:** a share made by the real `grantShare` is
+   followed through **every** call site of `activeShareExists` and
+   `hasActiveShare` — companies, contacts (`14 §1`), projects, quotation threads
+   (`11 §2`), dispatches (`18 §2`), rep reports (`20 §10`), comments (`25 §10`)
+   and coverage. It exists because until this slice every share row in FACET was
+   hand-written by a verify script, so *"the filters honour a share"* had only
+   ever been proved against fixtures.
+4. **§8**: re-granting after a revoke is a NEW row — two rows, the first still
+   carrying its `revoked_at`, exactly one live.
+5. **§9**: `share.granted` fires on all three anchors, an interaction resolves
+   it `[21 §3]`, and **a revoke withdraws it** `[21 §4]`.
+
+### Two defects it caught
+
+**1. The fixtures stored `name_normalized` un-normalized.** §3 and §5 failed on
+the **list** filters while `canViewRecord` and the detail reads passed — which
+looks exactly like a share that grants a record but not a listing. It was
+neither: `normalizeName` folds every non-alphanumeric to a space, so a stamp of
+`verifysh-1755…` stored raw was searched for as `%verifysh 1755…%` and matched
+nothing. The fixture was fixed to store what `createCompany` stores, not the
+assertion loosened. Worth recording because the symptom pointed at the feature
+and the cause was in the scaffolding.
+
+**2. A revoke would have left a badge nobody could clear.** `share.granted` is
+persistent and `21 §3` gives it one condition — the grantee logs an interaction
+against the anchor's company — while `createReport` requires `canViewRecord` on
+that company. Revoke the share and the grantee can no longer log it, so the
+entry sits in the act-now tier forever. That is precisely the failure `21 §4`
+exists to forbid. `sweepNotifications` gained a third resolver.
+
+### `RESOLUTION_RULES` was deliberately NOT extended
+
+The resolver is not in that table and `21 §3` is untouched. The table is what
+the **recipient** can do, and `notifications/page.tsx` renders it to them as
+advice with `.find`; *"clears when somebody revokes it"* is not advice anyone
+can act on. So: no new row, no new message key, and `verify:phase10a` §11 —
+which asserts every (persistent type × anchor) has a rule, in both directions —
+passes unchanged.
+
+### The trap: a resolver that would have hollowed out another script
+
+The obvious condition for the new resolver is *"the recipient holds no live
+share"*. It is wrong, and not in a way that fails visibly.
+
+`verify-phase10a.ts` §11 **plants `share.granted` rows with no `record_shares`
+row behind them**, deliberately, to test `21 §3`'s rule at a time when no
+producer existed. Under the loose condition every one of those clears on the
+first sweep — and that script's *"an interaction resolves the project anchor"*
+then passes whether or not `resolveOnInteraction` still works. A green
+assertion that cannot fail is worse than a red one.
+
+The condition is therefore **granted and then revoked**: a revoked row exists
+for that (record, recipient) **and** no live one does. `verify-sharing` §9 pins
+both halves — the withdrawal, and that a planted row with no share behind it is
+left alone.
+
+### The other trap: an assertion about every row in a table
+
+**Third outing of one shape**, after `verify:phase11` §16 over `audit_log`.
+§1 asserts who holds `can_share`; §2 creates a role that holds it; nothing is
+cleaned up `[12 §7]`. Written as a claim about *every row in `roles`* it goes
+green on the first run and red on every run after — and reads as a seed
+regression, which it is not. **Excluding the current run's stamp does not fix
+it either:** the previous run's role is still there.
+
+The fix is `phase11` §16's: scope by **whose** the rows are. §1 matches against
+`ROLE_SEED`'s own names, so any number of accumulated run-stamped roles is
+invisible to it. **Proved rather than reasoned about** — the script was run
+twice, and §1 is green on the second.
+
+The constructed role also had to not disturb the two other scripts that make
+claims about `roles`, and this was checked by running them, not by reading them:
+
+- `verify:phase10a` makes **no** flag claim about roles — it resolves two by
+  name behind a `seededRoles.length < 7` **floor**, and a floor is immune to
+  extra rows.
+- `verify:schema25` §5 **does** iterate every row in `roles`, asserting each
+  one's `sees_all_records_readonly` matches what `ROLE_SEED` grants by name. The
+  new role passes only because it holds that flag **false**. Both facts are
+  stated in `verify-sharing.ts` beside the insert, as the reason those values
+  are not free to change. Both scripts were re-run and are green.
+
+### What the five existing scripts actually do with shares
+
+The premise that "the five verify scripts insert `record_shares` rows by hand"
+needed one correction before it could be answered:
+
+| script | what it writes | converted? |
+|---|---|---|
+| `verify-slice3.ts:877` | a `record_shares` row, project → repC, to prove the dispatch cascade | no |
+| `verify-comments.ts:446` | a `record_shares` row, company → repB, to prove comment visibility | no |
+| `verify-phase9.ts` | `company_reps` with `origin: 'shared'` — a **membership**, not a share | n/a |
+| `verify-phase11.ts` | the same, and a company named `Company Shared` | n/a |
+| `verify-phase10a.ts` | nothing; it names the three record types in its §11 anchor table | n/a |
+
+**Both real fixtures stay.** Neither asserts anything *about* sharing — each
+uses a share row as scaffolding for something else — so neither duplicates the
+behaviour under test, and the schema is unchanged so both keep passing.
+Converting them would couple two green scripts to a new module for no assertion
+gained, and would make a comments run fail when sharing changed.
+
+What the fixtures raise is answered **once, in the script that owns sharing**:
+§5 walks a real share through every filter, including the dispatch cascade
+`verify-slice3` proves from a hand row and the comment branch `verify-comments`
+proves from one. Each insert now carries a comment saying so.
+
+### What is still manual
+
+- **Nobody has looked at it.** No screenshot at 1366 or 1440, in either locale.
+  The panel sits in the company screen's **narrow** column, so a long name
+  beside a "Stop sharing" button is the pair that wraps; the row is
+  `flex-wrap`, which is an argument rather than an observation.
+- **The client half is untested**, as everywhere: one `useActionState` per form
+  means a rejected revoke cannot blank the grant control, and that is asserted
+  only by both POSTs returning 200.
+- **The picker's scale.** `shareableUsers` returns every active colleague minus
+  those already holding the record — the same shape, and the same unaddressed
+  limit, as the mention picker `[22 §6.9]`.
+- **A grant to somebody who already holds the record** is allowed, writes a row
+  that grants nothing new, and raises a persistent notification about access
+  they already had. No document asks for the refusal and "already holds it" is a
+  different question per record type, so none was invented. Stated in
+  `sharing.ts` as a non-rule and in `24 §4.16` as an OPEN item.
+
+---
+
 ## Why the HTTP pass is not optional
 
 Also moved from `CLAUDE.md`, from its **Working style** section, which now

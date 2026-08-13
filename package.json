@@ -27,6 +27,7 @@
     "verify:phase11": "tsx --env-file=.env scripts/verify-phase11.ts",
     "verify:phase10a": "tsx --env-file=.env scripts/verify-phase10a.ts",
     "verify:comments": "tsx --env-file=.env scripts/verify-comments.ts",
+    "verify:sharing": "tsx --env-file=.env scripts/verify-sharing.ts",
     "verify:schema25": "tsx --env-file=.env scripts/verify-schema25.ts",
     "verify:routes": "tsx --env-file=.env scripts/verify-routes.ts"
   },

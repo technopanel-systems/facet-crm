@@ -874,6 +874,13 @@ async function main(): Promise<void> {
     "repC cannot see a dispatch that names someone else on a project they cannot see",
     (await getDispatch(repC, linked.id)) === null,
   );
+  // **Still a hand-written row, deliberately.** `grantShare` in
+  // `src/lib/sharing.ts` is the real path as of feature slice 3, and this
+  // fixture is not converted to it: this script asserts nothing about sharing,
+  // so the coupling would buy no assertion and would make a slice-3 run fail
+  // when sharing changed. What the two paths agree is asserted once, in
+  // `verify-sharing.ts` §5, which follows a REAL project share down this exact
+  // cascade — project → thread → dispatch — for that reason.
   await db.insert(recordShares).values({
     recordType: "project",
     recordId: project.id,

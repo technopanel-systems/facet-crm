@@ -21,7 +21,9 @@
  *   9. The comment box `[25 §9]` posts for real, and its cap refuses rather
  *      than 500s — the one assertion of `readFields`' shape validation
  *      anywhere, because no in-process script crosses the action boundary.
- *  10. No screen renders anything shaped like an unresolved message key.
+ *  10. The sharing panel `[07 B1]`, `[25 §30]` grants and revokes for real, and
+ *      the rep who may not share is not offered the form.
+ *  11. No screen renders anything shaped like an unresolved message key.
  *
  * Section 0 runs before all of them, and refuses a server that booted before
  * the build — the hole every one of the above passed straight through `[23]`.
@@ -979,7 +981,135 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log("\n10. Nothing reads like a message key that failed to resolve");
+  console.log("\n10. The sharing panel, granted and revoked for real [07 B1], [25 §30]");
+  {
+    // **`verify:sharing` drives `grantShare`; this drives the FORM.** The two
+    // do not overlap: the in-process script never touches `readFields`, the
+    // bound `$ACTION` envelope, or the per-row revoke binding — and the binding
+    // is the part with no analogue in the data layer at all, because there the
+    // share id is an argument rather than something a page had to carry.
+    for (const locale of ["en", "ar"] as const) {
+      const jar = jars["manager@example.test"];
+      const list = await get(jar, `/${locale}/companies`);
+      const id = firstId(list.body, "companies");
+      if (!id) {
+        console.log(`  --    ${locale}: the manager sees no company to share`);
+        continue;
+      }
+
+      const page = await get(jar, `/${locale}/companies/${id}`);
+      check(
+        `${locale}: the company screen carries the sharing panel [25 §30]`,
+        page.body.includes('data-slot="sharing-panel"'),
+      );
+
+      const grantForm = page.body.match(
+        /<form[^>]*data-slot="sharing-grant"[\s\S]*?<\/form>/,
+      )?.[0];
+      check(
+        `${locale}: can_share is offered the grant form [07 B1]`,
+        Boolean(grantForm),
+      );
+      if (!grantForm) continue;
+      check(
+        `${locale}: it names a person to share with`,
+        grantForm.includes('name="sharedWithUserId"'),
+      );
+
+      // The envelope scraper of section 9, for the reason recorded there: a
+      // bound action's inputs carry no `value` attribute, and its JSON must be
+      // HTML-unescaped or the replay reads as a stale deployment `[23]`.
+      const envelopeOf = (form: string): FormData => {
+        const fields = new FormData();
+        for (const input of form.matchAll(/<input[^>]*>/g)) {
+          const name = input[0].match(/name="([^"]+)"/)?.[1];
+          if (!name?.startsWith("$ACTION")) continue;
+          fields.append(
+            name,
+            unescapeHtml(input[0].match(/value="([^"]*)"/)?.[1] ?? ""),
+          );
+        }
+        return fields;
+      };
+
+      const post = async (body: FormData): Promise<number> => {
+        const response = await fetch(`${BASE}/${locale}/companies/${id}`, {
+          method: "POST",
+          headers: { cookie: header(jar), origin: BASE },
+          body,
+          redirect: "manual",
+        });
+        store(jar, response);
+        return response.status;
+      };
+
+      // Whoever the picker offers first. Asserting the marker rather than a
+      // name: the list is whoever is active and not already holding it.
+      const recipient = grantForm.match(
+        /<option value="([0-9a-f-]{36})"/i,
+      )?.[1];
+      check(
+        `${locale}: the picker offers somebody to share with`,
+        Boolean(recipient),
+      );
+      if (!recipient) continue;
+
+      const grant = envelopeOf(grantForm);
+      grant.set("sharedWithUserId", recipient);
+      const granted = await post(grant);
+      check(
+        `${locale}: *** granting a share answers 200, not 500 *** [07 B1]`,
+        granted === 200,
+        `got ${granted}`,
+      );
+
+      const afterGrant = await get(jar, `/${locale}/companies/${id}`);
+      check(
+        `${locale}: the record now lists who holds it [25 §30]`,
+        afterGrant.body.includes('data-slot="share-row"'),
+      );
+
+      const revokeForm = afterGrant.body.match(
+        /<li[^>]*data-slot="share-row"[\s\S]*?<form[\s\S]*?<\/form>/,
+      )?.[0];
+      check(
+        `${locale}: each row carries a revoke control [07 B1]`,
+        Boolean(revokeForm),
+      );
+      if (!revokeForm) continue;
+
+      const revoked = await post(envelopeOf(revokeForm));
+      check(
+        `${locale}: *** revoking answers 200, not 500 *** [12 §7]`,
+        revoked === 200,
+        `got ${revoked}`,
+      );
+
+      const afterRevoke = await get(jar, `/${locale}/companies/${id}`);
+      check(
+        `${locale}: the revoked row leaves the live list [12 §7]`,
+        !afterRevoke.body.includes('data-slot="share-row"'),
+      );
+    }
+
+    // The negative half, and the one that matters: a rep holds no `can_share`,
+    // so the control is simply not rendered `[facet-ui]`. The data layer
+    // refuses regardless — `verify:sharing` §2 is where that is asserted.
+    const repJar = jars["rep-a@example.test"];
+    const repList = await get(repJar, "/en/companies");
+    const repCompany = firstId(repList.body, "companies");
+    if (repCompany) {
+      const repPage = await get(repJar, `/en/companies/${repCompany}`);
+      check(
+        "a rep is NOT offered the grant form — no can_share [07 B1]",
+        !repPage.body.includes('data-slot="sharing-grant"'),
+      );
+    } else {
+      console.log("  --    rep-a holds no company to check the gate on");
+    }
+  }
+
+  console.log("\n11. Nothing reads like a message key that failed to resolve");
   {
     // Accumulated by `scanForUnresolvedKeys` over every page fetched above —
     // so this covers all three identities, both locales, both themes and every

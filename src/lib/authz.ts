@@ -68,7 +68,7 @@ import {
 } from "@/db/schema";
 import { redirect } from "@/i18n/navigation";
 import { withAudit, type AuditActor } from "@/lib/audit";
-import type { CommentRecordType } from "@/lib/enums";
+import { SHARED_RECORD_TYPES, type CommentRecordType } from "@/lib/enums";
 import { hashPassword } from "@/lib/passwords";
 import { RuleError } from "@/lib/validation";
 
@@ -144,8 +144,17 @@ export type ViewableRecordType =
  * viewable `[25 §9]` — the type is what keeps a dispatch share term from
  * compiling, and it refuses `contact` besides, which `:456-459` previously
  * refused only in prose.
+ *
+ * **It is now derived from `SHARED_RECORD_TYPES` rather than written twice.**
+ * `25 §30`'s write path needs the same three values at runtime, to check what a
+ * form posted; the array is the source and this union follows it. It cannot
+ * carry a `satisfies readonly ViewableRecordType[]` at the declaration the way
+ * `ANCHOR_TYPES` does — `enums.ts` imports nothing on purpose — so that
+ * assignability is proved where it matters instead: `sharing.ts` hands these
+ * values straight to `canViewRecord`, which would not compile if a shareable
+ * kind ever stopped being a viewable one.
  */
-type SharedRecordType = "company" | "project" | "quotation_thread";
+export type SharedRecordType = (typeof SHARED_RECORD_TYPES)[number];
 
 /* ------------------------------------------------------------------ *
  * Session
