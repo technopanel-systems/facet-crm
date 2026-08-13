@@ -38,10 +38,11 @@
  * when Phase 12 adds one. There is no second code path.
  */
 
-import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, isNull, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
+  comments,
   companies,
   notificationTypes,
   notifications,
@@ -56,8 +57,10 @@ import {
   type ViewableRecordType,
 } from "@/lib/authz";
 import {
+  COMMENT_RECORD_TYPES,
   NOTIFICATION_TYPES,
   notificationTypeName,
+  type CommentRecordType,
   type NotificationTypeKey,
   type NotificationTypeName,
 } from "@/lib/enums";
@@ -71,8 +74,28 @@ const SYSTEM_ACTOR: AuditActor = { actorUserId: null, actingAsUserId: null };
 
 const PAGE_SIZE = 25;
 
-/** The anchors a notification may carry, matching `record_type` `[09 §1]`. */
-export type NotificationAnchorType = ViewableRecordType;
+/**
+ * The anchors a notification may carry.
+ *
+ * **The array is the source of truth and the type derives from it**, not the
+ * other way round. It used to be `ViewableRecordType`, which was safe only
+ * while the two lists happened to match: feature slice 2 added `dispatch` to
+ * `ViewableRecordType` `[25 §9]`, and a hand-written array typed
+ * `NotificationAnchorType[]` would have gone on compiling while
+ * `asAnchorType("dispatch")` returned null and a dispatch-anchored notification
+ * rendered with no link and no error anywhere.
+ *
+ * `satisfies` still proves every member is a record `canViewRecord` can answer
+ * for, which is what `decorate` needs.
+ */
+const ANCHOR_TYPES = [
+  "company",
+  "contact",
+  "project",
+  "quotation_thread",
+] as const satisfies readonly ViewableRecordType[];
+
+export type NotificationAnchorType = (typeof ANCHOR_TYPES)[number];
 
 export type HandoverCounts = {
   companies: number;
@@ -90,9 +113,38 @@ export type HandoverCounts = {
  * `04 C1` warns about.
  */
 export type HandoverPayload = {
+  kind: "handover";
   fromUserId: string;
   fromUserName: string | null;
   counts: HandoverCounts;
+};
+
+/**
+ * `25 §11` — what a `mention.received` row carries instead of an anchor.
+ *
+ * **It has no anchor on purpose.** `notifications_live_key` is a partial unique
+ * index over every unresolved row with a `record_id`, and nothing ever resolves
+ * a type that is not persistent — so an anchored mention would deliver the
+ * first tag of a person on a record and silently drop every later one, for
+ * good. The record travels here, the way `record.handed_over`'s counts do.
+ *
+ * Ids are stored; names, the body and the link are resolved on read, for the
+ * reason above `HandoverPayload`. `recordViewable` is re-derived with
+ * `canViewRecord` every time: a notification row is not access-controlled proof
+ * of anything, and a share can be revoked between the tag and the reading of
+ * it.
+ */
+export type MentionPayload = {
+  kind: "mention";
+  commentId: string;
+  recordType: CommentRecordType;
+  recordId: string;
+  authorUserId: string;
+  authorName: string | null;
+  /** Withheld — with `body` and `href` — when the record is no longer visible. */
+  recordViewable: boolean;
+  body: string | null;
+  href: string | null;
 };
 
 export type NotificationRow = {
@@ -103,12 +155,30 @@ export type NotificationRow = {
   typeName: NotificationTypeName | null;
   tier: "act_now" | "digest";
   isPersistent: boolean;
+  /**
+   * Is this still waiting on the reader? The one definition of the badge
+   * `[21 §4]`.
+   *
+   * `07 G1` makes an act-now entry persistent and undismissable, and `21 §4`
+   * states the exception in its own words: where no resolution condition can
+   * become true, *"`is_persistent` is false and **it can be dismissed**."* That
+   * sentence had no implementation — the badge counted every unresolved act-now
+   * row, `markRead` deliberately never touches `resolved_at`, and no sweep
+   * resolves a non-persistent type. So `record.handed_over` incremented the
+   * bell forever, and `mention.received` — the highest-volume type in FACET
+   * once it replaces WhatsApp — would have buried the tier within weeks.
+   *
+   * So: a persistent entry waits until its condition clears, and a
+   * non-persistent one waits until it is read. Reading is not doing, for a type
+   * whose condition can be done. For news there is nothing to do but read it.
+   */
+  waiting: boolean;
   anchorType: NotificationAnchorType | null;
   anchorId: string | null;
   /** Only set when the viewer may still open it `[20 §8.2]`. */
   anchorViewable: boolean;
   anchorLabel: string | null;
-  payload: HandoverPayload | null;
+  payload: HandoverPayload | MentionPayload | null;
   digestDate: string | null;
   /** How many follow-ups the digest covered, by kind. */
   digestCounts: Record<string, number> | null;
@@ -435,7 +505,13 @@ function countByKind(rows: FollowUpRow[]): Record<string, number> {
  * Reading — recipient-filtered, every time `[00 §1.13]`
  * ------------------------------------------------------------------ */
 
-/** Unresolved act-now notifications for this person, for the nav badge. */
+/**
+ * Act-now notifications still waiting on this person, for the nav badge.
+ *
+ * The SQL twin of `NotificationRow.waiting` — read its comment for why the
+ * second term exists. The two are one rule: a change to either is a change to
+ * both.
+ */
 export async function unresolvedCount(session: AuthSession): Promise<number> {
   const [row] = await db
     .select({ total: count() })
@@ -449,6 +525,12 @@ export async function unresolvedCount(session: AuthSession): Promise<number> {
         eq(notifications.recipientUserId, session.user.id),
         eq(notificationTypes.tier, "act_now"),
         isNull(notifications.resolvedAt),
+        // `21 §4` — a type with no resolution condition "can be dismissed",
+        // and reading it is the only dismissal there is.
+        or(
+          eq(notificationTypes.isPersistent, true),
+          isNull(notifications.readAt),
+        ),
       ),
     );
   return row?.total ?? 0;
@@ -530,13 +612,6 @@ type RawNotification = {
   createdAt: Date;
 };
 
-const ANCHOR_TYPES: NotificationAnchorType[] = [
-  "company",
-  "contact",
-  "project",
-  "quotation_thread",
-];
-
 function asAnchorType(value: string | null): NotificationAnchorType | null {
   return ANCHOR_TYPES.find((type) => type === value) ?? null;
 }
@@ -566,6 +641,10 @@ async function decorate(
     typeName: notificationTypeName(row.typeKey) ?? null,
     tier: row.tier,
     isPersistent: row.isPersistent,
+    waiting:
+      row.tier === "act_now" &&
+      row.resolvedAt === null &&
+      (row.isPersistent || row.readAt === null),
     anchorType,
     anchorId: row.recordId,
     anchorViewable,
@@ -573,13 +652,34 @@ async function decorate(
       anchorViewable && anchorType && row.recordId
         ? await anchorName(anchorType, row.recordId)
         : null,
-    payload: await handoverPayload(row.payload),
+    payload: await decodePayload(session, row),
     digestDate: row.digestDate,
     digestCounts: digestCounts(row.payload),
     readAt: row.readAt,
     resolvedAt: row.resolvedAt,
     createdAt: row.createdAt,
   };
+}
+
+/**
+ * The payload, decoded **by type key** rather than by shape.
+ *
+ * Sniffing was safe while one type carried a payload; with two it is a latent
+ * bug — a handover payload and a mention payload are both objects, and the
+ * next type would decide which one it looked like by accident. The key is what
+ * the row actually says it is.
+ */
+async function decodePayload(
+  session: AuthSession,
+  row: RawNotification,
+): Promise<HandoverPayload | MentionPayload | null> {
+  if (row.typeKey === NOTIFICATION_TYPES.recordHandedOver) {
+    return handoverPayload(row.payload);
+  }
+  if (row.typeKey === NOTIFICATION_TYPES.mentionReceived) {
+    return mentionPayload(session, row.payload);
+  }
+  return null;
 }
 
 async function anchorName(
@@ -626,6 +726,7 @@ async function handoverPayload(
     .limit(1);
 
   return {
+    kind: "handover",
     fromUserId: record.fromUserId,
     fromUserName: from?.name ?? null,
     counts: {
@@ -635,6 +736,83 @@ async function handoverPayload(
       tasks: Number(c.tasks ?? 0),
     },
   };
+}
+
+/**
+ * `25 §11` — the mention payload, with the record re-checked on every read.
+ *
+ * The visibility question is asked here and not at write time: the tag was
+ * raised unconditionally, because `25 §11` attaches no condition to it and
+ * inventing one would be inventing business logic. What is conditional is what
+ * the reader is shown — the same rule the anchor path follows `[20 §8.2]`. The
+ * entry still appears, because what happened is not a secret from the person it
+ * happened to; it simply carries no body, no name and no link.
+ */
+async function mentionPayload(
+  session: AuthSession,
+  value: unknown,
+): Promise<MentionPayload | null> {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const commentId = record.commentId;
+  const recordId = record.recordId;
+  const authorUserId = record.authorUserId;
+  const recordType = COMMENT_RECORD_TYPES.find(
+    (type) => type === record.recordType,
+  );
+  if (
+    typeof commentId !== "string" ||
+    typeof recordId !== "string" ||
+    typeof authorUserId !== "string" ||
+    !recordType
+  ) {
+    return null;
+  }
+
+  const viewable = await canViewRecord(session, recordType, recordId);
+
+  const [author] = await db
+    .select({ name: users.name })
+    .from(users)
+    .where(eq(users.id, authorUserId))
+    .limit(1);
+
+  const [comment] = viewable
+    ? await db
+        .select({ body: comments.body })
+        .from(comments)
+        .where(eq(comments.id, commentId))
+        .limit(1)
+    : [];
+
+  return {
+    kind: "mention",
+    commentId,
+    recordType,
+    recordId,
+    authorUserId,
+    authorName: author?.name ?? null,
+    recordViewable: viewable,
+    // Read now, not stored: `25 §12` makes a comment editable, and a
+    // notification quoting the version before the correction would be worse
+    // than one quoting nothing.
+    body: comment?.body ?? null,
+    // The thread lives on the record `[25 §9]`, so the link goes there and the
+    // fragment finds the comment in it. There is no comment page.
+    href: viewable ? `${recordHref(recordType, recordId)}#comment-${commentId}` : null,
+  };
+}
+
+/**
+ * Where a record lives. The twin of `_components/anchors.ts`, which cannot be
+ * imported here — it is a screen module, and this one is read by the sweep.
+ */
+function recordHref(recordType: CommentRecordType, id: string): string {
+  if (recordType === "quotation_thread") return `/quotations/${id}`;
+  if (recordType === "project") return `/projects/${id}`;
+  if (recordType === "contact") return `/contacts/${id}`;
+  if (recordType === "dispatch") return `/dispatches/${id}`;
+  return `/companies/${id}`;
 }
 
 function digestCounts(value: unknown): Record<string, number> | null {

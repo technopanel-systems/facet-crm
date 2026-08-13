@@ -27,6 +27,7 @@ import {
   reassignCompanyAction,
   reincludeCompanyAction,
 } from "../actions";
+import { CommentBox } from "../../_components/comment-box";
 import {
   TurnPanel,
   daysSince,
@@ -292,6 +293,17 @@ export default async function CompanyDetailPage({
                   {t("reports.new")}
                 </Link>
               </Button>
+            }
+            // One thread per record `[25 §9]`: the conversation sits inside the
+            // timeline card, not beside it. The Log button stays where it is —
+            // a report is what happened with the customer and a comment is what
+            // colleagues say about it, and the two are not the same act.
+            composer={
+              <CommentBox
+                session={session}
+                recordType="company"
+                recordId={company.id}
+              />
             }
           />
         </div>

@@ -59,12 +59,24 @@
  * better than a clever query nobody can audit.
  */
 
-import { and, asc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  lt,
+  lte,
+  sql,
+} from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { db } from "@/db";
 import {
   auditLog,
+  commentMentions,
+  comments,
   companies,
   dispatches,
   quotationThreads,
@@ -73,32 +85,45 @@ import {
   users,
 } from "@/db/schema";
 import {
+  visibleCommentsFilter,
   visibleCompaniesFilter,
   visibleDispatchesFilter,
   visibleQuotationThreadsFilter,
   visibleRepReportsFilter,
   type AuthSession,
 } from "@/lib/authz";
+import type { CommentRecordType } from "@/lib/enums";
 
-/** The five system events `20 §6` and `20 §8` name, plus the rep's own. */
+/**
+ * The five system events `20 §6` and `20 §8` name, the rep's own, and the
+ * conversation `[25 §9]`.
+ *
+ * `25 §9` is explicit that a comment is not a seventh kind of report but does
+ * belong here: *"Both land on the same timeline. One thread per record carrying
+ * reports, system events and conversation."* What keeps `25 §14` true — counted,
+ * never summed — is that `daily-activity.ts` tallies this kind in its own
+ * column and excludes it from every other, not that it is kept off the thread.
+ */
 export type TimelineEventKind =
   | "report"
   | "company_added"
   | "quotation_raised"
   | "quotation_issued"
   | "payment_confirmed"
-  | "dispatched";
+  | "dispatched"
+  | "comment";
 
 export type TimelineLink =
   | { type: "report"; id: string }
   | { type: "company"; id: string }
+  | { type: "contact"; id: string }
   | { type: "quotation"; id: string }
-  | { type: "dispatch"; id: string };
+  | { type: "dispatch"; id: string }
+  | { type: "comment"; id: string };
 
-export type TimelineEvent = {
+type TimelineEventBase = {
   /** Stable across renders: the kind plus the source row's id. */
   key: string;
-  kind: TimelineEventKind;
   /** The calendar day in Riyadh, `YYYY-MM-DD`. Never an instant. */
   day: string;
   /** Orders entries within a day. */
@@ -114,11 +139,58 @@ export type TimelineEvent = {
 };
 
 /**
- * Which timeline is being asked for. A report naming a project appears on both
- * its company's and its project's. Neither key set means "everything in the
- * range", which is what the daily view asks for.
+ * A comment's own words, which are the event rather than a detail of it.
+ *
+ * `detail` is *"a short value the screen renders beside the kind"* and a body
+ * is neither short nor beside anything, so this is its own field — and it is
+ * discriminated on `kind` so the six derived sources cannot accidentally be
+ * read for one.
+ *
+ * `canEdit` is `author === viewer` `[25 §12]`, decided here because the session
+ * is here. It is an identity question, not a visibility one — the distinction
+ * `reports.ts` draws for the same rule.
  */
-export type TimelineScope = { companyId?: string; projectId?: string };
+export type TimelineComment = {
+  id: string;
+  body: string;
+  editedAt: Date | null;
+  canEdit: boolean;
+  mentions: { userId: string; name: string }[];
+};
+
+export type TimelineEvent = TimelineEventBase &
+  (
+    | { kind: Exclude<TimelineEventKind, "comment">; comment?: never }
+    | { kind: "comment"; comment: TimelineComment }
+  );
+
+/**
+ * Which timeline is being asked for.
+ *
+ * A report naming a project appears on both its company's and its project's.
+ * `record` is the third form, for the records that have a thread but no derived
+ * events of their own — a contact, a quotation thread, a dispatch `[25 §9]`.
+ * **No key at all** means "everything in the range", which is what the daily
+ * view asks for.
+ *
+ * A company scope and a project scope are also record anchors; `commentAnchor`
+ * derives that rather than making a caller pass the same id twice.
+ */
+export type TimelineScope = {
+  companyId?: string;
+  projectId?: string;
+  record?: { type: CommentRecordType; id: string };
+};
+
+/** The record whose comments this scope is asking for, if any. */
+function commentAnchor(
+  scope: TimelineScope,
+): { type: CommentRecordType; id: string } | null {
+  if (scope.record) return scope.record;
+  if (scope.companyId) return { type: "company", id: scope.companyId };
+  if (scope.projectId) return { type: "project", id: scope.projectId };
+  return null;
+}
 
 /** `(x at time zone 'Asia/Riyadh')::date` — the app's timezone is fixed, and a
  *  timeline entry is a day there rather than a UTC instant. */
@@ -432,6 +504,132 @@ async function dispatchedEvents(
   }));
 }
 
+/**
+ * The conversation `[25 §9]` — one thread per record, so a comment appears on
+ * the timeline of the record it was written on and nowhere else.
+ *
+ * **`visibleCommentsFilter` is applied either way, anchored or not.**
+ *
+ * The first draft skipped it when anchored, on the reasoning that a detail
+ * screen has already proved visibility by loading the record through that
+ * record's own filter — true of every screen, and the sort of thing that stays
+ * true right up until it doesn't. `scripts/verify-comments.ts` §2 called this
+ * with an outsider's session and got somebody else's conversation back. In
+ * production nothing reached it, because the pages 404 first; as a property of
+ * the function it was simply false.
+ *
+ * The cost is one correlated `exists` over a single anchor row: the record type
+ * is pinned by equality, so four of the filter's five branches are contradicted
+ * and dropped before execution. That is not a price worth trading a leak for,
+ * in the one module where a leak is silent `[03]` — FACET has no RLS, so a
+ * missing filter is not a weakened defence, it is none `[00 §1.13]`.
+ *
+ * The range is a half-open window on the raw timestamp rather than
+ * `riyadhDay(...) between ...` like its neighbours. That expression is STABLE,
+ * not IMMUTABLE — the schema says so where it explains `digest_date` — so
+ * Postgres cannot index it, and `comments` is the one table on this timeline
+ * that grows every time anybody says anything. `lt` on the exclusive end, not
+ * `lte`: half-open is the only form that neither drops nor duplicates the last
+ * hour of the day.
+ */
+async function commentEvents(
+  session: AuthSession,
+  scope: TimelineScope,
+  range?: DateRange,
+): Promise<TimelineEvent[]> {
+  const anchor = commentAnchor(scope);
+
+  const rows = await db
+    .select({
+      id: comments.id,
+      recordType: comments.recordType,
+      recordId: comments.recordId,
+      at: comments.createdAt,
+      day: riyadhDay(comments.createdAt),
+      actorUserId: comments.authorUserId,
+      actorName: users.name,
+      body: comments.body,
+      editedAt: comments.editedAt,
+    })
+    .from(comments)
+    .innerJoin(users, eq(users.id, comments.authorUserId))
+    .where(
+      and(
+        visibleCommentsFilter(session),
+        anchor
+          ? and(
+              eq(comments.recordType, anchor.type),
+              eq(comments.recordId, anchor.id),
+            )
+          : undefined,
+        range
+          ? gte(
+              comments.createdAt,
+              sql`${range.from}::date::timestamp at time zone 'Asia/Riyadh'`,
+            )
+          : undefined,
+        range
+          ? lt(
+              comments.createdAt,
+              sql`(${range.to}::date + 1)::timestamp at time zone 'Asia/Riyadh'`,
+            )
+          : undefined,
+      ),
+    );
+
+  const mentions = await mentionsFor(rows.map((row) => row.id));
+
+  return rows.map((row) => ({
+    key: `comment:${row.id}`,
+    kind: "comment" as const,
+    day: row.day,
+    at: row.at,
+    actorUserId: row.actorUserId,
+    actorName: row.actorName,
+    // Only where the anchor IS the company or the project. A comment on a
+    // contact is not a company event, and inventing one here would put it on a
+    // timeline `25 §9` does not put it on.
+    companyId: row.recordType === "company" ? row.recordId : null,
+    projectId: row.recordType === "project" ? row.recordId : null,
+    detail: null,
+    // The comment's own edit route, rendered only when `canEdit` `[25 §12]`.
+    link: { type: "comment" as const, id: row.id },
+    comment: {
+      id: row.id,
+      body: row.body,
+      editedAt: row.editedAt,
+      canEdit: row.actorUserId === session.user.id,
+      mentions: mentions.get(row.id) ?? [],
+    },
+  }));
+}
+
+/** Who was tagged, for a page of comments, in one query rather than per row. */
+async function mentionsFor(
+  commentIds: string[],
+): Promise<Map<string, { userId: string; name: string }[]>> {
+  const byComment = new Map<string, { userId: string; name: string }[]>();
+  if (commentIds.length === 0) return byComment;
+
+  const tagged = await db
+    .select({
+      commentId: commentMentions.commentId,
+      userId: commentMentions.mentionedUserId,
+      name: users.name,
+    })
+    .from(commentMentions)
+    .innerJoin(users, eq(users.id, commentMentions.mentionedUserId))
+    .where(inArray(commentMentions.commentId, commentIds))
+    .orderBy(asc(users.name));
+
+  for (const row of tagged) {
+    const list = byComment.get(row.commentId) ?? [];
+    list.push({ userId: row.userId, name: row.name });
+    byComment.set(row.commentId, list);
+  }
+  return byComment;
+}
+
 /** The company or project term, for the three sources that reach it through a
  *  quotation thread. */
 function anchorFilter(scope: TimelineScope) {
@@ -451,13 +649,34 @@ async function gather(
   scope: TimelineScope,
   range?: DateRange,
 ): Promise<TimelineEvent[]> {
+  /**
+   * **The six derived sources are anchored to a company or a project, or to
+   * nothing at all.** They express that themselves — `anchorFilter` for the
+   * three that reach it through a thread, an inline ternary in `reportEvents`,
+   * `companyAddedEvents` and `dispatchedEvents` — and every one of those terms
+   * falls to `undefined` when neither key is set. That is correct for the daily
+   * view, which asks for everything in a range.
+   *
+   * It is NOT correct for `25 §9`'s third scope. A contact, a quotation thread
+   * and a dispatch have a thread of their own and no derived events, so running
+   * the six for one of them would answer "every event this viewer can see"
+   * instead of "this record's". Silently, and as over-disclosure rather than a
+   * crash. So they are not run at all.
+   */
+  const derived = scope.record
+    ? []
+    : [
+        reportEvents(session, scope, range),
+        companyAddedEvents(session, scope, range),
+        quotationRaisedEvents(session, scope, range),
+        quotationIssuedEvents(session, scope, range),
+        paymentConfirmedEvents(session, scope, range),
+        dispatchedEvents(session, scope, range),
+      ];
+
   const parts = await Promise.all([
-    reportEvents(session, scope, range),
-    companyAddedEvents(session, scope, range),
-    quotationRaisedEvents(session, scope, range),
-    quotationIssuedEvents(session, scope, range),
-    paymentConfirmedEvents(session, scope, range),
-    dispatchedEvents(session, scope, range),
+    ...derived,
+    commentEvents(session, scope, range),
   ]);
 
   return parts
@@ -497,6 +716,24 @@ export function companyTimeline(
   options: { limit?: number; page?: number } = {},
 ) {
   return timelineFor(session, { companyId }, options);
+}
+
+/**
+ * The thread of a record that has no derived events of its own — a contact, a
+ * quotation thread, a dispatch `[25 §9]`.
+ *
+ * Callers pass **no `limit`**, so it pages rather than capping: `<Timeline>`
+ * only offers a "view all" link when it is given one, and these three records
+ * have no full-history route. A cap with no route behind it is what
+ * `timelineFor` above exists not to do.
+ */
+export function recordTimeline(
+  session: AuthSession,
+  type: CommentRecordType,
+  id: string,
+  options: { page?: number } = {},
+) {
+  return timelineFor(session, { record: { type, id } }, options);
 }
 
 export function projectTimeline(

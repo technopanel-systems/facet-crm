@@ -131,6 +131,13 @@ export default async function ActivityPage({
                   {t("activity.fields.person")}
                 </TableHead>
                 <TableHead numeric>{t("activity.fields.reportsLogged")}</TableHead>
+                {/* Immediately beside the report count and never inside it —
+                    `25 §14` shows the two as `reports: 4 · comments: 7`, and
+                    the whole point of the adjacency is that nothing adds
+                    them. */}
+                <TableHead numeric>
+                  {t("activity.fields.commentsLogged")}
+                </TableHead>
                 <TableHead numeric>{t("activity.fields.companiesTouched")}</TableHead>
                 <TableHead numeric>{t("activity.fields.systemEvents")}</TableHead>
                 <TableHead numeric>{t("activity.fields.signalsRaised")}</TableHead>
@@ -147,6 +154,9 @@ export default async function ActivityPage({
                   </TableCell>
                   <TableCell numeric dir="ltr">
                     {row.reportsLogged}
+                  </TableCell>
+                  <TableCell numeric dir="ltr">
+                    {row.commentsLogged}
                   </TableCell>
                   <TableCell numeric dir="ltr">
                     {row.companiesTouched}
@@ -182,6 +192,9 @@ export default async function ActivityPage({
                 </TableCell>
                 <TableCell numeric dir="ltr">
                   {total.reportsLogged}
+                </TableCell>
+                <TableCell numeric dir="ltr">
+                  {total.commentsLogged}
                 </TableCell>
                 <TableCell numeric dir="ltr">
                   {total.companiesTouched}

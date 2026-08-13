@@ -127,6 +127,10 @@ export function ThreadActions({
     confirmPaymentAction.bind(null, threadId),
     emptyFormState,
   );
+  const [returnState, returnEdit, returning] = useActionState(
+    returnForEditAction.bind(null, threadId),
+    emptyFormState,
+  );
 
   // A revision's origin says which route produced it `[07 C2]`: the
   // coordinator editing directly, or the rep asking for a change. When the
@@ -209,10 +213,31 @@ export function ThreadActions({
               title={t("quotations.actions.returnForEdit")}
               hint={t("quotations.actions.returnForEditHint")}
             >
-              <PlainButton
-                action={returnForEditAction.bind(null, threadId)}
-                label={t("quotations.actions.returnForEdit")}
-              />
+              <form action={returnEdit} className="flex flex-col gap-2">
+                {/* Required `[25 §13]` — the reason IS the return. It becomes a
+                    comment on the thread rather than a field of its own, so the
+                    rep reads what to fix where the conversation already is. */}
+                <Textarea
+                  id="reason"
+                  name="reason"
+                  rows={2}
+                  required
+                  className="text-start"
+                />
+                <div>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    variant="outline"
+                    disabled={returning}
+                  >
+                    {returning
+                      ? t("common.saving")
+                      : t("quotations.actions.returnForEdit")}
+                  </Button>
+                </div>
+                <Feedback state={returnState} />
+              </form>
             </Panel>
           ) : null}
 

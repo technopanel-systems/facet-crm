@@ -18,7 +18,10 @@
  *      which nothing else drives.
  *   8. The chain strip `[22 §6.6]` renders on a quotation thread AND on the
  *      project behind it, in both locales.
- *   9. No screen renders anything shaped like an unresolved message key.
+ *   9. The comment box `[25 §9]` posts for real, and its cap refuses rather
+ *      than 500s — the one assertion of `readFields`' shape validation
+ *      anywhere, because no in-process script crosses the action boundary.
+ *  10. No screen renders anything shaped like an unresolved message key.
  *
  * Section 0 runs before all of them, and refuses a server that booted before
  * the build — the hole every one of the above passed straight through `[23]`.
@@ -308,6 +311,20 @@ async function walk(jar: Jar, email: string, locale: string): Promise<void> {
 }
 
 /** The id-bearing routes, discovered from the lists rather than hard-coded. */
+/**
+ * The five kinds `comments_record_type` admits `[25 §9]`, by list section.
+ *
+ * `reports` and `users` are absent because they are not commentable — a report
+ * is already somebody's words, and a colleague is not a record.
+ */
+const COMMENTABLE = new Set([
+  "companies",
+  "contacts",
+  "projects",
+  "quotations",
+  "dispatches",
+]);
+
 async function walkRecords(jar: Jar, email: string): Promise<void> {
   // `/users/[id]/handover` is deliberately absent: `19 §3` opens it only AFTER
   // deactivation, and `team.ts:141` returns null for a user who is still
@@ -344,6 +361,16 @@ async function walkRecords(jar: Jar, email: string): Promise<void> {
           check(
             `  ${path} renders the chain strip`,
             body.includes('data-slot="chain-strip"'),
+          );
+        }
+        // `25 §9` — comments belong on every record, so every one of the five
+        // detail screens offers the box. This is the assertion that would have
+        // caught the three screens that had no timeline to hang it on.
+        if (COMMENTABLE.has(section)) {
+          check(
+            `  ${path} offers the comment box [25 §9]`,
+            body.includes('data-slot="comment-composer"') &&
+              body.includes('name="body"'),
           );
         }
       }
@@ -860,7 +887,99 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log("\n9. Nothing reads like a message key that failed to resolve");
+  console.log("\n9. The comment box, posted for real [25 §9], [25 §11]");
+  {
+    // **`verify:comments` drives `addComment`; this drives the FORM.** The two
+    // do not overlap: the in-process script never touches `readFields`, the
+    // action, the chip picker's repeated `mentions` values or the body cap —
+    // and the cap is shape validation, so the action is the only place it
+    // lives. That boundary is where slices 2 and 3 replayed a POST by hand and
+    // threw the replay away `[23]`; this one is kept.
+    for (const locale of ["en", "ar"] as const) {
+      const jar = jars["rep-a@example.test"];
+      const list = await get(jar, `/${locale}/companies`);
+      const id = firstId(list.body, "companies");
+      if (!id) {
+        console.log(`  --    ${locale}: rep-a holds no company to comment on`);
+        continue;
+      }
+
+      const page = await get(jar, `/${locale}/companies/${id}`);
+      check(
+        `${locale}: the company screen carries the composer [25 §9]`,
+        page.body.includes('data-slot="comment-composer"'),
+      );
+
+      const form = page.body.match(
+        /<form[^>]*data-slot="comment-composer"[\s\S]*?<\/form>/,
+      )?.[0];
+      check(`${locale}: the composer is a real form`, Boolean(form));
+      if (!form) continue;
+
+      // The chip picker posts repeated `mentions` values `[25 §11]`. Asserting
+      // the marker rather than a name: the list is whoever is active.
+      check(
+        `${locale}: it offers people to tag [25 §11]`,
+        form.includes('name="mentions"'),
+      );
+
+      const envelope = (): FormData => {
+        const fields = new FormData();
+        for (const input of form.matchAll(/<input[^>]*>/g)) {
+          const name = input[0].match(/name="([^"]+)"/)?.[1];
+          if (!name?.startsWith("$ACTION")) continue;
+          // HTML-unescaped, for the reason section 7 records: a bound action's
+          // envelope carries JSON, and replaying `&quot;` verbatim reads as a
+          // stale deployment that is not one.
+          fields.append(
+            name,
+            unescapeHtml(input[0].match(/value="([^"]*)"/)?.[1] ?? ""),
+          );
+        }
+        return fields;
+      };
+
+      const post = async (body: FormData): Promise<number> => {
+        const response = await fetch(`${BASE}/${locale}/companies/${id}`, {
+          method: "POST",
+          headers: { cookie: header(jar), origin: BASE },
+          body,
+          redirect: "manual",
+        });
+        store(jar, response);
+        return response.status;
+      };
+
+      const good = envelope();
+      good.set("body", `verify-routes ${locale} comment`);
+      const posted = await post(good);
+      check(
+        `${locale}: *** posting a comment answers 200, not 500 *** [25 §9]`,
+        posted === 200,
+        `got ${posted}`,
+      );
+
+      const after = await get(jar, `/${locale}/companies/${id}`);
+      check(
+        `${locale}: the comment is on the record's thread [25 §9]`,
+        after.body.includes('data-slot="comment"'),
+      );
+
+      // **The cap** `[25 §9]`. It is `readFields` shape validation, so nothing
+      // in process crosses it — this is the only assertion of it anywhere. A
+      // 200 carrying the error is the correct answer; a 500 is the defect.
+      const tooLong = envelope();
+      tooLong.set("body", "x".repeat(5001));
+      const capped = await post(tooLong);
+      check(
+        `${locale}: an over-long comment is refused, not a 500 [25 §9]`,
+        capped === 200,
+        `got ${capped}`,
+      );
+    }
+  }
+
+  console.log("\n10. Nothing reads like a message key that failed to resolve");
   {
     // Accumulated by `scanForUnresolvedKeys` over every page fetched above —
     // so this covers all three identities, both locales, both themes and every

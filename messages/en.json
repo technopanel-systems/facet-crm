@@ -161,14 +161,16 @@
       "quotation_raised": "Quotation raised",
       "quotation_issued": "Quotation issued",
       "payment_confirmed": "Payment confirmed",
-      "dispatched": "Dispatched"
+      "dispatched": "Dispatched",
+      "comment": "Comment"
     },
     "notificationType": {
       "quotationExpired": "Quotation expired",
       "recordAssigned": "Assigned to you",
       "recordHandedOver": "Work handed over to you",
       "shareGranted": "Shared with you",
-      "followUpDigest": "Daily follow-ups"
+      "followUpDigest": "Daily follow-ups",
+      "mentionReceived": "Mentioned you"
     },
     "followUpKind": {
       "quotation_no_response": "Quotation, no response",
@@ -447,6 +449,7 @@
       "threadClosed": "This quotation is closed.",
       "coordinatorOnly": "Only the sales coordinator can do that.",
       "cancellationReasonRequired": "Cancelling needs a written reason.",
+      "returnReasonRequired": "Say what needs changing. The reason goes to the rep as a comment.",
       "paymentFirst": "Confirm the payment first.",
       "noSuppliers": "No product suppliers have been set up yet, so a line cannot be saved."
     }
@@ -739,6 +742,27 @@
       "authorOnly": "Only the person who wrote this report may correct it."
     }
   },
+  "comments": {
+    "new": "Comment",
+    "placeholder": "What do your colleagues need to know?",
+    "post": "Post",
+    "tag": "Tell someone",
+    "edited": "edited",
+    "taggedPeople": "Tagged: {names}",
+    "editTitle": "Edit comment",
+    "fields": {
+      "body": "Comment"
+    },
+    "detail": {
+      "tagEditHint": "Unticking somebody does not take back a notification already sent."
+    },
+    "errors": {
+      "bodyRequired": "Write something first.",
+      "authorOnly": "Only the person who wrote a comment can edit it.",
+      "notFound": "That comment no longer exists.",
+      "recordNotFound": "That record is not yours to comment on."
+    }
+  },
   "timeline": {
     "title": "Timeline",
     "fullTitle": "Full history",
@@ -756,6 +780,7 @@
       "to": "To",
       "person": "Person",
       "reportsLogged": "Logged",
+      "commentsLogged": "Comments",
       "companiesTouched": "Companies",
       "systemEvents": "Recorded by FACET",
       "signalsRaised": "Signals"
@@ -824,7 +849,10 @@
       "digestSummary": "{total} follow-ups on {date}.",
       "digestLink": "Open follow-ups",
       "clearsThreadNoLongerExpired": "Clears when the quotation is extended or revised.",
-      "clearsInteractionAgainstCompany": "Clears when you log an interaction with the company."
+      "clearsInteractionAgainstCompany": "Clears when you log an interaction with the company.",
+      "mention": "{name} mentioned you in a comment.",
+      "mentionUnknown": "Somebody mentioned you in a comment.",
+      "mentionLink": "Open the record"
     },
     "actions": {
       "markRead": "Mark read",

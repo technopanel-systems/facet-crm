@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { redirect } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
-import { SMAC_VERIFICATIONS } from "@/lib/enums";
+import { COMMENT_BODY_MAX, SMAC_VERIFICATIONS } from "@/lib/enums";
 import {
   acceptThread,
   addQuotationLine,
@@ -351,14 +351,29 @@ export async function issueVersionAction(
   return {};
 }
 
+/**
+ * `25 §13` — the return carries a reason, and the reason is a comment.
+ *
+ * It stopped being a zero-field action here: the reason is required, so the
+ * panel is a form with a field rather than a lone button.
+ */
 export async function returnForEditAction(
   threadId: string,
+  _previous: FormState,
+  formData: FormData,
 ): Promise<FormState> {
   const session = await requireSession();
+  const fields = readFields(formData);
+  const reason = fields.text("reason", {
+    required: true,
+    max: COMMENT_BODY_MAX,
+  });
+  if (!fields.ok || !reason) return fields.state;
+
   try {
-    await returnForEdit(session, threadId);
+    await returnForEdit(session, threadId, reason);
   } catch (error) {
-    return ruleErrorState(error);
+    return ruleErrorState(error, fields.values);
   }
   revalidatePath(`/quotations/${threadId}`);
   return {};

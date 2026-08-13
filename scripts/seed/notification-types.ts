@@ -1,5 +1,5 @@
 /**
- * `21 §2` — the five notification types, and no sixth.
+ * The seeded notification types — `21 §2`'s five, and `25 §11`'s sixth.
  *
  * `10 §10` makes the type a **lookup, not an enum in code**: the trigger list
  * stays open and adding a type must be data, not a migration. That is why this
@@ -10,6 +10,14 @@
  * list open since the business model was written; `21 §2` closes it, and holds
  * the line `20 §11` drew — a row is seeded when, and only when, something
  * produces it.
+ *
+ * **`21 §2` is headed "and no sixth", and `mention.received` is the sixth.**
+ * That heading enumerated what was true when it was written; the rule beneath
+ * it is the test in the paragraph above, which `25 §11` passes on both limbs —
+ * it is named in user truth, and `src/lib/comments.ts` raises it. Adding the
+ * type without its producer would have been the dead gate; adding both in one
+ * change is what `21 §11` describes for `share.granted`. `25` is the later
+ * user-truth document besides.
  *
  * **`is_persistent` is not a synonym for act-now** `[21 §4]`. A type is
  * persistent only where its resolution condition can actually become true;
@@ -88,6 +96,33 @@ export const NOTIFICATION_TYPE_SEED: NotificationTypeSeed[] = [
     nameEn: "Daily follow-ups",
     nameAr: "المتابعات اليومية",
     tier: "digest",
+    isPersistent: false,
+  },
+  {
+    // `25 §11` — "Tagging a person raises a notification. That is the difference
+    // between a comment box people ignore and one that replaces WhatsApp."
+    // Raised per mention by `addComment` and `updateComment`.
+    //
+    // Act-now rather than digest: it is directed at one person about one thing,
+    // and the point is that it interrupts. A daily summary would reproduce
+    // exactly the latency `25 §9` exists to remove.
+    //
+    // NOT persistent `[21 §4]`, for `record.handed_over`'s reason. Being
+    // mentioned has no condition that can clear: opening the record is a click
+    // by another name, which `07 G1` refuses, and a reply is not owed. Being
+    // mentioned is news — and where it implies work, that work raises its own
+    // notification through the normal path.
+    //
+    // It is also raised with NO ANCHOR, which is not cosmetic: the partial
+    // unique index `notifications_live_key` covers every unresolved row that
+    // carries a `record_id`, and nothing ever resolves a non-persistent type.
+    // Anchored, the second mention of the same person on the same record would
+    // be swallowed by `on conflict do nothing`, permanently. The record travels
+    // in `payload` instead, as `record.handed_over`'s counts do `[21 §10]`.
+    key: NOTIFICATION_TYPES.mentionReceived,
+    nameEn: "Mentioned you",
+    nameAr: "أشار إليك",
+    tier: "act_now",
     isPersistent: false,
   },
 ];

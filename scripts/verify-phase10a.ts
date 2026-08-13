@@ -300,6 +300,10 @@ async function main(): Promise<void> {
     { key: NOTIFICATION_TYPES.recordHandedOver, tier: "act_now", persistent: false },
     { key: NOTIFICATION_TYPES.shareGranted, tier: "act_now", persistent: true },
     { key: NOTIFICATION_TYPES.followUpDigest, tier: "digest", persistent: false },
+    // `25 §11`'s sixth — see the count assertion below. NOT persistent, for
+    // `record.handed_over`'s reason `[21 §4]`: being mentioned has no condition
+    // that can clear.
+    { key: NOTIFICATION_TYPES.mentionReceived, tier: "act_now", persistent: false },
   ];
 
   for (const want of expected) {
@@ -315,10 +319,24 @@ async function main(): Promise<void> {
       `got ${row?.defaultChannel}`,
     );
   }
-  // A type nothing produces is the shape of v1's dead approval gate `[20 §11]`.
+  /**
+   * A type nothing produces is the shape of v1's dead approval gate `[20 §11]`.
+   *
+   * **This said five until feature slice 2, and the line moving is the point.**
+   * `21 §2` is headed *"Five notification types are seeded, and no sixth"*, but
+   * the rule underneath that heading is a **test**, not a cap: *"Each type below
+   * is named in a user-truth document AND has a real event in the code that can
+   * raise it."* `mention.received` passes both limbs — `25 §11` names it
+   * (*"Tagging a person raises a notification"*) and `src/lib/comments.ts`
+   * raises it, added in the same change. `25` is the later user-truth document
+   * besides, so it wins on its own.
+   *
+   * What the number still guards is the thing `21 §2` actually cared about: a
+   * seeded type with no producer. Raise it only alongside one.
+   */
   check(
-    "exactly five notification types and no sixth [21 §2]",
-    types.length === 5,
+    "exactly six notification types — 21 §2's five, and 25 §11's [21 §2], [25 §11]",
+    types.length === 6,
     `got ${types.map((type) => type.key).join(", ")}`,
   );
 

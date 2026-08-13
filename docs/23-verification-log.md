@@ -830,6 +830,112 @@ lesson about a token defined in only one.
 
 ---
 
+## Feature slice 2 — comments and mentions (2026-08-13)
+
+`25 §9`–`§15` built. `scripts/verify-comments.ts` is kept, and
+`npm run verify:routes` gained a section that posts the comment form for real.
+
+**All four checks, the whole verify suite and the HTTP pass are green:**
+`typecheck` · `lint` · `build` · `check:messages` (719 keys), then
+`verify:{comments,slice2,slice3,phase9,phase11,phase10a,schema25}` and
+`verify:routes` — **389 checks**, three identities, both locales, both themes.
+
+### What `verify-comments.ts` asserts
+
+Ten sections, each citing the document it comes from:
+
+1. All five record types take a comment, and **the database refuses a sixth by
+   constraint name** — `comments_record_type`, walked off `error.cause` the way
+   `verify-phase10a.ts` learned to. A positive CHECK is the only thing standing
+   between a future `record_type` value and silently becoming commentable.
+2. Visibility follows the record `[25 §10]`, **in both directions**. The
+   negative half is the one that found a bug.
+3. Author-only edit, each refusal asserting its own translation key; `edited_at`
+   moves; a no-op save writes no audit row; **no delete path exists**.
+4. The mention: act-now, not persistent, raised anchorless — and **two mentions
+   of the same person on the same record both land**.
+5. A tag on somebody who cannot see the record still raises, and its payload
+   withholds the body and the link while still naming who tagged them.
+6. Comments join the record's timeline, and a record-only scope returns **its own
+   comments and nothing else**.
+7. `25 §14`, the central claim: one more comment moves the comment column and
+   moves no other.
+8. `25 §13`: the return-for-edit reason is a comment on the thread, and a
+   refused return **rolls its reason back with it**.
+9. `21 §4`: a notification with no resolution condition can be dismissed.
+10. Every write is audited, and the distinct actions are printed.
+
+### Three defects it caught, and one it did not
+
+**1. `recordTimeline` returned another rep's conversation.** §2 handed it an
+outsider's session and got a comment back. The design had the anchored read skip
+`visibleCommentsFilter` on the reasoning that a detail screen has already proved
+visibility by loading the record — true of every screen, and **not a property of
+the function**. Nothing in production reached it, because the pages `notFound()`
+first; as a claim about the module it was simply false. The filter is now applied
+on every read, anchored or not. The anchored case pins `record_type` by equality,
+so four of the five branches are contradicted and never execute — one `exists`
+over one row, which is not a price worth trading a silent leak for in a codebase
+with no RLS `[03]`, `[00 §1.13]`.
+
+**2. `notifications_live_key` would have swallowed every repeat mention.** The
+partial unique index covers `(recipient, type, record_type, record_id)` for every
+unresolved row **with a `record_id`**, and nothing resolves a type that is not
+persistent — so an anchored `mention.received` would have delivered the first tag
+of a person on a record and dropped every later one, permanently and silently.
+Found while designing rather than in production, so the type is raised
+**anchorless** with the record in `payload`, the way `record.handed_over` carries
+its counts `[21 §10]`. §4 asserts the second tag lands, so the index cannot be
+re-introduced by a later "tidy-up".
+
+**3. The bell counted a dismissible notification forever.** `unresolvedCount`
+counts `tier='act_now' AND resolved_at IS NULL` and **never reads
+`is_persistent`**; `markRead` deliberately never touches `resolved_at`; no sweep
+resolves a non-persistent type. So `record.handed_over` had been incrementing the
+badge permanently since Phase 10a, and `mention.received` — the highest-volume
+type in FACET once it replaces WhatsApp — would have buried the tier within
+weeks. `21 §4` already legislated the fix in its own words: where no resolution
+condition can become true, *"`is_persistent` is false and **it can be
+dismissed**"*. That sentence had no implementation. `waiting` is now one
+definition, in `notifications.ts`, read by the badge query, `/notifications` and
+the Today screen — which had each spelled the rule out separately.
+
+**What it did not catch: the wrong server.** The first `verify:routes` run
+reported *"1 of 389 CHECK(S) FAILED"* — five message keys rendering as raw text.
+The keys were in both catalogues and `check:messages` was green. The cause was
+that `npm run start` had lost the port to **a stale server from an earlier
+session** (`EADDRINUSE`, in the start log nobody reads), so 388 checks had passed
+against a days-old build.
+
+**Section 0 exists precisely to refuse this, and it waved it through.** The
+`/api/health` boot stamp was `const BOOTED_AT = new Date()` at module scope, with
+a comment claiming it was *"stamped once at boot"*. A route module is evaluated
+**lazily, on the first request that reaches it** — so the stamp was really "when
+somebody first asked for `/api/health`", and a days-old server that had never
+been probed reported itself as milliseconds old. It now derives from
+`process.uptime()`, which is the process's real age whenever the module loads.
+Verified by pointing the guard at a server older than the build and watching it
+refuse.
+
+Two lessons, both already this repo's shape: **a guard is not verified until it
+has been made to fire**, and the untranslated-key scan earned its place a second
+time — it was the only assertion in the suite that could see a stale server,
+because it is the only one that does not merely check a marker is present.
+
+### What is still manual
+
+- **Nobody has looked at it.** No screenshot at 1366 or 1440, in either locale.
+  The chip row and the comment body are the two things that wrap, and the chip
+  row's scale limit is `22 §6.9`.
+- **The client half is untested**, as everywhere: the composer's uncontrolled
+  reset after a successful post, and its remount against `state.values` after a
+  rejected one, are asserted only by the POST returning 200 and the comment
+  appearing on the next render.
+- **The edit screen's form is not replayed** over HTTP. `verify-comments` §3
+  drives `updateComment` in process; the POST through `readFields` is not driven.
+
+---
+
 ## Why the HTTP pass is not optional
 
 Also moved from `CLAUDE.md`, from its **Working style** section, which now

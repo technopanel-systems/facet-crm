@@ -11,6 +11,7 @@ import {
   Fact,
   Facts,
 } from "@/components/page-header";
+import { Timeline } from "@/components/timeline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,8 +36,11 @@ import {
   listServiceTypes,
 } from "@/lib/lookups";
 import { getQuotationThread } from "@/lib/quotations";
+import { recordTimeline } from "@/lib/timeline";
 
 import { ChainStrip } from "../../_components/chain-strip";
+import { CommentBox } from "../../_components/comment-box";
+import { ListPagination } from "../../_components/list-controls";
 import {
   TurnPanel,
   chainTurnKey,
@@ -49,10 +53,13 @@ export const dynamic = "force-dynamic";
 
 export default async function QuotationDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; id: string }>;
+  searchParams: Promise<{ page?: string }>;
 }) {
   const { locale, id } = await params;
+  const { page } = await searchParams;
   setRequestLocale(locale);
 
   const session = await requireSession();
@@ -80,6 +87,14 @@ export default async function QuotationDetailPage({
       // so the node cannot read hollow to someone who ought to see it filled.
       listDispatches(session, { threadId: id }),
     ]);
+
+  // `25 §9` — one thread per record. A quotation has no derived events of its
+  // own on this screen (its versions are the table above), so this carries the
+  // conversation, and it pages rather than capping: there is no full-history
+  // route to send anyone to.
+  const timeline = await recordTimeline(session, "quotation_thread", id, {
+    page: Number(page) || 1,
+  });
 
   const live = thread.live;
   // Editable only while the version is still `requested` and the thread is
@@ -449,6 +464,27 @@ export default async function QuotationDetailPage({
           />
         </CardContent>
       </Card>
+
+      {/* `25 §9` — the thread this screen exists to replace WhatsApp for. The
+          rep and the coordinator coordinate a quotation here instead, and
+          `25 §13`'s return-for-edit reason lands in this same conversation
+          rather than in a field of its own. */}
+      <Timeline
+        events={timeline.events}
+        total={timeline.total}
+        composer={
+          <CommentBox
+            session={session}
+            recordType="quotation_thread"
+            recordId={thread.id}
+          />
+        }
+      />
+      <ListPagination
+        basePath={`/quotations/${thread.id}`}
+        page={timeline.page}
+        total={timeline.total}
+      />
     </div>
   );
 }

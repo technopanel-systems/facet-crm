@@ -28,6 +28,7 @@ export async function Timeline({
   total,
   title,
   action,
+  composer,
   fullHistoryHref,
 }: {
   events: TimelineEvent[];
@@ -36,6 +37,12 @@ export async function Timeline({
   title?: string;
   /** The Log button, when there is a company to log against. */
   action?: React.ReactNode;
+  /**
+   * The comment box `[25 §9]`. It sits inside the card rather than beside it
+   * because there is **one thread per record**: a separate Comments card would
+   * be a second place to look for the same conversation.
+   */
+  composer?: React.ReactNode;
   fullHistoryHref?: string;
 }) {
   const t = await getTranslations();
@@ -55,13 +62,13 @@ export async function Timeline({
           {action}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-col gap-4">
         {events.length === 0 ? (
           <p className="text-muted-foreground text-start text-sm">
             {t("timeline.empty")}
           </p>
         ) : (
-          <>
+          <div>
             <ul className="flex flex-col">
               {events.map((event) => (
                 <TimelineRow key={event.key} event={event} />
@@ -75,8 +82,9 @@ export async function Timeline({
                 })}
               </p>
             ) : null}
-          </>
+          </div>
         )}
+        {composer}
       </CardContent>
     </Card>
   );
@@ -91,6 +99,10 @@ async function TimelineRow({ event }: { event: TimelineEvent }) {
     dateStyle: "medium",
     timeZone: "UTC",
   });
+
+  if (event.kind === "comment") {
+    return <CommentRow event={event} day={day} t={t} />;
+  }
 
   const label = t(`enums.timelineEvent.${event.kind}`);
   const href = hrefFor(event.link);
@@ -127,6 +139,82 @@ async function TimelineRow({ event }: { event: TimelineEvent }) {
   );
 }
 
+/**
+ * A comment on the thread `[25 §9]`.
+ *
+ * It is the one kind whose content is the event rather than a detail of it, so
+ * it gets the body on its own line instead of a label beside a badge. Everything
+ * else is the row above — same border, same padding, same end-aligned date — so
+ * the conversation reads as part of the timeline rather than as a second widget
+ * inside it.
+ *
+ * The `id` is what a mention notification's link lands on `[25 §11]`.
+ */
+async function CommentRow({
+  event,
+  day,
+  t,
+}: {
+  event: TimelineEvent & { kind: "comment" };
+  day: string;
+  t: Translate;
+}) {
+  const { comment } = event;
+
+  return (
+    <li
+      id={`comment-${comment.id}`}
+      data-slot="comment"
+      className="border-line flex flex-col gap-1 border-b py-2.5 last:border-b-0"
+    >
+      <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-start">
+        <Badge variant="outline">{t("enums.timelineEvent.comment")}</Badge>
+        <span className="text-faint text-[11.5px]">
+          <span className="num" dir="ltr">
+            {day}
+          </span>
+          {event.actorName ? (
+            <span className="ms-2">
+              {t("timeline.byWhom", { name: event.actorName })}
+            </span>
+          ) : null}
+          {comment.editedAt ? (
+            <span className="ms-2">{t("comments.edited")}</span>
+          ) : null}
+        </span>
+      </span>
+
+      {/* The author's own words. `whitespace-pre-wrap` because a colleague
+          writing two paragraphs meant two paragraphs, and `break-words` because
+          nothing stops them pasting a SMAC reference with no spaces in it. */}
+      <p className="text-start text-sm whitespace-pre-wrap wrap-break-word">
+        {comment.body}
+      </p>
+
+      {comment.mentions.length > 0 ? (
+        <p className="text-faint text-start text-[11.5px]">
+          {t("comments.taggedPeople", {
+            names: comment.mentions.map((person) => person.name).join(", "),
+          })}
+        </p>
+      ) : null}
+
+      {/* Editable by the author, never deleted `[25 §12]`. Nobody else is
+          offered the link, and the server refuses it besides. */}
+      {comment.canEdit ? (
+        <span className="text-start">
+          <Link
+            href={`/comments/${comment.id}/edit`}
+            className="text-faint text-[11.5px] hover:underline"
+          >
+            {t("common.edit")}
+          </Link>
+        </span>
+      ) : null}
+    </li>
+  );
+}
+
 type Translate = Awaited<ReturnType<typeof getTranslations>>;
 
 /**
@@ -159,9 +247,16 @@ function hrefFor(link: TimelineLink | null): string | null {
       return `/reports/${link.id}`;
     case "company":
       return `/companies/${link.id}`;
+    case "contact":
+      return `/contacts/${link.id}`;
     case "quotation":
       return `/quotations/${link.id}`;
     case "dispatch":
       return `/dispatches/${link.id}`;
+    // A comment has no page of its own — the thread on the record is where it
+    // lives `[25 §9]` — so its only route is the author's own edit screen,
+    // which `CommentRow` renders behind `canEdit` `[25 §12]`.
+    case "comment":
+      return `/comments/${link.id}/edit`;
   }
 }

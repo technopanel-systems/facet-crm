@@ -222,6 +222,8 @@ here, struck, so the decision is legible where the question was asked.
 | ~~6.6~~ | ~~The **chain strip**~~, kanban, calendar, drag-and-drop and charts | **The strip CLOSED — feature slice 1**, on the condition this entry set: it consumes `src/lib/chain.ts` and draws `CHAIN_COLUMNS`, labelling each step from `chainOwner`. See §9. The rest stay deferred by the founder to the redesign-decisions document, and the board's columns *are* those positions |
 | 6.7 | **The turn column on `/companies` and `/projects`** `[new in stage 2]` | `22 §4` asks every row to say whose move it is. `/quotations`, `/follow-ups` and `/coverage` can: the chain position, the follow-up kind and `daysSince` are already on their rows. `listCompanies` and `listProjects` return **no last-interaction age**, so "Nothing recorded for 23 days" cannot be said there without a data-layer change. Not faked from a second derivation — that is the trap `21 §7` names |
 | 6.8 | **Second person for the rep half of a quotation's turn** `[new in stage 2]` | `22 §4` says second person *where that person is the reader*. The coordinator half can be: `canApproveQuotation` names that identity exactly. The rep half names the raiser instead, because `QuotationThreadListRow` carries `raisedByName` and no id — and two people called Mohammed would read each other's turn as their own. A `raisedById` on the row would close it |
+| 6.9 | **The mention chip row does not scale** `[new in feature slice 2]` | Every active colleague is offered as a checkbox under every comment box. At fourteen people that is a readable row; at thirty it is a wall, and at sixty it is unusable. **The trigger:** when the row stops fitting on a laptop, it becomes a scoped picker — and the people worth offering are the ones already on the record, its reps, its shares, its thread raiser. Nothing of that is built now. Choosing a threshold today would be guessing at a number nobody has hit, which is what `25 §23` refused for quantity tolerance and for the same reason |
+| 6.10 | **A return for edit tells nobody** `[new in feature slice 2]` | `25 §13` makes the coordinator's reason a comment, and the comment lands on the thread — but nothing tags the rep, so nothing reaches their bell. Auto-tagging the raiser would close it in one line and is very likely right; no document says so, and `CLAUDE.md` forbids inventing the rule. It is named here rather than built. Until then the rep finds the reason on the thread, which is still better than the phone call `25 §9` describes |
 
 ### 6.5 The coverage defect, in full
 
@@ -397,3 +399,70 @@ the sum exists to show that the sum is meaningless.
   the thread and gated by `visibleQuotationThreadsFilter` — the audit row
   contributing nothing to the access question, which is what keeps it inside
   `20 §8.2`. A later slice extends that source.
+
+---
+
+## 10. Comments on the record **[derived]**
+
+Feature slice 2. `25 §9`–`§15` in the screens, and `25 §11`'s people-tagging.
+
+### 10.1 One thread per record, inside the timeline card
+
+`25 §9` is explicit that both land on the same timeline — *"one thread per
+record carrying reports, system events and conversation"* — so a comment is a
+seventh `TimelineEventKind`, not a second card beside the first. A Comments card
+would contradict that sentence twice over: two places to look on a company, and
+on a contact a card with a timeline-shaped thing in it that is not the timeline.
+
+The composer sits **in** the card, in a new `composer` slot, under the entries.
+The Log button stays in the header where it was. That is the distinction `25 §9`
+draws made visible: a report is what happened *with the customer*, a comment is
+what colleagues say *to each other*, and they are not the same act — so they are
+not the same control.
+
+**Three screens gained a timeline they never had**: contact, quotation thread,
+dispatch. They have no derived events of their own, so their thread is the
+conversation until some later source anchors to them. They pass **no `limit`**
+and page with `?page=`, because `<Timeline>` only offers a "view all" link when
+it is given a `fullHistoryHref` and only companies and projects have one — a cap
+with nothing behind it is the failure `20 §6` exists to avoid.
+
+**A dispatch still owes nobody a turn** `[22 §4]`. Colleagues talking about an
+event does not make it somebody's move.
+
+### 10.2 A comment reads as its own words
+
+Every other row is a badge and a short value. A comment's content **is** the
+event, so it takes a line of its own — `whitespace-pre-wrap`, because two
+paragraphs meant two paragraphs, and `wrap-break-word`, because nothing stops
+somebody pasting a reference with no spaces in it. The tagged names sit under it
+as text, and the Edit link only for the author `[25 §12]`.
+
+**Tagged people are not links**, which is a narrowing of `25 §11`'s *"`@Rawan` …
+become links"*, recorded rather than quietly dropped: there is no person page a
+rep may open — `/users` is `can_manage_users` only `[19]` — so a link would 404
+for most viewers.
+
+### 10.3 The chip row, and why it is checkboxes
+
+`25 §11` wants tagging; FACET has no autocomplete primitive, and `Combobox` is
+the documented exception for the ~200-item city list `[15 §5]` rather than a
+control to reach for. Parsing `@Rawan` out of the body needs the rep to guess an
+exact stored spelling, in a company that records names in two scripts and has
+more than one Mohammed.
+
+So: native checkboxes posting repeated `mentions` values — `signal-fields.tsx`'s
+shape, no client state, no JavaScript to submit, and the browser places them
+correctly in RTL. Its limit is **§6.9**.
+
+### 10.4 The composer is deliberately plain
+
+`25 §15` says FACET does not replace verbal talk or office work. Applied here:
+no typing indicator, no read receipt, no reply threading, no emoji bar. A box,
+the people to tell, and a button. It is where a decision gets **written down**,
+not where it has to be made.
+
+The box is uncontrolled, so React clears it once the action resolves — the empty
+box under the comment that just appeared. A **rejected** one is remounted against
+`state.values`, because the only way to fail is to write past the cap and
+throwing that away would be worse than the error.

@@ -57,10 +57,13 @@ export default async function NotificationsPage({
     page: currentPage,
   });
 
-  const waiting = rows.filter(
-    (row) => row.tier === "act_now" && !row.resolvedAt,
-  );
-  const rest = rows.filter((row) => !waiting.includes(row));
+  // `row.waiting` is the one definition `[21 §4]`, in `src/lib/notifications.ts`
+  // beside the badge's own query. The rule used to be spelled out here and on
+  // the Today screen, which is two places for it to drift from the badge — and
+  // it had: both counted a non-persistent act-now entry forever, because
+  // nothing resolves one and reading it changed nothing.
+  const waiting = rows.filter((row) => row.waiting);
+  const rest = rows.filter((row) => !row.waiting);
   const hasUnread = rows.some((row) => !row.readAt);
 
   return (
@@ -136,6 +139,23 @@ export default async function NotificationsPage({
 type Translator = Awaited<ReturnType<typeof getTranslations>>;
 type Formatter = Awaited<ReturnType<typeof getFormatter>>;
 
+/**
+ * The first line or so of a comment, for the notification only.
+ *
+ * A comment runs to `COMMENT_BODY_MAX`, and this list is a bell, not a reading
+ * surface — the thread on the record is where the whole thing lives `[25 §9]`.
+ * The ellipsis is a character rather than a translated string because it is
+ * punctuation, not a message.
+ */
+const MENTION_EXCERPT = 140;
+
+function excerpt(body: string): string {
+  const flat = body.replace(/\s+/g, " ").trim();
+  return flat.length > MENTION_EXCERPT
+    ? `${flat.slice(0, MENTION_EXCERPT)}…`
+    : flat;
+}
+
 function NotificationEntry({
   row,
   t,
@@ -163,7 +183,7 @@ function NotificationEntry({
         <span className="text-start text-sm font-medium">{title}</span>
         {row.resolvedAt ? (
           <Badge variant="secondary">{t("notifications.fields.done")}</Badge>
-        ) : row.tier === "act_now" ? (
+        ) : row.waiting ? (
           <Badge variant="destructive">
             {t("notifications.fields.waiting")}
           </Badge>
@@ -191,7 +211,7 @@ function NotificationEntry({
         )
       ) : null}
 
-      {row.payload ? (
+      {row.payload?.kind === "handover" ? (
         <p className="text-muted-foreground text-start text-sm">
           {row.payload.fromUserName
             ? t("notifications.detail.handover", {
@@ -203,6 +223,41 @@ function NotificationEntry({
               })
             : t("notifications.detail.handoverUnknown")}
         </p>
+      ) : null}
+
+      {/* `25 §11` — a mention carries no anchor, so the record and the link
+          come out of the payload. The record is re-checked on read, and when
+          it fails the entry still shows: what happened is not a secret from
+          the person it happened to, it simply carries no body and no link. */}
+      {row.payload?.kind === "mention" ? (
+        <div className="flex flex-col gap-1">
+          <p className="text-muted-foreground text-start text-sm">
+            {row.payload.authorName
+              ? t("notifications.detail.mention", {
+                  name: row.payload.authorName,
+                })
+              : t("notifications.detail.mentionUnknown")}
+          </p>
+          {row.payload.recordViewable && row.payload.href ? (
+            <>
+              {row.payload.body ? (
+                <p className="text-start text-sm">
+                  {excerpt(row.payload.body)}
+                </p>
+              ) : null}
+              <Link
+                href={row.payload.href}
+                className="text-start text-sm hover:underline"
+              >
+                {t("notifications.detail.mentionLink")}
+              </Link>
+            </>
+          ) : (
+            <span className="text-muted-foreground text-start text-sm">
+              {t("notifications.detail.anchorHidden")}
+            </span>
+          )}
+        </div>
       ) : null}
 
       {row.digestDate ? (

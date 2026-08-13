@@ -24,6 +24,7 @@ import { projectTimeline, TIMELINE_CARD_LIMIT } from "@/lib/timeline";
 
 import { setCreditSplitAction } from "../actions";
 import { ChainStrip } from "../../_components/chain-strip";
+import { CommentBox } from "../../_components/comment-box";
 import {
   TurnPanel,
   daysSince,
@@ -332,6 +333,15 @@ export default async function ProjectDetailPage({
         events={timeline.events}
         total={timeline.total}
         fullHistoryHref={`/projects/${project.id}/timeline`}
+        // A comment is not an interaction, so it IS offered here `[25 §9]`:
+        // what it needs is a record to hang on, not a company to have visited.
+        composer={
+          <CommentBox
+            session={session}
+            recordType="project"
+            recordId={project.id}
+          />
+        }
       />
     </div>
   );

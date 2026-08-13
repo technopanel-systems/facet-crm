@@ -610,18 +610,45 @@ async function main(): Promise<void> {
     );
   }
 
-  const [commentCount] = await db
+  /**
+   * **`comments` and `comment_mentions` are written now — feature slice 2.**
+   *
+   * This asserted both were EMPTY, which was the right assertion for stage 3:
+   * the migration landed the columns and nothing filled them, and a table that
+   * had quietly acquired rows would have meant something was writing them by a
+   * path no document described.
+   *
+   * `25 §9`–`§15` is that path, and it is built, so the assertion inverts. What
+   * it guards now is the structure, not the emptiness: every comment hangs on
+   * one of the five kinds the CHECK admits, and every mention hangs on a
+   * comment. `scripts/verify-comments.ts` owns the behaviour.
+   */
+  const [strayAnchor] = await db
     .select({ n: sql<number>`count(*)::int` })
-    .from(comments);
-  const [mentionCount] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(commentMentions);
-  check("comments is empty", commentCount?.n === 0, `got ${commentCount?.n}`);
+    .from(comments)
+    .where(
+      sql`record_type not in ('company', 'contact', 'project', 'quotation_thread', 'dispatch')`,
+    );
   check(
-    "comment_mentions is empty",
-    mentionCount?.n === 0,
-    `got ${mentionCount?.n}`,
+    "every comment hangs on one of 25 §9's five record kinds",
+    strayAnchor?.n === 0,
+    `got ${strayAnchor?.n} on another kind`,
   );
+
+  const [orphanMention] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(commentMentions)
+    .where(
+      sql`not exists (select 1 from comments c where c.id = ${commentMentions.commentId})`,
+    );
+  check(
+    "no mention outlives its comment",
+    orphanMention?.n === 0,
+    `got ${orphanMention?.n} orphaned`,
+  );
+
+  // Nothing is deleted `[25 §12]`, `[12 §7]`, so there is no `deleted_at` to
+  // check — the absence of the column IS the guarantee, asserted above.
 
   // A gap recorded in a script that runs is a gap that gets closed.
   console.log(
@@ -635,7 +662,11 @@ async function main(): Promise<void> {
       "      it in the application layer today; projects_loss_state is\n" +
       "      deliberately one-way until the screen offers the nine.\n" +
       "    · Nothing READS the new columns either: authz.ts does not consult\n" +
-      "      sees_all_records_readonly, so 25 §28's third tier is not live.",
+      "      sees_all_records_readonly, so 25 §28's third tier is not live.\n" +
+      "      Feature slice 2 built comments THROUGH the existing two tiers, so\n" +
+      "      a coordinator reads every quotation conversation and no company\n" +
+      "      one. That is today's rule, not 25 §28's — visibleCommentsFilter\n" +
+      "      is where the third tier lands when somebody builds it.",
   );
 
   /* --- 9. The foreign keys ------------------------------------------ */

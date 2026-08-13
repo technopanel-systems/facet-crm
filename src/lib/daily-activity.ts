@@ -51,7 +51,21 @@ export type DailyActivityRow = {
   reportsLogged: number;
   /** Distinct companies an interaction touched. A field note touches none. */
   companiesTouched: number;
-  /** The four derived events, attributed to whoever performed them. */
+  /**
+   * Comments written, **counted and never summed with reports** `[25 §14]`.
+   *
+   * Its own column, beside `reportsLogged` and never inside it: the founder
+   * wants comments visible in reporting — a rep sometimes uses one to log
+   * detail — but merging them would let a rep raise his activity count by
+   * talking to colleagues, diluting the number that matters. Same principle as
+   * `07 D2`: shown side by side, never combined.
+   *
+   * It is also **not** a `companiesTouched`. A comment is colleagues talking
+   * about a customer, not contact with one, so it can never satisfy a coverage
+   * threshold `[25 §9]`.
+   */
+  commentsLogged: number;
+  /** The derived events, attributed to whoever performed them. */
   systemEvents: number;
   signalsRaised: number;
 };
@@ -123,11 +137,20 @@ export async function dailyActivity(
       userName: person.name,
       reportsLogged: mine.length,
       companiesTouched: companies.size,
+      commentsLogged: events.filter(
+        (event) => event.actorUserId === person.id && event.kind === "comment",
+      ).length,
       // `report` events are the logged half and are already counted above;
       // counting them here too would double the figure the founder wants
-      // shown BESIDE it, not merged into it.
+      // shown BESIDE it, not merged into it. `comment` is the same argument a
+      // second time `[25 §14]` — it has its own column, so counting it as a
+      // system event would put it in two totals and quietly make it worth
+      // twice a report.
       systemEvents: events.filter(
-        (event) => event.actorUserId === person.id && event.kind !== "report",
+        (event) =>
+          event.actorUserId === person.id &&
+          event.kind !== "report" &&
+          event.kind !== "comment",
       ).length,
       signalsRaised: mine.reduce(
         (sum, report) => sum + report.signals.length,
@@ -139,10 +162,13 @@ export async function dailyActivity(
   return {
     range,
     rows,
+    // Each column sums down its own list. Nothing here adds one column to
+    // another, which is `25 §14` holding at the totals row too.
     total: rows.reduce(
       (sum, row) => ({
         reportsLogged: sum.reportsLogged + row.reportsLogged,
         companiesTouched: sum.companiesTouched + row.companiesTouched,
+        commentsLogged: sum.commentsLogged + row.commentsLogged,
         systemEvents: sum.systemEvents + row.systemEvents,
         signalsRaised: sum.signalsRaised + row.signalsRaised,
       }),
@@ -155,6 +181,7 @@ function emptyTotals(): Omit<DailyActivityRow, "userId" | "userName"> {
   return {
     reportsLogged: 0,
     companiesTouched: 0,
+    commentsLogged: 0,
     systemEvents: 0,
     signalsRaised: 0,
   };

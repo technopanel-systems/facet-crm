@@ -43,12 +43,17 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
-import { QueryBuilder, type AnyPgColumn } from "drizzle-orm/pg-core";
+import {
+  QueryBuilder,
+  type AnyPgColumn,
+  type PgTable,
+} from "drizzle-orm/pg-core";
 import { getLocale } from "next-intl/server";
 
 import { auth, getSessionToken } from "@/auth";
 import { db } from "@/db";
 import {
+  comments,
   companies,
   companyReps,
   contacts,
@@ -63,6 +68,7 @@ import {
 } from "@/db/schema";
 import { redirect } from "@/i18n/navigation";
 import { withAudit, type AuditActor } from "@/lib/audit";
+import type { CommentRecordType } from "@/lib/enums";
 import { hashPassword } from "@/lib/passwords";
 import { RuleError } from "@/lib/validation";
 
@@ -96,30 +102,50 @@ export type AuthSession = {
  * Record kinds whose visibility is answerable today (others arrive with
  * their feature phases and must be added HERE, nowhere else).
  *
- * **`"dispatch"` is deliberately absent, though the `record_type` enum has
- * it.** Adding it forces an exhaustive `canViewRecord` case, and Slice 3 has
- * nothing to call one: `canViewRecord` exists for WRITE paths, "where an id
- * arrives from a form and must be checked before it is written into another
- * record", and dispatches are append-only — no document asks for an edit, and
- * deletion is a `delete_request`. The dispatch screens compose
- * `visibleDispatchesFilter` into the WHERE, exactly as the quotation screens
- * do. A dead branch here is the failure CLAUDE.md names.
+ * **`"dispatch"` arrived with feature slice 2, on the trigger this comment set.**
+ * It was deliberately absent through Slice 3: `canViewRecord` exists for WRITE
+ * paths, *"where an id arrives from a form and must be checked before it is
+ * written into another record"*, and dispatches are append-only — no document
+ * asked for an edit, and deletion is a `delete_request`. The stated trigger was
+ * **the first write path that takes a dispatch id from a form**, with the value
+ * and a real case to be added together, in the same change.
  *
- * **The trigger for adding it:** the first write path that takes a dispatch id
- * from a form — a void/correct action, or per-dispatch sharing. Add the value
- * and a real case together, in the same change.
+ * `25 §9` is that write path: comments belong on **every** record, dispatches
+ * named among the five, so a dispatch id now arrives from the comment form and
+ * must be checked before a row is written against it. The value and its case
+ * landed together, and the case states the same terms `visibleDispatchesFilter`
+ * does rather than a second rule.
  *
  * **Phase 9 tested that rule and added nothing** `[20 §13]`. A rep report is
  * editable, so a report id does arrive from a form — but only its author may
  * edit `[20 §9]`, which is an identity question, not a visibility one. Reads
  * compose `visibleRepReportsFilter` into the WHERE like every other list. A
- * `"rep_report"` case would have had no caller.
+ * `"rep_report"` case would have had no caller. A comment is editable on the
+ * same terms `[25 §12]` and adds no value here for the same reason.
  */
 export type ViewableRecordType =
   | "company"
   | "contact"
   | "project"
-  | "quotation_thread";
+  | "quotation_thread"
+  | "dispatch";
+
+/**
+ * The record kinds a **share** may actually grant, which is a smaller set.
+ *
+ * `record_shares.record_type` carries the whole enum, but only three of its
+ * values are read by a filter: `visibleContactsFilter` `[:456]`,
+ * `visibleDispatchesFilter` `[:565]` and `visibleRepReportsFilter` `[:652]`
+ * each deliberately carry no share term of their own. A share row on one of
+ * those grants nothing `[21 §3]`.
+ *
+ * Until feature slice 2 that was enforced by `ViewableRecordType` not having
+ * `dispatch` in it. Now that it does — a comment needs a dispatch to be
+ * viewable `[25 §9]` — the type is what keeps a dispatch share term from
+ * compiling, and it refuses `contact` besides, which `:456-459` previously
+ * refused only in prose.
+ */
+type SharedRecordType = "company" | "project" | "quotation_thread";
 
 /* ------------------------------------------------------------------ *
  * Session
@@ -270,7 +296,7 @@ export async function requirePermission(
 
 async function hasActiveShare(
   userId: string,
-  recordType: ViewableRecordType,
+  recordType: SharedRecordType,
   recordId: string,
 ): Promise<boolean> {
   const [share] = await db
@@ -313,6 +339,10 @@ async function canViewProject(
  *   projects `[04 Q7]`.
  * - quotation_thread: raising rep OR an explicit thread share OR visibility
  *   of the parent project (owner/share — founder decision, phase 6).
+ * - dispatch `[18 §2]`: `can_dispatch` sees every one, else the credited rep,
+ *   else the thread it was dispatched against. Term for term the SQL twin
+ *   below, and a direct dispatch `[07 C6]` carries no thread, so it stops
+ *   there.
  *
  * This answers ONE record. A list needs the same rule pushed into SQL — see
  * the filters below. Detail screens use the filters too; this function is for
@@ -373,6 +403,32 @@ export async function canViewRecord(
       }
       return canViewProject(userId, thread.projectId);
     }
+    case "dispatch": {
+      // `can_dispatch` records them all, so it reads them all `[18 §2]`.
+      if (session.user.role.canDispatch) return true;
+      const [dispatch] = await db
+        .select({
+          userId: dispatches.userId,
+          quotationThreadId: dispatches.quotationThreadId,
+        })
+        .from(dispatches)
+        .where(eq(dispatches.id, recordId))
+        .limit(1);
+      if (!dispatch) return false;
+      // The CREDITED rep, not whoever recorded it: `04 C1` makes the dispatch
+      // the only source of achieved sqm, and one they cannot see is one they
+      // cannot check.
+      if (dispatch.userId === userId) return true;
+      // A direct dispatch `[07 C6]` has no thread, so there is nothing left to
+      // cascade through. No share term — `record_shares` could carry a
+      // dispatch row and nothing writes one `[:565-569]`.
+      if (!dispatch.quotationThreadId) return false;
+      return canViewRecord(
+        session,
+        "quotation_thread",
+        dispatch.quotationThreadId,
+      );
+    }
   }
 }
 
@@ -400,7 +456,7 @@ const subquery = new QueryBuilder();
 
 /** `exists (select 1 from record_shares ...)`, correlated on a record column. */
 function activeShareExists(
-  recordType: ViewableRecordType,
+  recordType: SharedRecordType,
   recordIdColumn: AnyPgColumn,
   userId: string,
 ): SQL {
@@ -671,6 +727,95 @@ export function visibleRepReportsFilter(
       ),
     ),
   );
+}
+
+/**
+ * Comments: whatever the record they hang on resolves to `[25 §10]`.
+ *
+ * *"Manager, coordinator, the owning rep, and any shared rep. The same rule
+ * reports follow (`20 §10`), for the same reason."* So this states **no new
+ * rule**: it is the five filters above, composed, one branch per record type
+ * the `comments_record_type` CHECK admits. A sixth branch would mean a sixth
+ * kind of commentable record, and the CHECK refuses one until somebody decides.
+ *
+ * The branch shape is `visibleDispatchesFilter`'s own `[:579-592]`: an `exists`
+ * over the anchor table, correlated on `comments.record_id`, carrying that
+ * table's filter. Two consequences follow from reusing them verbatim, and both
+ * are intended rather than discovered:
+ *
+ *  - **`can_approve_quotation` reads every quotation conversation** `[16 §10]`
+ *    and **`can_dispatch` every dispatch conversation** `[18 §2]`. Their
+ *    filters return `undefined`, so `and(eq(…), undefined)` degrades to *"the
+ *    record exists"*. That is what `25 §10` asks for — the coordinator is on
+ *    the thread, and the talk about it is theirs to read.
+ *  - **A rep removed from a company loses sight of comments they wrote
+ *    themselves**, exactly as they lose their own reports `[:646-650]`. The
+ *    conversation belonged to the record `[20 §1]`.
+ *
+ * **The sees-everything case is the early return, never a branch.** Drizzle's
+ * `or()` *drops* an `undefined` member rather than treating it as true, so a
+ * sub-filter returning `undefined` into the `or` would silently narrow this
+ * instead of widening it. Only `and()` is safe to feed one, which is what each
+ * branch does inside its own `exists`.
+ *
+ * **One caller, deliberately: `commentEvents` in global mode** — the `/activity`
+ * read, where no anchor has been resolved. A detail screen has already proved
+ * visibility by loading the record through that record's own filter, so it
+ * reads comments with a plain `record_type`/`record_id` equality on
+ * `comments_record_idx`. Asking a second time would be five correlated
+ * subqueries per row answering a settled question, and a second place the rule
+ * could drift.
+ *
+ * Like every builder here it targets `comments` **unaliased** — it renders
+ * `"comments"."record_type"` literally, so a caller that aliases the table
+ * breaks it at runtime rather than at compile time `[:388]`.
+ */
+export function visibleCommentsFilter(session: AuthSession): SQL | undefined {
+  if (session.user.role.seesAllReps) return undefined;
+
+  return or(
+    commentsOn("company", companies, companies.id, visibleCompaniesFilter(session)),
+    commentsOn("contact", contacts, contacts.id, visibleContactsFilter(session)),
+    commentsOn("project", projects, projects.id, visibleProjectsFilter(session)),
+    commentsOn(
+      "quotation_thread",
+      quotationThreads,
+      quotationThreads.id,
+      visibleQuotationThreadsFilter(session),
+    ),
+    commentsOn(
+      "dispatch",
+      dispatches,
+      dispatches.id,
+      visibleDispatchesFilter(session),
+    ),
+  );
+}
+
+/**
+ * One branch of `visibleCommentsFilter`: comments of this record type, whose
+ * anchor row passes that anchor's own filter.
+ *
+ * `and(x, undefined)` is `x` in Drizzle, so an identity that sees every record
+ * of the kind degrades to *"a row with that id exists"* — which is the correct
+ * reading, not a bypass: the comment still has to hang on a real record.
+ */
+function commentsOn(
+  recordType: CommentRecordType,
+  anchor: PgTable,
+  anchorId: AnyPgColumn,
+  filter: SQL | undefined,
+): SQL {
+  return and(
+    eq(comments.recordType, recordType),
+    exists(
+      subquery
+        .select({ one: sql`1` })
+        .from(anchor)
+        // Column-to-column: this is what correlates the subquery.
+        .where(and(eq(anchorId, comments.recordId), filter)),
+    ),
+  ) as SQL;
 }
 
 /**

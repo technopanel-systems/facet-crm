@@ -161,14 +161,16 @@
       "quotation_raised": "طلب عرض سعر",
       "quotation_issued": "إصدار عرض السعر",
       "payment_confirmed": "تأكيد الدفع",
-      "dispatched": "تم التوريد"
+      "dispatched": "تم التوريد",
+      "comment": "تعليق"
     },
     "notificationType": {
       "quotationExpired": "انتهت صلاحية عرض السعر",
       "recordAssigned": "أُسند إليك",
       "recordHandedOver": "تم تسليم عمل إليك",
       "shareGranted": "تمت مشاركته معك",
-      "followUpDigest": "المتابعات اليومية"
+      "followUpDigest": "المتابعات اليومية",
+      "mentionReceived": "أشار إليك"
     },
     "followUpKind": {
       "quotation_no_response": "عرض سعر بلا رد",
@@ -447,6 +449,7 @@
       "threadClosed": "عرض السعر هذا مغلق.",
       "coordinatorOnly": "منسق المبيعات وحده يمكنه فعل ذلك.",
       "cancellationReasonRequired": "الإلغاء يحتاج إلى سبب مكتوب.",
+      "returnReasonRequired": "اذكر ما الذي يحتاج تعديلاً. يصل السبب إلى المندوب كتعليق.",
       "paymentFirst": "أكّد الدفع أولًا.",
       "noSuppliers": "لم تُضف أي جهات توريد بعد، لذلك لا يمكن حفظ البند."
     }
@@ -739,6 +742,27 @@
       "authorOnly": "لا يصحح هذا التقرير إلا من كتبه."
     }
   },
+  "comments": {
+    "new": "تعليق",
+    "placeholder": "ما الذي يحتاج زملاؤك إلى معرفته؟",
+    "post": "نشر",
+    "tag": "أبلغ أحدًا",
+    "edited": "مُعدَّل",
+    "taggedPeople": "مُشار إليهم: {names}",
+    "editTitle": "تعديل التعليق",
+    "fields": {
+      "body": "التعليق"
+    },
+    "detail": {
+      "tagEditHint": "إلغاء الإشارة إلى شخص لا يسحب إشعارًا أُرسل بالفعل."
+    },
+    "errors": {
+      "bodyRequired": "اكتب شيئًا أولًا.",
+      "authorOnly": "من كتب التعليق وحده يمكنه تعديله.",
+      "notFound": "لم يعد هذا التعليق موجودًا.",
+      "recordNotFound": "هذا السجل ليس لك لتعلّق عليه."
+    }
+  },
   "timeline": {
     "title": "الجدول الزمني",
     "fullTitle": "السجل الكامل",
@@ -756,6 +780,7 @@
       "to": "إلى",
       "person": "الشخص",
       "reportsLogged": "المسجَّل",
+      "commentsLogged": "التعليقات",
       "companiesTouched": "الشركات",
       "systemEvents": "سجّله فاسِت",
       "signalsRaised": "الإشارات"
@@ -824,7 +849,10 @@
       "digestSummary": "{total} متابعات في {date}.",
       "digestLink": "فتح المتابعات",
       "clearsThreadNoLongerExpired": "يزول عند تمديد عرض السعر أو مراجعته.",
-      "clearsInteractionAgainstCompany": "يزول عند تسجيلك تواصلاً مع الشركة."
+      "clearsInteractionAgainstCompany": "يزول عند تسجيلك تواصلاً مع الشركة.",
+      "mention": "أشار إليك {name} في تعليق.",
+      "mentionUnknown": "أشار إليك أحدهم في تعليق.",
+      "mentionLink": "افتح السجل"
     },
     "actions": {
       "markRead": "تعليم كمقروء",

@@ -75,6 +75,9 @@ import {
   visibleQuotationThreadsFilter,
   type AuthSession,
 } from "@/lib/authz";
+// `25 §13` — the return-for-edit reason is a comment. See the note in
+// `comments.ts` about the import cycle this closes, and why it is safe.
+import { insertComment } from "@/lib/comments";
 import {
   DEFAULT_VAT_RATE,
   QUOTATION_THREAD_END_STATES,
@@ -1491,16 +1494,39 @@ export async function issueVersion(
 }
 
 /**
- * The coordinator sends it back for an edit round `[04 flow 10]`.
+ * The coordinator sends it back for an edit round `[04 flow 10]`, with a reason.
  *
- * The version stays `requested` and editable — this is a counter, not a state
- * change. The rep fixes the lines and the coordinator issues it.
+ * The version stays `requested` and editable — the round is a counter, not a
+ * state change. The rep fixes the lines and the coordinator issues it.
+ *
+ * **The reason is a comment, not a field** `[25 §13]`: *"It is the same act. No
+ * separate field."* So nothing is added to `quotation_versions` — the reason
+ * lands on the thread's own conversation, where the rep is already reading, and
+ * six months later the round-trip is on the record instead of in a phone
+ * `[25 §9]`.
+ *
+ * **It is required.** A return with no reason is exactly the WhatsApp round-trip
+ * `25 §9` exists to end: the rep has to ring somebody to find out what to fix.
+ * `04 flow 10`'s cancellation reason is required for the same reason.
+ *
+ * The comment is written **inside this transaction**, so a reason cannot survive
+ * a return that rolled back, nor a return leave no reason behind.
+ *
+ * It hangs on the **thread**, never the version: `comments_record_type` refuses
+ * `quotation_version` on purpose — the conversation belongs to the thread, not
+ * to one superseded version of it.
  */
 export async function returnForEdit(
   session: AuthSession,
   threadId: string,
+  reason: string,
 ): Promise<void> {
   await assertCoordinator(session, threadId);
+
+  const body = reason.trim();
+  if (!body) {
+    throw new RuleError("quotations.errors.returnReasonRequired", "reason");
+  }
 
   await withAudit(session.actor, async (tx, log) => {
     const version = await liveVersionOf(tx, threadId);
@@ -1520,6 +1546,15 @@ export async function returnForEdit(
       entityId: version.id,
       before: { returnForEditRound: version.returnForEditRound },
       after: { returnForEditRound: after.returnForEditRound },
+    });
+
+    // No mentions: nothing in `25` says a return tags the rep, and inventing
+    // one would be inventing business logic. Recorded as open in `22 §6`.
+    await insertComment(tx, log, session, {
+      recordType: "quotation_thread",
+      recordId: threadId,
+      body,
+      mentions: [],
     });
   });
 }

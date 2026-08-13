@@ -8,19 +8,27 @@ import {
 } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Timeline } from "@/components/timeline";
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
 import { getContact } from "@/lib/contacts";
 import { bilingualName } from "@/lib/lookups";
+import { recordTimeline } from "@/lib/timeline";
+
+import { CommentBox } from "../../_components/comment-box";
+import { ListPagination } from "../../_components/list-controls";
 
 export const dynamic = "force-dynamic";
 
 export default async function ContactDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; id: string }>;
+  searchParams: Promise<{ page?: string }>;
 }) {
   const { locale, id } = await params;
+  const { page } = await searchParams;
   setRequestLocale(locale);
 
   const session = await requireSession();
@@ -30,6 +38,13 @@ export default async function ContactDetailPage({
   const t = await getTranslations();
   const format = await getFormatter();
   const dash = t("common.none");
+
+  // `25 §9` — one thread per record. A contact has no derived events of its
+  // own, so its thread is the conversation and nothing else; it pages rather
+  // than capping, because there is no full-history route to send anyone to.
+  const timeline = await recordTimeline(session, "contact", contact.id, {
+    page: Number(page) || 1,
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -91,6 +106,23 @@ export default async function ContactDetailPage({
           </Facts>
         </CardContent>
       </Card>
+
+      <Timeline
+        events={timeline.events}
+        total={timeline.total}
+        composer={
+          <CommentBox
+            session={session}
+            recordType="contact"
+            recordId={contact.id}
+          />
+        }
+      />
+      <ListPagination
+        basePath={`/contacts/${contact.id}`}
+        page={timeline.page}
+        total={timeline.total}
+      />
     </div>
   );
 }

@@ -176,6 +176,41 @@ export function signalTakesReference(signal: ReportSignal): boolean {
 /** The longest a signal reference may be — a name or a code, not a narrative. */
 export const SIGNAL_REFERENCE_MAX = 200;
 
+/**
+ * `[25 §9]` — the five kinds of record a comment may hang on.
+ *
+ * The database says the same thing in the `comments_record_type` CHECK, stated
+ * positively there because `record_type` is shared with seven other tables and
+ * will grow for reasons that have nothing to do with comments. This list is
+ * that CHECK in TypeScript: keep the two in step, and `scripts/verify-comments`
+ * asserts the database refuses a sixth by constraint name.
+ *
+ * `quotation_version` is excluded on purpose — a comment belongs to the thread,
+ * which is the conversation, not to one superseded version of it.
+ */
+export const COMMENT_RECORD_TYPES = [
+  "company",
+  "contact",
+  "project",
+  "quotation_thread",
+  "dispatch",
+] as const;
+export type CommentRecordType = (typeof COMMENT_RECORD_TYPES)[number];
+
+/**
+ * `[25 §9]` — the longest a comment may be, matching a report's narrative.
+ *
+ * A comment is what colleagues say to each other about a record; there is no
+ * reason a colleague note needs to run longer than the account of the visit it
+ * is about. The cap is also what keeps the timeline legible: an uncapped body
+ * breaks the layout on every screen that renders one, and comments render on
+ * six of them.
+ *
+ * `25 §13`'s return-for-edit reason is a comment, so it takes this number
+ * rather than a second one.
+ */
+export const COMMENT_BODY_MAX = 5000;
+
 /** `[07 E6]`, `[21 §6]` — the three routes out of dormancy. */
 export const DORMANCY_OUTCOMES = [
   "reincluded",
@@ -185,15 +220,32 @@ export const DORMANCY_OUTCOMES = [
 export type DormancyOutcome = (typeof DORMANCY_OUTCOMES)[number];
 
 /**
- * `[21 §2]` — the five seeded notification types, and no sixth. The type is a
- * lookup row `[10 §10]`, so these are the **keys** of rows in
- * `notification_types`, not an enum in the database. They live here because the
- * seed, the raising code and the screen all need the same list, and this module
- * imports nothing.
+ * The seeded notification types. The type is a lookup row `[10 §10]`, so these
+ * are the **keys** of rows in `notification_types`, not an enum in the database.
+ * They live here because the seed, the raising code and the screen all need the
+ * same list, and this module imports nothing.
  *
  * The database key is dotted; the property name is what the message catalogue
  * keys off (`notifications.types.<name>`), because a dotted message id would
  * nest into an accidental object tree.
+ *
+ * **`21 §2` seeded five and was headed "no sixth"; `mention.received` is the
+ * sixth, and that is not a reversal.** The rule `21 §2` states is a test rather
+ * than a cap: *"Each type below is named in a user-truth document **and** has a
+ * real event in the code that can raise it. Nothing else is seeded: a type
+ * nothing produces is the shape of v1's dead approval gate."* A mention passes
+ * both limbs — `25 §11` names it (*"Tagging a person raises a notification"*)
+ * and `src/lib/comments.ts` raises it, in the change that added it. `21 §11`
+ * kept the door open in the same words, recording `share.granted` as the one
+ * seeded type whose *"raise call sits behind that path the day it exists"*.
+ * `25` is also the later user-truth document, so it wins on its own.
+ *
+ * **It is act-now and NOT persistent** `[21 §4]`: persistence belongs only to a
+ * type whose condition can clear, and being mentioned has none. Opening the
+ * record is a click by another name, which `07 G1` rejects, and a reply is not
+ * owed. So it is `record.handed_over`'s shape `[21 §5]` — news, dismissible —
+ * and if a mention implies work, that work raises its own notification through
+ * the normal path.
  */
 export const NOTIFICATION_TYPES = {
   quotationExpired: "quotation.expired",
@@ -201,6 +253,7 @@ export const NOTIFICATION_TYPES = {
   recordHandedOver: "record.handed_over",
   shareGranted: "share.granted",
   followUpDigest: "followup.digest",
+  mentionReceived: "mention.received",
 } as const;
 
 export type NotificationTypeName = keyof typeof NOTIFICATION_TYPES;

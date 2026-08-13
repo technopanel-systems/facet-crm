@@ -68,9 +68,8 @@ export default async function TodayPage({
   // "0" — so the panel is absent rather than showing a target of nothing.
   const measured = mine && mine.targetSqm !== null ? mine : undefined;
 
-  const waiting = notifications.rows.filter(
-    (row) => row.tier === "act_now" && !row.resolvedAt,
-  );
+  // The same one definition the bell and `/notifications` read `[21 §4]`.
+  const waiting = notifications.rows.filter((row) => row.waiting);
 
   const queue = follow.rows.slice(0, QUEUE_ROWS);
 
@@ -223,19 +222,29 @@ export default async function TodayPage({
                   // a share can be revoked and a company handed on, and the row
                   // outlives either. `RecordRow` links the TITLE, so an
                   // unopenable row passes no href and renders as plain text.
+                  //
+                  // A mention carries no anchor `[25 §11]` — its record is in
+                  // the payload, already visibility-checked there — so the two
+                  // routes to a link are read in one place here.
                   <RecordRow
                     key={row.id}
                     href={
-                      row.anchorViewable && row.anchorId && row.anchorType
-                        ? anchorHref(row.anchorType, row.anchorId)
-                        : undefined
+                      row.payload?.kind === "mention"
+                        ? (row.payload.href ?? undefined)
+                        : row.anchorViewable && row.anchorId && row.anchorType
+                          ? anchorHref(row.anchorType, row.anchorId)
+                          : undefined
                     }
                     title={
                       row.typeName
                         ? t(`enums.notificationType.${row.typeName}`)
                         : row.typeKey
                     }
-                    meta={row.anchorLabel ?? undefined}
+                    meta={
+                      row.payload?.kind === "mention"
+                        ? (row.payload.authorName ?? undefined)
+                        : (row.anchorLabel ?? undefined)
+                    }
                   />
                 ))}
               </ul>

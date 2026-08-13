@@ -22,19 +22,27 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Timeline } from "@/components/timeline";
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
 import { getDispatch } from "@/lib/dispatches";
 import { bilingualName } from "@/lib/lookups";
+import { recordTimeline } from "@/lib/timeline";
+
+import { CommentBox } from "../../_components/comment-box";
+import { ListPagination } from "../../_components/list-controls";
 
 export const dynamic = "force-dynamic";
 
 export default async function DispatchPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; id: string }>;
+  searchParams: Promise<{ page?: string }>;
 }) {
   const { locale, id } = await params;
+  const { page } = await searchParams;
   setRequestLocale(locale);
 
   const session = await requireSession();
@@ -44,6 +52,14 @@ export default async function DispatchPage({
   const dispatch = await getDispatch(session, id);
   // A record hidden by visibility and one that never existed look identical.
   if (!dispatch) notFound();
+
+  // `25 §9` — a dispatch takes a comment like any other record. Note what it
+  // still does not take: a turn `[22 §4]`. A dispatch owes nobody the next
+  // action; it is an event that already happened, and colleagues talking about
+  // it does not make it somebody's move.
+  const timeline = await recordTimeline(session, "dispatch", dispatch.id, {
+    page: Number(page) || 1,
+  });
 
   const dash = t("common.none");
   const day = (value: string) =>
@@ -234,6 +250,23 @@ export default async function DispatchPage({
           </div>
         </CardContent>
       </Card>
+
+      <Timeline
+        events={timeline.events}
+        total={timeline.total}
+        composer={
+          <CommentBox
+            session={session}
+            recordType="dispatch"
+            recordId={dispatch.id}
+          />
+        }
+      />
+      <ListPagination
+        basePath={`/dispatches/${dispatch.id}`}
+        page={timeline.page}
+        total={timeline.total}
+      />
     </div>
   );
 }
