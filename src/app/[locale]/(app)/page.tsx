@@ -1,5 +1,6 @@
 import { getFormatter, getTranslations, setRequestLocale } from "next-intl/server";
 
+import { RecordRow } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +12,7 @@ import { achievementForPeriod, currentPeriod } from "@/lib/targets";
 
 import { anchorHref } from "./_components/anchors";
 import { shellCounts } from "./_components/shell-counts";
+import { toneClass, turnTone } from "./_components/turn";
 
 export const dynamic = "force-dynamic";
 
@@ -127,7 +129,9 @@ export default async function TodayPage({
         </Card>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* The concept KPI row: auto-fit minmax(178px,1fr), so a fifth tile
+          would wrap of its own accord rather than needing a new breakpoint. */}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(178px,1fr))] gap-3">
         {FOLLOW_UP_KINDS.map((kind) => (
           <Link
             key={kind}
@@ -142,8 +146,8 @@ export default async function TodayPage({
         ))}
       </div>
 
-      <div className="grid items-start gap-4 lg:grid-cols-5">
-        <Card className="lg:col-span-3" data-slot="today-queue">
+      <div className="grid items-start gap-4 lg:grid-cols-[1.25fr_1fr]">
+        <Card data-slot="today-queue">
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <CardTitle className="text-start text-sm">
               {t("today.queue.title")}
@@ -164,51 +168,41 @@ export default async function TodayPage({
             ) : (
               <ul className="flex flex-col">
                 {queue.map((row) => (
-                  <li
+                  <RecordRow
                     key={`${row.kind}:${row.anchorId}`}
-                    className="border-line flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b py-2.5 last:border-b-0"
-                  >
-                    <span className="flex min-w-0 flex-col text-start">
-                      <Link
-                        href={anchorHref(row.anchorType, row.anchorId)}
-                        className="truncate text-sm font-medium hover:underline"
-                      >
-                        {bilingualName(
-                          {
-                            nameEn: row.anchorNameEn,
-                            nameAr: row.anchorNameAr,
-                          },
-                          locale,
-                        )}
-                      </Link>
-                      <span className="text-muted-foreground truncate text-xs">
-                        {t(`enums.followUpKind.${row.kind}`)}
-                        {row.ownerNames.length > 0
-                          ? ` · ${row.ownerNames.join(", ")}`
-                          : ""}
-                      </span>
-                    </span>
-                    {/* Elapsed time, coloured by lateness `[22 §4]`. Working
-                        days for the two thresholds `07 D5` states that way,
-                        calendar days for the rest `[21 §8]`. */}
-                    <span
-                      className="num text-tone-red-fg text-xs font-semibold"
-                      dir="ltr"
-                    >
-                      {row.inWorkingDays
+                    href={anchorHref(row.anchorType, row.anchorId)}
+                    title={bilingualName(
+                      { nameEn: row.anchorNameEn, nameAr: row.anchorNameAr },
+                      locale,
+                    )}
+                    meta={`${t(`enums.followUpKind.${row.kind}`)}${
+                      row.ownerNames.length > 0
+                        ? ` · ${row.ownerNames.join(", ")}`
+                        : ""
+                    }`}
+                    // Elapsed time, coloured by lateness `[22 §4]`. Every row
+                    // here is late by construction — `follow-ups.ts` put it in
+                    // the queue because it passed its threshold — so the tone
+                    // reads that fact through the same helper the lists use
+                    // rather than hard-coding red, as this row used to.
+                    whenClassName={toneClass(turnTone({ overdue: true }))}
+                    when={
+                      // Working days for the two thresholds `07 D5` states
+                      // that way, calendar days for the rest `[21 §8]`.
+                      row.inWorkingDays
                         ? t("followUps.fields.workingDays", {
                             count: row.ageDays,
                           })
-                        : t("followUps.fields.days", { count: row.ageDays })}
-                    </span>
-                  </li>
+                        : t("followUps.fields.days", { count: row.ageDays })
+                    }
+                  />
                 ))}
               </ul>
             )}
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2" data-slot="today-waiting">
+        <Card data-slot="today-waiting">
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <CardTitle className="text-start text-sm">
               {t("today.waiting.title")}
@@ -225,33 +219,24 @@ export default async function TodayPage({
             ) : (
               <ul className="flex flex-col">
                 {waiting.map((row) => (
-                  <li
+                  // A link only while the viewer may still open it `[20 §8.2]`:
+                  // a share can be revoked and a company handed on, and the row
+                  // outlives either. `RecordRow` links the TITLE, so an
+                  // unopenable row passes no href and renders as plain text.
+                  <RecordRow
                     key={row.id}
-                    className="border-line flex flex-col gap-0.5 border-b py-2.5 text-start last:border-b-0"
-                  >
-                    <span className="text-sm font-medium">
-                      {row.typeName
+                    href={
+                      row.anchorViewable && row.anchorId && row.anchorType
+                        ? anchorHref(row.anchorType, row.anchorId)
+                        : undefined
+                    }
+                    title={
+                      row.typeName
                         ? t(`enums.notificationType.${row.typeName}`)
-                        : row.typeKey}
-                    </span>
-                    {/* A link only while the viewer may still open it
-                        `[20 §8.2]`: a share can be revoked and a company handed
-                        on, and the row outlives either. */}
-                    {row.anchorId && row.anchorType && row.anchorLabel ? (
-                      row.anchorViewable ? (
-                        <Link
-                          href={anchorHref(row.anchorType, row.anchorId)}
-                          className="text-muted-foreground truncate text-xs hover:underline"
-                        >
-                          {row.anchorLabel}
-                        </Link>
-                      ) : (
-                        <span className="text-muted-foreground truncate text-xs">
-                          {row.anchorLabel}
-                        </span>
-                      )
-                    ) : null}
-                  </li>
+                        : row.typeKey
+                    }
+                    meta={row.anchorLabel ?? undefined}
+                  />
                 ))}
               </ul>
             )}
@@ -281,17 +266,25 @@ function Progress({
       : 0;
 
   return (
-    <div
-      className="bg-surface-2 border-line h-3 overflow-hidden rounded-md border"
-      role="progressbar"
-      aria-valuenow={pct}
-      aria-valuemin={0}
-      aria-valuemax={100}
-    >
+    <div className="flex flex-col gap-1.5">
       <div
-        className="bg-brand h-full rounded-md"
-        style={{ inlineSize: `${pct}%` }}
-      />
+        className="bg-surface-2 border-line h-8.5 overflow-hidden rounded-md border"
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        <div
+          className="bg-brand h-full rounded-md"
+          style={{ inlineSize: `${pct}%` }}
+        />
+      </div>
+      {/* The concept's `.legend`: mono, faint, the scale under the bar. */}
+      <div className="num text-faint flex justify-between text-[11px]" dir="ltr">
+        <span>0</span>
+        <span>{pct}%</span>
+        <span>{target ?? "0"}</span>
+      </div>
     </div>
   );
 }
