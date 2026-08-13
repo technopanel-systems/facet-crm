@@ -1,7 +1,11 @@
 import { getFormatter, getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 
-import { DetailRow, PageHeader } from "@/components/page-header";
+import {
+  Fact,
+  Facts,
+  DetailHeader,
+} from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,8 +47,17 @@ export default async function UserDetailPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title={user.name}
+      <DetailHeader
+        name={user.name}
+        state={[
+          bilingualName(
+            { nameEn: user.roleNameEn, nameAr: user.roleNameAr },
+            locale,
+          ),
+          user.region ? t(`enums.region.${user.region}`) : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
         action={
           <Button asChild size="sm" variant="outline">
             <Link href={`/users/${user.id}/edit`}>{t("team.actions.edit")}</Link>
@@ -56,21 +69,21 @@ export default async function UserDetailPage({
         <CardHeader>
           <CardTitle>{t("team.detail.account")}</CardTitle>
         </CardHeader>
-        <CardContent>
-          <dl className="flex flex-col gap-3">
-            <DetailRow label={t("team.fields.email")}>
+        <CardContent className="px-0">
+          <Facts>
+            <Fact label={t("team.fields.email")}>
               <span dir="ltr">{user.email}</span>
-            </DetailRow>
-            <DetailRow label={t("team.fields.role")}>
+            </Fact>
+            <Fact label={t("team.fields.role")}>
               {bilingualName(
                 { nameEn: user.roleNameEn, nameAr: user.roleNameAr },
                 locale,
               )}
-            </DetailRow>
-            <DetailRow label={t("team.fields.region")}>
+            </Fact>
+            <Fact label={t("team.fields.region")}>
               {user.region ? t(`enums.region.${user.region}`) : null}
-            </DetailRow>
-            <DetailRow label={t("team.fields.status")}>
+            </Fact>
+            <Fact label={t("team.fields.status")}>
               {user.isActive ? (
                 <Badge variant="secondary">
                   {t("team.fields.statusActive")}
@@ -80,22 +93,22 @@ export default async function UserDetailPage({
                   {t("team.fields.statusInactive")}
                 </Badge>
               )}
-            </DetailRow>
+            </Fact>
             {user.deactivatedAt ? (
-              <DetailRow label={t("team.fields.deactivatedAt")}>
+              <Fact label={t("team.fields.deactivatedAt")}>
                 <span dir="ltr">
                   {format.dateTime(user.deactivatedAt, {
                     dateStyle: "medium",
                   })}
                 </span>
-              </DetailRow>
+              </Fact>
             ) : null}
-            <DetailRow label={t("common.createdAt")}>
+            <Fact label={t("common.createdAt")}>
               <span dir="ltr">
                 {format.dateTime(user.createdAt, { dateStyle: "medium" })}
               </span>
-            </DetailRow>
-          </dl>
+            </Fact>
+          </Facts>
 
           {!user.canSignIn ? (
             <p className="text-muted-foreground mt-4 text-start text-sm">

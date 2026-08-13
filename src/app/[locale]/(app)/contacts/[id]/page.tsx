@@ -1,7 +1,11 @@
 import { notFound } from "next/navigation";
 import { getFormatter, getTranslations, setRequestLocale } from "next-intl/server";
 
-import { DetailRow, PageHeader } from "@/components/page-header";
+import {
+  Fact,
+  Facts,
+  DetailHeader,
+} from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
@@ -29,9 +33,10 @@ export default async function ContactDetailPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title={bilingualName(contact, locale)}
-        description={contact.position ?? undefined}
+      <DetailHeader
+        name={bilingualName(contact, locale)}
+        state={contact.position ?? undefined}
+        reference={contact.phone ?? undefined}
         action={
           <Button asChild size="sm" variant="outline">
             <Link href={`/contacts/${contact.id}/edit`}>{t("common.edit")}</Link>
@@ -45,9 +50,9 @@ export default async function ContactDetailPage({
             {t("contacts.detail.details")}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <dl>
-            <DetailRow label={t("contacts.fields.company")}>
+        <CardContent className="px-0">
+          <Facts>
+            <Fact label={t("contacts.fields.company")}>
               <Link
                 href={`/companies/${contact.companyId}`}
                 className="hover:underline"
@@ -60,30 +65,30 @@ export default async function ContactDetailPage({
                   locale,
                 )}
               </Link>
-            </DetailRow>
-            <DetailRow label={t("common.nameEn")}>{contact.nameEn}</DetailRow>
-            <DetailRow label={t("common.nameAr")}>
+            </Fact>
+            <Fact label={t("common.nameEn")}>{contact.nameEn}</Fact>
+            <Fact label={t("common.nameAr")}>
               {contact.nameAr ?? dash}
-            </DetailRow>
-            <DetailRow label={t("contacts.fields.position")}>
+            </Fact>
+            <Fact label={t("contacts.fields.position")}>
               {contact.position ?? dash}
-            </DetailRow>
-            <DetailRow label={t("common.phone")}>
+            </Fact>
+            <Fact label={t("common.phone")}>
               <span dir="ltr">{contact.phone ?? dash}</span>
-            </DetailRow>
-            <DetailRow label={t("common.email")}>
+            </Fact>
+            <Fact label={t("common.email")}>
               <span dir="ltr">{contact.email ?? dash}</span>
-            </DetailRow>
-            <DetailRow label={t("common.notes")}>
+            </Fact>
+            <Fact label={t("common.notes")}>
               {contact.notes ?? dash}
-            </DetailRow>
-            <DetailRow label={t("common.createdBy")}>
+            </Fact>
+            <Fact label={t("common.createdBy")}>
               {contact.createdByName ?? t("common.unknownUser")}
-            </DetailRow>
-            <DetailRow label={t("common.createdAt")}>
+            </Fact>
+            <Fact label={t("common.createdAt")}>
               {format.dateTime(contact.createdAt, { dateStyle: "medium" })}
-            </DetailRow>
-          </dl>
+            </Fact>
+          </Facts>
         </CardContent>
       </Card>
     </div>

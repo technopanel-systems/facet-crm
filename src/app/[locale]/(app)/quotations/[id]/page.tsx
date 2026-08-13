@@ -5,7 +5,12 @@ import {
   setRequestLocale,
 } from "next-intl/server";
 
-import { DetailRow, PageHeader } from "@/components/page-header";
+import {
+  DetailHeader,
+  DetailRow,
+  Fact,
+  Facts,
+} from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +24,7 @@ import {
 } from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
 import { can, requireSession } from "@/lib/authz";
+import { chainState } from "@/lib/chain";
 import { bilingualName } from "@/lib/lookups";
 import {
   listProductClasses,
@@ -29,6 +35,11 @@ import {
 } from "@/lib/lookups";
 import { getQuotationThread } from "@/lib/quotations";
 
+import {
+  TurnPanel,
+  chainTurnKey,
+  initials,
+} from "../../_components/turn";
 import { ThreadActions } from "./thread-actions";
 import { ThreadLines } from "./thread-lines";
 
@@ -68,17 +79,28 @@ export default async function QuotationDetailPage({
   const editable = live.status === "requested" && !thread.endState;
   const isCoordinator = can(session, "canApproveQuotation");
 
+  // `25 §3`'s chain position, from the one definition `[src/lib/chain.ts]`.
+  // `hasDispatch` is deliberately not passed: this page does not load
+  // dispatches, so the chain stops at `paid` rather than claiming a position
+  // it cannot see.
+  const chain = chainState({
+    versionStatus: live.status,
+    endState: thread.endState,
+    paymentConfirmedAt: thread.paymentConfirmedAt,
+  });
+
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title={live.smacReference ?? t("quotations.fields.endStateOpen")}
-        description={`${bilingualName(
+      <DetailHeader
+        name={bilingualName(
           { nameEn: thread.projectNameEn, nameAr: thread.projectNameAr },
           locale,
-        )} · ${bilingualName(
+        )}
+        state={bilingualName(
           { nameEn: thread.companyNameEn, nameAr: thread.companyNameAr },
           locale,
-        )}`}
+        )}
+        reference={live.smacReference ?? undefined}
         action={
           thread.endState ? (
             <Badge
@@ -94,18 +116,36 @@ export default async function QuotationDetailPage({
         }
       />
 
+      {/* `22 §3` — the most important element on the screen. Every input is
+          already in scope: the chain reads `live.status`, `endState` and
+          `paymentConfirmedAt`, and `22 §6.6`'s chain STRIP stays deferred —
+          naming the turn is the archetype, drawing the six steps is not. */}
+      <TurnPanel
+        who={initials(thread.raisedByName)}
+        tone={chain.owedBy === null ? "calm" : "soon"}
+        line={t(chainTurnKey(chain, isCoordinator), {
+          name: thread.raisedByName,
+        })}
+        detail={t("quotations.detail.turnSince", {
+          date: format.dateTime(
+            thread.paymentConfirmedAt ?? thread.createdAt,
+            { dateStyle: "long" },
+          ),
+        })}
+      />
+
       <Card>
         <CardHeader>
           <CardTitle className="text-start text-sm">
             {t("quotations.detail.details")}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <dl>
+        <CardContent className="px-0">
+          <Facts>
             {/* The title, always; the link only for someone who may open the
                 project. A coordinator sees every quotation and none of the
                 customer detail behind it `[16 §10]`. */}
-            <DetailRow label={t("quotations.fields.project")}>
+            <Fact label={t("quotations.fields.project")}>
               {thread.projectViewable ? (
                 <Link
                   href={`/projects/${thread.projectId}`}
@@ -125,8 +165,8 @@ export default async function QuotationDetailPage({
                   locale,
                 )
               )}
-            </DetailRow>
-            <DetailRow label={t("quotations.fields.company")}>
+            </Fact>
+            <Fact label={t("quotations.fields.company")}>
               {thread.companyViewable ? (
                 <Link
                   href={`/companies/${thread.companyId}`}
@@ -146,8 +186,8 @@ export default async function QuotationDetailPage({
                   locale,
                 )
               )}
-            </DetailRow>
-            <DetailRow label={t("quotations.fields.contact")}>
+            </Fact>
+            <Fact label={t("quotations.fields.contact")}>
               {thread.contactNameEn
                 ? bilingualName(
                     {
@@ -157,17 +197,17 @@ export default async function QuotationDetailPage({
                     locale,
                   )
                 : dash}
-            </DetailRow>
-            <DetailRow label={t("quotations.fields.raisedBy")}>
+            </Fact>
+            <Fact label={t("quotations.fields.raisedBy")}>
               {thread.raisedByName}
-            </DetailRow>
-            <DetailRow label={t("quotations.detail.raisedOn")}>
+            </Fact>
+            <Fact label={t("quotations.detail.raisedOn")}>
               {format.dateTime(thread.createdAt, { dateStyle: "medium" })}
-            </DetailRow>
+            </Fact>
 
             {/* Payment and acceptance-for-processing are where the CUSTOMER
                 commits `[16 §5]` — the end state above is internal approval. */}
-            <DetailRow label={t("quotations.detail.paymentConfirmedAt")}>
+            <Fact label={t("quotations.detail.paymentConfirmedAt")}>
               {thread.paymentConfirmedAt ? (
                 format.dateTime(thread.paymentConfirmedAt, {
                   dateStyle: "medium",
@@ -177,31 +217,31 @@ export default async function QuotationDetailPage({
                   {t("quotations.detail.notConfirmed")}
                 </span>
               )}
-            </DetailRow>
+            </Fact>
             {thread.paymentConfirmedByName ? (
-              <DetailRow label={t("quotations.detail.paymentConfirmedBy")}>
+              <Fact label={t("quotations.detail.paymentConfirmedBy")}>
                 {thread.paymentConfirmedByName}
-              </DetailRow>
+              </Fact>
             ) : null}
-            <DetailRow label={t("quotations.detail.acceptedForProcessing")}>
+            <Fact label={t("quotations.detail.acceptedForProcessing")}>
               {thread.acceptedForProcessingAt
                 ? format.dateTime(thread.acceptedForProcessingAt, {
                     dateStyle: "medium",
                   })
                 : dash}
-            </DetailRow>
+            </Fact>
 
             {thread.endState === "cancelled" ? (
               <>
-                <DetailRow label={t("quotations.detail.cancelledBy")}>
+                <Fact label={t("quotations.detail.cancelledBy")}>
                   {thread.cancelledByName ?? t("common.unknownUser")}
-                </DetailRow>
-                <DetailRow label={t("quotations.detail.cancellationReason")}>
+                </Fact>
+                <Fact label={t("quotations.detail.cancellationReason")}>
                   {thread.cancellationReason ?? dash}
-                </DetailRow>
+                </Fact>
               </>
             ) : null}
-          </dl>
+          </Facts>
         </CardContent>
       </Card>
 
@@ -212,13 +252,13 @@ export default async function QuotationDetailPage({
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
-          <dl>
-            <DetailRow label={t("quotations.fields.versionStatus")}>
+          <Facts>
+            <Fact label={t("quotations.fields.versionStatus")}>
               <Badge variant="outline">
                 {t(`enums.quotationVersionStatus.${live.status}`)}
               </Badge>
-            </DetailRow>
-            <DetailRow label={t("quotations.fields.reference")}>
+            </Fact>
+            <Fact label={t("quotations.fields.reference")}>
               <span dir="ltr">{live.smacReference ?? dash}</span>
               {live.smacReference ? (
                 <span className="text-muted-foreground ms-2 text-xs">
@@ -227,28 +267,28 @@ export default async function QuotationDetailPage({
                   )}
                 </span>
               ) : null}
-            </DetailRow>
-            <DetailRow label={t("quotations.fields.origin")}>
+            </Fact>
+            <Fact label={t("quotations.fields.origin")}>
               {t(`enums.quotationVersionOrigin.${live.origin}`)}
-            </DetailRow>
-            <DetailRow label={t("quotations.fields.validUntil")}>
+            </Fact>
+            <Fact label={t("quotations.fields.validUntil")}>
               <span dir="ltr">{live.validUntil ?? dash}</span>
-            </DetailRow>
+            </Fact>
             {live.returnForEditRound > 0 ? (
-              <DetailRow label={t("quotations.detail.returnedRounds")}>
+              <Fact label={t("quotations.detail.returnedRounds")}>
                 <span dir="ltr">{live.returnForEditRound}</span>
-              </DetailRow>
+              </Fact>
             ) : null}
-            <DetailRow label={t("quotations.fields.deliveryPeriod")}>
+            <Fact label={t("quotations.fields.deliveryPeriod")}>
               {live.deliveryPeriod ?? dash}
-            </DetailRow>
-            <DetailRow label={t("quotations.fields.paymentMethod")}>
+            </Fact>
+            <Fact label={t("quotations.fields.paymentMethod")}>
               {live.paymentMethod ?? dash}
-            </DetailRow>
-            <DetailRow label={t("quotations.fields.shipmentTerms")}>
+            </Fact>
+            <Fact label={t("quotations.fields.shipmentTerms")}>
               {live.shipmentTerms ?? dash}
-            </DetailRow>
-          </dl>
+            </Fact>
+          </Facts>
 
           <ThreadLines
             threadId={thread.id}

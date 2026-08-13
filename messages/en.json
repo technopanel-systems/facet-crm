@@ -249,7 +249,8 @@
       "addContact": "Add contact",
       "projects": "Projects",
       "noProjects": "No projects you can see.",
-      "archived": "Archived"
+      "archived": "Archived",
+      "turnDetail": "Log a report to reset the clock — the coverage screen counts from the last one."
     },
     "errors": {
       "notFound": "That company does not exist, or it is not one of yours.",
@@ -300,7 +301,8 @@
       "addCompany": "Add company",
       "removeCompany": "Remove",
       "hiddenCompany": "Not visible to you",
-      "noCompanies": "No companies linked."
+      "noCompanies": "No companies linked.",
+      "turnOwner": "Waiting on {name} — the next move on this project"
     },
     "errors": {
       "atLeastOneCompany": "A project needs at least one company.",
@@ -382,7 +384,8 @@
       "paymentConfirmedBy": "Payment confirmed by",
       "paymentConfirmedAt": "Payment confirmed",
       "acceptedForProcessing": "Accepted for processing",
-      "notConfirmed": "Not confirmed"
+      "notConfirmed": "Not confirmed",
+      "turnSince": "Sitting here since {date}."
     },
     "actions": {
       "coordinator": "Coordinator",

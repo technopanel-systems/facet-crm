@@ -81,41 +81,46 @@ export default async function NotificationsPage({
         </p>
       ) : (
         <>
-          {waiting.length > 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("notifications.detail.actNow")}</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                {waiting.map((row) => (
-                  <NotificationEntry
-                    key={row.id}
-                    row={row}
-                    t={t}
-                    format={format}
-                  />
-                ))}
-              </CardContent>
-            </Card>
-          ) : null}
+          {/* The concept's two columns `[22 §3]`, and the split is already the
+              right one: act-now is what the reader owes, the digest is what
+              merely happened `[07 G1]`. Act-now takes the wide side. */}
+          <div className="grid items-start gap-4 lg:grid-cols-[1.25fr_1fr]">
+            {waiting.length > 0 ? (
+              <Card data-slot="notifications-act-now">
+                <CardHeader>
+                  <CardTitle>{t("notifications.detail.actNow")}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  {waiting.map((row) => (
+                    <NotificationEntry
+                      key={row.id}
+                      row={row}
+                      t={t}
+                      format={format}
+                    />
+                  ))}
+                </CardContent>
+              </Card>
+            ) : null}
 
-          {rest.length > 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("notifications.detail.digest")}</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                {rest.map((row) => (
-                  <NotificationEntry
-                    key={row.id}
-                    row={row}
-                    t={t}
-                    format={format}
-                  />
-                ))}
-              </CardContent>
-            </Card>
-          ) : null}
+            {rest.length > 0 ? (
+              <Card data-slot="notifications-digest">
+                <CardHeader>
+                  <CardTitle>{t("notifications.detail.digest")}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  {rest.map((row) => (
+                    <NotificationEntry
+                      key={row.id}
+                      row={row}
+                      t={t}
+                      format={format}
+                    />
+                  ))}
+                </CardContent>
+              </Card>
+            ) : null}
+          </div>
 
           <ListPagination
             basePath="/notifications"

@@ -249,7 +249,8 @@
       "addContact": "إضافة جهة اتصال",
       "projects": "المشاريع",
       "noProjects": "لا توجد مشاريع يمكنك الاطلاع عليها.",
-      "archived": "مؤرشفة"
+      "archived": "مؤرشفة",
+      "turnDetail": "سجّل تقريرًا لإعادة ضبط العدّاد — شاشة التغطية تحسب من آخر تقرير."
     },
     "errors": {
       "notFound": "هذه الشركة غير موجودة، أو أنها ليست ضمن سجلاتك.",
@@ -300,7 +301,8 @@
       "addCompany": "إضافة شركة",
       "removeCompany": "إزالة",
       "hiddenCompany": "غير مرئية لك",
-      "noCompanies": "لا توجد شركات مرتبطة."
+      "noCompanies": "لا توجد شركات مرتبطة.",
+      "turnOwner": "بانتظار {name} — الخطوة التالية في هذا المشروع"
     },
     "errors": {
       "atLeastOneCompany": "يجب أن يرتبط المشروع بشركة واحدة على الأقل.",
@@ -382,7 +384,8 @@
       "paymentConfirmedBy": "أكّد الدفع",
       "paymentConfirmedAt": "تاريخ تأكيد الدفع",
       "acceptedForProcessing": "معتمد للتنفيذ",
-      "notConfirmed": "غير مؤكد"
+      "notConfirmed": "غير مؤكد",
+      "turnSince": "قائم هنا منذ {date}."
     },
     "actions": {
       "coordinator": "منسق المبيعات",

@@ -95,9 +95,13 @@ async function TimelineRow({ event }: { event: TimelineEvent }) {
   const label = t(`enums.timelineEvent.${event.kind}`);
   const href = hrefFor(event.link);
 
+  // `RecordRow`'s shape, hand-written: a timeline entry leads with its badge,
+  // which the shared row has no slot for. Everything else matches — the same
+  // border, the same padding, the same end-aligned mono date — so the two read
+  // as one component in a card that holds both.
   return (
-    <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b py-2.5 last:border-b-0">
-      <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+    <li className="border-line flex items-center gap-3 border-b py-2.5 last:border-b-0">
+      <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-1 text-start">
         <Badge variant={event.kind === "report" ? "secondary" : "outline"}>
           {label}
         </Badge>
@@ -109,8 +113,10 @@ async function TimelineRow({ event }: { event: TimelineEvent }) {
           <span className="text-sm">{detailText(event, t)}</span>
         )}
       </span>
-      <span className="text-muted-foreground text-xs">
-        <span dir="ltr">{day}</span>
+      <span className="text-faint flex-none text-[11.5px]">
+        <span className="num" dir="ltr">
+          {day}
+        </span>
         {event.actorName ? (
           <span className="ms-2">
             {t("timeline.byWhom", { name: event.actorName })}

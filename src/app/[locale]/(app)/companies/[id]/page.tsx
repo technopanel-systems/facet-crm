@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation";
 import { getFormatter, getTranslations, setRequestLocale } from "next-intl/server";
 
-import { DetailRow, PageHeader } from "@/components/page-header";
+import {
+  DetailHeader,
+  Fact,
+  Facts,
+  RecordRow,
+} from "@/components/page-header";
 import { Timeline } from "@/components/timeline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +27,12 @@ import {
   reassignCompanyAction,
   reincludeCompanyAction,
 } from "../actions";
+import {
+  TurnPanel,
+  daysSince,
+  initials,
+  turnTone,
+} from "../../_components/turn";
 import { DormancyPanel } from "./dormancy-panel";
 
 export const dynamic = "force-dynamic";
@@ -73,23 +84,56 @@ export default async function CompanyDetailPage({
 
   const dash = t("common.none");
 
+  // The elapsed figure for the turn panel, from the timeline the page has
+  // already fetched — `22 §4`'s "Nothing recorded for 23 days". It is a
+  // display number over data in hand, not a second answer to "is this quiet":
+  // that judgement is `quiet` above, and it stays `isCompanyQuiet`'s alone.
+  const lastEventDay = timeline.events[0]?.day ?? null;
+  const sinceLastEvent = lastEventDay
+    ? daysSince(new Date(`${lastEventDay}T00:00:00Z`))
+    : 0;
+
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title={bilingualName(company, locale)}
-        description={
-          company.archivedAt
-            ? t("companies.detail.archived")
-            : // `20 §5` — suppressed follow-ups are worth saying on the record
-              // itself, not only on the coverage screen.
-              onHoldUntil
-              ? t("coverage.detail.onHoldUntil", { date: onHoldUntil })
-              : undefined
-        }
+      <DetailHeader
+        name={bilingualName(company, locale)}
+        state={[
+          pickName(locale, company.categoryNameEn, company.categoryNameAr),
+          pickName(locale, company.cityNameEn, company.cityNameAr),
+        ]
+          .filter(Boolean)
+          .join(" · ")}
         action={
           <Button asChild size="sm" variant="outline">
             <Link href={`/companies/${company.id}/edit`}>{t("common.edit")}</Link>
           </Button>
+        }
+      />
+
+      {/* `22 §3`'s turn panel — the most important element on the screen.
+          Every input is already computed above: `quiet` is `isCompanyQuiet`,
+          which is the derivation `follow-ups.ts` uses rather than a second one
+          `[21 §7]`, and `onHoldUntil` is `20 §5`'s suppression. The elapsed
+          figure is the timeline's most recent day, which the page already
+          loaded — nothing new is fetched and no threshold is invented here. */}
+      <TurnPanel
+        who={company.createdByName ? initials(company.createdByName) : undefined}
+        tone={turnTone({ overdue: quiet && !onHoldUntil && !company.archivedAt })}
+        line={
+          company.archivedAt
+            ? t("companies.detail.archived")
+            : onHoldUntil
+              ? t("coverage.detail.onHoldUntil", { date: onHoldUntil })
+              : lastEventDay === null
+                ? t("coverage.fields.neverLogged")
+                : quiet
+                  ? t("coverage.fields.quietFor", { count: sinceLastEvent })
+                  : t("coverage.fields.coveredFor", { count: sinceLastEvent })
+        }
+        detail={
+          company.archivedAt || onHoldUntil
+            ? undefined
+            : t("companies.detail.turnDetail")
         }
       />
 
@@ -99,36 +143,34 @@ export default async function CompanyDetailPage({
             {t("companies.detail.details")}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <dl>
-            <DetailRow label={t("common.nameEn")}>{company.nameEn}</DetailRow>
-            <DetailRow label={t("common.nameAr")}>
-              {company.nameAr ?? dash}
-            </DetailRow>
-            <DetailRow label={t("common.phone")}>
+        <CardContent className="px-0">
+          <Facts>
+            <Fact label={t("common.nameEn")}>{company.nameEn}</Fact>
+            <Fact label={t("common.nameAr")}>{company.nameAr ?? dash}</Fact>
+            <Fact label={t("common.phone")} numeric>
               <span dir="ltr">{company.phone ?? dash}</span>
-            </DetailRow>
-            <DetailRow label={t("companies.fields.category")}>
+            </Fact>
+            <Fact label={t("companies.fields.category")}>
               {pickName(locale, company.categoryNameEn, company.categoryNameAr) ??
                 dash}
-            </DetailRow>
-            <DetailRow label={t("companies.fields.vatNumber")}>
+            </Fact>
+            <Fact label={t("companies.fields.vatNumber")} numeric>
               <span dir="ltr">{company.vatNumber ?? dash}</span>
-            </DetailRow>
-            <DetailRow label={t("common.region")}>
+            </Fact>
+            <Fact label={t("common.region")}>
               {company.region ? t(`enums.region.${company.region}`) : dash}
-            </DetailRow>
-            <DetailRow label={t("common.city")}>
+            </Fact>
+            <Fact label={t("common.city")}>
               {pickName(locale, company.cityNameEn, company.cityNameAr) ?? dash}
-            </DetailRow>
-            <DetailRow label={t("companies.fields.leadSource")}>
+            </Fact>
+            <Fact label={t("companies.fields.leadSource")}>
               {pickName(
                 locale,
                 company.leadSourceNameEn,
                 company.leadSourceNameAr,
               ) ?? dash}
-            </DetailRow>
-            <DetailRow label={t("companies.fields.warmth")}>
+            </Fact>
+            <Fact label={t("companies.fields.warmth")}>
               {company.warmth ? (
                 <Badge variant="secondary">
                   {t(`enums.warmth.${company.warmth}`)}
@@ -136,143 +178,33 @@ export default async function CompanyDetailPage({
               ) : (
                 t("companies.fields.warmthUnset")
               )}
-            </DetailRow>
+            </Fact>
             {/* Two separate things, deliberately `[10 §1]`: warmth is the
                 rep's judgement, qualification is what has actually happened.
                 A company is qualified because a quotation was requested
                 against it — there is nothing here for anyone to tick. */}
-            <DetailRow label={t("common.qualified")}>
+            <Fact label={t("common.qualified")}>
               {company.isQualified ? (
                 <Badge variant="outline">{t("common.yes")}</Badge>
               ) : (
                 <span className="text-muted-foreground">{t("common.no")}</span>
               )}
-            </DetailRow>
-            <DetailRow label={t("common.notes")}>
-              {company.notes ?? dash}
-            </DetailRow>
-            <DetailRow label={t("common.createdBy")}>
+            </Fact>
+            <Fact label={t("common.createdBy")}>
               {company.createdByName ?? t("common.unknownUser")}
-            </DetailRow>
-            <DetailRow label={t("common.createdAt")}>
+            </Fact>
+            <Fact label={t("common.createdAt")} numeric>
               {format.dateTime(company.createdAt, { dateStyle: "medium" })}
-            </DetailRow>
-          </dl>
+            </Fact>
+            {/* A sentence, not a datum — it spans the grid so it is readable
+                rather than squeezed into a 140px column. */}
+            <Fact label={t("common.notes")} wide>
+              {company.notes ?? dash}
+            </Fact>
+          </Facts>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-start text-sm">
-            {t("companies.detail.reps")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="flex flex-col gap-2">
-            {reps.map((rep) => (
-              <li
-                key={rep.id}
-                className="flex flex-wrap items-center gap-2 text-start text-sm"
-              >
-                <span className="font-medium">{rep.userName}</span>
-                {rep.isPrimary ? (
-                  <Badge variant="secondary">
-                    {t("companies.detail.primary")}
-                  </Badge>
-                ) : null}
-                <span className="text-muted-foreground text-xs">
-                  {t(`enums.companyRepOrigin.${rep.origin}`)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
-          <CardTitle className="text-start text-sm">
-            {t("companies.detail.contacts")}
-          </CardTitle>
-          <Button asChild size="xs" variant="outline">
-            <Link href={`/contacts/new?companyId=${company.id}`}>
-              {t("companies.detail.addContact")}
-            </Link>
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {contacts.rows.length === 0 ? (
-            <p className="text-muted-foreground text-start text-sm">
-              {t("companies.detail.noContacts")}
-            </p>
-          ) : (
-            <ul className="flex flex-col">
-              {contacts.rows.map((contact) => (
-                <li
-                  key={contact.id}
-                  className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b py-2.5 last:border-b-0"
-                >
-                  <Link
-                    href={`/contacts/${contact.id}`}
-                    className="text-start text-sm font-medium hover:underline"
-                  >
-                    {bilingualName(contact, locale)}
-                  </Link>
-                  <span className="text-muted-foreground text-start text-sm">
-                    {contact.position ?? dash}
-                    {contact.phone ? (
-                      <span dir="ltr" className="ms-3">
-                        {contact.phone}
-                      </span>
-                    ) : null}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-start text-sm">
-            {t("companies.detail.projects")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {projects.rows.length === 0 ? (
-            <p className="text-muted-foreground text-start text-sm">
-              {t("companies.detail.noProjects")}
-            </p>
-          ) : (
-            <ul className="flex flex-col">
-              {projects.rows.map((project) => (
-                <li
-                  key={project.id}
-                  className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b py-2.5 last:border-b-0"
-                >
-                  <Link
-                    href={`/projects/${project.id}`}
-                    className="text-start text-sm font-medium hover:underline"
-                  >
-                    {bilingualName(project, locale)}
-                  </Link>
-                  <span className="text-muted-foreground text-start text-sm">
-                    {project.endState
-                      ? t(`enums.projectEndState.${project.endState}`)
-                      : t("projects.fields.endStateOpen")}
-                    {project.sqmExpected ? (
-                      <span dir="ltr" className="ms-3">
-                        {project.sqmExpected}
-                      </span>
-                    ) : null}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
 
       {/* `07 E6` — rendered only when there is a decision to take: the company
           has gone quiet, or somebody has already taken one. A panel that showed
@@ -352,20 +284,119 @@ export default async function CompanyDetailPage({
         </Card>
       ) : null}
 
-      {/* `20 §6` — the rep's payoff for logging, and the reason the log button
-          sits in its header rather than at the top of the page. */}
-      <Timeline
-        events={timeline.events}
-        total={timeline.total}
-        fullHistoryHref={`/companies/${company.id}/timeline`}
-        action={
-          <Button asChild size="xs">
-            <Link href={`/reports/new?companyId=${company.id}`}>
-              {t("reports.new")}
-            </Link>
-          </Button>
-        }
-      />
+      {/* `22 §3` — related records as cards, in the concept's two-column
+          grid. The timeline is the wide side: it is the rep's payoff for
+          logging `[20 §6]`, and the reason its log button sits in its own
+          header rather than at the top of the page. */}
+      <div className="grid items-start gap-4 lg:grid-cols-[1.25fr_1fr]">
+        <div className="flex flex-col gap-4">
+          <Timeline
+            events={timeline.events}
+            total={timeline.total}
+            fullHistoryHref={`/companies/${company.id}/timeline`}
+            action={
+              <Button asChild size="xs">
+                <Link href={`/reports/new?companyId=${company.id}`}>
+                  {t("reports.new")}
+                </Link>
+              </Button>
+            }
+          />
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-start text-sm">
+                {t("companies.detail.reps")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="flex flex-col gap-2">
+                {reps.map((rep) => (
+                  <li
+                    key={rep.id}
+                    className="flex flex-wrap items-center gap-2 text-start text-sm"
+                  >
+                    <span className="font-medium">{rep.userName}</span>
+                    {rep.isPrimary ? (
+                      <Badge variant="secondary">
+                        {t("companies.detail.primary")}
+                      </Badge>
+                    ) : null}
+                    <span className="text-muted-foreground text-xs">
+                      {t(`enums.companyRepOrigin.${rep.origin}`)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <CardTitle className="text-start text-sm">
+                {t("companies.detail.contacts")}
+              </CardTitle>
+              <Button asChild size="xs" variant="outline">
+                <Link href={`/contacts/new?companyId=${company.id}`}>
+                  {t("companies.detail.addContact")}
+                </Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {contacts.rows.length === 0 ? (
+                <p className="text-muted-foreground text-start text-sm">
+                  {t("companies.detail.noContacts")}
+                </p>
+              ) : (
+                <ul className="flex flex-col">
+                  {contacts.rows.map((contact) => (
+                    <RecordRow
+                      key={contact.id}
+                      href={`/contacts/${contact.id}`}
+                      title={bilingualName(contact, locale)}
+                      meta={contact.position ?? dash}
+                      when={contact.phone ?? undefined}
+                    />
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-start text-sm">
+                {t("companies.detail.projects")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {projects.rows.length === 0 ? (
+                <p className="text-muted-foreground text-start text-sm">
+                  {t("companies.detail.noProjects")}
+                </p>
+              ) : (
+                <ul className="flex flex-col">
+                  {projects.rows.map((project) => (
+                    <RecordRow
+                      key={project.id}
+                      href={`/projects/${project.id}`}
+                      title={bilingualName(project, locale)}
+                      meta={
+                        project.endState
+                          ? t(`enums.projectEndState.${project.endState}`)
+                          : t("projects.fields.endStateOpen")
+                      }
+                      when={project.sqmExpected ?? undefined}
+                    />
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,11 @@
 import { notFound } from "next/navigation";
 import { getFormatter, getTranslations, setRequestLocale } from "next-intl/server";
 
-import { DetailRow, PageHeader } from "@/components/page-header";
+import {
+  DetailHeader,
+  Fact,
+  Facts,
+} from "@/components/page-header";
 import { Timeline } from "@/components/timeline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +19,11 @@ import { getProject } from "@/lib/projects";
 import { projectTimeline, TIMELINE_CARD_LIMIT } from "@/lib/timeline";
 
 import { setCreditSplitAction } from "../actions";
+import {
+  TurnPanel,
+  daysSince,
+  initials,
+} from "../../_components/turn";
 import { CreditSplit } from "./credit-split";
 import { ProjectLinks } from "./project-links";
 
@@ -59,16 +68,50 @@ export default async function ProjectDetailPage({
     dateStyle: "short",
   }).format(new Date());
 
+  // The elapsed figure for the turn panel, from the timeline already fetched.
+  const lastEventDay = timeline.events[0]?.day ?? null;
+  const sinceLastEvent = lastEventDay
+    ? daysSince(new Date(`${lastEventDay}T00:00:00Z`))
+    : 0;
+
   const dash = t("common.none");
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title={bilingualName(project, locale)}
+      <DetailHeader
+        name={bilingualName(project, locale)}
+        state={[
+          project.ownerName,
+          project.endState
+            ? t(`enums.projectEndState.${project.endState}`)
+            : t("projects.fields.endStateOpen"),
+        ]
+          .filter(Boolean)
+          .join(" · ")}
         action={
           <Button asChild size="sm" variant="outline">
             <Link href={`/projects/${project.id}/edit`}>{t("common.edit")}</Link>
           </Button>
+        }
+      />
+
+      {/* `22 §3`'s turn panel. A resolved project owes nobody the next action;
+          an open one is its owner's, and the elapsed figure is the timeline
+          this page already loaded. No threshold is derived here — `25 §4`'s
+          "in production", "on hold until" and "lost" are the rep's own inputs
+          and none of them is built yet, so this says only what is known. */}
+      <TurnPanel
+        who={initials(project.ownerName)}
+        tone={project.endState ? "calm" : "soon"}
+        line={
+          project.endState
+            ? t(`enums.projectEndState.${project.endState}`)
+            : t("projects.detail.turnOwner", { name: project.ownerName })
+        }
+        detail={
+          lastEventDay === null
+            ? t("coverage.fields.neverLogged")
+            : t("coverage.fields.coveredFor", { count: sinceLastEvent })
         }
       />
 
@@ -78,25 +121,25 @@ export default async function ProjectDetailPage({
             {t("projects.detail.details")}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <dl>
-            <DetailRow label={t("common.nameEn")}>{project.nameEn}</DetailRow>
-            <DetailRow label={t("common.nameAr")}>
+        <CardContent className="px-0">
+          <Facts>
+            <Fact label={t("common.nameEn")}>{project.nameEn}</Fact>
+            <Fact label={t("common.nameAr")}>
               {project.nameAr ?? dash}
-            </DetailRow>
-            <DetailRow label={t("projects.fields.owner")}>
+            </Fact>
+            <Fact label={t("projects.fields.owner")}>
               {project.ownerName}
-            </DetailRow>
-            <DetailRow label={t("projects.fields.sqmExpected")}>
+            </Fact>
+            <Fact label={t("projects.fields.sqmExpected")}>
               <span dir="ltr">{project.sqmExpected ?? dash}</span>
-            </DetailRow>
-            <DetailRow label={t("common.region")}>
+            </Fact>
+            <Fact label={t("common.region")}>
               {project.region ? t(`enums.region.${project.region}`) : dash}
-            </DetailRow>
-            <DetailRow label={t("common.city")}>
+            </Fact>
+            <Fact label={t("common.city")}>
               {pickName(locale, project.cityNameEn, project.cityNameAr) ?? dash}
-            </DetailRow>
-            <DetailRow label={t("projects.fields.endState")}>
+            </Fact>
+            <Fact label={t("projects.fields.endState")}>
               {project.endState ? (
                 <Badge
                   variant={
@@ -108,19 +151,19 @@ export default async function ProjectDetailPage({
               ) : (
                 t("projects.fields.endStateOpen")
               )}
-            </DetailRow>
+            </Fact>
             {project.endState === "lost" ? (
-              <DetailRow label={t("projects.fields.lossReason")}>
+              <Fact label={t("projects.fields.lossReason")}>
                 {project.lossReason ?? dash}
-              </DetailRow>
+              </Fact>
             ) : null}
-            <DetailRow label={t("common.createdBy")}>
+            <Fact label={t("common.createdBy")}>
               {project.createdByName ?? t("common.unknownUser")}
-            </DetailRow>
-            <DetailRow label={t("common.createdAt")}>
+            </Fact>
+            <Fact label={t("common.createdAt")}>
               {format.dateTime(project.createdAt, { dateStyle: "medium" })}
-            </DetailRow>
-          </dl>
+            </Fact>
+          </Facts>
         </CardContent>
       </Card>
 

@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
-import { DetailRow, PageHeader } from "@/components/page-header";
+import {
+  DetailRow,
+  Fact,
+  Facts,
+  DetailHeader,
+} from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,9 +49,10 @@ export default async function QuotationVersionPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title={`${t("quotations.fields.version")} ${version.versionNumber}`}
-        description={version.smacReference ?? undefined}
+      <DetailHeader
+        name={`${t("quotations.fields.version")} ${version.versionNumber}`}
+        state={t(`enums.quotationVersionStatus.${version.status}`)}
+        reference={version.smacReference ?? undefined}
         action={
           <Button asChild size="sm" variant="outline">
             <Link href={`/quotations/${id}`}>{t("common.back")}</Link>
@@ -64,26 +70,26 @@ export default async function QuotationVersionPage({
             {t("quotations.detail.details")}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <dl>
-            <DetailRow label={t("quotations.fields.versionStatus")}>
+        <CardContent className="px-0">
+          <Facts>
+            <Fact label={t("quotations.fields.versionStatus")}>
               <Badge variant="outline">
                 {t(`enums.quotationVersionStatus.${version.status}`)}
               </Badge>
-            </DetailRow>
-            <DetailRow label={t("quotations.fields.reference")}>
+            </Fact>
+            <Fact label={t("quotations.fields.reference")}>
               <span dir="ltr">{version.smacReference ?? dash}</span>
-            </DetailRow>
-            <DetailRow label={t("quotations.fields.origin")}>
+            </Fact>
+            <Fact label={t("quotations.fields.origin")}>
               {t(`enums.quotationVersionOrigin.${version.origin}`)}
-            </DetailRow>
-            <DetailRow label={t("quotations.fields.validUntil")}>
+            </Fact>
+            <Fact label={t("quotations.fields.validUntil")}>
               <span dir="ltr">{version.validUntil ?? dash}</span>
-            </DetailRow>
-            <DetailRow label={t("common.createdBy")}>
+            </Fact>
+            <Fact label={t("common.createdBy")}>
               {version.createdByName ?? t("common.unknownUser")}
-            </DetailRow>
-          </dl>
+            </Fact>
+          </Facts>
         </CardContent>
       </Card>
 

@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation";
 import { getFormatter, getTranslations, setRequestLocale } from "next-intl/server";
 
-import { DetailRow, PageHeader } from "@/components/page-header";
+import {
+  DetailHeader,
+  Fact,
+  Facts,
+  RecordRow,
+} from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,13 +59,12 @@ export default async function ReportDetailPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title={t("reports.detail.title")}
-        description={
-          report.entryType === "interaction"
-            ? t("reports.detail.interactionHint")
-            : t("reports.detail.fieldNoteHint")
-        }
+      {/* The company names an interaction; a field note belongs to no
+          customer `[20 §2]`, so it is named by what it is. Either way the
+          header names the record rather than the screen. */}
+      <DetailHeader
+        name={companyName ?? t(`enums.reportEntryType.${report.entryType}`)}
+        state={`${day(report.reportDate)} · ${report.userName}`}
         action={
           // `20 §9` — only the author corrects a report. The data layer
           // refuses either way; this simply does not offer it.
@@ -78,18 +82,18 @@ export default async function ReportDetailPage({
             {t(`enums.reportEntryType.${report.entryType}`)}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <dl className="flex flex-col">
-            <DetailRow label={t("reports.fields.reportDate")}>
+        <CardContent className="px-0">
+          <Facts>
+            <Fact label={t("reports.fields.reportDate")}>
               <span dir="ltr">{day(report.reportDate)}</span>
-            </DetailRow>
-            <DetailRow label={t("reports.fields.author")}>
+            </Fact>
+            <Fact label={t("reports.fields.author")}>
               {report.userName}
-            </DetailRow>
+            </Fact>
 
             {report.entryType === "interaction" ? (
               <>
-                <DetailRow label={t("reports.fields.company")}>
+                <Fact label={t("reports.fields.company")}>
                   {companyName === null ? null : report.companyViewable ? (
                     <Link
                       href={`/companies/${report.companyId}`}
@@ -100,8 +104,8 @@ export default async function ReportDetailPage({
                   ) : (
                     companyName
                   )}
-                </DetailRow>
-                <DetailRow label={t("reports.fields.contact")}>
+                </Fact>
+                <Fact label={t("reports.fields.contact")}>
                   {report.contactNameEn
                     ? bilingualName(
                         {
@@ -111,8 +115,8 @@ export default async function ReportDetailPage({
                         locale,
                       )
                     : null}
-                </DetailRow>
-                <DetailRow label={t("reports.fields.project")}>
+                </Fact>
+                <Fact label={t("reports.fields.project")}>
                   {projectName === null ? null : report.projectViewable ? (
                     <Link
                       href={`/projects/${report.projectId}`}
@@ -123,41 +127,41 @@ export default async function ReportDetailPage({
                   ) : (
                     projectName
                   )}
-                </DetailRow>
-                <DetailRow label={t("reports.fields.channel")}>
+                </Fact>
+                <Fact label={t("reports.fields.channel")}>
                   {report.channel
                     ? t(`enums.reportChannel.${report.channel}`)
                     : null}
-                </DetailRow>
-                <DetailRow label={t("reports.fields.outcome")}>
+                </Fact>
+                <Fact label={t("reports.fields.outcome")}>
                   {report.outcome
                     ? t(`enums.reportOutcome.${report.outcome}`)
                     : null}
-                </DetailRow>
+                </Fact>
                 {report.onHoldUntil ? (
-                  <DetailRow label={t("reports.fields.onHoldUntil")}>
+                  <Fact label={t("reports.fields.onHoldUntil")}>
                     <span dir="ltr">{day(report.onHoldUntil)}</span>
-                  </DetailRow>
+                  </Fact>
                 ) : null}
               </>
             ) : (
               <>
-                <DetailRow label={t("reports.fields.category")}>
+                <Fact label={t("reports.fields.category")}>
                   {report.category
                     ? t(`enums.fieldNoteCategory.${report.category}`)
                     : null}
-                </DetailRow>
-                <DetailRow label={t("reports.fields.city")}>
+                </Fact>
+                <Fact label={t("reports.fields.city")}>
                   {report.cityNameEn
                     ? bilingualName(
                         { nameEn: report.cityNameEn, nameAr: report.cityNameAr },
                         locale,
                       )
                     : null}
-                </DetailRow>
+                </Fact>
               </>
             )}
-          </dl>
+          </Facts>
 
           {report.onHoldUntil ? (
             <p className="text-muted-foreground mt-4 text-start text-xs">
@@ -195,17 +199,15 @@ export default async function ReportDetailPage({
           ) : (
             <ul className="flex flex-col">
               {report.signals.map((signal) => (
-                <li
+                <RecordRow
                   key={signal.signal}
-                  className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b py-2.5 last:border-b-0"
-                >
-                  <Badge variant="outline">
-                    {t(`enums.reportSignal.${signal.signal}`)}
-                  </Badge>
-                  <span className="text-muted-foreground text-sm">
-                    {signal.reference ?? dash}
-                  </span>
-                </li>
+                  title={
+                    <Badge variant="outline">
+                      {t(`enums.reportSignal.${signal.signal}`)}
+                    </Badge>
+                  }
+                  when={signal.reference ?? dash}
+                />
               ))}
             </ul>
           )}

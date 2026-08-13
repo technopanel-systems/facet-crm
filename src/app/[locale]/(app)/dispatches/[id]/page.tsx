@@ -1,7 +1,11 @@
 import { getFormatter, getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 
-import { DetailRow, PageHeader } from "@/components/page-header";
+import {
+  Fact,
+  Facts,
+  DetailHeader,
+} from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -50,9 +54,16 @@ export default async function DispatchPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title={`${dispatch.sqm} ${t("common.sqm")}`}
-        description={day(dispatch.dispatchDate)}
+      {/* The COMPANY is the record's name `[22 §3]`. A quantity as a
+          title told a rep nothing about which dispatch they had opened; the
+          square metres are a fact below, where a quantity belongs. */}
+      <DetailHeader
+        name={bilingualName(
+          { nameEn: dispatch.companyNameEn, nameAr: dispatch.companyNameAr },
+          locale,
+        )}
+        state={`${day(dispatch.dispatchDate)} · ${dispatch.sqm} ${t("common.sqm")}`}
+        reference={dispatch.smacReference ?? undefined}
       />
 
       <Card>
@@ -61,9 +72,9 @@ export default async function DispatchPage({
             {t("dispatches.detail.title")}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <dl className="grid gap-4 sm:grid-cols-2">
-            <DetailRow label={t("dispatches.fields.company")}>
+        <CardContent className="px-0">
+          <Facts>
+            <Fact label={t("dispatches.fields.company")}>
               {dispatch.companyViewable ? (
                 <Link
                   href={`/companies/${dispatch.companyId}`}
@@ -74,22 +85,22 @@ export default async function DispatchPage({
               ) : (
                 bilingualName({ nameEn: dispatch.companyNameEn, nameAr: dispatch.companyNameAr }, locale)
               )}
-            </DetailRow>
-            <DetailRow label={t("dispatches.fields.rep")}>
+            </Fact>
+            <Fact label={t("dispatches.fields.rep")}>
               {dispatch.userName}
-            </DetailRow>
-            <DetailRow label={t("dispatches.fields.sqm")}>
+            </Fact>
+            <Fact label={t("dispatches.fields.sqm")}>
               <span dir="ltr">
                 {dispatch.sqm} {t("common.sqm")}
               </span>
-            </DetailRow>
-            <DetailRow label={t("dispatches.fields.dispatchDate")}>
+            </Fact>
+            <Fact label={t("dispatches.fields.dispatchDate")}>
               <span dir="ltr">{day(dispatch.dispatchDate)}</span>
-            </DetailRow>
+            </Fact>
             {/* A direct sale has no project at all `[07 C6]`, which is also
                 why no credit split can apply to it. Otherwise: the name
                 always, the link only for someone who may open it `[16 §8]`. */}
-            <DetailRow label={t("dispatches.fields.project")}>
+            <Fact label={t("dispatches.fields.project")}>
               {dispatch.projectId === null ? (
                 dash
               ) : dispatch.projectViewable ? (
@@ -114,11 +125,11 @@ export default async function DispatchPage({
                   locale,
                 )
               )}
-            </DetailRow>
-            <DetailRow label={t("dispatches.fields.recordedBy")}>
+            </Fact>
+            <Fact label={t("dispatches.fields.recordedBy")}>
               {dispatch.recordedByName}
-            </DetailRow>
-          </dl>
+            </Fact>
+          </Facts>
         </CardContent>
       </Card>
 
@@ -137,22 +148,22 @@ export default async function DispatchPage({
         </CardHeader>
         <CardContent>
           {dispatch.isDirect ? (
-            <dl className="grid gap-4 sm:grid-cols-2">
-              <DetailRow label={t("dispatches.fields.source")}>
+            <Facts>
+              <Fact label={t("dispatches.fields.source")}>
                 <Badge variant="outline">
                   {t("dispatches.fields.direct")}
                 </Badge>
-              </DetailRow>
-              <DetailRow label={t("dispatches.fields.approvedBy")}>
+              </Fact>
+              <Fact label={t("dispatches.fields.approvedBy")}>
                 {dispatch.approvedByName ?? dash}
                 {dispatch.approvedAt
                   ? ` · ${format.dateTime(dispatch.approvedAt, { dateStyle: "medium" })}`
                   : ""}
-              </DetailRow>
-            </dl>
+              </Fact>
+            </Facts>
           ) : (
-            <dl className="grid gap-4 sm:grid-cols-2">
-              <DetailRow label={t("dispatches.fields.quotation")}>
+            <Facts>
+              <Fact label={t("dispatches.fields.quotation")}>
                 {dispatch.threadViewable ? (
                   <Link
                     href={`/quotations/${dispatch.quotationThreadId}`}
@@ -164,11 +175,11 @@ export default async function DispatchPage({
                 ) : (
                   <span dir="ltr">{dispatch.smacReference ?? dash}</span>
                 )}
-              </DetailRow>
-              <DetailRow label={t("dispatches.fields.paymentGate")}>
+              </Fact>
+              <Fact label={t("dispatches.fields.paymentGate")}>
                 {t("dispatches.detail.paymentConfirmed")}
-              </DetailRow>
-            </dl>
+              </Fact>
+            </Facts>
           )}
         </CardContent>
       </Card>
