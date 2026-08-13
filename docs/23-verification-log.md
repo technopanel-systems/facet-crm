@@ -725,6 +725,63 @@ with a `NOTE:` line naming any branch the data never reached. **No silent
 coverage** — which shapes exist at all depends on fixture data, so what was
 exercised is printed rather than assumed.
 
+### The hole this closed: section 0 and section 9
+
+The trap below cost two green runs. Both halves of it are now guarded, and
+**both guards were made to fail on purpose before being believed** — an
+assertion that has never failed proves nothing.
+
+**Section 0 — the server must have booted from this build.** `/api/health`
+carries `bootedAt`, stamped at module scope, so the condition is directly
+checkable: a server whose boot **precedes the mtime of `.next/BUILD_ID`** is
+running code older than the build on disk. The script refuses before check one.
+
+That is the checkable form of *"did not start from this run"*. It is stricter
+than an occupied-port snapshot in the way that matters — it still fires after
+the operator restarts against a stale build — and looser only where looseness
+is right: a server started from *this* build by an earlier command is a valid
+thing to verify against, so running the suite twice is not an error. It cannot
+catch code edited and never rebuilt; nothing served over HTTP can.
+
+Proven by reproducing incident 2 exactly — rebuild under a running server, then
+run:
+
+```
+The server at http://localhost:3100 did not start from this run.
+  It booted   2026-08-13T09:04:17.533Z
+  The build is 2026-08-13T09:05:24.251Z
+```
+
+The failure names the port's holder and prints the `Get-NetTCPConnection` /
+`Stop-Process` line, because *kill it by PID* is the part that was got wrong.
+
+**Section 9 — nothing may read like a key that failed to resolve.** Every page
+the script fetches is scanned: script and style blocks are removed **whole**
+(the flight payload carries the entire catalogue as JSON — a scan that only
+stripped tags would match all 699 keys on every page), tags are replaced by a
+space, and the visible text is matched against
+`<namespace>.<key>`. **The namespaces are read from `messages/en.json`'s own
+top-level keys**, not guessed, so the pattern cannot drift from the catalogue.
+
+**This is not asserting on translated strings**; `20 §8` and the existing rule
+stand. It never looks for a translation. It looks for the *shape* of a lookup
+that failed — which is precisely what the stale server rendered, and precisely
+what every marker assertion passed straight through: `data-slot="chain-strip"`
+was correct on a page whose six labels were raw keys.
+
+Proven by deleting `chain.step.new`, rebuilding and running:
+
+```
+FAIL  no visible text is <namespace>.<key> — 27 namespaces watched — 1 found
+      chain.step.new   first seen on /en/quotations/79423651-…
+```
+
+One failure, the key named, the page named, and the other 366 checks still
+green — specific, not noisy. A space, not nothing, replaces a tag for a reason:
+`<b>team</b>.<i>x</i>` must not become `team.x`, and ordinary prose ("…on the
+team. Next…") never matches because a namespace needs a dot and a segment
+immediately after it.
+
 ### The trap: three servers, one port
 
 Twice in one session, a green suite was measured against the wrong server.
@@ -741,10 +798,11 @@ recycle it — **a job spec from a previous shell invocation**, which killed
 nothing, so the port stayed held and a subsequent build's marker never reached
 the running server. Forty checks failed against code that was correct on disk.
 
-Three rules, all cheap:
+Three rules, all cheap, and **the script now enforces the first two itself**:
 
 - **Read the server's log before trusting the suite.** `EADDRINUSE` is one
-  line, and nothing downstream mentions it.
+  line, and nothing downstream mentions it. Section 0 catches it whether or
+  not anyone reads the log.
 - **Kill by PID.** `Get-NetTCPConnection -LocalPort N` then `Stop-Process`, and
   assert the port is free before starting.
 - **A stale `next dev` serves new code with old messages.** That combination
@@ -752,6 +810,13 @@ Three rules, all cheap:
   other half of stage 3's casualty — a build overwriting the `.next` a dev
   server holds — so: check for a dev server before building *and* before
   verifying.
+
+**Neither guard existed while the strip was being built**, which is why the
+trap was hit twice in one afternoon and why the write-up above is longer than
+the fix. The general lesson is the one this repo keeps relearning: a suite that
+only asserts what it expects to see will pass against a server that is not the
+one under test. Both new sections assert something about the *run itself*
+rather than about the screens.
 
 ### Still manual
 

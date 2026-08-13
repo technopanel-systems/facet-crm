@@ -186,6 +186,15 @@ That pass is now a kept script: **`npm run verify:routes`**, against
 route as a rep, a manager and a coordinator, in both locales and both themes.
 Assert on DOM markers, not translated strings, and replay the real form POSTs.
 
+Two of its sections assert something about **the run itself**, because a suite
+that only checks what it expects to see will pass against the wrong server —
+twice in one afternoon it did. **Section 0** refuses a server that booted
+before `.next/BUILD_ID` was written (`/api/health` carries `bootedAt`); if it
+fires, stop the port's holder **by PID** and start again. **Section 9** fails on
+any visible text shaped like `<namespace>.<key>`, the namespaces read from
+`messages/en.json` itself — that is not asserting a translation, it is
+asserting that no lookup silently failed.
+
 **Check laptop width first — 1366 and 1440 — then wide.** The content column is
 start-aligned and capped at 1320px, so those two are where it is capped by the
 *screen* instead. A wide viewport hides exactly the wrapping defects a laptop

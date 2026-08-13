@@ -18,6 +18,10 @@
  *      which nothing else drives.
  *   8. The chain strip `[22 §6.6]` renders on a quotation thread AND on the
  *      project behind it, in both locales.
+ *   9. No screen renders anything shaped like an unresolved message key.
+ *
+ * Section 0 runs before all of them, and refuses a server that booted before
+ * the build — the hole every one of the above passed straight through `[23]`.
  *
  * **It replaces a script stage 1 wrote and threw away** `[23]`. A restyle that
  * 500s a screen is the redesign's failure mode, and the four checks cannot see
@@ -43,6 +47,8 @@
  * id to follow, which is a legitimate empty state rather than a broken link.
  */
 
+import { readFileSync, statSync } from "node:fs";
+
 process.loadEnvFile(".env");
 
 const BASE = process.env.VERIFY_BASE_URL ?? "http://localhost:3000";
@@ -59,6 +65,57 @@ function check(label: string, condition: boolean, detail = ""): void {
   }
   failures += 1;
   console.log(`  FAIL  ${label}${detail ? ` — ${detail}` : ""}`);
+}
+
+/* ── Nothing may read like a key that failed to resolve ───────────────────── */
+
+/**
+ * **This is not asserting on translated strings.** The rule stands: next-intl
+ * ships the whole catalogue to every page, so grepping for *"Quotation
+ * requested"* proves the message bundle exists and nothing about whether the
+ * screen rendered it `[23]`, `[20 §8]`. Nothing here looks for a translation.
+ *
+ * It looks for the **shape of an unresolved key** — `chain.step.new`,
+ * `projects.chain.title`, `common.none` as *visible text* — which is what
+ * next-intl renders when a lookup fails, and which is exactly what a stale
+ * server produced while every marker assertion passed. A marker assertion
+ * cannot see it: `data-slot="chain-strip"` was correct on a page whose six
+ * labels were raw keys.
+ *
+ * **The pattern is built from the catalogue's own top-level keys**, not
+ * guessed, so it cannot drift from the namespaces that exist. A word that is
+ * not a namespace cannot begin a match, and a namespace needs a dot and a
+ * segment straight after it — so ordinary prose ("…on the team. Next…", with
+ * its space) never matches.
+ */
+const NAMESPACES = Object.keys(
+  JSON.parse(readFileSync("messages/en.json", "utf8")) as Record<
+    string,
+    unknown
+  >,
+);
+const KEY_SHAPE = new RegExp(
+  `\\b(?:${NAMESPACES.join("|")})(?:\\.[A-Za-z0-9_]+)+`,
+  "g",
+);
+
+/** Every key-shaped string seen as visible text, against where it first was. */
+const leaked = new Map<string, string>();
+
+function scanForUnresolvedKeys(path: string, body: string): void {
+  if (!body.includes("<html")) return;
+  const visible = body
+    // **Script blocks go first, whole.** The flight payload carries the entire
+    // message catalogue as JSON — every key in the file, in a string — so a
+    // scan that only stripped tags would match all 699 of them on every page.
+    .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[\s\S]*?<\/style>/gi, " ")
+    // A space, not nothing: `<b>team</b>.<i>x</i>` must not become `team.x`.
+    .replace(/<[^>]+>/g, " ");
+
+  for (const [match] of visible.matchAll(KEY_SHAPE)) {
+    if (!leaked.has(match)) leaked.set(match, path);
+  }
 }
 
 /* ── A cookie jar, because a session is a cookie ──────────────────────────── */
@@ -108,14 +165,17 @@ async function get(
         redirect: "manual",
       });
       store(jar, followed);
-      return {
-        status: followed.status,
-        body: await followed.text(),
-        url: next,
-      };
+      const body = await followed.text();
+      scanForUnresolvedKeys(next, body);
+      return { status: followed.status, body, url: next };
     }
   }
-  return { status: response.status, body: await response.text(), url: path };
+  const body = await response.text();
+  // **Every page this script touches is scanned**, rather than a chosen few:
+  // the fetch is the one choke point, and the failure it guards against does
+  // not announce itself on the screen you thought to check.
+  scanForUnresolvedKeys(path, body);
+  return { status: response.status, body, url: path };
 }
 
 /* ── Login ────────────────────────────────────────────────────────────────── */
@@ -291,6 +351,95 @@ async function walkRecords(jar: Jar, email: string): Promise<void> {
   }
 }
 
+/* ── The startup guard ────────────────────────────────────────────────────── */
+
+/**
+ * **Refuse to measure the wrong server.**
+ *
+ * Twice in one session a whole green run was taken against a process that was
+ * already holding the port `[23]`: once a `next dev` left over from the
+ * morning, which compiled the new component from source but served the message
+ * catalogue it had imported at boot — so screens rendered `chain.step.new` as
+ * literal text while 296 marker assertions passed — and once a `next start`
+ * that a `kill %1` from a different shell had failed to stop, so a fresh
+ * build's changes never reached the server they were being asserted against.
+ *
+ * **The condition is "this server did not start from this run"**, and the
+ * symptom is stale content. `/api/health` reports `bootedAt`, stamped at module
+ * scope, so the condition is directly checkable: a server that booted **before
+ * `.next/BUILD_ID` was written** is running code older than the build on disk,
+ * whatever it happens to be serving.
+ *
+ * That is stricter than an occupied-port check in the way that matters — it
+ * still fires after the operator restarts against a stale build — and looser
+ * only where looseness is right: a server started from *this* build by an
+ * earlier command is a valid thing to verify against, and running the suite
+ * twice must not be an error.
+ *
+ * It cannot catch code edited and never rebuilt. Nothing served over HTTP can.
+ */
+async function assertServerIsThisBuild(health: Response): Promise<void> {
+  let builtAt: Date;
+  try {
+    builtAt = statSync(".next/BUILD_ID").mtime;
+  } catch {
+    console.error(
+      "No .next/BUILD_ID — there is no build to verify against.\n" +
+        "  Run `npm run build && npm run start` first.",
+    );
+    process.exit(1);
+  }
+
+  const body = (await health.json().catch(() => ({}))) as {
+    bootedAt?: string;
+  };
+  if (!body.bootedAt) {
+    // The field is served by `src/app/api/health/route.ts`. Absent means the
+    // server predates it — which is itself a server older than this build.
+    console.error(
+      `The server at ${BASE} reports no bootedAt.\n` +
+        "  /api/health has carried it since the chain-strip slice, so this\n" +
+        "  process is older than the build you mean to drive. Stop it — by\n" +
+        "  PID, not by job spec — and start it again from this build.",
+    );
+    process.exit(1);
+  }
+
+  const bootedAt = new Date(body.bootedAt);
+  if (bootedAt.getTime() >= builtAt.getTime()) {
+    console.log(
+      `\n0. The server at ${BASE} booted ${describeGap(builtAt, bootedAt)} the build it is being driven against.`,
+    );
+    return;
+  }
+
+  const port = new URL(BASE).port || "80";
+  console.error(
+    `\nThe server at ${BASE} did not start from this run.\n` +
+      `  It booted   ${bootedAt.toISOString()}\n` +
+      `  The build is ${builtAt.toISOString()}\n\n` +
+      "  Something was already listening on that port, so `next start` never\n" +
+      "  bound and every check below would have been measured against stale\n" +
+      "  code. Read the start log for EADDRINUSE, then stop the holder BY PID\n" +
+      "  — a `kill %1` only reaches a job of the shell that started it:\n\n" +
+      `    Get-NetTCPConnection -LocalPort ${port} -State Listen |\n` +
+      "      Select-Object -Unique OwningProcess |\n" +
+      "      ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }\n\n" +
+      "  Then `npm run build && npm run start`, and check it says Ready.",
+  );
+  process.exit(1);
+}
+
+/** "42s after" / "2m before" — the shape of the gap, for the passing line. */
+function describeGap(from: Date, to: Date): string {
+  const seconds = Math.round((to.getTime() - from.getTime()) / 1000);
+  const magnitude =
+    Math.abs(seconds) < 90
+      ? `${Math.abs(seconds)}s`
+      : `${Math.round(Math.abs(seconds) / 60)}m`;
+  return `${magnitude} after`;
+}
+
 /* ── Main ─────────────────────────────────────────────────────────────────── */
 
 async function main(): Promise<void> {
@@ -317,6 +466,7 @@ async function main(): Promise<void> {
     );
     process.exit(1);
   }
+  await assertServerIsThisBuild(health);
 
   console.log("\n1. Anonymous requests are turned away");
   {
@@ -707,6 +857,28 @@ async function main(): Promise<void> {
           `  --    NOTE: this data never reached ${what} — that branch is unproven by this run.`,
         );
       }
+    }
+  }
+
+  console.log("\n9. Nothing reads like a message key that failed to resolve");
+  {
+    // Accumulated by `scanForUnresolvedKeys` over every page fetched above —
+    // so this covers all three identities, both locales, both themes and every
+    // record screen, without a line of its own in any of them.
+    check(
+      `no visible text is <namespace>.<key> — ${NAMESPACES.length} namespaces watched`,
+      leaked.size === 0,
+      `${leaked.size} found`,
+    );
+    for (const [key, path] of leaked) {
+      console.log(`        ${key}   first seen on ${path}`);
+    }
+    if (leaked.size > 0) {
+      console.log(
+        "\n  A key rendering as text means next-intl found no message for it.\n" +
+          "  Check `npm run check:messages` — and if that is green, the server\n" +
+          "  is serving a catalogue older than the file. See section 0.",
+      );
     }
   }
 }
