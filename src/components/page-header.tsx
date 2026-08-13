@@ -77,20 +77,31 @@ export function DetailHeader({
 /**
  * The bordered fact grid `[22 §3]` — the concept's `.facts`.
  *
- * `auto-fit minmax(140px,1fr)`, as the concept has it, but the lines are drawn
- * with `gap-px` over a `bg-line` ground rather than the concept's
- * `border-inline-end`. The concept shows four facts on one row; a company
- * detail has thirteen and wraps, and `:last-child` would leave a hanging edge
- * on every row but the last — and no horizontal rule between rows at all.
+ * `auto-fit minmax(140px,1fr)`, as the concept has it. **The rules are drawn
+ * by the cells, not by the container**, and that is the whole trick:
+ *
+ * The concept shows exactly four facts on one row, so it can say
+ * `border-inline-end` per fact and `none` on the last. A company detail has
+ * **thirteen**, which at laptop width wraps to seven tracks and then six —
+ * leaving one track of the last row empty. Any container-drawn line work
+ * (`gap-px` over a coloured ground) paints that empty track as a solid block
+ * of `--line`, which reads as a broken cell. Borders on the cells leave it
+ * simply blank, because there is no cell there to draw one.
+ *
+ * The wrapper exists to clip the first column's start border, which `-ms-px`
+ * pushes outside. Without it the grid would show a doubled edge against the
+ * card border, since `CardContent` is `px-0` here.
  */
 export function Facts({ children }: { children: ReactNode }) {
   return (
-    <dl
-      data-slot="facts"
-      className="bg-line grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-px"
-    >
-      {children}
-    </dl>
+    <div className="overflow-hidden">
+      <dl
+        data-slot="facts"
+        className="-ms-px grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))]"
+      >
+        {children}
+      </dl>
+    </div>
   );
 }
 
@@ -115,7 +126,15 @@ export function Fact({
   children: ReactNode;
 }) {
   return (
-    <div className={cn("bg-card px-4 py-3 text-start", wide && "col-span-full")}>
+    <div
+      className={cn(
+        // `border-t` is the row rule and, on the first row, the rule under the
+        // card header. `border-s` is the column rule; the first column's is
+        // clipped by `Facts`.
+        "border-line border-s border-t px-4 py-3 text-start",
+        wide && "col-span-full",
+      )}
+    >
       <dt className="text-faint text-[11px]">{label}</dt>
       <dd
         className={cn(
