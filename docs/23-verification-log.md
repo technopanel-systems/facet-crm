@@ -682,6 +682,89 @@ and it happened anyway — check for a dev server before building.
 
 ---
 
+## Feature slice 1 — the chain strip (2026-08-13)
+
+`22 §6.6`'s strip, on the quotation thread and project detail screens, on
+`redesign/chain-strip`. No schema. `verify:routes` grew a **section 8**.
+
+### What section 8 asserts
+
+It drives the **two screens together**, as the manager, in both locales. That
+pairing is the whole design: reading `data-position` off the quotation's own
+strip says whether that thread is live, and a live thread obliges the project
+behind it to draw something. Asserting the project screen alone would be a
+tautology — it renders the card only when it has a thread to render it for.
+
+1. Every quotation thread draws a strip — a closed one included.
+2. **Six nodes.** A dropped `25 §3` column fails here.
+3. **Exactly one node is ringed, and only while someone owes it.** A
+   `dispatched` or `closed` thread rings none; every other position rings one.
+4. A closed thread has done nodes and no current one — the `reached` branch.
+5. The turn panel sits with it.
+6. The project behind a live thread draws either the strip or `25 §22`'s flag,
+   and the flag carries its figures.
+
+### It walks by shape, not by row
+
+The first version followed all 25 threads on page 1 and produced 588 checks,
+of which 550 re-proved what the first one had. Worse, it proved the wrong
+things: **every project it reached had two live threads**, so the strip half of
+the project screen went untested while the flag half was asserted forty times —
+and no `closed` thread appears until page 2, so the one branch that needed a
+helper change was never drawn.
+
+It now pages (four pages, capped) and asserts a shape the **first** time it
+meets it — position plus which project half it reached. Seven shapes per
+locale, 356 checks, and the run prints what it reached:
+
+```
+--    reached 32 project strip(s), 72 flag(s), 64 closed thread(s)
+```
+
+with a `NOTE:` line naming any branch the data never reached. **No silent
+coverage** — which shapes exist at all depends on fixture data, so what was
+exercised is printed rather than assumed.
+
+### The trap: three servers, one port
+
+Twice in one session, a green suite was measured against the wrong server.
+
+`npx next start` **failed to bind** — a `next dev` from earlier in the day held
+port 3000 — and the suite ran happily against that stale process, which
+compiled the new component from source but served the message catalogue it had
+imported at boot. The screens rendered `chain.step.new` as literal text and
+296 checks passed anyway, because they assert on DOM markers, which were
+correct. `check:messages` was green throughout; the JSON was never wrong.
+
+Then, moving to port 3100 to leave the dev server alone, `kill %1` was used to
+recycle it — **a job spec from a previous shell invocation**, which killed
+nothing, so the port stayed held and a subsequent build's marker never reached
+the running server. Forty checks failed against code that was correct on disk.
+
+Three rules, all cheap:
+
+- **Read the server's log before trusting the suite.** `EADDRINUSE` is one
+  line, and nothing downstream mentions it.
+- **Kill by PID.** `Get-NetTCPConnection -LocalPort N` then `Stop-Process`, and
+  assert the port is free before starting.
+- **A stale `next dev` serves new code with old messages.** That combination
+  reads exactly like a missing translation key, and is not one. It is also the
+  other half of stage 3's casualty — a build overwriting the `.next` a dev
+  server holds — so: check for a dev server before building *and* before
+  verifying.
+
+### Still manual
+
+The strip has not been **looked at** in a browser — no screenshot was taken at
+1366 or 1440, in either locale. Everything above is markup-level. What is
+proven structurally: six `flex-1 min-w-0` steps cannot overflow their row, the
+labels `truncate`, and every token the strip uses (`--brand`, `--brand-ink`,
+`--line-strong`, `--a-amber-bg`, `--a-amber-fg`, `--text-faint`) is defined in
+**both** themes — checked against `globals.css`, which is section 4's own
+lesson about a token defined in only one.
+
+---
+
 ## Why the HTTP pass is not optional
 
 Also moved from `CLAUDE.md`, from its **Working style** section, which now

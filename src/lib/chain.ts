@@ -12,11 +12,12 @@ import type {
  * they are *computed from real events*: always accurate, never stale, nothing to
  * maintain, and they answer whose move it is, which is `22 §4`'s rule.
  *
- * **Anything that needs a chain position calls this.** Today that is the turn
- * column on `/quotations` and the turn panel on a quotation. When `22 §6.6`'s
- * deferred **chain strip** is built, it consumes this helper verbatim rather
- * than re-deriving the same six positions from the same three fields — and so
- * does the board of `25 §3`, whose columns *are* these positions.
+ * **Anything that needs a chain position calls this.** The turn column on
+ * `/quotations`, the turn panel on a quotation, and `22 §6.6`'s **chain strip**
+ * on the quotation and project detail screens — which draws `CHAIN_COLUMNS`
+ * and labels each step from `chainOwner`, rather than re-deriving the same six
+ * positions from the same three fields. The board of `25 §3` is next, and its
+ * columns *are* these positions.
  *
  * Two derivations of one rule is how the quiet-threshold trap `21 §7` names
  * came about: `follow-ups.ts` owns "quiet", and `isCompanyQuiet` exists so that
@@ -30,26 +31,39 @@ import type {
  */
 
 /**
- * `25 §3`'s six columns, plus the terminal case.
+ * `25 §3`'s six columns, **in order**.
  *
  * `new` is a **project** with no quotation thread at all — a thread can never
  * be in it, since raising one creates version 1. It is named here because the
  * board's first column is this position and the board must not define its own.
  *
- * `closed` is not a `25 §3` column: `25 §5` keeps a lost project off the board
- * and `16 §5` ends a thread at rejected, cancelled or expired. Nobody owes the
- * next action on one, which is the only thing `22 §4` asks.
+ * The order is the chain's own, and two callers depend on it: the strip walks
+ * it forwards to draw six nodes, and `chainReached` tests it backwards because
+ * furthest-along wins.
  */
-export const CHAIN_POSITIONS = [
+export const CHAIN_COLUMNS = [
   "new",
   "requested",
   "waitingSignature",
   "waitingPayment",
   "paid",
   "dispatched",
-  "closed",
 ] as const;
+
+/**
+ * The six columns, plus the terminal case.
+ *
+ * `closed` is not a `25 §3` column: `25 §5` keeps a lost project off the board
+ * and `16 §5` ends a thread at rejected, cancelled or expired. Nobody owes the
+ * next action on one, which is the only thing `22 §4` asks. So the board and
+ * the strip take `CHAIN_COLUMNS`, and only a *position* can be `closed` —
+ * derived from the one list above rather than restating six names beside it.
+ */
+export const CHAIN_POSITIONS = [...CHAIN_COLUMNS, "closed"] as const;
 export type ChainPosition = (typeof CHAIN_POSITIONS)[number];
+
+/** A column, never the terminal case — what `reached` and the strip index. */
+export type ChainColumn = (typeof CHAIN_COLUMNS)[number];
 
 /**
  * Who owes the next action at a position — `22 §4`'s question, not a
@@ -73,6 +87,18 @@ const OWNERS: Record<ChainPosition, ChainOwner> = {
   closed: null,
 };
 
+/**
+ * Who owes the next action at **any** position, not only the current one.
+ *
+ * `chainState().owedBy` answers for the position a thread is actually in; the
+ * chain strip labels all six steps with whose move each is `[22 §4]`, and the
+ * board's column headers will want the same. Both read this map rather than
+ * writing a second one — which is the whole reason this module exists.
+ */
+export function chainOwner(position: ChainPosition): ChainOwner {
+  return OWNERS[position];
+}
+
 export type ChainInput = {
   /** The live version's status — never `superseded`, by definition. */
   versionStatus: QuotationVersionStatus;
@@ -94,6 +120,17 @@ export type ChainInput = {
 export type ChainState = {
   position: ChainPosition;
   owedBy: ChainOwner;
+  /**
+   * The furthest column the thread actually **reached** — the same thing as
+   * `position`, except on a closed one, where `position` is `closed` and this
+   * still says where it stopped.
+   *
+   * The strip needs it: a rejected thread that had been issued has two done
+   * nodes and a chain that goes no further, and `closed` alone cannot draw
+   * that. It is not a second derivation — `chainPosition` calls the same
+   * function, so there is one ladder read twice rather than two ladders.
+   */
+  reached: ChainColumn;
 };
 
 /**
@@ -102,15 +139,25 @@ export type ChainState = {
  */
 export function chainState(input: ChainInput): ChainState {
   const position = chainPosition(input);
-  return { position, owedBy: OWNERS[position] };
+  return { position, owedBy: OWNERS[position], reached: chainReached(input) };
 }
 
 function chainPosition(input: ChainInput): ChainPosition {
-  const { versionStatus, endState, paymentConfirmedAt, hasDispatch } = input;
-
   // Rejected, cancelled and expired end the thread. `accepted` does NOT — it
   // is internal approval `[16 §5]`, and the chain carries on to payment.
-  if (endState && endState !== "accepted") return "closed";
+  if (input.endState && input.endState !== "accepted") return "closed";
+  return chainReached(input);
+}
+
+/**
+ * How far the chain travelled, ignoring whether it then ended.
+ *
+ * `new` is never returned: this takes a thread, and a thread that exists is
+ * past it by definition. The board reaches `new` by having no thread to ask
+ * about at all.
+ */
+function chainReached(input: ChainInput): ChainColumn {
+  const { versionStatus, endState, paymentConfirmedAt, hasDispatch } = input;
 
   if (hasDispatch) return "dispatched";
   if (paymentConfirmedAt) return "paid";

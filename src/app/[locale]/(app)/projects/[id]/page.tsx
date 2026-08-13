@@ -12,13 +12,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
 import { can, listActiveUsers, requireSession } from "@/lib/authz";
+import { chainState } from "@/lib/chain";
 import { listCompanyOptions } from "@/lib/companies";
 import { getCreditSplitInForce } from "@/lib/credit-splits";
+import { fromScaled, SQM_SCALE, toScaled, ZERO } from "@/lib/decimal";
+import { listDispatches } from "@/lib/dispatches";
 import { bilingualName, pickName } from "@/lib/lookups";
 import { getProject } from "@/lib/projects";
+import { listQuotationThreads } from "@/lib/quotations";
 import { projectTimeline, TIMELINE_CARD_LIMIT } from "@/lib/timeline";
 
 import { setCreditSplitAction } from "../actions";
+import { ChainStrip } from "../../_components/chain-strip";
 import {
   TurnPanel,
   daysSince,
@@ -48,11 +53,55 @@ export default async function ProjectDetailPage({
   const companies = await listCompanyOptions(session);
 
   // `18 §3` — the split names people, so the picker is the user directory.
-  const [split, people, timeline] = await Promise.all([
+  const [split, people, timeline, threads] = await Promise.all([
     getCreditSplitInForce(session, project.id),
     listActiveUsers(),
     projectTimeline(session, project.id, { limit: TIMELINE_CARD_LIMIT }),
+    listQuotationThreads(session, { projectId: project.id }),
   ]);
+
+  // **Live means the chain has not closed.** `closed_at` `[25 §24]` is the
+  // other reading — a thread the rep closes because he knows nothing more is
+  // coming — but nothing writes it yet, so the chain is the only answer
+  // available and this is not a second definition of it.
+  const live = threads.rows.filter(
+    (row) => chainState(row).position !== "closed",
+  );
+
+  // `25 §22` — one thread per project is the encouraged path, and a second is
+  // usually the coordinator not knowing the first exists. One gets the strip;
+  // several get the flag, because a strip implies ONE position and a project
+  // with three live threads does not have one.
+  const only = live.length === 1 ? live[0] : null;
+  const onlyChain = only
+    ? chainState({
+        versionStatus: only.versionStatus,
+        endState: only.endState,
+        paymentConfirmedAt: only.paymentConfirmedAt,
+        // The sixth node, made real. `listDispatches` already filters by
+        // thread, and anyone who can see the thread can see its dispatches.
+        hasDispatch:
+          (await listDispatches(session, { threadId: only.id })).total > 0,
+      })
+    : null;
+
+  // **The one place quotations are summed, and only to show that summing them
+  // is meaningless** — `25 §21` says quoted is never a sum, and `25 §22` asks
+  // for exactly this flag: *"3 open quotations · 5,800 m² quoted against 2,000
+  // expected"*. The same square metres counted three times is the point being
+  // made. Nothing else may reuse this figure. Decimals stay strings `[22 §2]`.
+  const quotedSqm =
+    live.length > 1
+      ? fromScaled(
+          live.reduce(
+            (total, row) =>
+              total + (row.totalSqm ? toScaled(row.totalSqm, SQM_SCALE) : ZERO),
+            ZERO,
+          ),
+          SQM_SCALE,
+        )
+      : null;
+
   const inForceIds = new Set(split?.rows.map((row) => row.userId) ?? []);
   const candidates = people.map((person) => ({
     id: person.id,
@@ -114,6 +163,76 @@ export default async function ProjectDetailPage({
             : t("coverage.fields.coveredFor", { count: sinceLastEvent })
         }
       />
+
+      {/* `22 §6.6`'s strip, where this project has ONE live quotation thread —
+          no second turn panel, because the panel above already names the
+          project's own turn, and no explanation, which belongs on the
+          quotation itself. */}
+      {only && onlyChain ? (
+        <Card>
+          <CardHeader className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle className="text-start text-sm">
+              {t("projects.chain.title")}
+              {only.smacReference ? (
+                <span className="num text-faint ms-2 font-normal" dir="ltr">
+                  {only.smacReference}
+                </span>
+              ) : null}
+            </CardTitle>
+            <Button asChild size="xs" variant="ghost">
+              <Link href={`/quotations/${only.id}`}>{t("common.view")}</Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <ChainStrip chain={onlyChain} />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* `25 §22`'s flag. Not a strip: three live threads have three
+          positions, and the thing worth saying is that they exist at all. */}
+      {live.length > 1 ? (
+        <Card data-slot="chain-many">
+          <CardHeader>
+            <CardTitle className="text-start text-sm">
+              {t("projects.chain.title")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <p className="text-tone-amber-fg text-start text-[13.5px] font-semibold">
+              {t("projects.chain.manyThreads", { count: live.length })}
+            </p>
+            <dl
+              data-slot="chain-many-figures"
+              className="flex flex-wrap gap-x-8 gap-y-2"
+            >
+              <div className="text-start">
+                <dt className="text-faint text-[11px]">
+                  {t("projects.chain.quoted")}
+                </dt>
+                <dd className="num mt-0.5 text-sm font-semibold" dir="ltr">
+                  {quotedSqm} {t("common.sqm")}
+                </dd>
+              </div>
+              <div className="text-start">
+                <dt className="text-faint text-[11px]">
+                  {t("projects.chain.expected")}
+                </dt>
+                <dd className="num mt-0.5 text-sm font-semibold" dir="ltr">
+                  {project.sqmExpected ? (
+                    `${project.sqmExpected} ${t("common.sqm")}`
+                  ) : (
+                    <span className="text-muted-foreground">{dash}</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+            <p className="text-muted-foreground text-start text-xs">
+              {t("projects.chain.manyThreadsHint")}
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>

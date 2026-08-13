@@ -209,8 +209,8 @@ there is no flash and no inline script.
 ## 6. OPEN — not chosen
 
 Recorded rather than filled in. Some need founder input, one is a defect.
-**6.1 closed in stage 2** and is kept here, struck, so the decision is legible
-where the question was asked.
+**6.1 closed in stage 2 and 6.6's strip in feature slice 1**; both are kept
+here, struck, so the decision is legible where the question was asked.
 
 | # | Open item | Why it is open |
 |---|---|---|
@@ -219,7 +219,7 @@ where the question was asked.
 | 6.3 | **"Everything I logged."** Neither `/activity` nor `/reports` answers it — see §6.5 | A `?rep=me` filter would be a URL param onto `listReports`'s **existing** `userId` option, so no new predicate — but it changes screen behaviour, not presentation |
 | 6.4 | **Where cross-company contact search returns.** `/contacts` leaves the rail; contacts are reached inside a company | Nothing is orphaned — the company detail screen lists contacts and links `/contacts/new?companyId=` — but searching a contact across companies now has no entry point. Likely answered by 6.2 |
 | 6.5 | **`coverage()` paginates before it filters — a real defect**, described below | The fix is a data-layer change. Out of scope for a shell stage |
-| 6.6 | The **chain strip**, kanban, calendar, drag-and-drop and charts | Explicitly deferred by the founder to the redesign-decisions document. **When the strip is built it consumes `src/lib/chain.ts`** — stage 2's single definition of `25 §3`'s six positions — rather than re-deriving them from the same three fields. So does the board, whose columns *are* those positions |
+| ~~6.6~~ | ~~The **chain strip**~~, kanban, calendar, drag-and-drop and charts | **The strip CLOSED — feature slice 1**, on the condition this entry set: it consumes `src/lib/chain.ts` and draws `CHAIN_COLUMNS`, labelling each step from `chainOwner`. See §9. The rest stay deferred by the founder to the redesign-decisions document, and the board's columns *are* those positions |
 | 6.7 | **The turn column on `/companies` and `/projects`** `[new in stage 2]` | `22 §4` asks every row to say whose move it is. `/quotations`, `/follow-ups` and `/coverage` can: the chain position, the follow-up kind and `daysSince` are already on their rows. `listCompanies` and `listProjects` return **no last-interaction age**, so "Nothing recorded for 23 days" cannot be said there without a data-layer change. Not faked from a second derivation — that is the trap `21 §7` names |
 | 6.8 | **Second person for the rep half of a quotation's turn** `[new in stage 2]` | `22 §4` says second person *where that person is the reader*. The coordinator half can be: `canApproveQuotation` names that identity exactly. The rep half names the raiser instead, because `QuotationThreadListRow` carries `raisedByName` and no id — and two people called Mohammed would read each other's turn as their own. A `raisedById` on the row would close it |
 
@@ -328,3 +328,72 @@ The rules are drawn by the cells now, so an empty track is simply blank: there
 is no cell there to draw one. Recorded because it is the general lesson —
 **container-drawn line work assumes a full last row**, and an `auto-fit` grid
 is exactly the thing that cannot promise one.
+
+---
+
+## 9. The chain strip **[derived]**
+
+Feature slice 1, and the close of §6.6's first item. `ChainStrip` lives at
+`(app)/_components/chain-strip.tsx`, beside `TurnPanel`.
+
+**The turn sentence, then the six steps, then the explanation** — the concept's
+`.chain-card`, in that order, on the quotation thread detail screen. The
+sentence says whose move it is; the strip says the two things a sentence
+cannot — how far the deal has travelled, and what happens next.
+
+**It derives nothing.** Every position, owner and node state comes from
+`src/lib/chain.ts`, which grew three things to serve it and the board after it:
+`CHAIN_COLUMNS` (the six, in order, with `CHAIN_POSITIONS` now derived from it),
+`chainOwner(position)` so every step can be labelled and not only the current
+one, and `ChainState.reached` so a **closed** thread can show where it stopped
+— `position` alone erases that. `reached` is not a second derivation: the
+furthest-along ladder moved into one function that `chainPosition` calls.
+
+Three rules worth keeping:
+
+**A node is ringed only while someone owes it.** That falls out of `owedBy`
+rather than being a rule of its own — a dispatched thread's last node is filled,
+and a closed thread rings nothing, showing done nodes up to `reached` and hollow
+ones after.
+
+**The rail is flex, not absolute.** Each step is `[half-rail][node][half-rail]`,
+the outer halves invisible at the ends. The concept positions its connector at
+`inset-inline-start:-50%` and flips a `translateX` under RTL; a flex row needs
+no override, no transform and no `rtl:` variant.
+
+**The second person must match its reader.** `22 §4` says second person *where
+that person is the reader*, and the coordinator opens this screen more than
+anyone — she neither raises the request nor confirms the payment. So the
+explanation has two variants keyed on `canApproveQuotation`, the same condition
+`chainTurnKey` already splits the turn line on. The closing sentence — **only
+dispatched square metres count toward a target** `[25 §21]` — is one string for
+both, because it is true of the company rather than of a role.
+
+### 9.1 The project screen has two shapes
+
+The strip renders there only where a project has **exactly one** live thread. A
+strip implies one position, and a project with three live threads does not have
+one, so `25 §22`'s flag replaces it: the count, and quoted against expected.
+That flag is **the one place quotations are summed**, and `25 §21` is why —
+the sum exists to show that the sum is meaningless.
+
+### 9.2 What it cost elsewhere
+
+- `listQuotationThreads` selects `totalSqm`. One column on an existing query,
+  for the flag's quoted figure.
+- Both screens pass `hasDispatch` from `listDispatches({ threadId })`, so the
+  sixth node is real rather than permanently hollow. Safe by construction:
+  `visibleDispatchesFilter`'s thread-cascade term means whoever can see a
+  thread can see the dispatches against it.
+- That made `dispatched` newly reachable on the quotation screen, which
+  surfaced a contradiction: *"Sitting here since 3 August"* under *"Nothing
+  outstanding — dispatched"*. The turn panel now gives no elapsed line when
+  nobody owes anything, which is what §4 means by colouring how long something
+  has waited.
+- **Per-step dates are still not drawn**, and no column is needed for them:
+  `quotation_versions` carries no `issued_at`, so `timeline.ts`'s
+  `quotationIssuedEvents` already takes the actor and the moment from the
+  `audit_log` row for `quotation_version.issued`, joined through the version to
+  the thread and gated by `visibleQuotationThreadsFilter` — the audit row
+  contributing nothing to the access question, which is what keeps it inside
+  `20 §8.2`. A later slice extends that source.

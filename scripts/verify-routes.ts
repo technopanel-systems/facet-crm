@@ -16,6 +16,8 @@
  *   7. Marking a project lost replays, in both locales `[25 §5]` — the form
  *      POST whose writer and whose database CHECK shipped in one pass, and
  *      which nothing else drives.
+ *   8. The chain strip `[22 §6.6]` renders on a quotation thread AND on the
+ *      project behind it, in both locales.
  *
  * **It replaces a script stage 1 wrote and threw away** `[23]`. A restyle that
  * 500s a screen is the redesign's failure mode, and the four checks cannot see
@@ -276,6 +278,14 @@ async function walkRecords(jar: Jar, email: string): Promise<void> {
       check(`${email} ${path} → 200`, status === 200, `got ${status}`);
       if (status === 200 && suffix === "") {
         check(`  ${path} renders a fact grid`, body.includes('data-slot="facts"'));
+        // Every thread has a chain position — a closed one included, which
+        // draws the strip stopped where it got to `[22 §6.6]`.
+        if (section === "quotations") {
+          check(
+            `  ${path} renders the chain strip`,
+            body.includes('data-slot="chain-strip"'),
+          );
+        }
       }
     }
   }
@@ -555,6 +565,168 @@ async function main(): Promise<void> {
       );
     }
   }
+
+  console.log("\n8. The chain strip, on both screens that draw it");
+  {
+    // **The two screens are asserted TOGETHER**, which is the only way to make
+    // the project half mean anything: reading `data-position` off the
+    // quotation's own strip says whether that thread is live, and a live
+    // thread obliges the project behind it to draw something. Asserting the
+    // project screen on its own would be a tautology — it renders the card
+    // only when it has a thread to render it for.
+    //
+    // **It walks until it has seen each SHAPE once, not each row.** The strip
+    // has a shape per chain position and the project half has two — the strip
+    // for a single live thread, `25 §22`'s flag as soon as there are two — and
+    // which of them the first row reaches is an accident of the data. Twenty-
+    // five identical assertions prove nothing the first one did not, and the
+    // interesting ones (a `closed` thread, a `dispatched` one) can sort well
+    // past page 1. So it pages, and asserts a shape the first time it meets it.
+    const jar = jars["manager@example.test"];
+    const PAGES = 4;
+    const shapes = new Set<string>();
+    const seen = { strip: 0, many: 0, closed: 0 };
+
+    for (const locale of ["en", "ar"] as const) {
+      let found = 0;
+
+      for (let page = 1; page <= PAGES; page += 1) {
+        const list = await get(jar, `/${locale}/quotations?page=${page}`);
+        const ids = [
+          ...new Set(
+            [
+              ...list.body.matchAll(
+                /href="\/(?:en|ar)\/quotations\/([0-9a-f-]{36})"/gi,
+              ),
+            ].map((match) => match[1]),
+          ),
+        ];
+        if (ids.length === 0) break;
+        found += ids.length;
+
+        for (const id of ids) {
+          const thread = await get(jar, `/${locale}/quotations/${id}`);
+          const strip = stripOf(thread.body);
+          if (!strip) {
+            // Every thread has a chain position, so this is a real failure
+            // rather than a shape not worth repeating.
+            check(`${locale} ${id.slice(0, 8)}: the quotation draws the strip`, false);
+            continue;
+          }
+
+          const projectId = firstId(thread.body, "projects");
+          const project = projectId
+            ? await get(jar, `/${locale}/projects/${projectId}`)
+            : null;
+          const projectStrip = project ? stripOf(project.body) : null;
+          const many = project?.body.includes('data-slot="chain-many"') ?? false;
+          const half = projectStrip ? "strip" : many ? "flag" : "none";
+
+          if (projectStrip) seen.strip += 1;
+          else if (many) seen.many += 1;
+          if (strip.position === "closed") seen.closed += 1;
+
+          const shape = `${locale} ${strip.position}/${half}`;
+          if (shapes.has(shape)) continue;
+          shapes.add(shape);
+
+          const label = `${shape} (${id.slice(0, 8)})`;
+          // Six nodes, one per `25 §3` column. A dropped column fails here.
+          check(`${label}: six steps`, strip.steps.length === 6, `got ${strip.steps.length}`);
+          // **A node is ringed only while someone owes it** — so a dispatched
+          // thread rings none, and a closed one rings none either, showing
+          // instead where it stopped.
+          const now = strip.steps.filter((state) => state === "now").length;
+          const owed =
+            strip.position !== "closed" && strip.position !== "dispatched";
+          check(`  it rings ${owed ? "one" : "no"} node`, now === (owed ? 1 : 0), `got ${now}`);
+          if (strip.position === "closed") {
+            check(
+              "  a closed thread has done nodes but no current one",
+              strip.steps.includes("done") && now === 0,
+              strip.steps.join(" "),
+            );
+          }
+          check(
+            "  the turn panel sits with it",
+            thread.body.includes('data-slot="turn-panel"'),
+          );
+
+          if (strip.position === "closed") {
+            // `16 §5` ends a thread at rejected, cancelled or expired; the
+            // project behind it has no live thread on this account, so the
+            // project half is not this thread's to prove.
+            continue;
+          }
+          if (!projectId) {
+            // A coordinator gets no project link `[16 §10]`; a manager should.
+            console.log(`  skip  ${label}: links no project`);
+            continue;
+          }
+          check(
+            "  its project draws the chain",
+            projectStrip !== null || many,
+            `status ${project?.status}`,
+          );
+          if (projectStrip) {
+            check(
+              "    six steps there too",
+              projectStrip.steps.length === 6,
+              `got ${projectStrip.steps.length}`,
+            );
+          } else if (many) {
+            // `25 §22`'s flag is the count AND the figures behind it.
+            check(
+              "    the flag carries its figures",
+              project?.body.includes('data-slot="chain-many-figures"') ?? false,
+            );
+          }
+        }
+      }
+
+      if (found === 0) {
+        // `verify:slice2` is what creates threads; without it there is nothing
+        // to walk, and that is a missing precondition rather than a failure.
+        console.log(`  skip  ${locale}: no quotation thread to drive`);
+      }
+    }
+
+    // **No silent coverage.** Which shapes exist at all depends on the fixture
+    // data, so what was actually reached is printed rather than assumed.
+    console.log(
+      `  --    reached ${seen.strip} project strip(s), ${seen.many} flag(s), ` +
+        `${seen.closed} closed thread(s)`,
+    );
+    for (const [what, count] of [
+      ["a single-thread project (the strip)", seen.strip],
+      ["a multi-thread project (`25 §22`'s flag)", seen.many],
+      ["a closed thread", seen.closed],
+    ] as const) {
+      if (count === 0) {
+        console.log(
+          `  --    NOTE: this data never reached ${what} — that branch is unproven by this run.`,
+        );
+      }
+    }
+  }
+}
+
+/** The strip's position and the state of each of its six nodes, or null. */
+function stripOf(
+  body: string,
+): { position: string; steps: string[] } | null {
+  const marker = body.indexOf('data-slot="chain-strip"');
+  if (marker < 0) return null;
+  const markup = body.slice(
+    body.lastIndexOf("<ol", marker),
+    body.indexOf("</ol>", marker),
+  );
+  return {
+    position: markup.match(/data-position="([a-zA-Z]+)"/)?.[1] ?? "",
+    steps: [...markup.matchAll(/<li[^>]*data-state="([a-z]+)"/g)].map(
+      (m) => m[1],
+    ),
+  };
 }
 
 /** The five entities Next escapes into an attribute value. */

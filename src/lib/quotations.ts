@@ -311,6 +311,16 @@ export type QuotationThreadListRow = {
   versionNumber: number;
   versionStatus: QuotationVersionStatus;
   validUntil: string | null;
+  /**
+   * The live version's quoted square metres.
+   *
+   * Here for `25 §22`'s flag on a project with more than one open thread —
+   * *"3 open quotations · 5,800 m² quoted against 2,000 expected"* — which is
+   * the **one** place quotations are added up, and only to show that adding
+   * them up is meaningless `[25 §21]`. A list row must never sum it across
+   * rows for any other purpose.
+   */
+  totalSqm: string | null;
   grandTotal: string | null;
   createdAt: Date;
 };
@@ -377,6 +387,7 @@ export async function listQuotationThreads(
         versionNumber: quotationVersions.versionNumber,
         versionStatus: quotationVersions.status,
         validUntil: quotationVersions.validUntil,
+        totalSqm: quotationVersions.totalSqm,
         grandTotal: quotationVersions.grandTotal,
         createdAt: quotationThreads.createdAt,
       })

@@ -25,6 +25,7 @@ import {
 import { Link } from "@/i18n/navigation";
 import { can, requireSession } from "@/lib/authz";
 import { chainState } from "@/lib/chain";
+import { listDispatches } from "@/lib/dispatches";
 import { bilingualName } from "@/lib/lookups";
 import {
   listProductClasses,
@@ -35,6 +36,7 @@ import {
 } from "@/lib/lookups";
 import { getQuotationThread } from "@/lib/quotations";
 
+import { ChainStrip } from "../../_components/chain-strip";
 import {
   TurnPanel,
   chainTurnKey,
@@ -63,13 +65,20 @@ export default async function QuotationDetailPage({
   const dash = t("common.none");
 
   // No colour list `[17 §2]` — the colour is typed on the line.
-  const [suppliers, classes, fireRatings, thicknesses, services] =
+  const [suppliers, classes, fireRatings, thicknesses, services, dispatched] =
     await Promise.all([
       listProductSuppliers(),
       listProductClasses(),
       listProductFireRatings(),
       listProductThicknesses(),
       listServiceTypes(),
+      // Whether anything has left the warehouse against this thread — the one
+      // input `getQuotationThread` cannot carry, because dispatch lives in its
+      // own table. No new query: `listDispatches` already filters by thread.
+      // Safe by construction — `visibleDispatchesFilter`'s thread-cascade term
+      // means whoever can see this thread can see the dispatches against it,
+      // so the node cannot read hollow to someone who ought to see it filled.
+      listDispatches(session, { threadId: id }),
     ]);
 
   const live = thread.live;
@@ -80,13 +89,14 @@ export default async function QuotationDetailPage({
   const isCoordinator = can(session, "canApproveQuotation");
 
   // `25 §3`'s chain position, from the one definition `[src/lib/chain.ts]`.
-  // `hasDispatch` is deliberately not passed: this page does not load
-  // dispatches, so the chain stops at `paid` rather than claiming a position
-  // it cannot see.
   const chain = chainState({
     versionStatus: live.status,
     endState: thread.endState,
     paymentConfirmedAt: thread.paymentConfirmedAt,
+    // `24 §"partial dispatches are the expected case"` — the question is
+    // whether ANY has gone out, never how much. The remainder is deliberately
+    // never shown as a number `[25 §26]`.
+    hasDispatch: dispatched.total > 0,
   });
 
   return (
@@ -116,23 +126,39 @@ export default async function QuotationDetailPage({
         }
       />
 
-      {/* `22 §3` — the most important element on the screen. Every input is
-          already in scope: the chain reads `live.status`, `endState` and
-          `paymentConfirmedAt`, and `22 §6.6`'s chain STRIP stays deferred —
-          naming the turn is the archetype, drawing the six steps is not. */}
-      <TurnPanel
-        who={initials(thread.raisedByName)}
-        tone={chain.owedBy === null ? "calm" : "soon"}
-        line={t(chainTurnKey(chain, isCoordinator), {
-          name: thread.raisedByName,
-        })}
-        detail={t("quotations.detail.turnSince", {
-          date: format.dateTime(
-            thread.paymentConfirmedAt ?? thread.createdAt,
-            { dateStyle: "long" },
-          ),
-        })}
-      />
+      {/* The concept's `.chain-card`: the turn, then the six steps, then the
+          explanation. `22 §3` makes the turn panel the most important element
+          on the screen, and `22 §6.6`'s strip goes under it rather than beside
+          it — the sentence says whose move it is, the strip says how far this
+          has come and what happens next. Both read one `chainState()`. */}
+      <Card>
+        <CardContent className="flex flex-col gap-5.5">
+          <TurnPanel
+            who={initials(thread.raisedByName)}
+            tone={chain.owedBy === null ? "calm" : "soon"}
+            line={t(chainTurnKey(chain, isCoordinator), {
+              name: thread.raisedByName,
+            })}
+            // "Sitting here since 3 August" under "Nothing outstanding —
+            // dispatched" contradicts itself, and `22 §4` colours *how long
+            // something has waited* — when nothing waits, there is no
+            // duration to give. Newly reachable: before `hasDispatch` was
+            // passed this page could not reach a position that owes nobody
+            // except a closed one.
+            detail={
+              chain.owedBy === null
+                ? undefined
+                : t("quotations.detail.turnSince", {
+                    date: format.dateTime(
+                      thread.paymentConfirmedAt ?? thread.createdAt,
+                      { dateStyle: "long" },
+                    ),
+                  })
+            }
+          />
+          <ChainStrip chain={chain} viewerIsCoordinator={isCoordinator} explain />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

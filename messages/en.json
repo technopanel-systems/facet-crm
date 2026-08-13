@@ -202,6 +202,30 @@
         "dispatched": "Nothing outstanding — dispatched",
         "closed": "Nothing outstanding — closed"
       }
+    },
+    "step": {
+      "new": "New",
+      "requested": "Quotation requested",
+      "waitingSignature": "Waiting signature",
+      "waitingPayment": "Waiting payment",
+      "paid": "Paid",
+      "dispatched": "Dispatched"
+    },
+    "by": {
+      "rep": "Sales rep",
+      "coordinator": "Coordinator"
+    },
+    "strip": {
+      "label": "Quotation chain",
+      "stopped": "The chain stopped here."
+    },
+    "explain": {
+      "title": "How this works.",
+      "body": {
+        "rep": "You raise the request; the coordinator builds the real quotation in SMAC and gets it signed, then accepts it here and sends you the PDF. When the customer pays, you confirm the payment — that is what unlocks dispatch. The coordinator records what actually left the warehouse.",
+        "coordinator": "The rep raises the request; you build the real quotation in SMAC and get it signed, then accept it here and send the PDF back. The rep confirms the payment — that is what unlocks dispatch. You record what actually left the warehouse."
+      },
+      "target": "Only dispatched square metres count toward a target."
     }
   },
   "errors": {
@@ -296,6 +320,13 @@
       "hiddenCompany": "Not visible to you",
       "noCompanies": "No companies linked.",
       "turnOwner": "Waiting on {name} — the next move on this project"
+    },
+    "chain": {
+      "title": "Quotation chain",
+      "manyThreads": "{count} open quotations on this project",
+      "manyThreadsHint": "Revise one rather than raising another — the same square metres are being quoted more than once.",
+      "quoted": "Quoted",
+      "expected": "Expected"
     },
     "errors": {
       "atLeastOneCompany": "A project needs at least one company.",
