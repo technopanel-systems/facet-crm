@@ -3,8 +3,61 @@
 import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
 
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+
+/**
+ * The form archetype `[22 §3]`: single column, labels above controls, errors
+ * under the control, **actions in a footer bar**.
+ *
+ * `CardFooter` already renders as `border-t bg-muted/50` — the footer bar the
+ * archetype asks for, built and used by nothing until now.
+ *
+ * **The measure is NOT here.** It belongs on the page wrapper, because
+ * `PageHeader` is a sibling of the form on all thirteen form pages: capping
+ * the card alone would leave the title at one edge of a 1320px column and its
+ * action ~1250px away, over a 672px form.
+ *
+ * `wide` is the stated exception `[22 §3]`: quotation lines, report signals
+ * and handover buckets are repeating rows — a table-shaped input rather than a
+ * field stack — so they keep the content column and their row grids. Only
+ * their actions move to the footer.
+ */
+export function FormShell({
+  action,
+  error,
+  actions,
+  wide,
+  children,
+}: {
+  action: (formData: FormData) => void;
+  /** A whole-form error key from the server action, never text `[07 E3]`. */
+  error?: string;
+  actions: ReactNode;
+  wide?: boolean;
+  children: ReactNode;
+}) {
+  const t = useTranslations();
+
+  return (
+    <form action={action} data-slot="form-shell">
+      <Card>
+        <CardContent
+          className={cn("flex flex-col", wide ? "gap-6" : "gap-5")}
+        >
+          {error ? (
+            <p role="alert" className="text-destructive text-start text-sm">
+              {t(error)}
+            </p>
+          ) : null}
+          {children}
+        </CardContent>
+        <CardFooter className="gap-2">{actions}</CardFooter>
+      </Card>
+    </form>
+  );
+}
 
 /**
  * Label + control + error, for the hand-rolled forms.

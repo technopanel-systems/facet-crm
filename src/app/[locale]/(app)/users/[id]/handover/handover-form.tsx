@@ -3,11 +3,12 @@
 import { useActionState } from "react";
 import { useTranslations } from "next-intl";
 
-import { SelectField } from "@/components/form-field";
+import { FormShell, SelectField } from "@/components/form-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Link } from "@/i18n/navigation";
 import { emptyFormState, type FormState } from "@/lib/validation";
 
 /**
@@ -34,11 +35,14 @@ type Colleague = { id: string; name: string };
 
 export function HandoverForm({
   action,
+  userId,
   buckets,
   colleagues,
   isEmpty,
 }: {
   action: (state: FormState, formData: FormData) => Promise<FormState>;
+  /** Where Cancel goes back to. */
+  userId: string;
   buckets: Bucket[];
   colleagues: Colleague[];
   isEmpty: boolean;
@@ -56,13 +60,25 @@ export function HandoverForm({
   }
 
   return (
-    <form action={formAction} className="flex flex-col gap-6">
-      {state.error ? (
-        <p role="alert" className="text-destructive text-start text-sm">
-          {t(state.error)}
-        </p>
-      ) : null}
-
+    // `wide`: the buckets are repeating rows of checkboxes, which is a
+    // table-shaped input rather than a field stack `[22 §3]`.
+    <FormShell
+      action={formAction}
+      error={state.error}
+      wide
+      actions={
+        <>
+          <Button type="submit" disabled={pending}>
+            {pending ? t("common.saving") : t("team.handover.reassign")}
+          </Button>
+          {/* This form had no way out at all. A screen that only commits is
+              the one place a mis-click cannot be taken back. */}
+          <Button asChild type="button" variant="ghost">
+            <Link href={`/users/${userId}`}>{t("common.cancel")}</Link>
+          </Button>
+        </>
+      }
+    >
       {buckets.map((bucket) => (
         <Card key={bucket.name}>
           <CardHeader>
@@ -134,12 +150,7 @@ export function HandoverForm({
         <p className="text-muted-foreground text-start text-xs">
           {t("team.handover.reassignHint")}
         </p>
-        <div>
-          <Button type="submit" disabled={pending}>
-            {pending ? t("common.saving") : t("team.handover.reassign")}
-          </Button>
-        </div>
       </div>
-    </form>
+    </FormShell>
   );
 }

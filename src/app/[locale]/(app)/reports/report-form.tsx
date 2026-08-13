@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 
-import { FormField, SelectField } from "@/components/form-field";
+import {
+  FormField,
+  FormShell,
+  SelectField,
+} from "@/components/form-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
@@ -101,14 +105,22 @@ export function ReportForm({
   const isInteraction = entryType === "interaction";
 
   return (
-    <form action={formAction} className="flex flex-col gap-6">
+    <FormShell
+      action={formAction}
+      error={state.error}
+      actions={
+        <>
+          <Button type="submit" size="lg" disabled={pending}>
+            {pending ? t("common.saving") : submitLabel}
+          </Button>
+          <Button asChild type="button" size="lg" variant="ghost">
+            <Link href={cancelHref}>{t("common.cancel")}</Link>
+          </Button>
+        </>
+      }
+    >
       <input type="hidden" name="entryType" value={entryType} />
 
-      {state.error ? (
-        <p role="alert" className="text-destructive text-start text-sm">
-          {t(state.error)}
-        </p>
-      ) : null}
 
       <p className="text-muted-foreground text-start text-sm">
         {isInteraction
@@ -322,45 +334,43 @@ export function ReportForm({
         error={errors.signals}
       />
 
-      <div className="grid gap-6 sm:grid-cols-2">
-        <FormField
+      <FormField
+        name="reportDate"
+        label={t("reports.fields.reportDate")}
+        error={errors.reportDate}
+        required
+      >
+        <Input
+          id="reportDate"
           name="reportDate"
-          label={t("reports.fields.reportDate")}
-          error={errors.reportDate}
-          required
+          type="date"
+          dir="ltr"
+          className={`text-start ${touch}`}
+          defaultValue={state.values?.reportDate ?? values.reportDate}
+          aria-invalid={!!errors.reportDate || undefined}
+        />
+      </FormField>
+
+      {isInteraction ? (
+        // Rendered always rather than revealed by JavaScript: the CHECK and
+        // the `RuleError` are the gate, and the UI never is `[19 §3]`.
+        <FormField
+          name="onHoldUntil"
+          label={t("reports.fields.onHoldUntil")}
+          error={errors.onHoldUntil}
+          hint={t("reports.detail.onHoldFieldHint")}
         >
           <Input
-            id="reportDate"
-            name="reportDate"
+            id="onHoldUntil"
+            name="onHoldUntil"
             type="date"
             dir="ltr"
             className={`text-start ${touch}`}
-            defaultValue={state.values?.reportDate ?? values.reportDate}
-            aria-invalid={!!errors.reportDate || undefined}
+            defaultValue={state.values?.onHoldUntil ?? values.onHoldUntil ?? ""}
+            aria-invalid={!!errors.onHoldUntil || undefined}
           />
         </FormField>
-
-        {isInteraction ? (
-          // Rendered always rather than revealed by JavaScript: the CHECK and
-          // the `RuleError` are the gate, and the UI never is `[19 §3]`.
-          <FormField
-            name="onHoldUntil"
-            label={t("reports.fields.onHoldUntil")}
-            error={errors.onHoldUntil}
-            hint={t("reports.detail.onHoldFieldHint")}
-          >
-            <Input
-              id="onHoldUntil"
-              name="onHoldUntil"
-              type="date"
-              dir="ltr"
-              className={`text-start ${touch}`}
-              defaultValue={state.values?.onHoldUntil ?? values.onHoldUntil ?? ""}
-              aria-invalid={!!errors.onHoldUntil || undefined}
-            />
-          </FormField>
-        ) : null}
-      </div>
+      ) : null}
 
       {isInteraction ? (
         <div className="flex flex-col gap-2 rounded-lg border border-dashed p-4">
@@ -376,16 +386,7 @@ export function ReportForm({
           </div>
         </div>
       ) : null}
-
-      <div className="flex items-center gap-3">
-        <Button type="submit" size="lg" disabled={pending}>
-          {pending ? t("common.saving") : submitLabel}
-        </Button>
-        <Button asChild type="button" size="lg" variant="ghost">
-          <Link href={cancelHref}>{t("common.cancel")}</Link>
-        </Button>
-      </div>
-    </form>
+    </FormShell>
   );
 }
 

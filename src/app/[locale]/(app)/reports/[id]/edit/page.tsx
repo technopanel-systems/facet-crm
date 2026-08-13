@@ -64,7 +64,7 @@ export default async function EditReportPage({
   ]);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex max-w-2xl flex-col gap-6">
       <PageHeader
         title={t("reports.editTitle")}
         description={t("reports.detail.correctionHint")}

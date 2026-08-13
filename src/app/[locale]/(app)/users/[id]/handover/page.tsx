@@ -102,6 +102,7 @@ export default async function HandoverPage({
 
       <HandoverForm
         action={reassignHandoverAction.bind(null, book.user.id)}
+        userId={book.user.id}
         buckets={buckets}
         colleagues={colleagues}
         isEmpty={book.isEmpty}

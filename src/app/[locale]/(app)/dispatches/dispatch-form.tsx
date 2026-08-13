@@ -3,7 +3,11 @@
 import { useActionState } from "react";
 import { useTranslations } from "next-intl";
 
-import { FormField, SelectField } from "@/components/form-field";
+import {
+  FormField,
+  FormShell,
+  SelectField,
+} from "@/components/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "@/i18n/navigation";
@@ -60,13 +64,20 @@ export function DispatchForm({
   const errors = state.fieldErrors ?? {};
 
   return (
-    <form action={formAction} className="flex flex-col gap-6">
-      {state.error ? (
-        <p role="alert" className="text-destructive text-start text-sm">
-          {t(state.error)}
-        </p>
-      ) : null}
-
+    <FormShell
+      action={formAction}
+      error={state.error}
+      actions={
+        <>
+          <Button type="submit" disabled={pending}>
+            {pending ? t("common.saving") : t("dispatches.actions.record")}
+          </Button>
+          <Button asChild type="button" variant="ghost">
+            <Link href="/dispatches">{t("common.cancel")}</Link>
+          </Button>
+        </>
+      }
+    >
       {mode === "linked" ? (
         <FormField
           name="quotationThreadId"
@@ -135,53 +146,42 @@ export function DispatchForm({
         </>
       )}
 
-      <div className="grid gap-6 sm:grid-cols-2">
-        <FormField
+      <FormField
+        name="sqm"
+        label={t("dispatches.fields.sqm")}
+        error={errors.sqm}
+        required
+      >
+        <Input
+          id="sqm"
           name="sqm"
-          label={t("dispatches.fields.sqm")}
-          error={errors.sqm}
-          required
-        >
-          <Input
-            id="sqm"
-            name="sqm"
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.0001"
-            dir="ltr"
-            className="text-start"
-            defaultValue={state.values?.sqm}
-            aria-invalid={!!errors.sqm || undefined}
-          />
-        </FormField>
+          type="number"
+          inputMode="decimal"
+          min="0"
+          step="0.0001"
+          dir="ltr"
+          className="text-start"
+          defaultValue={state.values?.sqm}
+          aria-invalid={!!errors.sqm || undefined}
+        />
+      </FormField>
 
-        <FormField
+      <FormField
+        name="dispatchDate"
+        label={t("dispatches.fields.dispatchDate")}
+        error={errors.dispatchDate}
+        required
+      >
+        <Input
+          id="dispatchDate"
           name="dispatchDate"
-          label={t("dispatches.fields.dispatchDate")}
-          error={errors.dispatchDate}
-          required
-        >
-          <Input
-            id="dispatchDate"
-            name="dispatchDate"
-            type="date"
-            dir="ltr"
-            className="text-start"
-            defaultValue={state.values?.dispatchDate ?? today}
-            aria-invalid={!!errors.dispatchDate || undefined}
-          />
-        </FormField>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={pending}>
-          {pending ? t("common.saving") : t("dispatches.actions.record")}
-        </Button>
-        <Button asChild type="button" variant="ghost">
-          <Link href="/dispatches">{t("common.cancel")}</Link>
-        </Button>
-      </div>
-    </form>
+          type="date"
+          dir="ltr"
+          className="text-start"
+          defaultValue={state.values?.dispatchDate ?? today}
+          aria-invalid={!!errors.dispatchDate || undefined}
+        />
+      </FormField>
+    </FormShell>
   );
 }

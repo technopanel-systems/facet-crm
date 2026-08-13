@@ -3,7 +3,10 @@
 import { useActionState, useState } from "react";
 import { useTranslations } from "next-intl";
 
-import { FormField } from "@/components/form-field";
+import {
+  FormField,
+  FormShell,
+} from "@/components/form-field";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
@@ -72,13 +75,21 @@ export function QuotationForm({
     locale === "ar" ? row.nameAr || row.nameEn : row.nameEn;
 
   return (
-    <form action={formAction} className="flex flex-col gap-6">
-      {state.error ? (
-        <p role="alert" className="text-destructive text-start text-sm">
-          {t(state.error)}
-        </p>
-      ) : null}
-
+    <FormShell
+      action={formAction}
+      error={state.error}
+      wide
+      actions={
+        <>
+          <Button type="submit" disabled={pending}>
+            {pending ? t("common.saving") : t("common.create")}
+          </Button>
+          <Button asChild type="button" variant="ghost">
+            <Link href="/quotations">{t("common.cancel")}</Link>
+          </Button>
+        </>
+      }
+    >
       <div className="grid gap-4 sm:grid-cols-2">
         {/* A rep can hold many projects, so this is the second field to earn a
             combobox after the city `[15 §5]` — same reasoning, list length. */}
@@ -322,16 +333,7 @@ export function QuotationForm({
       <p className="text-muted-foreground text-start text-xs">
         {t("quotations.detail.computed")}
       </p>
-
-      <div className="flex items-center gap-2">
-        <Button type="submit" disabled={pending}>
-          {pending ? t("common.saving") : t("common.create")}
-        </Button>
-        <Button asChild type="button" variant="ghost">
-          <Link href="/quotations">{t("common.cancel")}</Link>
-        </Button>
-      </div>
-    </form>
+    </FormShell>
   );
 }
 

@@ -3,7 +3,11 @@
 import { useActionState } from "react";
 import { useTranslations } from "next-intl";
 
-import { FormField, SelectField } from "@/components/form-field";
+import {
+  FormField,
+  FormShell,
+  SelectField,
+} from "@/components/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "@/i18n/navigation";
@@ -60,13 +64,20 @@ export function UserForm({
     locale === "ar" ? row.nameAr || row.nameEn : row.nameEn;
 
   return (
-    <form action={formAction} className="flex flex-col gap-5">
-      {state.error ? (
-        <p role="alert" className="text-destructive text-start text-sm">
-          {t(state.error)}
-        </p>
-      ) : null}
-
+    <FormShell
+      action={formAction}
+      error={state.error}
+      actions={
+        <>
+          <Button type="submit" disabled={pending}>
+            {pending ? t("common.saving") : submitLabel}
+          </Button>
+          <Button asChild variant="ghost">
+            <Link href={cancelHref}>{t("common.cancel")}</Link>
+          </Button>
+        </>
+      }
+    >
       <FormField
         name="name"
         label={t("team.fields.name")}
@@ -167,15 +178,6 @@ export function UserForm({
           ))}
         </SelectField>
       </FormField>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" disabled={pending}>
-          {pending ? t("common.saving") : submitLabel}
-        </Button>
-        <Button asChild variant="ghost">
-          <Link href={cancelHref}>{t("common.cancel")}</Link>
-        </Button>
-      </div>
-    </form>
+    </FormShell>
   );
 }
