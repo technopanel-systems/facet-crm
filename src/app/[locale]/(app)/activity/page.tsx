@@ -22,6 +22,8 @@ import {
   defaultRange,
 } from "@/lib/daily-activity";
 
+import { ListCard } from "../_components/list-controls";
+
 export const dynamic = "force-dynamic";
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -119,25 +121,19 @@ export default async function ActivityPage({
           {t("activity.empty")}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
+        // No pager: `activity()` returns the whole team for the range, so the
+        // footer is a count and nothing else.
+        <ListCard basePath="/activity" page={1} total={rows.length}>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="text-start">
                   {t("activity.fields.person")}
                 </TableHead>
-                <TableHead className="text-start">
-                  {t("activity.fields.reportsLogged")}
-                </TableHead>
-                <TableHead className="text-start">
-                  {t("activity.fields.companiesTouched")}
-                </TableHead>
-                <TableHead className="text-start">
-                  {t("activity.fields.systemEvents")}
-                </TableHead>
-                <TableHead className="text-start">
-                  {t("activity.fields.signalsRaised")}
-                </TableHead>
+                <TableHead numeric>{t("activity.fields.reportsLogged")}</TableHead>
+                <TableHead numeric>{t("activity.fields.companiesTouched")}</TableHead>
+                <TableHead numeric>{t("activity.fields.systemEvents")}</TableHead>
+                <TableHead numeric>{t("activity.fields.signalsRaised")}</TableHead>
                 <TableHead className="text-start">
                   {t("common.actions")}
                 </TableHead>
@@ -149,16 +145,16 @@ export default async function ActivityPage({
                   <TableCell className="text-start font-medium">
                     {row.userName}
                   </TableCell>
-                  <TableCell className="text-start" dir="ltr">
+                  <TableCell numeric dir="ltr">
                     {row.reportsLogged}
                   </TableCell>
-                  <TableCell className="text-start" dir="ltr">
+                  <TableCell numeric dir="ltr">
                     {row.companiesTouched}
                   </TableCell>
-                  <TableCell className="text-start" dir="ltr">
+                  <TableCell numeric dir="ltr">
                     {row.systemEvents}
                   </TableCell>
-                  <TableCell className="text-start" dir="ltr">
+                  <TableCell numeric dir="ltr">
                     {row.signalsRaised}
                   </TableCell>
                   <TableCell className="text-start">
@@ -184,23 +180,23 @@ export default async function ActivityPage({
                 <TableCell className="text-start font-medium">
                   {t("activity.detail.teamTotal")}
                 </TableCell>
-                <TableCell className="text-start" dir="ltr">
+                <TableCell numeric dir="ltr">
                   {total.reportsLogged}
                 </TableCell>
-                <TableCell className="text-start" dir="ltr">
+                <TableCell numeric dir="ltr">
                   {total.companiesTouched}
                 </TableCell>
-                <TableCell className="text-start" dir="ltr">
+                <TableCell numeric dir="ltr">
                   {total.systemEvents}
                 </TableCell>
-                <TableCell className="text-start" dir="ltr">
+                <TableCell numeric dir="ltr">
                   {total.signalsRaised}
                 </TableCell>
                 <TableCell />
               </TableRow>
             </TableFooter>
           </Table>
-        </div>
+        </ListCard>
       )}
 
       {expanded ? (

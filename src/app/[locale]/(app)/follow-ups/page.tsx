@@ -16,9 +16,15 @@ import { requireSession } from "@/lib/authz";
 import { FOLLOW_UP_KINDS } from "@/lib/enums";
 import { followUps } from "@/lib/follow-ups";
 import { bilingualName } from "@/lib/lookups";
+import { cn } from "@/lib/utils";
 
 import { anchorHref } from "../_components/anchors";
-import { ListPagination, SearchForm } from "../_components/list-controls";
+import {
+  FilterNav,
+  ListCard,
+  SearchForm,
+} from "../_components/list-controls";
+import { toneClass, turnTone } from "../_components/turn";
 
 export const dynamic = "force-dynamic";
 
@@ -63,16 +69,9 @@ export default async function FollowUpsPage({
     kind: activeKind,
   });
 
+  // The private `withParams` that used to live here is now `FilterNav`'s, so
+  // no filter on any list drops the search any more `[22 §3]`.
   const basePath = "/follow-ups";
-  const withParams = (extra: Record<string, string | undefined>) => {
-    const search = new URLSearchParams();
-    if (q) search.set("q", q);
-    for (const [key, value] of Object.entries(extra)) {
-      if (value) search.set(key, value);
-    }
-    const query = search.toString();
-    return query ? `${basePath}?${query}` : basePath;
-  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -98,23 +97,20 @@ export default async function FollowUpsPage({
         placeholder={t("followUps.searchPlaceholder")}
       />
 
-      <nav className="flex flex-wrap gap-2" aria-label={t("common.filter")}>
-        <Button asChild size="xs" variant={activeKind ? "outline" : "secondary"}>
-          <Link href={withParams({})}>{t("followUps.fields.allKinds")}</Link>
-        </Button>
-        {FOLLOW_UP_KINDS.map((value) => (
-          <Button
-            key={value}
-            asChild
-            size="xs"
-            variant={activeKind === value ? "secondary" : "outline"}
-          >
-            <Link href={withParams({ kind: value })}>
-              {t(`enums.followUpKind.${value}`)} ({counts[value]})
-            </Link>
-          </Button>
-        ))}
-      </nav>
+      <FilterNav
+        basePath={basePath}
+        name="kind"
+        active={activeKind}
+        query={q}
+        options={[
+          { label: t("followUps.fields.allKinds") },
+          ...FOLLOW_UP_KINDS.map((value) => ({
+            value,
+            label: t(`enums.followUpKind.${value}`),
+            count: counts[value],
+          })),
+        ]}
+      />
 
       {rows.length === 0 ? (
         <p className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
@@ -123,110 +119,114 @@ export default async function FollowUpsPage({
             : t("followUps.empty")}
         </p>
       ) : (
-        <>
-          <div className="overflow-x-auto rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-start">
-                    {t("followUps.fields.kind")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("followUps.fields.record")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("followUps.fields.company")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("followUps.fields.reps")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("followUps.fields.since")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("followUps.fields.age")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("common.actions")}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={`${row.kind}:${row.anchorId}`}>
-                    <TableCell className="text-start">
-                      <Badge variant="outline">
-                        {t(`enums.followUpKind.${row.kind}`)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-start font-medium">
-                      <Link href={anchorHref(row.anchorType, row.anchorId)} className="hover:underline">
+        <ListCard
+          basePath={basePath}
+          page={currentPage}
+          total={total}
+          query={q}
+        >
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-start">
+                  {t("followUps.fields.kind")}
+                </TableHead>
+                <TableHead className="text-start">
+                  {t("followUps.fields.record")}
+                </TableHead>
+                <TableHead className="text-start">
+                  {t("followUps.fields.company")}
+                </TableHead>
+                <TableHead className="text-start">
+                  {t("followUps.fields.reps")}
+                </TableHead>
+                <TableHead numeric>{t("followUps.fields.since")}</TableHead>
+                <TableHead numeric>{t("followUps.fields.age")}</TableHead>
+                <TableHead className="text-start">
+                  {t("common.actions")}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={`${row.kind}:${row.anchorId}`}>
+                  <TableCell className="text-start">
+                    <Badge variant="outline">
+                      {t(`enums.followUpKind.${row.kind}`)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-start font-medium">
+                    <Link href={anchorHref(row.anchorType, row.anchorId)} className="hover:underline">
+                      {bilingualName(
+                        { nameEn: row.anchorNameEn, nameAr: row.anchorNameAr },
+                        locale,
+                      )}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-start">
+                    {row.companyId && row.companyNameEn ? (
+                      <Link
+                        href={`/companies/${row.companyId}`}
+                        className="hover:underline"
+                      >
                         {bilingualName(
-                          { nameEn: row.anchorNameEn, nameAr: row.anchorNameAr },
+                          {
+                            nameEn: row.companyNameEn,
+                            nameAr: row.companyNameAr,
+                          },
                           locale,
                         )}
                       </Link>
-                    </TableCell>
-                    <TableCell className="text-start">
-                      {row.companyId && row.companyNameEn ? (
-                        <Link
-                          href={`/companies/${row.companyId}`}
-                          className="hover:underline"
-                        >
-                          {bilingualName(
-                            {
-                              nameEn: row.companyNameEn,
-                              nameAr: row.companyNameAr,
-                            },
-                            locale,
-                          )}
+                    ) : (
+                      t("common.none")
+                    )}
+                  </TableCell>
+                  <TableCell className="text-start">
+                    {row.ownerNames.length > 0
+                      ? row.ownerNames.join(", ")
+                      : t("common.none")}
+                  </TableCell>
+                  <TableCell numeric dir="ltr">
+                    {format.dateTime(new Date(`${row.since}T00:00:00Z`), {
+                      dateStyle: "medium",
+                      timeZone: "UTC",
+                    })}
+                  </TableCell>
+                  {/* `22 §4` — waiting time coloured by lateness. **Every row
+                      on this screen is late**, and not by a judgement made
+                      here: `follow-ups.ts` put it in the queue precisely
+                      because it passed its threshold `[07 D5]`. The colour
+                      reads that fact rather than re-deriving it `[21 §7]`. */}
+                  <TableCell
+                    numeric
+                    className={cn(
+                      "font-semibold",
+                      toneClass(turnTone({ overdue: true })),
+                    )}
+                    dir="ltr"
+                  >
+                    {/* Working days for the two thresholds `07 D5` states
+                        that way; calendar days for the rest `[21 §8]`. */}
+                    {row.inWorkingDays
+                      ? t("followUps.fields.workingDays", {
+                          count: row.ageDays,
+                        })
+                      : t("followUps.fields.days", { count: row.ageDays })}
+                  </TableCell>
+                  <TableCell className="text-start">
+                    {row.companyId ? (
+                      <Button asChild size="xs" variant="outline">
+                        <Link href={`/reports/new?companyId=${row.companyId}`}>
+                          {t("reports.new")}
                         </Link>
-                      ) : (
-                        t("common.none")
-                      )}
-                    </TableCell>
-                    <TableCell className="text-start">
-                      {row.ownerNames.length > 0
-                        ? row.ownerNames.join(", ")
-                        : t("common.none")}
-                    </TableCell>
-                    <TableCell className="text-start" dir="ltr">
-                      {format.dateTime(new Date(`${row.since}T00:00:00Z`), {
-                        dateStyle: "medium",
-                        timeZone: "UTC",
-                      })}
-                    </TableCell>
-                    <TableCell className="text-start" dir="ltr">
-                      {/* Working days for the two thresholds `07 D5` states
-                          that way; calendar days for the rest `[21 §8]`. */}
-                      {row.inWorkingDays
-                        ? t("followUps.fields.workingDays", {
-                            count: row.ageDays,
-                          })
-                        : t("followUps.fields.days", { count: row.ageDays })}
-                    </TableCell>
-                    <TableCell className="text-start">
-                      {row.companyId ? (
-                        <Button asChild size="xs" variant="outline">
-                          <Link href={`/reports/new?companyId=${row.companyId}`}>
-                            {t("reports.new")}
-                          </Link>
-                        </Button>
-                      ) : null}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          <ListPagination
-            basePath={basePath}
-            page={currentPage}
-            total={total}
-            query={q}
-          />
-        </>
+                      </Button>
+                    ) : null}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </ListCard>
       )}
     </div>
   );

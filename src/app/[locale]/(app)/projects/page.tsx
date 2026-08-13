@@ -16,7 +16,7 @@ import { requireSession } from "@/lib/authz";
 import { bilingualName, pickName } from "@/lib/lookups";
 import { listProjects } from "@/lib/projects";
 
-import { ListPagination, SearchForm } from "../_components/list-controls";
+import { ListCard, SearchForm } from "../_components/list-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -55,75 +55,71 @@ export default async function ProjectsPage({
           {q ? t("projects.emptyFiltered") : t("projects.empty")}
         </p>
       ) : (
-        <>
-          <div className="overflow-x-auto rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-start">
-                    {t("common.nameEn")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("projects.fields.owner")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("projects.fields.sqmExpected")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("common.city")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("projects.fields.endState")}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="text-start font-medium">
-                      <Link
-                        href={`/projects/${row.id}`}
-                        className="hover:underline"
+        <ListCard
+          basePath="/projects"
+          page={currentPage}
+          total={total}
+          query={q}
+        >
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-start">
+                  {t("common.nameEn")}
+                </TableHead>
+                <TableHead className="text-start">
+                  {t("projects.fields.owner")}
+                </TableHead>
+                <TableHead numeric>
+                  {t("projects.fields.sqmExpected")}
+                </TableHead>
+                <TableHead className="text-start">
+                  {t("common.city")}
+                </TableHead>
+                <TableHead className="text-start">
+                  {t("projects.fields.endState")}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell className="text-start font-medium">
+                    <Link
+                      href={`/projects/${row.id}`}
+                      className="hover:underline"
+                    >
+                      {bilingualName(row, locale)}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-start">{row.ownerName}</TableCell>
+                  <TableCell numeric dir="ltr">
+                    {row.sqmExpected ?? t("common.none")}
+                  </TableCell>
+                  <TableCell className="text-start">
+                    {pickName(locale, row.cityNameEn, row.cityNameAr) ??
+                      t("common.none")}
+                  </TableCell>
+                  <TableCell className="text-start">
+                    {row.endState ? (
+                      <Badge
+                        variant={
+                          row.endState === "lost" ? "destructive" : "secondary"
+                        }
                       >
-                        {bilingualName(row, locale)}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-start">{row.ownerName}</TableCell>
-                    <TableCell className="text-start" dir="ltr">
-                      {row.sqmExpected ?? t("common.none")}
-                    </TableCell>
-                    <TableCell className="text-start">
-                      {pickName(locale, row.cityNameEn, row.cityNameAr) ??
-                        t("common.none")}
-                    </TableCell>
-                    <TableCell className="text-start">
-                      {row.endState ? (
-                        <Badge
-                          variant={
-                            row.endState === "lost" ? "destructive" : "secondary"
-                          }
-                        >
-                          {t(`enums.projectEndState.${row.endState}`)}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">
-                          {t("projects.fields.endStateOpen")}
-                        </span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          <ListPagination
-            basePath="/projects"
-            page={currentPage}
-            total={total}
-            query={q}
-          />
-        </>
+                        {t(`enums.projectEndState.${row.endState}`)}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {t("projects.fields.endStateOpen")}
+                      </span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </ListCard>
       )}
     </div>
   );

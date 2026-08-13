@@ -71,7 +71,8 @@
     "date": "Date",
     "view": "View",
     "filter": "Filter",
-    "apply": "Apply"
+    "apply": "Apply",
+    "whoseMove": "Whose move"
   },
   "enums": {
     "region": {
@@ -184,6 +185,28 @@
       "reincluded": "Re-included",
       "reassigned": "Reassigned",
       "archived": "Archived"
+    }
+  },
+  "chain": {
+    "turn": {
+      "yours": {
+        "requested": "Your turn — issue it in SMAC",
+        "waitingSignature": "Your turn — get it signed",
+        "paid": "Your turn — record the dispatch"
+      },
+      "coordinator": {
+        "requested": "Waiting on the coordinator — issue in SMAC",
+        "waitingSignature": "Waiting on the coordinator — signatures",
+        "paid": "Waiting on the coordinator — dispatch"
+      },
+      "rep": {
+        "new": "Waiting on {name} — raise a quotation",
+        "waitingPayment": "Waiting on {name} — confirm payment"
+      },
+      "none": {
+        "dispatched": "Nothing outstanding — dispatched",
+        "closed": "Nothing outstanding — closed"
+      }
     }
   },
   "errors": {
@@ -738,7 +761,10 @@
       "covered": "Covered",
       "onHold": "On hold",
       "filterAll": "All companies",
-      "filterQuiet": "Quiet only"
+      "filterQuiet": "Quiet only",
+      "neverLogged": "Nothing ever recorded",
+      "quietFor": "Nothing recorded for {count} days",
+      "coveredFor": "Last recorded {count} days ago"
     },
     "detail": {
       "hint": "Which companies have gone quiet. There is nothing to submit here, so there is nothing to miss and nothing is penalised.",

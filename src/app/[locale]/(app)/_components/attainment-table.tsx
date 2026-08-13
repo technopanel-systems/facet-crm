@@ -44,79 +44,69 @@ export async function AttainmentTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-start">
-              {t("targets.fields.person")}
-            </TableHead>
-            <TableHead className="text-start">
-              {t("targets.fields.targetSqm")}
-            </TableHead>
-            <TableHead className="text-start">
-              {t("targets.fields.achievedSqm")}
-            </TableHead>
-            <TableHead className="text-start">
-              {t("targets.fields.ofWhich")}
-            </TableHead>
-            <TableHead className="text-start">
-              {t("targets.fields.progress")}
-            </TableHead>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="text-start">
+            {t("targets.fields.person")}
+          </TableHead>
+          <TableHead numeric>{t("targets.fields.targetSqm")}</TableHead>
+          <TableHead numeric>{t("targets.fields.achievedSqm")}</TableHead>
+          <TableHead numeric>{t("targets.fields.ofWhich")}</TableHead>
+          <TableHead numeric>{t("targets.fields.progress")}</TableHead>
+          {maySetTargets ? (
+            <TableHead className="text-start">{t("common.actions")}</TableHead>
+          ) : null}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((row) => (
+          <TableRow key={row.userId}>
+            <TableCell className="text-start font-medium">
+              {row.userName}
+            </TableCell>
+            {/* Null is NOT zero `[07 D1]`: someone with no row is not
+                measured this month, which a `0` would misreport. */}
+            <TableCell numeric dir="ltr">
+              {row.targetSqm ?? (
+                <span className="text-muted-foreground font-sans" dir="auto">
+                  {t("targets.fields.notMeasured")}
+                </span>
+              )}
+            </TableCell>
+            <TableCell numeric dir="ltr">
+              <Link
+                href={`/dispatches?userId=${row.userId}`}
+                className="hover:underline"
+              >
+                {row.achievedSqm}
+              </Link>
+            </TableCell>
+            {/* `07 C6` — the direct route, countable. */}
+            <TableCell numeric className="text-xs" dir="ltr">
+              {t("targets.fields.linkedShort")} {row.linkedSqm}
+              {" · "}
+              {t("targets.fields.directShort")} {row.directSqm}
+            </TableCell>
+            <TableCell numeric dir="ltr">
+              {row.targetSqm
+                ? `${Math.round(
+                    (Number(row.achievedSqm) / Number(row.targetSqm)) * 100,
+                  )}%`
+                : t("common.none")}
+            </TableCell>
             {maySetTargets ? (
-              <TableHead className="text-start">{t("common.actions")}</TableHead>
+              <TableCell className="text-start">
+                <TargetRow
+                  action={setTargetAction.bind(null, row.userId)}
+                  period={period}
+                  currentSqm={row.targetSqm}
+                />
+              </TableCell>
             ) : null}
           </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.userId}>
-              <TableCell className="text-start font-medium">
-                {row.userName}
-              </TableCell>
-              {/* Null is NOT zero `[07 D1]`: someone with no row is not
-                  measured this month, which a `0` would misreport. */}
-              <TableCell className="num text-start" dir="ltr">
-                {row.targetSqm ?? (
-                  <span className="text-muted-foreground font-sans" dir="auto">
-                    {t("targets.fields.notMeasured")}
-                  </span>
-                )}
-              </TableCell>
-              <TableCell className="num text-start" dir="ltr">
-                <Link
-                  href={`/dispatches?userId=${row.userId}`}
-                  className="hover:underline"
-                >
-                  {row.achievedSqm}
-                </Link>
-              </TableCell>
-              {/* `07 C6` — the direct route, countable. */}
-              <TableCell className="num text-start text-xs" dir="ltr">
-                {t("targets.fields.linkedShort")} {row.linkedSqm}
-                {" · "}
-                {t("targets.fields.directShort")} {row.directSqm}
-              </TableCell>
-              <TableCell className="num text-start" dir="ltr">
-                {row.targetSqm
-                  ? `${Math.round(
-                      (Number(row.achievedSqm) / Number(row.targetSqm)) * 100,
-                    )}%`
-                  : t("common.none")}
-              </TableCell>
-              {maySetTargets ? (
-                <TableCell className="text-start">
-                  <TargetRow
-                    action={setTargetAction.bind(null, row.userId)}
-                    period={period}
-                    currentSqm={row.targetSqm}
-                  />
-                </TableCell>
-              ) : null}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

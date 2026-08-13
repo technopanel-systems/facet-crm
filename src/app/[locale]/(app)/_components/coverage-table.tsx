@@ -14,12 +14,16 @@ import { Link } from "@/i18n/navigation";
 import type { CoverageRow } from "@/lib/coverage";
 import { bilingualName } from "@/lib/lookups";
 
+import { Turn, turnTone } from "./turn";
+
 /**
  * The coverage table — every company this identity may read, with how long it
  * has been since anyone logged against it.
  *
  * Extracted so `/coverage` and `/performance` render the identical table
- * `[22 §7]`.
+ * `[22 §7]`. It renders **only** the table: the empty state and the `ListCard`
+ * frame belong to the caller, because an empty state inside a card with a
+ * pagination footer reads as a broken page rather than an empty one.
  *
  * **`quietOnly` is not offered here**, and the reason is `22 §6.5`: `coverage()`
  * filters it after paginating, so a caller asking for quiet companies gets the
@@ -30,109 +34,119 @@ import { bilingualName } from "@/lib/lookups";
 export async function CoverageTable({
   rows,
   locale,
-  empty,
 }: {
   rows: CoverageRow[];
   locale: string;
-  empty: string;
 }) {
   const t = await getTranslations();
   const format = await getFormatter();
 
-  if (rows.length === 0) {
-    return (
-      <p className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-        {empty}
-      </p>
-    );
-  }
-
   return (
-    <div className="overflow-x-auto rounded-lg border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-start">
-              {t("coverage.fields.company")}
-            </TableHead>
-            <TableHead className="text-start">
-              {t("coverage.fields.reps")}
-            </TableHead>
-            <TableHead className="text-start">
-              {t("coverage.fields.lastInteraction")}
-            </TableHead>
-            <TableHead className="text-start">
-              {t("coverage.fields.daysSince")}
-            </TableHead>
-            <TableHead className="text-start">{t("common.qualified")}</TableHead>
-            <TableHead className="text-start">
-              {t("coverage.fields.status")}
-            </TableHead>
-            <TableHead className="text-start">{t("common.actions")}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.companyId}>
-              <TableCell className="text-start font-medium">
-                <Link
-                  href={`/companies/${row.companyId}`}
-                  className="hover:underline"
-                >
-                  {bilingualName(
-                    { nameEn: row.companyNameEn, nameAr: row.companyNameAr },
-                    locale,
-                  )}
-                </Link>
-              </TableCell>
-              <TableCell className="text-start">
-                {row.repNames.length > 0
-                  ? row.repNames.join(", ")
-                  : t("common.none")}
-              </TableCell>
-              <TableCell className="num text-start" dir="ltr">
-                {row.lastInteractionOn
-                  ? format.dateTime(
-                      new Date(`${row.lastInteractionOn}T00:00:00Z`),
-                      { dateStyle: "medium", timeZone: "UTC" },
-                    )
-                  : t("coverage.fields.never")}
-              </TableCell>
-              <TableCell className="num text-start" dir="ltr">
-                {/* Never logged is not zero days. */}
-                {row.daysSince ?? t("common.none")}
-              </TableCell>
-              <TableCell className="text-start">
-                {row.isQualified ? t("common.yes") : t("common.no")}
-              </TableCell>
-              <TableCell className="text-start">
-                {row.onHoldUntil ? (
-                  <Badge variant="outline">
-                    {t("coverage.detail.onHoldUntil", {
-                      date: row.onHoldUntil,
-                    })}
-                  </Badge>
-                ) : row.isQuiet ? (
-                  <Badge variant="destructive">
-                    {t("coverage.fields.quiet")}
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary">
-                    {t("coverage.fields.covered")}
-                  </Badge>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="text-start">
+            {t("coverage.fields.company")}
+          </TableHead>
+          <TableHead className="text-start">
+            {t("coverage.fields.reps")}
+          </TableHead>
+          <TableHead numeric>
+            {t("coverage.fields.lastInteraction")}
+          </TableHead>
+          {/* `22 §4`'s own worked example lives here: "Nothing recorded for
+              23 days" beats "Lead". `daysSince` and `isQuiet` are both
+              already on the row, so the column is a rendering of what
+              `coverage()` decided, not a second opinion about it. */}
+          <TableHead className="text-start">
+            {t("common.whoseMove")}
+          </TableHead>
+          <TableHead className="text-start">{t("common.qualified")}</TableHead>
+          <TableHead className="text-start">
+            {t("coverage.fields.status")}
+          </TableHead>
+          <TableHead className="text-start">{t("common.actions")}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((row) => (
+          <TableRow key={row.companyId}>
+            <TableCell className="text-start font-medium">
+              <Link
+                href={`/companies/${row.companyId}`}
+                className="hover:underline"
+              >
+                {bilingualName(
+                  { nameEn: row.companyNameEn, nameAr: row.companyNameAr },
+                  locale,
                 )}
-              </TableCell>
-              <TableCell className="text-start">
-                <Button asChild size="xs" variant="outline">
-                  <Link href={`/reports/new?companyId=${row.companyId}`}>
-                    {t("reports.new")}
-                  </Link>
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+              </Link>
+            </TableCell>
+            <TableCell className="text-start">
+              {row.repNames.length > 0
+                ? row.repNames.join(", ")
+                : t("common.none")}
+            </TableCell>
+            <TableCell numeric dir="ltr">
+              {row.lastInteractionOn
+                ? format.dateTime(
+                    new Date(`${row.lastInteractionOn}T00:00:00Z`),
+                    { dateStyle: "medium", timeZone: "UTC" },
+                  )
+                : t("coverage.fields.never")}
+            </TableCell>
+            <TableCell className="text-start">
+              <Turn
+                line={
+                  row.onHoldUntil
+                    ? t("coverage.detail.onHoldUntil", {
+                        date: row.onHoldUntil,
+                      })
+                    : // Never logged is not zero days.
+                      row.daysSince === null
+                      ? t("coverage.fields.neverLogged")
+                      : row.isQuiet
+                        ? t("coverage.fields.quietFor", {
+                            count: row.daysSince,
+                          })
+                        : t("coverage.fields.coveredFor", {
+                            count: row.daysSince,
+                          })
+                }
+                // On hold is not late: `20 §5` says the clock is deliberately
+                // suppressed, so the row is calm however long it has been.
+                tone={turnTone({
+                  overdue: row.isQuiet && !row.onHoldUntil,
+                })}
+              />
+            </TableCell>
+            <TableCell className="text-start">
+              {row.isQualified ? t("common.yes") : t("common.no")}
+            </TableCell>
+            <TableCell className="text-start">
+              {/* The date is in the turn cell; the pill is only the state. */}
+              {row.onHoldUntil ? (
+                <Badge variant="outline">{t("coverage.fields.onHold")}</Badge>
+              ) : row.isQuiet ? (
+                <Badge variant="destructive">
+                  {t("coverage.fields.quiet")}
+                </Badge>
+              ) : (
+                <Badge variant="secondary">
+                  {t("coverage.fields.covered")}
+                </Badge>
+              )}
+            </TableCell>
+            <TableCell className="text-start">
+              <Button asChild size="xs" variant="outline">
+                <Link href={`/reports/new?companyId=${row.companyId}`}>
+                  {t("reports.new")}
+                </Link>
+              </Button>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

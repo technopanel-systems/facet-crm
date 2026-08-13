@@ -65,12 +65,27 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
   )
 }
 
-function TableHead({ className, ...props }: React.ComponentProps<"th">) {
+/**
+ * `numeric` is one prop, not two classes remembered separately — the same
+ * reasoning `22 §2` used to make `num` a single utility. It carries both
+ * halves of `22 §3`'s rule: numeric columns are **end-aligned and mono**.
+ *
+ * Put it on the `TableHead` as well as the `TableCell`, always. A right-aligned
+ * column under a left-aligned heading is the thing the rule exists to stop.
+ */
+type NumericProps = { numeric?: boolean }
+
+function TableHead({
+  className,
+  numeric,
+  ...props
+}: React.ComponentProps<"th"> & NumericProps) {
   return (
     <th
       data-slot="table-head"
       className={cn(
-        "h-9 px-2 text-start align-middle text-[10.5px] font-semibold tracking-wider whitespace-nowrap text-faint uppercase [&:has([role=checkbox])]:pe-0",
+        "px-4 py-2.5 text-start align-middle text-[10.5px] font-semibold tracking-wider whitespace-nowrap text-faint uppercase [&:has([role=checkbox])]:pe-0",
+        numeric && "text-end",
         className
       )}
       {...props}
@@ -78,12 +93,17 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   )
 }
 
-function TableCell({ className, ...props }: React.ComponentProps<"td">) {
+function TableCell({
+  className,
+  numeric,
+  ...props
+}: React.ComponentProps<"td"> & NumericProps) {
   return (
     <td
       data-slot="table-cell"
       className={cn(
-        "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pe-0",
+        "px-4 py-3 align-middle whitespace-nowrap [&:has([role=checkbox])]:pe-0",
+        numeric && "num text-end",
         className
       )}
       {...props}

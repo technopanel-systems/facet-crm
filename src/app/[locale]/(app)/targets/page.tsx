@@ -8,6 +8,7 @@ import { can, requireSession } from "@/lib/authz";
 import { achievementForPeriod, currentPeriod, periodStart } from "@/lib/targets";
 
 import { AttainmentTable } from "../_components/attainment-table";
+import { ListCard } from "../_components/list-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -63,11 +64,20 @@ export default async function TargetsPage({
         </Button>
       </form>
 
-      <AttainmentTable
-        rows={rows}
-        period={period}
-        maySetTargets={maySetTargets}
-      />
+      {rows.length === 0 ? (
+        <p className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
+          {t("targets.empty")}
+        </p>
+      ) : (
+        // A month's measured set is never paged, so the footer is the count.
+        <ListCard basePath="/targets" page={1} total={rows.length}>
+          <AttainmentTable
+            rows={rows}
+            period={period}
+            maySetTargets={maySetTargets}
+          />
+        </ListCard>
+      )}
 
       {/* `07 D2` — target progress and activity side by side, NEVER combined
           into one score. Since Phase 9 activity is real and derived `[20 §8]`,

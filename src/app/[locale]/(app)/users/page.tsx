@@ -16,7 +16,11 @@ import { Link } from "@/i18n/navigation";
 import { can, listUsers, requireSession } from "@/lib/authz";
 import { bilingualName } from "@/lib/lookups";
 
-import { ListPagination, SearchForm } from "../_components/list-controls";
+import {
+  FilterNav,
+  ListCard,
+  SearchForm,
+} from "../_components/list-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -67,118 +71,97 @@ export default async function UsersPage({
         placeholder={t("team.searchPlaceholder")}
       />
 
-      <nav className="flex flex-wrap gap-2" aria-label={t("common.filter")}>
-        <Button
-          asChild
-          size="xs"
-          variant={filter === "active" ? "secondary" : "outline"}
-        >
-          <Link href={basePath}>{t("team.fields.filterActive")}</Link>
-        </Button>
-        <Button
-          asChild
-          size="xs"
-          variant={filter === "inactive" ? "secondary" : "outline"}
-        >
-          <Link href={`${basePath}?status=inactive`}>
-            {t("team.fields.filterInactive")}
-          </Link>
-        </Button>
-        <Button
-          asChild
-          size="xs"
-          variant={filter === "all" ? "secondary" : "outline"}
-        >
-          <Link href={`${basePath}?status=all`}>
-            {t("team.fields.filterAll")}
-          </Link>
-        </Button>
-      </nav>
+      {/* `active` is the default, so it is the chip with no parameter. */}
+      <FilterNav
+        basePath={basePath}
+        name="status"
+        active={filter === "active" ? undefined : filter}
+        query={q}
+        options={[
+          { label: t("team.fields.filterActive") },
+          { value: "inactive", label: t("team.fields.filterInactive") },
+          { value: "all", label: t("team.fields.filterAll") },
+        ]}
+      />
 
       {rows.length === 0 ? (
         <p className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
           {q ? t("team.emptyFiltered") : t("team.empty")}
         </p>
       ) : (
-        <>
-          <div className="overflow-x-auto rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-start">
-                    {t("team.fields.name")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("team.fields.email")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("team.fields.role")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("team.fields.region")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("team.fields.status")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("common.createdAt")}
-                  </TableHead>
+        <ListCard
+          basePath={basePath}
+          page={currentPage}
+          total={total}
+          query={q}
+        >
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-start">
+                  {t("team.fields.name")}
+                </TableHead>
+                <TableHead className="text-start">
+                  {t("team.fields.email")}
+                </TableHead>
+                <TableHead className="text-start">
+                  {t("team.fields.role")}
+                </TableHead>
+                <TableHead className="text-start">
+                  {t("team.fields.region")}
+                </TableHead>
+                <TableHead className="text-start">
+                  {t("team.fields.status")}
+                </TableHead>
+                <TableHead numeric>{t("common.createdAt")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell className="text-start font-medium">
+                    <Link
+                      href={`/users/${row.id}`}
+                      className="hover:underline"
+                    >
+                      {row.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="num text-start" dir="ltr">
+                    {row.email}
+                  </TableCell>
+                  <TableCell className="text-start">
+                    {bilingualName(
+                      { nameEn: row.roleNameEn, nameAr: row.roleNameAr },
+                      locale,
+                    )}
+                  </TableCell>
+                  <TableCell className="text-start">
+                    {row.region
+                      ? t(`enums.region.${row.region}`)
+                      : t("common.none")}
+                  </TableCell>
+                  <TableCell className="text-start">
+                    {row.isActive ? (
+                      <Badge variant="secondary">
+                        {t("team.fields.statusActive")}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">
+                        {t("team.fields.statusInactive")}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell numeric dir="ltr">
+                    {format.dateTime(row.createdAt, {
+                      dateStyle: "medium",
+                    })}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="text-start font-medium">
-                      <Link
-                        href={`/users/${row.id}`}
-                        className="hover:underline"
-                      >
-                        {row.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-start" dir="ltr">
-                      {row.email}
-                    </TableCell>
-                    <TableCell className="text-start">
-                      {bilingualName(
-                        { nameEn: row.roleNameEn, nameAr: row.roleNameAr },
-                        locale,
-                      )}
-                    </TableCell>
-                    <TableCell className="text-start">
-                      {row.region
-                        ? t(`enums.region.${row.region}`)
-                        : t("common.none")}
-                    </TableCell>
-                    <TableCell className="text-start">
-                      {row.isActive ? (
-                        <Badge variant="secondary">
-                          {t("team.fields.statusActive")}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">
-                          {t("team.fields.statusInactive")}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-start" dir="ltr">
-                      {format.dateTime(row.createdAt, {
-                        dateStyle: "medium",
-                      })}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          <ListPagination
-            basePath={basePath}
-            page={currentPage}
-            total={total}
-            query={q}
-          />
-        </>
+              ))}
+            </TableBody>
+          </Table>
+        </ListCard>
       )}
     </div>
   );

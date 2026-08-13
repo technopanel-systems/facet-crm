@@ -10,7 +10,7 @@ import { achievementForPeriod, currentPeriod, periodStart } from "@/lib/targets"
 
 import { AttainmentTable } from "../_components/attainment-table";
 import { CoverageTable } from "../_components/coverage-table";
-import { ListPagination, SearchForm } from "../_components/list-controls";
+import { ListCard, SearchForm } from "../_components/list-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -104,11 +104,21 @@ export default async function PerformancePage({
           {t("targets.detail.derivedNotice")}
         </p>
 
-        <AttainmentTable
-          rows={attainment}
-          period={period}
-          maySetTargets={can(session, "canSetTargets")}
-        />
+        {attainment.length === 0 ? (
+          <p className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
+            {t("targets.empty")}
+          </p>
+        ) : (
+          // No pager: `achievementForPeriod` returns the whole measured set
+          // for the month, so the footer is a count and nothing else.
+          <ListCard basePath="/performance" page={1} total={attainment.length}>
+            <AttainmentTable
+              rows={attainment}
+              period={period}
+              maySetTargets={can(session, "canSetTargets")}
+            />
+          </ListCard>
+        )}
       </section>
 
       <section className="flex flex-col gap-4">
@@ -128,20 +138,24 @@ export default async function PerformancePage({
           basePath="/performance"
           defaultValue={q}
           placeholder={t("coverage.searchPlaceholder")}
+          hidden={{ period: asMonth(period), rep }}
         />
 
-        <CoverageTable
-          rows={cover.rows}
-          locale={locale}
-          empty={q ? t("coverage.emptyFiltered") : t("coverage.empty")}
-        />
-
-        <ListPagination
-          basePath="/performance"
-          page={currentPage}
-          total={cover.total}
-          query={q}
-        />
+        {cover.rows.length === 0 ? (
+          <p className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
+            {q ? t("coverage.emptyFiltered") : t("coverage.empty")}
+          </p>
+        ) : (
+          <ListCard
+            basePath="/performance"
+            page={currentPage}
+            total={cover.total}
+            query={q}
+            extra={{ period: asMonth(period), rep }}
+          >
+            <CoverageTable rows={cover.rows} locale={locale} />
+          </ListCard>
+        )}
       </section>
 
       {/* `07 D2` — side by side, never one score. Reports stays reachable here

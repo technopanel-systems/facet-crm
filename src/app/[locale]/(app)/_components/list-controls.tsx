@@ -1,8 +1,10 @@
+import type { ReactNode } from "react";
 import { getTranslations } from "next-intl/server";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "@/i18n/navigation";
+import { cn } from "@/lib/utils";
 
 /** Kept in step with `PAGE_SIZE` in the data modules. */
 const PAGE_SIZE = 25;
@@ -19,15 +21,25 @@ export async function SearchForm({
   /** Already translated. Lists that search something other than a name and a
    *  phone say so — the default is the companies wording. */
   placeholder,
+  /** Filters the search must not drop — see `FilterNav`. */
+  hidden,
 }: {
   basePath: string;
   defaultValue?: string;
   placeholder?: string;
+  hidden?: Record<string, string | undefined>;
 }) {
   const t = await getTranslations();
 
   return (
     <form method="get" className="flex flex-wrap items-center gap-2">
+      {/* A new search resets to page 1 by omitting `page`, but it must not
+          silently drop the filter the user is looking through. */}
+      {Object.entries(hidden ?? {}).map(([name, value]) =>
+        value ? (
+          <input key={name} type="hidden" name={name} value={value} />
+        ) : null,
+      )}
       <Input
         type="search"
         name="q"
@@ -50,8 +62,130 @@ export async function SearchForm({
   );
 }
 
+export type FilterOption = {
+  /** `undefined` is the "all" chip: the parameter is dropped entirely. */
+  value?: string;
+  /** Already translated. */
+  label: string;
+  /** Rendered after the label, e.g. a per-kind count. */
+  count?: number;
+};
+
 /**
- * Previous / next links carrying the current search.
+ * The filter chips, as links.
+ *
+ * **Every chip carries the current search.** `22 §3` says filters are GET
+ * forms in the URL — shareable and reload-proof — and a chip that navigates to
+ * a bare `?type=…` silently throws the user's query away. `/reports`,
+ * `/dispatches` and `/users` all did that; `/follow-ups` and `/coverage` each
+ * carried a private `withParams` helper to avoid it. This is that helper, once.
+ *
+ * The page number is deliberately *not* carried: page 3 of one filter is
+ * rarely page 3 of another.
+ */
+export async function FilterNav({
+  basePath,
+  name,
+  options,
+  active,
+  query,
+  extra,
+}: {
+  basePath: string;
+  /** The search parameter these chips set, e.g. `kind`. */
+  name: string;
+  options: FilterOption[];
+  active?: string;
+  query?: string;
+  /** Other parameters to preserve, e.g. `/performance`'s `period`. */
+  extra?: Record<string, string | undefined>;
+}) {
+  const t = await getTranslations();
+
+  const href = (value?: string) => {
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    for (const [key, item] of Object.entries(extra ?? {})) {
+      if (item) params.set(key, item);
+    }
+    if (value) params.set(name, value);
+    const search = params.toString();
+    return search ? `${basePath}?${search}` : basePath;
+  };
+
+  return (
+    <nav className="flex flex-wrap gap-2" aria-label={t("common.filter")}>
+      {options.map((option) => {
+        const on = (option.value ?? "") === (active ?? "");
+        return (
+          <Button
+            key={option.value ?? "all"}
+            asChild
+            size="xs"
+            variant={on ? "secondary" : "ghost"}
+          >
+            <Link href={href(option.value)} aria-current={on ? "true" : undefined}>
+              {option.label}
+              {option.count !== undefined ? (
+                <span className="num ms-1.5 opacity-70" dir="ltr">
+                  {option.count}
+                </span>
+              ) : null}
+            </Link>
+          </Button>
+        );
+      })}
+    </nav>
+  );
+}
+
+/**
+ * The list archetype's frame `[22 §3]`: a bordered card holding the table, with
+ * **pagination in the footer**.
+ *
+ * It replaces the `<div className="overflow-x-auto rounded-lg border">` that
+ * eleven pages hand-rolled around `<Table>`, which also double-wrapped
+ * `Table`'s own scroll container.
+ *
+ * The footer renders whenever there are rows, not only when there is a second
+ * page: "Showing 1–7 of 7" is the count a rep wants, and a card whose footer
+ * appears and disappears with the row count reads as a rendering bug.
+ */
+export async function ListCard({
+  basePath,
+  page,
+  total,
+  query,
+  extra,
+  children,
+}: {
+  basePath: string;
+  page: number;
+  total: number;
+  query?: string;
+  /** Filters the pager must carry, so page 2 of a filtered list still is. */
+  extra?: Record<string, string | undefined>;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      data-slot="list-card"
+      className="border-line bg-card overflow-hidden rounded-xl border shadow-(--shadow)"
+    >
+      {children}
+      <ListPagination
+        basePath={basePath}
+        page={page}
+        total={total}
+        query={query}
+        extra={extra}
+      />
+    </div>
+  );
+}
+
+/**
+ * The footer bar: a count, and previous / next as links.
  *
  * Links, not buttons: paging is navigation, and the back button should work.
  */
@@ -60,58 +194,66 @@ export async function ListPagination({
   page,
   total,
   query,
+  extra,
 }: {
   basePath: string;
   page: number;
   total: number;
   query?: string;
+  extra?: Record<string, string | undefined>;
 }) {
   const t = await getTranslations();
-  if (total <= PAGE_SIZE) return null;
+  if (total === 0) return null;
 
-  const lastPage = Math.ceil(total / PAGE_SIZE);
+  const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const from = (page - 1) * PAGE_SIZE + 1;
   const to = Math.min(page * PAGE_SIZE, total);
 
   const href = (target: number) => {
     const params = new URLSearchParams();
     if (query) params.set("q", query);
+    for (const [key, item] of Object.entries(extra ?? {})) {
+      if (item) params.set(key, item);
+    }
     if (target > 1) params.set("page", String(target));
     const search = params.toString();
     return search ? `${basePath}?${search}` : basePath;
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <p className="text-muted-foreground text-start text-sm">
-        {t("common.showing", { from, to, total })}
-      </p>
-      <div className="flex items-center gap-2">
-        <Button
-          asChild={page > 1}
-          size="sm"
-          variant="outline"
-          disabled={page <= 1}
-        >
-          {page > 1 ? (
-            <Link href={href(page - 1)}>{t("common.previous")}</Link>
-          ) : (
-            <span>{t("common.previous")}</span>
-          )}
-        </Button>
-        <Button
-          asChild={page < lastPage}
-          size="sm"
-          variant="outline"
-          disabled={page >= lastPage}
-        >
-          {page < lastPage ? (
-            <Link href={href(page + 1)}>{t("common.next")}</Link>
-          ) : (
-            <span>{t("common.next")}</span>
-          )}
-        </Button>
-      </div>
+    <div
+      className={cn(
+        "border-line text-faint flex flex-wrap items-center justify-between gap-3",
+        "border-t px-4 py-2.5 text-xs",
+      )}
+    >
+      {/* Prose, not a column of figures — so no `num`. Forcing mono here would
+          render the Arabic words in a monospace fallback, and `dir="ltr"`
+          would reverse the sentence to line up three digits. */}
+      <p className="text-start">{t("common.showing", { from, to, total })}</p>
+      {lastPage > 1 ? (
+        <div className="flex items-center gap-2">
+          <Button asChild={page > 1} size="xs" variant="outline" disabled={page <= 1}>
+            {page > 1 ? (
+              <Link href={href(page - 1)}>{t("common.previous")}</Link>
+            ) : (
+              <span>{t("common.previous")}</span>
+            )}
+          </Button>
+          <Button
+            asChild={page < lastPage}
+            size="xs"
+            variant="outline"
+            disabled={page >= lastPage}
+          >
+            {page < lastPage ? (
+              <Link href={href(page + 1)}>{t("common.next")}</Link>
+            ) : (
+              <span>{t("common.next")}</span>
+            )}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

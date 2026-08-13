@@ -17,7 +17,11 @@ import { REPORT_ENTRY_TYPES, REPORT_OUTCOMES } from "@/lib/enums";
 import { bilingualName } from "@/lib/lookups";
 import { listReports } from "@/lib/reports";
 
-import { ListPagination, SearchForm } from "../_components/list-controls";
+import {
+  FilterNav,
+  ListCard,
+  SearchForm,
+} from "../_components/list-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -93,31 +97,23 @@ export default async function ReportsPage({
         basePath={basePath}
         defaultValue={q}
         placeholder={t("reports.searchPlaceholder")}
+        hidden={{ type: entryType, outcome: chosenOutcome }}
       />
 
-      <nav className="flex flex-wrap gap-2" aria-label={t("common.filter")}>
-        <Button asChild size="xs" variant={type ? "outline" : "secondary"}>
-          <Link href={basePath}>{t("reports.fields.filterAll")}</Link>
-        </Button>
-        <Button
-          asChild
-          size="xs"
-          variant={type === "interaction" ? "secondary" : "outline"}
-        >
-          <Link href={`${basePath}?type=interaction`}>
-            {t("reports.fields.filterInteractions")}
-          </Link>
-        </Button>
-        <Button
-          asChild
-          size="xs"
-          variant={type === "field_note" ? "secondary" : "outline"}
-        >
-          <Link href={`${basePath}?type=field_note`}>
-            {t("reports.fields.filterFieldNotes")}
-          </Link>
-        </Button>
-      </nav>
+      {/* `outcome` is an accepted parameter with no control of its own, so the
+          chips carry it rather than dropping it `[22 §3]`. */}
+      <FilterNav
+        basePath={basePath}
+        name="type"
+        active={entryType}
+        query={q}
+        extra={{ outcome: chosenOutcome }}
+        options={[
+          { label: t("reports.fields.filterAll") },
+          { value: "interaction", label: t("reports.fields.filterInteractions") },
+          { value: "field_note", label: t("reports.fields.filterFieldNotes") },
+        ]}
+      />
 
       {rows.length === 0 ? (
         <p className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
@@ -126,102 +122,99 @@ export default async function ReportsPage({
             : t("reports.empty")}
         </p>
       ) : (
-        <>
-          <div className="overflow-x-auto rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-start">
-                    {t("reports.fields.reportDate")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("reports.fields.entryType")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("reports.fields.company")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("reports.fields.outcome")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("reports.fields.signals")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("reports.fields.author")}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="text-start font-medium" dir="ltr">
-                      <Link
-                        href={`/reports/${row.id}`}
-                        className="hover:underline"
-                      >
-                        {format.dateTime(
-                          new Date(`${row.reportDate}T00:00:00Z`),
-                          { dateStyle: "medium", timeZone: "UTC" },
-                        )}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-start">
-                      <Badge
-                        variant={
-                          row.entryType === "interaction"
-                            ? "secondary"
-                            : "outline"
-                        }
-                      >
-                        {t(`enums.reportEntryType.${row.entryType}`)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-start">
-                      {/* A field note belongs to no customer `[20 §2]`. */}
-                      {row.companyNameEn
-                        ? bilingualName(
-                            {
-                              nameEn: row.companyNameEn,
-                              nameAr: row.companyNameAr,
-                            },
-                            locale,
-                          )
-                        : t("common.none")}
-                    </TableCell>
-                    <TableCell className="text-start">
-                      {row.outcome
-                        ? t(`enums.reportOutcome.${row.outcome}`)
-                        : row.category
-                          ? t(`enums.fieldNoteCategory.${row.category}`)
-                          : t("common.none")}
-                    </TableCell>
-                    <TableCell className="text-start">
-                      {row.signals.length === 0 ? (
-                        t("common.none")
-                      ) : (
-                        <span className="flex flex-wrap gap-1">
-                          {row.signals.map((signal) => (
-                            <Badge key={signal.signal} variant="outline">
-                              {t(`enums.reportSignal.${signal.signal}`)}
-                            </Badge>
-                          ))}
-                        </span>
+        <ListCard
+          basePath={basePath}
+          page={currentPage}
+          total={total}
+          query={q}
+          extra={{ type: entryType, outcome: chosenOutcome }}
+        >
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-start">
+                  {t("reports.fields.reportDate")}
+                </TableHead>
+                <TableHead className="text-start">
+                  {t("reports.fields.entryType")}
+                </TableHead>
+                <TableHead className="text-start">
+                  {t("reports.fields.company")}
+                </TableHead>
+                <TableHead className="text-start">
+                  {t("reports.fields.outcome")}
+                </TableHead>
+                <TableHead className="text-start">
+                  {t("reports.fields.signals")}
+                </TableHead>
+                <TableHead className="text-start">
+                  {t("reports.fields.author")}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell className="num text-start font-medium" dir="ltr">
+                    <Link
+                      href={`/reports/${row.id}`}
+                      className="hover:underline"
+                    >
+                      {format.dateTime(
+                        new Date(`${row.reportDate}T00:00:00Z`),
+                        { dateStyle: "medium", timeZone: "UTC" },
                       )}
-                    </TableCell>
-                    <TableCell className="text-start">{row.userName}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          <ListPagination
-            basePath={basePath}
-            page={currentPage}
-            total={total}
-            query={q}
-          />
-        </>
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-start">
+                    <Badge
+                      variant={
+                        row.entryType === "interaction"
+                          ? "secondary"
+                          : "outline"
+                      }
+                    >
+                      {t(`enums.reportEntryType.${row.entryType}`)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-start">
+                    {/* A field note belongs to no customer `[20 §2]`. */}
+                    {row.companyNameEn
+                      ? bilingualName(
+                          {
+                            nameEn: row.companyNameEn,
+                            nameAr: row.companyNameAr,
+                          },
+                          locale,
+                        )
+                      : t("common.none")}
+                  </TableCell>
+                  <TableCell className="text-start">
+                    {row.outcome
+                      ? t(`enums.reportOutcome.${row.outcome}`)
+                      : row.category
+                        ? t(`enums.fieldNoteCategory.${row.category}`)
+                        : t("common.none")}
+                  </TableCell>
+                  <TableCell className="text-start">
+                    {row.signals.length === 0 ? (
+                      t("common.none")
+                    ) : (
+                      <span className="flex flex-wrap gap-1">
+                        {row.signals.map((signal) => (
+                          <Badge key={signal.signal} variant="outline">
+                            {t(`enums.reportSignal.${signal.signal}`)}
+                          </Badge>
+                        ))}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-start">{row.userName}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </ListCard>
       )}
     </div>
   );

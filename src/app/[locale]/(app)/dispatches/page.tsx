@@ -16,7 +16,11 @@ import { can, requireSession } from "@/lib/authz";
 import { listDispatches } from "@/lib/dispatches";
 import { bilingualName } from "@/lib/lookups";
 
-import { ListPagination, SearchForm } from "../_components/list-controls";
+import {
+  FilterNav,
+  ListCard,
+  SearchForm,
+} from "../_components/list-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -69,129 +73,118 @@ export default async function DispatchesPage({
         basePath={basePath}
         defaultValue={q}
         placeholder={t("dispatches.searchPlaceholder")}
+        hidden={{ direct, userId }}
       />
 
-      <nav className="flex flex-wrap gap-2" aria-label={t("common.filter")}>
-        <Button asChild size="xs" variant={direct ? "outline" : "secondary"}>
-          <Link href={basePath}>{t("dispatches.fields.filterAll")}</Link>
-        </Button>
-        <Button
-          asChild
-          size="xs"
-          variant={direct === "0" ? "secondary" : "outline"}
-        >
-          <Link href={`${basePath}?direct=0`}>
-            {t("dispatches.fields.filterLinked")}
-          </Link>
-        </Button>
-        <Button
-          asChild
-          size="xs"
-          variant={direct === "1" ? "secondary" : "outline"}
-        >
-          <Link href={`${basePath}?direct=1`}>
-            {t("dispatches.fields.filterDirect")}
-          </Link>
-        </Button>
-      </nav>
+      {/* `userId` is the attainment table's deep-link target and has no control
+          of its own, so the chips carry it rather than dropping it. */}
+      <FilterNav
+        basePath={basePath}
+        name="direct"
+        active={direct === "0" || direct === "1" ? direct : undefined}
+        query={q}
+        extra={{ userId }}
+        options={[
+          { label: t("dispatches.fields.filterAll") },
+          { value: "0", label: t("dispatches.fields.filterLinked") },
+          { value: "1", label: t("dispatches.fields.filterDirect") },
+        ]}
+      />
 
       {rows.length === 0 ? (
         <p className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
           {q ? t("dispatches.emptyFiltered") : t("dispatches.empty")}
         </p>
       ) : (
-        <>
-          <div className="overflow-x-auto rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-start">
-                    {t("dispatches.fields.dispatchDate")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("dispatches.fields.company")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("dispatches.fields.rep")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("dispatches.fields.sqm")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("dispatches.fields.source")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("dispatches.fields.recordedBy")}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="text-start font-medium" dir="ltr">
+        <ListCard
+          basePath={basePath}
+          page={currentPage}
+          total={total}
+          query={q}
+          extra={{ direct, userId }}
+        >
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-start">
+                  {t("dispatches.fields.dispatchDate")}
+                </TableHead>
+                <TableHead className="text-start">
+                  {t("dispatches.fields.company")}
+                </TableHead>
+                <TableHead className="text-start">
+                  {t("dispatches.fields.rep")}
+                </TableHead>
+                <TableHead numeric>
+                  {t("dispatches.fields.sqm")}
+                </TableHead>
+                <TableHead className="text-start">
+                  {t("dispatches.fields.source")}
+                </TableHead>
+                <TableHead className="text-start">
+                  {t("dispatches.fields.recordedBy")}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell className="num text-start font-medium" dir="ltr">
+                    <Link
+                      href={`/dispatches/${row.id}`}
+                      className="hover:underline"
+                    >
+                      {format.dateTime(new Date(`${row.dispatchDate}T00:00:00Z`), {
+                        dateStyle: "medium",
+                        timeZone: "UTC",
+                      })}
+                    </Link>
+                  </TableCell>
+                  {/* `18 §2` — the name always; the link only for someone who
+                      may open the record. */}
+                  <TableCell className="text-start">
+                    {row.companyViewable ? (
                       <Link
-                        href={`/dispatches/${row.id}`}
+                        href={`/companies/${row.companyId}`}
                         className="hover:underline"
                       >
-                        {format.dateTime(new Date(`${row.dispatchDate}T00:00:00Z`), {
-                          dateStyle: "medium",
-                          timeZone: "UTC",
-                        })}
+                        {bilingualName({ nameEn: row.companyNameEn, nameAr: row.companyNameAr }, locale)}
                       </Link>
-                    </TableCell>
-                    {/* `18 §2` — the name always; the link only for someone who
-                        may open the record. */}
-                    <TableCell className="text-start">
-                      {row.companyViewable ? (
-                        <Link
-                          href={`/companies/${row.companyId}`}
-                          className="hover:underline"
-                        >
-                          {bilingualName({ nameEn: row.companyNameEn, nameAr: row.companyNameAr }, locale)}
-                        </Link>
-                      ) : (
-                        bilingualName({ nameEn: row.companyNameEn, nameAr: row.companyNameAr }, locale)
-                      )}
-                    </TableCell>
-                    <TableCell className="text-start">{row.userName}</TableCell>
-                    <TableCell className="text-start" dir="ltr">
-                      {row.sqm} {t("common.sqm")}
-                    </TableCell>
-                    <TableCell className="text-start">
-                      {row.isDirect ? (
-                        <Badge variant="outline">
-                          {t("dispatches.fields.direct")}
-                        </Badge>
-                      ) : row.threadViewable ? (
-                        <Link
-                          href={`/quotations/${row.quotationThreadId}`}
-                          className="hover:underline"
-                          dir="ltr"
-                        >
-                          {row.smacReference ?? t("common.none")}
-                        </Link>
-                      ) : (
-                        <span dir="ltr">
-                          {row.smacReference ?? t("common.none")}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-start">
-                      {row.recordedByName}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          <ListPagination
-            basePath={basePath}
-            page={currentPage}
-            total={total}
-            query={q}
-          />
-        </>
+                    ) : (
+                      bilingualName({ nameEn: row.companyNameEn, nameAr: row.companyNameAr }, locale)
+                    )}
+                  </TableCell>
+                  <TableCell className="text-start">{row.userName}</TableCell>
+                  <TableCell numeric dir="ltr">
+                    {row.sqm} {t("common.sqm")}
+                  </TableCell>
+                  <TableCell className="text-start">
+                    {row.isDirect ? (
+                      <Badge variant="outline">
+                        {t("dispatches.fields.direct")}
+                      </Badge>
+                    ) : row.threadViewable ? (
+                      <Link
+                        href={`/quotations/${row.quotationThreadId}`}
+                        className="hover:underline"
+                        dir="ltr"
+                      >
+                        {row.smacReference ?? t("common.none")}
+                      </Link>
+                    ) : (
+                      <span dir="ltr">
+                        {row.smacReference ?? t("common.none")}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-start">
+                    {row.recordedByName}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </ListCard>
       )}
     </div>
   );

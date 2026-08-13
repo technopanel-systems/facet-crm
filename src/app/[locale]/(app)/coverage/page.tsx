@@ -1,13 +1,15 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { PageHeader } from "@/components/page-header";
-import { Button } from "@/components/ui/button";
-import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
 import { coverage, coverageRepOptions } from "@/lib/coverage";
 
 import { CoverageTable } from "../_components/coverage-table";
-import { ListPagination, SearchForm } from "../_components/list-controls";
+import {
+  FilterNav,
+  ListCard,
+  SearchForm,
+} from "../_components/list-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -49,16 +51,8 @@ export default async function CoveragePage({
     coverageRepOptions(session),
   ]);
 
+  // FilterNav carries the search through every chip now `[22 §3]`.
   const basePath = "/coverage";
-  const withParams = (extra: Record<string, string | undefined>) => {
-    const search = new URLSearchParams();
-    if (q) search.set("q", q);
-    for (const [key, value] of Object.entries(extra)) {
-      if (value) search.set(key, value);
-    }
-    const query = search.toString();
-    return query ? `${basePath}?${query}` : basePath;
-  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -79,61 +73,57 @@ export default async function CoveragePage({
         basePath={basePath}
         defaultValue={q}
         placeholder={t("coverage.searchPlaceholder")}
+        hidden={{ rep, quiet }}
       />
 
-      <nav className="flex flex-wrap gap-2" aria-label={t("common.filter")}>
-        <Button asChild size="xs" variant={quietOnly ? "outline" : "secondary"}>
-          <Link href={withParams({ rep })}>
-            {t("coverage.fields.filterAll")}
-          </Link>
-        </Button>
-        <Button asChild size="xs" variant={quietOnly ? "secondary" : "outline"}>
-          <Link href={withParams({ rep, quiet: "1" })}>
-            {t("coverage.fields.filterQuiet")}
-          </Link>
-        </Button>
-
-        {/* Offered only when there is more than one person to choose between:
-            a rep gets only their own name, which makes the control pointless. */}
-        {repOptions.length > 1 ? (
-          <>
-            <Button asChild size="xs" variant={rep ? "outline" : "secondary"}>
-              <Link href={withParams({ quiet: quiet })}>
-                {t("coverage.fields.allReps")}
-              </Link>
-            </Button>
-            {repOptions.map((option) => (
-              <Button
-                key={option.id}
-                asChild
-                size="xs"
-                variant={rep === option.id ? "secondary" : "outline"}
-              >
-                <Link href={withParams({ rep: option.id, quiet })}>
-                  {option.name}
-                </Link>
-              </Button>
-            ))}
-          </>
-        ) : null}
-      </nav>
-
-      <CoverageTable
-        rows={rows}
-        locale={locale}
-        empty={
-          q || rep || quietOnly
-            ? t("coverage.emptyFiltered")
-            : t("coverage.empty")
-        }
-      />
-
-      <ListPagination
+      <FilterNav
         basePath={basePath}
-        page={currentPage}
-        total={total}
+        name="quiet"
+        active={quietOnly ? "1" : undefined}
         query={q}
+        extra={{ rep }}
+        options={[
+          { label: t("coverage.fields.filterAll") },
+          { value: "1", label: t("coverage.fields.filterQuiet") },
+        ]}
       />
+
+      {/* Offered only when there is more than one person to choose between:
+          a rep gets only their own name, which makes the control pointless. */}
+      {repOptions.length > 1 ? (
+        <FilterNav
+          basePath={basePath}
+          name="rep"
+          active={rep}
+          query={q}
+          extra={{ quiet }}
+          options={[
+            { label: t("coverage.fields.allReps") },
+            ...repOptions.map((option) => ({
+              value: option.id,
+              label: option.name,
+            })),
+          ]}
+        />
+      ) : null}
+
+      {rows.length === 0 ? (
+        <p className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
+          {q || rep || quietOnly
+            ? t("coverage.emptyFiltered")
+            : t("coverage.empty")}
+        </p>
+      ) : (
+        <ListCard
+          basePath={basePath}
+          page={currentPage}
+          total={total}
+          query={q}
+          extra={{ rep, quiet }}
+        >
+          <CoverageTable rows={rows} locale={locale} />
+        </ListCard>
+      )}
     </div>
   );
 }
