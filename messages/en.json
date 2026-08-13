@@ -213,7 +213,7 @@
     "notFound": {
       "title": "Not found",
       "body": "This record does not exist, or it is not one of yours.",
-      "home": "Back to start"
+      "home": "Back to Today"
     }
   },
   "validation": {

@@ -507,6 +507,13 @@ one new file there, `chain.ts`, imports nothing but types.
   stage, and asserting the rail would be asserting a Next.js behaviour FACET
   does not choose. The script asserts the not-found screen's own shape instead.
 
+  The consequence is a product one, and it is why this is worth writing down:
+  a rep who mistypes a URL gets a screen with **no navigation**. The link out
+  of `not-found.tsx` is therefore load-bearing rather than decorative — it is
+  the only way back that is not the browser's own button. It names **Today**,
+  the same word the rail uses for `/`; it said "Back to start" until stage 2,
+  which is a second name for one place.
+
 ### The width check earned its place
 
 `25` and the brief both put laptop first, and the start-aligned column behaves
@@ -534,12 +541,16 @@ over the remaining form POSTs, and checking their effect at the database the
 way stage 1 did for `read_at` / `resolved_at`, is the next thing to add. The
 auth checklist `[11 §4.1]` is still manual beyond `verify:phase11` §6.
 
-**`dev-fixtures.ts` cannot reset a password.** It is idempotent by email and
-skips an account that already exists, so once the four `@example.test` fixtures
-are created their password can never be changed by re-running it — and
-`DEV_FIXTURE_PASSWORD` is not in `.env`. Stage 2 needed a one-off to log in.
-Teaching the script to update the hash of an account it already created would
-cost three lines and remove a stumble from every future HTTP pass.
+**`dev-fixtures.ts` could not reset a password — fixed in stage 2.** It was
+idempotent by email and *skipped* an account that already existed, so once the
+four `@example.test` fixtures were created their password could never be
+changed by re-running it; `DEV_FIXTURE_PASSWORD` was not in `.env.example`
+either, so stage 2 lost the original and reset the hashes with a throwaway
+script. The script now **re-applies the password on every run** and touches
+nothing else — name, email and role are left as they are, because a fixture
+whose role was changed by hand for a test should stay changed — and
+`DEV_FIXTURE_PASSWORD` is in `.env.example` with the development-only note.
+So the next HTTP pass starts with `npm run dev:fixtures`, not a detour.
 
 ---
 

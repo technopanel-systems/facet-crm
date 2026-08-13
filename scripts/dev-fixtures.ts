@@ -12,11 +12,19 @@
  *   rep-b@example.test    Sales Rep       (sees_all_reps = false)
  *   manager@example.test  Sales Manager   (sees_all_reps = true)
  *
- * Usage: `DEV_FIXTURE_PASSWORD=... npm run dev:fixtures`
+ * Usage: `npm run dev:fixtures`, with `DEV_FIXTURE_PASSWORD` in `.env`.
  *
  * The password comes from the environment deliberately — a default baked into
  * the repository would be a known credential on every checkout, and these are
  * real, loginable accounts.
+ *
+ * **Idempotent by email, but the password is re-applied every run** — this
+ * script is the one way to set it. It used to skip an existing account
+ * entirely, which meant that once the four fixtures were created their
+ * password could never be changed by re-running it; stage 2 lost the original
+ * and had to reset the hashes with a throwaway script `[23]`. Nothing else is
+ * touched: name, email and role are left exactly as they are, because a rep
+ * whose role was changed by hand for a test should stay changed.
  *
  * **It refuses to run unless NODE_ENV is exactly "development"** `[15 §7]`.
  * Refusing only when NODE_ENV=production is set is the weaker half of the
@@ -95,7 +103,21 @@ async function main(): Promise<void> {
       .where(eq(users.email, fixture.email))
       .limit(1);
     if (existing) {
-      console.log(`  ${fixture.email} already exists`);
+      // Re-apply the password and nothing else. Audited like every other
+      // system-run mutation, with the hash itself never written to the log.
+      await withAudit({ actorUserId: null, actingAsUserId: null }, async (tx, log) => {
+        await tx
+          .update(users)
+          .set({ passwordHash })
+          .where(eq(users.id, existing.id));
+        log({
+          action: "user.password_reset",
+          entityType: "user",
+          entityId: existing.id,
+          after: { email: fixture.email },
+        });
+      });
+      console.log(`  ${fixture.email} exists — password re-applied`);
       continue;
     }
 
