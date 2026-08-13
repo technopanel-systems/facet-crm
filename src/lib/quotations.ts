@@ -1515,6 +1515,25 @@ export async function issueVersion(
  * It hangs on the **thread**, never the version: `comments_record_type` refuses
  * `quotation_version` on purpose — the conversation belongs to the thread, not
  * to one superseded version of it.
+ *
+ * **The raiser is tagged, and that is not a manual mention** `[25 §13]`. `25 §11`
+ * governs a person choosing to tell a colleague something; this is the act
+ * notifying the person it creates work for. The reason exists to end the
+ * WhatsApp round-trip `[25 §9]`, and a reason nobody is told about does not end
+ * it — the rep would learn of the return by opening a screen they have no
+ * reason to open. So the tag is part of returning, not a decision the
+ * coordinator makes each time, and there is no control for it.
+ *
+ * It is `raisedByUserId`, which is the rep who holds the thread **now**: `19 §1`
+ * rewrites it on handover precisely so that whoever inherited the work is the
+ * one told about it. `addMentions` drops a self-tag, so a coordinator returning
+ * their own thread raises nothing.
+ *
+ * **This is a patch over a larger gap, recorded as `22 §6.11`:** a returned
+ * quotation appears in no queue at all. `followUps()`'s four kinds have nothing
+ * for "returned and not yet resubmitted", so the notification is the only thing
+ * that reaches the rep — and a notification that is read once is gone, where a
+ * follow-up persists until the condition clears `[21 §1]`.
  */
 export async function returnForEdit(
   session: AuthSession,
@@ -1548,13 +1567,19 @@ export async function returnForEdit(
       after: { returnForEditRound: after.returnForEditRound },
     });
 
-    // No mentions: nothing in `25` says a return tags the rep, and inventing
-    // one would be inventing business logic. Recorded as open in `22 §6`.
+    // Read inside the transaction, with everything else this act touches.
+    const [thread] = await tx
+      .select({ raisedByUserId: quotationThreads.raisedByUserId })
+      .from(quotationThreads)
+      .where(eq(quotationThreads.id, threadId))
+      .limit(1);
+
     await insertComment(tx, log, session, {
       recordType: "quotation_thread",
       recordId: threadId,
       body,
-      mentions: [],
+      // The act tells the person it creates work for `[25 §13]` — see above.
+      mentions: thread ? [thread.raisedByUserId] : [],
     });
   });
 }

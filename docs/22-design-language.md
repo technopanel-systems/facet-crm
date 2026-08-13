@@ -209,8 +209,9 @@ there is no flash and no inline script.
 ## 6. OPEN — not chosen
 
 Recorded rather than filled in. Some need founder input, one is a defect.
-**6.1 closed in stage 2 and 6.6's strip in feature slice 1**; both are kept
-here, struck, so the decision is legible where the question was asked.
+**6.1 closed in stage 2, 6.6's strip in feature slice 1, and 6.10 in feature
+slice 2**; all three are kept here, struck, so the decision is legible where the
+question was asked.
 
 | # | Open item | Why it is open |
 |---|---|---|
@@ -223,7 +224,8 @@ here, struck, so the decision is legible where the question was asked.
 | 6.7 | **The turn column on `/companies` and `/projects`** `[new in stage 2]` | `22 §4` asks every row to say whose move it is. `/quotations`, `/follow-ups` and `/coverage` can: the chain position, the follow-up kind and `daysSince` are already on their rows. `listCompanies` and `listProjects` return **no last-interaction age**, so "Nothing recorded for 23 days" cannot be said there without a data-layer change. Not faked from a second derivation — that is the trap `21 §7` names |
 | 6.8 | **Second person for the rep half of a quotation's turn** `[new in stage 2]` | `22 §4` says second person *where that person is the reader*. The coordinator half can be: `canApproveQuotation` names that identity exactly. The rep half names the raiser instead, because `QuotationThreadListRow` carries `raisedByName` and no id — and two people called Mohammed would read each other's turn as their own. A `raisedById` on the row would close it |
 | 6.9 | **The mention chip row does not scale** `[new in feature slice 2]` | Every active colleague is offered as a checkbox under every comment box. At fourteen people that is a readable row; at thirty it is a wall, and at sixty it is unusable. **The trigger:** when the row stops fitting on a laptop, it becomes a scoped picker — and the people worth offering are the ones already on the record, its reps, its shares, its thread raiser. Nothing of that is built now. Choosing a threshold today would be guessing at a number nobody has hit, which is what `25 §23` refused for quantity tolerance and for the same reason |
-| 6.10 | **A return for edit tells nobody** `[new in feature slice 2]` | `25 §13` makes the coordinator's reason a comment, and the comment lands on the thread — but nothing tags the rep, so nothing reaches their bell. Auto-tagging the raiser would close it in one line and is very likely right; no document says so, and `CLAUDE.md` forbids inventing the rule. It is named here rather than built. Until then the rep finds the reason on the thread, which is still better than the phone call `25 §9` describes |
+| ~~6.10~~ | ~~**A return for edit tells nobody**~~ `[new in feature slice 2]` | **CLOSED — feature slice 2, founder-decided.** Returning a quotation now tags the thread's raiser. **This is `25 §13`, not `25 §11`:** it is not a manual tag but *the act notifying the person it creates work for*. `25 §13` folds the reason into a comment so the round-trip stops happening on WhatsApp `[25 §9]` — and a reason nobody is told about does not stop it, because the rep learns of the return by opening a screen they have no reason to open. So there is no control for it and no way to return without it. It tags `raisedByUserId`, which `19 §1` rewrites on handover, so whoever holds the thread now is the one told |
+| 6.11 | **A returned quotation appears in no queue** `[new in feature slice 2]` | **Larger than 6.10, which is only a patch over it.** `followUps()`'s four kinds `[07 D5]` have nothing for *"returned for edits and not yet resubmitted"*, so a returned quotation reaches the rep's Today screen through **nothing**. The approved concept shows exactly that row — *"Rawan returned the quotation for edits · Your turn"* (`docs/design/facet-concept-v2.html`, Today tab) — and it has no producer. A **fifth follow-up kind** is the shape of the fix, computed on read from `return_for_edit_round` and the version's status, per `21 §1`'s rule that a follow-up is a condition and never a stored row. The difference this leaves standing: a notification is read once and gone, where a follow-up persists until the condition clears. **Not built now** — the founder should see the tag working before a fifth kind is added |
 
 ### 6.5 The coverage defect, in full
 
@@ -455,7 +457,19 @@ So: native checkboxes posting repeated `mentions` values — `signal-fields.tsx`
 shape, no client state, no JavaScript to submit, and the browser places them
 correctly in RTL. Its limit is **§6.9**.
 
-### 10.4 The composer is deliberately plain
+### 10.4 One tag is not chosen by anybody
+
+Every mention in `§10.3` is a person deciding to tell a colleague something.
+**The return-for-edit tag is not**: returning a quotation tags the thread's
+raiser, always, with no checkbox for it and no way to return without it.
+
+That is `25 §13` rather than `25 §11` — the act notifying the person it creates
+work for. Drawn as an ordinary tagged-name line on the comment, because from the
+rep's side it is one: somebody told them something about their quotation.
+
+It is a patch over `§6.11`, not a substitute for it.
+
+### 10.5 The composer is deliberately plain
 
 `25 §15` says FACET does not replace verbal talk or office work. Applied here:
 no typing indicator, no read receipt, no reply threading, no emoji bar. A box,

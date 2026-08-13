@@ -788,17 +788,44 @@ async function main(): Promise<void> {
   );
 
   const threadBefore = await listComments(coordinator, "quotation_thread", thread.id);
+  const raiserNotifiedBefore = await mentionsFor(repA.user.id);
   await returnForEdit(coordinator, thread.id, `${stamp} line 3 quantity is wrong`);
   const threadAfter = await listComments(coordinator, "quotation_thread", thread.id);
+  const returned = threadAfter.find(
+    (c) => c.body === `${stamp} line 3 quantity is wrong`,
+  );
   check(
     "the reason lands as a comment on the THREAD [25 §13]",
-    threadAfter.length === threadBefore.length + 1 &&
-      threadAfter.some((c) => c.body === `${stamp} line 3 quantity is wrong`),
+    threadAfter.length === threadBefore.length + 1 && returned !== undefined,
   );
   check(
     "…written by the coordinator who returned it [20 §8]",
-    threadAfter.find((c) => c.body === `${stamp} line 3 quantity is wrong`)
-      ?.authorUserId === coordinator.user.id,
+    returned?.authorUserId === coordinator.user.id,
+  );
+
+  /**
+   * **The tag is part of the act, not a choice** `[25 §13]`.
+   *
+   * `25 §11` governs a person deciding to tell a colleague something. This is
+   * the return notifying the person it creates work for: the reason exists to
+   * end the WhatsApp round-trip `[25 §9]`, and a reason nobody is told about
+   * does not end it. There is no control for it and no way to return without
+   * it, which is why it is asserted here rather than left to the screen.
+   */
+  check(
+    "*** returning tags the thread's raiser — the act tells them *** [25 §13]",
+    returned?.mentions.some((m) => m.userId === repA.user.id) === true,
+    `tagged ${returned?.mentions.map((m) => m.name).join(", ") || "nobody"}`,
+  );
+  check(
+    "…and that reaches their bell, not just the thread [25 §13]",
+    (await mentionsFor(repA.user.id)) === raiserNotifiedBefore + 1,
+    `${raiserNotifiedBefore} → ${await mentionsFor(repA.user.id)}`,
+  );
+  check(
+    "the raiser is raisedByUserId, so a handover redirects it [19 §1]",
+    returned?.mentions.length === 1,
+    `tagged ${returned?.mentions.length} people`,
   );
 
   // One act, one transaction `[25 §13]`: a refused return leaves no reason

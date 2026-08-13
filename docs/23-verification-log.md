@@ -860,8 +860,9 @@ Ten sections, each citing the document it comes from:
    comments and nothing else**.
 7. `25 §14`, the central claim: one more comment moves the comment column and
    moves no other.
-8. `25 §13`: the return-for-edit reason is a comment on the thread, and a
-   refused return **rolls its reason back with it**.
+8. `25 §13`: the return-for-edit reason is a comment on the thread; **returning
+   tags the thread's raiser and that reaches their bell**; and a refused return
+   **rolls its reason back with it**.
 9. `21 §4`: a notification with no resolution condition can be dismissed.
 10. Every write is audited, and the distinct actions are printed.
 
@@ -921,6 +922,25 @@ Two lessons, both already this repo's shape: **a guard is not verified until it
 has been made to fire**, and the untranslated-key scan earned its place a second
 time — it was the only assertion in the suite that could see a stale server,
 because it is the only one that does not merely check a marker is present.
+
+### The auto-tag, added after the first review
+
+The slice first shipped with the return-for-edit reason landing on the thread and
+tagging nobody, recorded as `22 §6.10` because no document said a return should
+tag the rep. **The founder decided it, and the framing is the useful part:** it
+is not `25 §11`'s manual tag, it is `25 §13`'s act notifying the person it
+creates work for. A reason exists to end the WhatsApp round-trip `[25 §9]`, and a
+reason nobody is told about does not end it.
+
+So `returnForEdit` tags `raisedByUserId` — the rep who holds the thread **now**,
+since `19 §1` rewrites that column on handover — with no control for it and no
+way to return without it. `verify-comments` §8 asserts the tag, that it reaches
+the bell, and that exactly one person is tagged.
+
+**It is a patch over `22 §6.11`, which is the real gap:** a returned quotation is
+in no queue at all. A notification is read once and gone; a follow-up persists
+until its condition clears `[21 §1]`. Not built, deliberately — the founder sees
+the tag working first.
 
 ### What is still manual
 
