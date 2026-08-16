@@ -15,7 +15,6 @@
     "quotations": "عروض الأسعار",
     "dispatches": "التوريدات",
     "reports": "التقارير",
-    "coverage": "التغطية",
     "activity": "النشاط",
     "targets": "الأهداف",
     "team": "الفريق",
@@ -89,9 +88,7 @@
     },
     "companyRepOrigin": {
       "self_registered": "تسجيل ذاتي",
-      "assigned": "مُسنَد",
-      "shared": "مشارَك",
-      "merge": "مدموج"
+      "assigned": "مُسنَد"
     },
     "quotationThreadEndState": {
       "accepted": "معتمد",
@@ -470,11 +467,7 @@
       "invalidCredentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة."
     },
     "signOut": "تسجيل الخروج",
-    "signedInAs": "مسجّل الدخول باسم {name}",
-    "impersonation": {
-      "banner": "{real} يعمل بصفة {target}",
-      "stop": "إيقاف الانتحال"
-    }
+    "signedInAs": "مسجّل الدخول باسم {name}"
   },
   "dispatches": {
     "title": "التوريدات",
@@ -640,14 +633,11 @@
       "companies": "الشركات",
       "projects": "المشاريع",
       "quotations": "مسارات عروض الأسعار",
-      "tasks": "المهام المفتوحة",
       "noCompanies": "لا توجد عضويات في شركات.",
       "noProjects": "لا توجد مشاريع مملوكة.",
       "noQuotations": "لا توجد مسارات عروض أسعار.",
-      "noTasks": "لا توجد مهام مفتوحة.",
       "nothing": "لم يبق شيء للتسليم.",
       "primary": "أساسي",
-      "noDueDate": "بلا تاريخ استحقاق",
       "reassignTo": "التسليم إلى",
       "reassignToPlaceholder": "اختر زميلًا",
       "reassign": "تسليم المحدد",
@@ -803,7 +793,6 @@
     }
   },
   "coverage": {
-    "title": "التغطية",
     "empty": "لا توجد شركات للتغطية.",
     "emptyFiltered": "لا توجد شركات تطابق هذا البحث.",
     "searchPlaceholder": "ابحث باسم الشركة",
@@ -811,9 +800,7 @@
       "company": "الشركة",
       "reps": "المندوبون",
       "lastInteraction": "آخر تفاعل",
-      "daysSince": "الأيام",
       "status": "الحالة",
-      "person": "المندوب",
       "allReps": "الجميع",
       "never": "لا يوجد",
       "quiet": "صامتة",
@@ -826,7 +813,6 @@
       "coveredFor": "آخر تسجيل قبل {count} يوم"
     },
     "detail": {
-      "hint": "أي الشركات صمتت. لا شيء يُسلَّم هنا، فلا شيء يُفوَّت ولا عقوبة على شيء.",
       "thresholds": "الصمت يعني {qualified} يومًا دون تفاعل للشركة التي طلبت عرض سعر، و{unqualified} يومًا لمن لم تطلب.",
       "onHoldUntil": "مؤجلة حتى {date}",
       "yours": "تسجيل الزيارة هو ما يُخرج الشركة من هذه القائمة."
@@ -850,7 +836,7 @@
       "digest": "الملخص اليومي",
       "persistent": "يبقى هذا حتى يُنجَز العمل — ولا يمكن تجاهله.",
       "anchorHidden": "لم يعد بإمكانك فتح السجل المشار إليه.",
-      "handover": "سلَّم {name} إليك {companies} شركات و{projects} مشاريع و{threads} عروض أسعار و{tasks} مهام.",
+      "handover": "سلَّم {name} إليك {companies} شركات و{projects} مشاريع و{threads} عروض أسعار.",
       "handoverUnknown": "تم تسليم عمل إليك.",
       "digestSummary": "{total} متابعات في {date}.",
       "digestLink": "فتح المتابعات",

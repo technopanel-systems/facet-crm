@@ -325,7 +325,6 @@ async function main(): Promise<void> {
         supplierId: supplier.id,
         classId: productClass.id,
         fireRatingId: fireRating.id,
-        colourId: null,
         customColour: "168",
         thicknessId: thickness.id,
         widthM: "1.2400",

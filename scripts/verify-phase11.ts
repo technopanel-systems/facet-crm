@@ -23,7 +23,8 @@
  *   8. Reactivation restores the flag and restores NO session `[19 §7]`.
  *   9. Handover is shut while the account is active `[19 §3]`, and
  *      deactivating moves nothing `[07 B7]`.
- *  10. The book is exactly four buckets — contacts are not one `[14 §1]`.
+ *  10. The book is exactly three buckets — contacts are not one `[14 §1]`,
+ *      and `tasks` no longer is either `[26 §6]`.
  *  11. Reassignment bucket by bucket, including the partial-unique-index trap.
  *  12. Every reassignment refusal, and that a failure rolls back whole.
  *  13. A handover does not move past credit `[18 §1]`. The central claim.
@@ -47,9 +48,9 @@
  * `users_email_key` is unique and creating users is this script's whole
  * subject, so a fixed address would collide on the second run.
  *
- * **The `tasks` bucket is exercised with rows this script inserts itself.**
- * Nothing writes that table until Phase 10; the bucket exists because
- * `04 Q8.1` names it.
+ * **There is no `tasks` bucket to exercise.** There was, until feature slice
+ * 6 withdrew `25 §20` and dropped `tasks` with it `[26 §6]` — this script's
+ * own task fixtures and bucket assertions were removed in the same slice.
  */
 
 process.loadEnvFile(".env");
@@ -67,7 +68,6 @@ import {
   quotationThreads,
   roles,
   sessions,
-  tasks,
   users,
 } from "@/db/schema";
 import {
@@ -151,7 +151,6 @@ const emptySelection: HandoverSelection = {
   membershipIds: [],
   projectIds: [],
   threadIds: [],
-  taskIds: [],
 };
 
 function only(part: Partial<HandoverSelection>): HandoverSelection {
@@ -548,11 +547,13 @@ async function main(): Promise<void> {
       origin: "self_registered",
     })
     .returning();
+  // `origin: "assigned"` — `company_rep_origin` dropped `'shared'` in feature
+  // slice 6, unused by real code and only ever written by fixtures `[26 §2]`.
   await db.insert(companyReps).values({
     companyId: companyShared.id,
     userId: receiver.user.id,
     isPrimary: false,
-    origin: "shared",
+    origin: "assigned",
   });
   // A membership the departing rep ALREADY lost — history, and not in the
   // book: there is nothing left to hand over.
@@ -606,27 +607,6 @@ async function main(): Promise<void> {
       projectId: project.id,
       companyId: companyA.id,
       raisedByUserId: departing.user.id,
-    })
-    .returning();
-
-  const [openTask] = await db
-    .insert(tasks)
-    .values({
-      title: `${stamp} open task`,
-      origin: "assigned",
-      assignedToUserId: departing.user.id,
-      createdByUserId: manager.user.id,
-    })
-    .returning();
-  const [doneTask] = await db
-    .insert(tasks)
-    .values({
-      title: `${stamp} done task`,
-      origin: "assigned",
-      assignedToUserId: departing.user.id,
-      createdByUserId: manager.user.id,
-      status: "done",
-      completedAt: new Date(),
     })
     .returning();
 
@@ -690,17 +670,8 @@ async function main(): Promise<void> {
     "*** nor the company membership ***",
     (await liveMembership(companyA.id, departing.user.id)) !== undefined,
   );
-  const [taskAfter] = await db
-    .select()
-    .from(tasks)
-    .where(eq(tasks.id, openTask.id))
-    .limit(1);
-  check(
-    "*** nor the open task ***",
-    taskAfter.assignedToUserId === departing.user.id,
-  );
 
-  /* --- 10. The book is exactly four buckets ------------------------ */
+  /* --- 10. The book is exactly three buckets ------------------------ */
 
   console.log("\n10. The handover book lists all of it, and nothing else");
 
@@ -726,20 +697,16 @@ async function main(): Promise<void> {
     book.quotationThreads.length === 1 &&
       book.quotationThreads[0].id === thread.id,
   );
-  check(
-    "the OPEN task is listed and the done one is not",
-    book.tasks.length === 1 && book.tasks[0].id === openTask.id,
-    `got ${book.tasks.length}`,
-  );
   check("the book is not empty", book.isEmpty === false);
   // `14 §1` — a contact has no owner and follows its company, so there is no
-  // contacts bucket to list. Asserted as the absence of a key.
+  // contacts bucket to list. Asserted as the absence of a key, same as the
+  // `tasks` bucket `26 §6` removed.
   check(
     "there is no contacts bucket [14 §1]",
     !("contacts" in book),
   );
+  check("there is no tasks bucket [26 §6]", !("tasks" in book));
   void otherProject;
-  void doneTask;
 
   /* --- 11. Reassignment, bucket by bucket -------------------------- */
 
@@ -753,7 +720,6 @@ async function main(): Promise<void> {
       membershipIds: [membershipA.id, membershipShared.id],
       projectIds: [project.id],
       threadIds: [thread.id],
-      taskIds: [openTask.id],
     },
   );
 
@@ -775,16 +741,6 @@ async function main(): Promise<void> {
   check(
     "the thread's raiser moved [19 §1]",
     threadMoved.raisedByUserId === receiver.user.id,
-  );
-
-  const [taskMoved] = await db
-    .select()
-    .from(tasks)
-    .where(eq(tasks.id, openTask.id))
-    .limit(1);
-  check(
-    "the open task's assignee moved",
-    taskMoved.assignedToUserId === receiver.user.id,
   );
 
   const [oldMembership] = await db
@@ -869,13 +825,21 @@ async function main(): Promise<void> {
       createdBy: strandedUser.id,
     })
     .returning();
-  const [strandedTask] = await db
-    .insert(tasks)
+  const [strandedCompany] = await db
+    .insert(companies)
     .values({
-      title: `${stamp} stranded task`,
-      origin: "assigned",
-      assignedToUserId: strandedUser.id,
-      createdByUserId: manager.user.id,
+      nameEn: `${stamp} Stranded Company`,
+      nameNormalized: `${stamp}-sc`,
+      createdBy: strandedUser.id,
+    })
+    .returning();
+  const [strandedMembership] = await db
+    .insert(companyReps)
+    .values({
+      companyId: strandedCompany.id,
+      userId: strandedUser.id,
+      isPrimary: true,
+      origin: "self_registered",
     })
     .returning();
   await deactivateUser(manager, strandedUser.id);
@@ -919,21 +883,21 @@ async function main(): Promise<void> {
     () =>
       reassignHandover(manager, strandedUser.id, receiver.user.id, {
         ...emptySelection,
-        // The task IS held; the project is somebody else's. The whole call
-        // must fail, not half-apply.
+        // The membership IS held; the project is somebody else's. The whole
+        // call must fail, not half-apply.
         projectIds: [otherProject.id],
-        taskIds: [strandedTask.id],
+        membershipIds: [strandedMembership.id],
       }),
   );
-  const [strandedTaskAfter] = await db
+  const [strandedMembershipAfter] = await db
     .select()
-    .from(tasks)
-    .where(eq(tasks.id, strandedTask.id))
+    .from(companyReps)
+    .where(eq(companyReps.id, strandedMembership.id))
     .limit(1);
   check(
     "*** and the valid half of that call rolled back with it ***",
-    strandedTaskAfter.assignedToUserId === strandedUser.id,
-    `got ${strandedTaskAfter.assignedToUserId}`,
+    strandedMembershipAfter.removedAt === null,
+    `got removedAt=${strandedMembershipAfter.removedAt}`,
   );
 
   /* --- 13. Past credit is untouched [18 §1] ------------------------ */
@@ -1066,7 +1030,7 @@ async function main(): Promise<void> {
    * the membership rows the handover CREATES, whose ids the script never sees.
    */
   const stamped = `${stamp}%`;
-  const [ownUsers, ownCompanies, ownProjects, ownTasks] = await Promise.all([
+  const [ownUsers, ownCompanies, ownProjects] = await Promise.all([
     db.select({ id: users.id }).from(users).where(like(users.email, stamped)),
     db
       .select({ id: companies.id })
@@ -1076,7 +1040,6 @@ async function main(): Promise<void> {
       .select({ id: projects.id })
       .from(projects)
       .where(like(projects.nameNormalized, stamped)),
-    db.select({ id: tasks.id }).from(tasks).where(like(tasks.title, stamped)),
   ]);
   const companyIds = ownCompanies.map((row) => row.id);
   const projectIds = ownProjects.map((row) => row.id);
@@ -1094,7 +1057,6 @@ async function main(): Promise<void> {
     ...ownUsers,
     ...ownCompanies,
     ...ownProjects,
-    ...ownTasks,
     ...ownThreads,
     ...ownMemberships,
   ].map((row) => row.id);
@@ -1116,7 +1078,6 @@ async function main(): Promise<void> {
     "company_rep.added",
     "project.reassigned",
     "quotation_thread.reassigned",
-    "task.reassigned",
     "user.handover",
   ];
   for (const action of OWNED) {

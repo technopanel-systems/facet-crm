@@ -22,8 +22,9 @@
  *    resolves a project's company through `buyerOrFirstCompany`, the same way
  *    `gather` does; a second resolution would name one company while another
  *    did the suppressing, which is the trap `21 §7` names.
- *  - **§11: none of it stores anything.** No `tasks` row with `origin
- *    'system'`, no `notifications` row — `21 §1`, restated with six kinds.
+ *  - **§11: none of it stores anything.** No `notifications` row — `21 §1`,
+ *    restated with six kinds. (`tasks` itself is gone since feature slice 6
+ *    `[26 §6]`; there is no table left to prove writes nothing to.)
  *
  * Usage: `npm run verify:followups`.
  *
@@ -69,7 +70,6 @@ import {
   repReports,
   roles,
   settings,
-  tasks,
   users,
   productClasses,
   productFireRatings,
@@ -348,7 +348,6 @@ async function main(): Promise<void> {
           supplierId: supplier.id,
           classId: productClass.id,
           fireRatingId: fireRating.id,
-          colourId: null,
           customColour: "168",
           thicknessId: thickness.id,
           widthM: "1.2400",
@@ -504,7 +503,6 @@ async function main(): Promise<void> {
     supplierId: supplier.id,
     classId: productClass.id,
     fireRatingId: fireRating.id,
-    colourId: null,
     customColour: "168",
     thicknessId: thickness.id,
     widthM: "1.2400",
@@ -798,17 +796,9 @@ async function main(): Promise<void> {
     `${notificationsBefore[0]?.n} then ${notificationsAfter[0]?.n}`,
   );
 
-  // The claim is that FACET never writes a SYSTEM task, not that the table is
-  // empty — `verify:phase11` inserts `assigned` rows that `12 §7` keeps.
-  const systemTasks = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(tasks)
-    .where(eq(tasks.origin, "system"));
-  check(
-    "*** no task anywhere carries origin 'system' — 10 §9 stays declined ***",
-    systemTasks[0]?.n === 0,
-    `got ${systemTasks[0]?.n}`,
-  );
+  // `tasks` itself is gone — `25 §20` withdrawn, feature slice 6 `[26 §6]` —
+  // so the claim this section once proved (FACET never writes a SYSTEM task)
+  // is proved by the table's absence, asserted once in `verify:schema25`.
 
   /* --- 12. The writer's gates [25 §18] ------------------------------- */
 

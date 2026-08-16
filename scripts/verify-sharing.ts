@@ -290,12 +290,9 @@ async function main(): Promise<void> {
    * A role holding `can_share` **without** `sees_all_reps` — the identity the
    * seed does not produce, which is exactly why the hole it opens is invisible.
    *
-   * Every other flag is false on purpose, and two of them are load-bearing:
-   * `sees_all_reps` false is the whole point of §2's last gate, and
-   * `sees_all_records_readonly` false is what keeps `verify:schema25` §5 green
-   * — that script iterates every row in `roles` asserting the read-only flag
-   * matches what `ROLE_SEED` grants by name, and an unnamed role holding it
-   * would fail there rather than here.
+   * Every other flag is false on purpose. `sees_all_reps` false is the whole
+   * point of §2's last gate. (`sees_all_records_readonly` no longer exists to
+   * worry about here — dropped in feature slice 6 `[26 §2]`.)
    */
   const [narrowRole] = await db
     .insert(roles)
@@ -378,7 +375,6 @@ async function main(): Promise<void> {
         supplierId: supplier.id,
         classId: productClass.id,
         fireRatingId: fireRating.id,
-        colourId: null,
         customColour: "168",
         thicknessId: thickness.id,
         widthM: "1.2400",
@@ -695,7 +691,6 @@ async function main(): Promise<void> {
         supplierId: supplier.id,
         classId: productClass.id,
         fireRatingId: fireRating.id,
-        colourId: null,
         customColour: "168",
         thicknessId: thickness.id,
         widthM: "1.2400",

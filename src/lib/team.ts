@@ -15,10 +15,15 @@
  * empty the screen. (All three seeded holders of the flag also carry
  * `sees_all_reps`, so it grants them nothing they lack today.)
  *
- * **Four buckets, and what is deliberately not one:**
+ * **Three buckets, and what is deliberately not one:**
  *
  *  - `company_reps` membership · `projects.owner_user_id` ·
- *    `quotation_threads.raised_by_user_id` · open `tasks`.
+ *    `quotation_threads.raised_by_user_id`.
+ *  - **A fourth bucket, open `tasks`, existed here until feature slice 6.**
+ *    `25 §20` ("manual tasks are built, small") was withdrawn — "not needed
+ *    for now" — and `tasks` was dropped with it `[26 §6]`. `19 §7` still
+ *    names it as one of four; that is superseded, not wrong at the time it
+ *    was written, and this document is not edited to match.
  *  - **Contacts are not a bucket**, though `04 Q8.1` names them: a contact has
  *    no owner of its own and follows its company `[14 §1]`, so handing over the
  *    membership hands over the contacts `[19 §7]`.
@@ -44,7 +49,6 @@ import {
   companyReps,
   projects,
   quotationThreads,
-  tasks,
   users,
 } from "@/db/schema";
 import { withAudit } from "@/lib/audit";
@@ -77,18 +81,11 @@ export type HandoverThread = {
   createdAt: Date;
 };
 
-export type HandoverTask = {
-  id: string;
-  title: string;
-  dueDate: string | null;
-};
-
 export type HandoverBook = {
   user: { id: string; name: string; email: string };
   companies: HandoverCompany[];
   projects: HandoverProject[];
   quotationThreads: HandoverThread[];
-  tasks: HandoverTask[];
   isEmpty: boolean;
 };
 
@@ -96,7 +93,6 @@ export type HandoverSelection = {
   membershipIds: string[];
   projectIds: string[];
   threadIds: string[];
-  taskIds: string[];
 };
 
 export type HandoverOutcome = {
@@ -105,7 +101,6 @@ export type HandoverOutcome = {
   companiesAlreadyMember: number;
   projectsMoved: number;
   threadsMoved: number;
-  tasksMoved: number;
 };
 
 function requireManageUsers(session: AuthSession): void {
@@ -140,7 +135,7 @@ export async function getHandoverBook(
 
   if (!subject || subject.isActive) return null;
 
-  const [companyRows, projectRows, threadRows, taskRows] = await Promise.all([
+  const [companyRows, projectRows, threadRows] = await Promise.all([
     db
       .select({
         membershipId: companyReps.id,
@@ -180,20 +175,6 @@ export async function getHandoverBook(
       .innerJoin(companies, eq(quotationThreads.companyId, companies.id))
       .where(eq(quotationThreads.raisedByUserId, userId))
       .orderBy(asc(projects.nameEn)),
-
-    // Open tasks only. A done or cancelled task is a record of finished work
-    // and has nobody to hand it to.
-    db
-      .select({
-        id: tasks.id,
-        title: tasks.title,
-        dueDate: tasks.dueDate,
-      })
-      .from(tasks)
-      .where(
-        and(eq(tasks.assignedToUserId, userId), eq(tasks.status, "open")),
-      )
-      .orderBy(asc(tasks.dueDate)),
   ]);
 
   return {
@@ -201,12 +182,10 @@ export async function getHandoverBook(
     companies: companyRows,
     projects: projectRows,
     quotationThreads: threadRows,
-    tasks: taskRows,
     isEmpty:
       companyRows.length === 0 &&
       projectRows.length === 0 &&
-      threadRows.length === 0 &&
-      taskRows.length === 0,
+      threadRows.length === 0,
   };
 }
 
@@ -233,13 +212,8 @@ export async function reassignHandover(
   const membershipIds = unique(selection.membershipIds);
   const projectIds = unique(selection.projectIds);
   const threadIds = unique(selection.threadIds);
-  const taskIds = unique(selection.taskIds);
 
-  const requested =
-    membershipIds.length +
-    projectIds.length +
-    threadIds.length +
-    taskIds.length;
+  const requested = membershipIds.length + projectIds.length + threadIds.length;
   if (requested === 0) throw new RuleError("team.errors.nothingSelected");
 
   if (fromUserId === toUserId) {
@@ -271,7 +245,6 @@ export async function reassignHandover(
       companiesAlreadyMember: 0,
       projectsMoved: 0,
       threadsMoved: 0,
-      tasksMoved: 0,
     };
 
     /* --- Company membership -------------------------------------- *
@@ -412,36 +385,6 @@ export async function reassignHandover(
       outcome.threadsMoved = moved.length;
     }
 
-    /* --- Tasks ---------------------------------------------------- *
-     * `origin`, `created_by_user_id` and `system_trigger` are untouched: they
-     * record how the task came into being, not who holds it now.             */
-    if (taskIds.length > 0) {
-      const moved = await tx
-        .update(tasks)
-        .set({ assignedToUserId: toUserId })
-        .where(
-          and(
-            inArray(tasks.id, taskIds),
-            eq(tasks.assignedToUserId, fromUserId),
-            eq(tasks.status, "open"),
-          ),
-        )
-        .returning({ id: tasks.id });
-      if (moved.length !== taskIds.length) {
-        throw new RuleError("team.errors.itemNotHeld");
-      }
-      for (const row of moved) {
-        log({
-          action: "task.reassigned",
-          entityType: "task",
-          entityId: row.id,
-          before: { assignedToUserId: fromUserId },
-          after: { assignedToUserId: toUserId },
-        });
-      }
-      outcome.tasksMoved = moved.length;
-    }
-
     // One summary row, so the log answers "who ran this handover, and how big
     // was it" without reassembling the per-row entries.
     log({
@@ -462,10 +405,7 @@ export async function reassignHandover(
      * individual records, and they already reach the recipient through their
      * own lists, timelines and follow-ups.                                     */
     const moved =
-      outcome.companiesMoved +
-      outcome.projectsMoved +
-      outcome.threadsMoved +
-      outcome.tasksMoved;
+      outcome.companiesMoved + outcome.projectsMoved + outcome.threadsMoved;
     if (moved > 0) {
       await raise(tx, log, {
         typeKey: NOTIFICATION_TYPES.recordHandedOver,
@@ -478,7 +418,6 @@ export async function reassignHandover(
             companies: outcome.companiesMoved,
             projects: outcome.projectsMoved,
             quotationThreads: outcome.threadsMoved,
-            tasks: outcome.tasksMoved,
           },
         },
       });

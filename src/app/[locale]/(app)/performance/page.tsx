@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "@/i18n/navigation";
 import { can, requireSession } from "@/lib/authz";
-import { coverage } from "@/lib/coverage";
+import { coverage, coverageRepOptions } from "@/lib/coverage";
 import { achievementForPeriod, currentPeriod, periodStart } from "@/lib/targets";
 
 import { AttainmentTable } from "../_components/attainment-table";
 import { CoverageTable } from "../_components/coverage-table";
-import { ListCard, SearchForm } from "../_components/list-controls";
+import { FilterNav, ListCard, SearchForm } from "../_components/list-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -23,10 +23,13 @@ function asMonth(period: string): string {
  * Performance `[22 §7]` — where targets and coverage merged when the rail
  * dropped to six items.
  *
- * **It is a composition, not a new capability.** `achievementForPeriod` and
- * `coverage` are called exactly as `/targets` and `/coverage` call them, and
- * both of those screens still exist and still work; they simply left the rail.
- * The tables are the same components both use, so the three can never drift.
+ * **It was a composition, then became the only owner.** `achievementForPeriod`
+ * and `coverage` were first called here exactly as `/targets` and the
+ * standalone `/coverage` screen called them, so the tables could never drift.
+ * Feature slice 6 deleted `/coverage` as a route — it was orphaned from the
+ * rail — but moved its quiet-only and per-rep filtering here first, onto the
+ * same `coverage()` call and the same `CoverageTable` `[26 §2]`: `20 §7`
+ * requires the capability, not the separate screen.
  *
  * **Scoped, never gated** `[20 §7]`: a rep sees their own row and their own
  * companies, `sees_all_reps` sees everyone's, and no permission flag guards the
@@ -47,11 +50,12 @@ export default async function PerformancePage({
     q?: string;
     page?: string;
     rep?: string;
+    quiet?: string;
   }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const { period: requested, q, page, rep } = await searchParams;
+  const { period: requested, q, page, rep, quiet } = await searchParams;
 
   const session = await requireSession();
   const t = await getTranslations();
@@ -60,10 +64,12 @@ export default async function PerformancePage({
     ? periodStart(requested as string)
     : currentPeriod();
   const currentPage = Number(page) || 1;
+  const quietOnly = quiet === "1";
 
-  const [attainment, cover] = await Promise.all([
+  const [attainment, cover, repOptions] = await Promise.all([
     achievementForPeriod(session, period),
-    coverage(session, { q, page: currentPage, userId: rep }),
+    coverage(session, { q, page: currentPage, userId: rep, quietOnly }),
+    coverageRepOptions(session),
   ]);
 
   return (
@@ -138,12 +144,45 @@ export default async function PerformancePage({
           basePath="/performance"
           defaultValue={q}
           placeholder={t("coverage.searchPlaceholder")}
-          hidden={{ period: asMonth(period), rep }}
+          hidden={{ period: asMonth(period), rep, quiet }}
         />
+
+        <FilterNav
+          basePath="/performance"
+          name="quiet"
+          active={quietOnly ? "1" : undefined}
+          query={q}
+          extra={{ period: asMonth(period), rep }}
+          options={[
+            { label: t("coverage.fields.filterAll") },
+            { value: "1", label: t("coverage.fields.filterQuiet") },
+          ]}
+        />
+
+        {/* Offered only when there is more than one person to choose between:
+            a rep gets only their own name, which makes the control pointless. */}
+        {repOptions.length > 1 ? (
+          <FilterNav
+            basePath="/performance"
+            name="rep"
+            active={rep}
+            query={q}
+            extra={{ period: asMonth(period), quiet }}
+            options={[
+              { label: t("coverage.fields.allReps") },
+              ...repOptions.map((option) => ({
+                value: option.id,
+                label: option.name,
+              })),
+            ]}
+          />
+        ) : null}
 
         {cover.rows.length === 0 ? (
           <p className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-            {q ? t("coverage.emptyFiltered") : t("coverage.empty")}
+            {q || rep || quietOnly
+              ? t("coverage.emptyFiltered")
+              : t("coverage.empty")}
           </p>
         ) : (
           <ListCard
@@ -151,7 +190,7 @@ export default async function PerformancePage({
             page={currentPage}
             total={cover.total}
             query={q}
-            extra={{ period: asMonth(period), rep }}
+            extra={{ period: asMonth(period), rep, quiet }}
           >
             <CoverageTable rows={cover.rows} locale={locale} />
           </ListCard>

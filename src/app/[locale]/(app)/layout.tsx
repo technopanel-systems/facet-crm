@@ -8,15 +8,21 @@ import { Link } from "@/i18n/navigation";
 import { can } from "@/lib/authz";
 import { bilingualName } from "@/lib/lookups";
 
-import { logoutAction, stopImpersonationAction } from "./actions";
+import { logoutAction } from "./actions";
 import { shellCounts } from "./_components/shell-counts";
 import { ThemeToggle } from "./_components/theme-toggle";
 
 /**
  * The protected shell. Every screen inside (app) exists behind this layout,
  * so `requireSession` here IS the enforcement point for RENDERING — pages
- * never check again, and the impersonation banner `[07 A6]` is persistent by
- * construction: it renders above whatever page is open.
+ * never check again.
+ *
+ * **No impersonation banner here.** `startImpersonation` `[07 A5, A6]` has no
+ * caller, so `session.isImpersonating` can never be true — a stop control
+ * that can never appear was the lie; feature slice 6 removed it rather than
+ * ship a banner nobody can trigger `[26 §4]`. The session plumbing
+ * (`isImpersonating`, `realUser`, `stopImpersonation`) stays: it is correct,
+ * waiting on the start control, not dead.
  *
  * It is NOT the enforcement point for writes. A server action is a separately
  * reachable POST endpoint that no layout wraps, so every action calls
@@ -67,25 +73,6 @@ export default async function AppLayout({
           rail. The 1320px cap below does NOT replace it: a max-width on a child
           clamps that child's box, not the column's min-content contribution. */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {session.isImpersonating ? (
-          <div className="bg-tone-amber text-tone-amber-fg">
-            {/* The band is full-bleed; only its row takes the page measure. */}
-            <div className="flex w-full max-w-330 flex-wrap items-center justify-between gap-4 px-6.5 py-2">
-              <p className="text-start text-sm font-medium">
-                {t("auth.impersonation.banner", {
-                  real: session.realUser.name,
-                  target: session.user.name,
-                })}
-              </p>
-              <form action={stopImpersonationAction}>
-                <Button type="submit" size="sm" variant="outline">
-                  {t("auth.impersonation.stop")}
-                </Button>
-              </form>
-            </div>
-          </div>
-        ) : null}
-
         {/* Sticky, blur and border stay on <header> — it is a stretched flex
             item, so the rule spans the full viewport minus the rail. */}
         <header className="border-line bg-canvas/85 sticky top-0 z-20 border-b backdrop-blur-md">

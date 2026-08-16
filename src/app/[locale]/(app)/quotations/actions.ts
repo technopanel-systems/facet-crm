@@ -42,10 +42,9 @@ import { readFields, ruleErrorState, type FormState } from "@/lib/validation";
 /**
  * One product line, from a row of repeated inputs.
  *
- * **The colour is one typed value** `[17 §2]` — a code like `168` or a RAL or
- * Pantone special, both into `custom_colour`. `colour_id` is written null from
- * every form, so `12 §12`'s "one or the other, never both" is unreachable here
- * and the `num_nonnulls` CHECK stays a backstop rather than an error users hit.
+ * **The colour is one required typed value** `[17 §2]` — a code like `168` or
+ * a RAL or Pantone special, into `custom_colour`. The lookup half and
+ * `colour_id` with it are gone since feature slice 6 `[26 §2]`.
  *
  * `sqm`, `line_total` and `vat_amount` are not read from the form at all —
  * FACET computes them `[16 §1]`.
@@ -67,7 +66,6 @@ function readLine(
     supplierId,
     classId: at("classId"),
     fireRatingId: at("fireRatingId"),
-    colourId: null,
     customColour: at("customColour") || null,
     thicknessId: at("thicknessId"),
     widthM: at("widthM"),

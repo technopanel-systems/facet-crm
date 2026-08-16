@@ -45,7 +45,6 @@ import {
   companies,
   contacts,
   productClasses,
-  productColours,
   productFireRatings,
   productSuppliers,
   productThicknesses,
@@ -160,7 +159,6 @@ export type ProductNameParts = {
   supplierCode: string;
   classCode: string;
   fireRatingCode: string;
-  colourCode: string | null;
   customColour: string | null;
   thicknessMm: string;
   thicknessIsStandard: boolean;
@@ -180,12 +178,11 @@ export type ProductNameParts = {
  * reproduce SMAC's form. The thickness joins the name, and 4 mm is omitted.
  * No real 5 mm quotation needs to be found first.
  *
- * The colour is the typed value `[17 §2]`, so in practice it always arrives as
- * `customColour`; `colourCode` is still read first for a row a non-form caller
- * wrote against the lookup.
+ * The colour is one required typed value `[17 §2]` — the lookup half and
+ * `colourCode` with it are gone since feature slice 6 `[26 §2]`.
  */
 export function productDisplayName(parts: ProductNameParts): string {
-  const colour = parts.colourCode ?? parts.customColour ?? "";
+  const colour = parts.customColour ?? "";
   const base = `${parts.supplierCode}- ${parts.classCode} ${parts.fireRatingCode} ${colour}`.trim();
   if (parts.thicknessIsStandard) return base;
   // Trailing zeros off a numeric(5,2): "5.00" reads as "5mm", not "5.00mm".
@@ -514,7 +511,6 @@ export type QuotationLineRow = {
   supplierId: string;
   classId: string;
   fireRatingId: string;
-  colourId: string | null;
   customColour: string | null;
   thicknessId: string;
   widthM: string;
@@ -581,7 +577,6 @@ async function loadLines(versionId: string): Promise<QuotationLineRow[]> {
       supplierCode: productSuppliers.code,
       classCode: productClasses.code,
       fireRatingCode: productFireRatings.code,
-      colourCode: productColours.code,
       thicknessMm: productThicknesses.thicknessMm,
       thicknessIsStandard: productThicknesses.isStandard,
     })
@@ -595,7 +590,6 @@ async function loadLines(versionId: string): Promise<QuotationLineRow[]> {
       productFireRatings,
       eq(quotationLines.fireRatingId, productFireRatings.id),
     )
-    .leftJoin(productColours, eq(quotationLines.colourId, productColours.id))
     .innerJoin(
       productThicknesses,
       eq(quotationLines.thicknessId, productThicknesses.id),
@@ -608,7 +602,6 @@ async function loadLines(versionId: string): Promise<QuotationLineRow[]> {
     supplierId: line.supplierId,
     classId: line.classId,
     fireRatingId: line.fireRatingId,
-    colourId: line.colourId,
     customColour: line.customColour,
     thicknessId: line.thicknessId,
     widthM: line.widthM,
@@ -623,7 +616,6 @@ async function loadLines(versionId: string): Promise<QuotationLineRow[]> {
       supplierCode: parts.supplierCode,
       classCode: parts.classCode,
       fireRatingCode: parts.fireRatingCode,
-      colourCode: parts.colourCode,
       customColour: line.customColour,
       thicknessMm: parts.thicknessMm,
       thicknessIsStandard: parts.thicknessIsStandard,
@@ -850,15 +842,14 @@ async function assertContactOnCompany(
 }
 
 /**
- * `12 §12` — exactly one colour: a lookup code or a typed one, never both and
- * never neither. The database refuses the other cases; this names the field.
- *
- * Since `17 §2` every form writes the typed one, so in practice this is the
- * "you left the colour blank" message — hence `customColour` as the field.
+ * `12 §12` — a colour is required. This once named which of two fields was
+ * missing; since `17 §2` there is only one, and since feature slice 6
+ * `[26 §2]` the database enforces it directly (`custom_colour NOT NULL`) —
+ * this is now a friendlier message ahead of that constraint, not the last
+ * line of defense.
  */
 function assertColourChoice(line: QuotationLineInput): void {
-  const chosen = [line.colourId, line.customColour].filter(Boolean).length;
-  if (chosen !== 1) {
+  if (!line.customColour) {
     throw new RuleError("quotations.errors.colourChoice", "customColour");
   }
 }
@@ -1064,7 +1055,6 @@ export type QuotationLineInput = {
   supplierId: string;
   classId: string;
   fireRatingId: string;
-  colourId: string | null;
   customColour: string | null;
   thicknessId: string;
   widthM: string;
@@ -1098,8 +1088,10 @@ async function insertLine(
       supplierId: input.supplierId,
       classId: input.classId,
       fireRatingId: input.fireRatingId,
-      colourId: input.colourId,
-      customColour: input.customColour,
+      // `assertColourChoice` (called by every path that reaches here) has
+      // already refused a blank colour, so the database's `NOT NULL` is
+      // never actually tested against `null` from application code.
+      customColour: input.customColour!,
       thicknessId: input.thicknessId,
       // `12 §11` — quotation lines are sheets only; the application writes it
       // rather than a CHECK, because this is a current scope boundary on one
@@ -1271,7 +1263,8 @@ export async function updateQuotationLine(
 
     const [after] = await tx
       .update(quotationLines)
-      .set({ ...input, ...lineMoney(input) })
+      // `assertColourChoice` above has already refused a blank colour.
+      .set({ ...input, customColour: input.customColour!, ...lineMoney(input) })
       .where(eq(quotationLines.id, lineId))
       .returning();
 
@@ -1685,7 +1678,6 @@ export async function createRevision(
           supplierId: line.supplierId,
           classId: line.classId,
           fireRatingId: line.fireRatingId,
-          colourId: line.colourId,
           customColour: line.customColour,
           thicknessId: line.thicknessId,
           formFactor: line.formFactor,

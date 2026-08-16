@@ -7,37 +7,42 @@
  * yet**. It reads `information_schema` and `pg_catalog` rather than a data
  * module, which no script here has done before.
  *
- * The exception is section 10, and it is the reason this file exists at all.
+ * The exception is section 9, and it is the reason this file exists at all.
  * `projects_loss_detail` refuses the free-text loss reason `src/lib/projects.ts`
  * used to write; zero lost projects meant the migration applied cleanly while
  * the first rep to mark one lost would have found a 500, and **none of the five
  * suites drives that path** — `verify:routes` replays only the theme toggle and
  * mark-read. A CHECK is only as good as the writer beside it, so the writer
- * changed in the same pass and section 10 proves the two agree. Feature slice
- * 5 later gave section 10 a second job: `assertLossReasonDetail`, the rule
+ * changed in the same pass and section 9 proves the two agree. Feature slice
+ * 5 later gave section 9 a second job: `assertLossReasonDetail`, the rule
  * `25 §5` owed since that same migration because a CHECK cannot subquery
  * `loss_reasons` to read the code behind a uuid.
  *
  *   1. Every column landed, with the right type and nullability `[25 G]`.
  *   2. Every withdrawn thing is gone — warmth, tolerance, sales desk
- *      `[25 §6, §23, §35]`.
- *   3. `tasks` is unchanged, and `origin: 'system'` is still unwritten
- *      `[25 §19, §20]`.
- *   4. Every CHECK refuses **at the database** `[13 §1]`.
- *   5. The seeds: ten categories, nine loss reasons, and the read-only flag on
- *      exactly two roles `[25 §5, §28, §33]`.
- *   6. The seeds are idempotent.
- *   7. The outcome enum agrees with `enums.ts` at runtime `[25 §2]`.
- *   8. *** Nothing writes the remaining new columns yet *** — plus what this
+ *      `[25 §6, §23, §35]` — plus everything feature slice 6 deleted:
+ *      `product_colours`, `activities`, `tasks`, `task_origin`, `task_status`,
+ *      `quotation_lines.colour_id`, `roles.sees_all_records_readonly`, and
+ *      `company_rep_origin`'s `'shared'`/`'merge'` values `[26 §2, §6]`. This
+ *      is where `25 §20`'s withdrawal (`tasks`) is confirmed — folded into
+ *      this section rather than kept as its own, since a separate section
+ *      making the same kind of claim ("this thing is gone") would be an
+ *      assertion about an assertion.
+ *   3. Every CHECK refuses **at the database** `[13 §1]`.
+ *   4. The seeds: ten categories and nine loss reasons `[25 §5, §33]`. The
+ *      read-only flag `25 §28` seeded is gone with the column `[26 §2]`.
+ *   5. The seeds are idempotent.
+ *   6. The outcome enum agrees with `enums.ts` at runtime `[25 §2]`.
+ *   7. *** Nothing writes the remaining new columns yet *** — plus what this
  *      pass deliberately does NOT enforce.
- *   9. The foreign keys point where they should.
- *  10. *** The writer and the CHECK agree *** `[25 §5]` — and, since feature
+ *   8. The foreign keys point where they should.
+ *   9. *** The writer and the CHECK agree *** `[25 §5]` — and, since feature
  *      slice 5, so does the `RuleError` a CHECK could never be.
  *
  * Usage: `npm run verify:schema25`
  *
  * That needs `NODE_ENV=development` in `.env`. `--env-file` is not optional and
- * cannot be replaced by the `process.loadEnvFile` call below: section 10
+ * cannot be replaced by the `process.loadEnvFile` call below: section 9
  * reaches `@/lib/authz`, and `src/auth/index.ts` reads `AUTH_SECRET` at module
  * scope — before any statement in this file runs.
  *
@@ -46,8 +51,8 @@
  * It needs a seeded database — `npm run db:seed` — and the fixture accounts:
  * `DEV_FIXTURE_PASSWORD=… npm run dev:fixtures`.
  *
- * **Nothing is cleaned up** `[12 §7]`. Section 10's company and project carry
- * the run stamp in their names, which is also how section 8 tells this
+ * **Nothing is cleaned up** `[12 §7]`. Section 9's company and project carry
+ * the run stamp in their names, which is also how section 7 tells this
  * script's own rows from everything else on the `projects` table: without
  * that, a second run would find the first run's own leftover rows and report
  * that something writes a column this section still claims is untouched.
@@ -65,7 +70,6 @@ import {
   lossReasons,
   projects,
   roles,
-  tasks,
   users,
 } from "@/db/schema";
 import type { AuthSession } from "@/lib/authz";
@@ -77,7 +81,6 @@ import { seedLookups } from "./seed-lookups";
 import { seedRoles } from "./seed-roles";
 import { COMPANY_CATEGORY_SEED } from "./seed/company-categories";
 import { LOSS_REASON_SEED } from "./seed/loss-reasons";
-import { ROLE_SEED } from "./seed/roles";
 
 let failures = 0;
 
@@ -90,7 +93,7 @@ function check(label: string, condition: boolean, detail = ""): void {
   }
 }
 
-/** Assert that `fn` is allowed — the positive half section 10 turns on. */
+/** Assert that `fn` is allowed — the positive half section 9 turns on. */
 async function allows(label: string, fn: () => Promise<unknown>): Promise<void> {
   try {
     await fn();
@@ -232,7 +235,6 @@ const LANDED: ColumnSpec[] = [
   { key: "comment_mentions.comment_id", type: "uuid", nullable: false, cite: "25 §11" },
   { key: "comment_mentions.mentioned_user_id", type: "uuid", nullable: false, cite: "25 §11" },
   { key: "rep_reports.reference", type: "text", nullable: true, cite: "25 §34" },
-  { key: "roles.sees_all_records_readonly", type: "boolean", nullable: false, defaultsFalse: true, cite: "25 §28" },
   { key: "quotation_threads.closed_at", type: "timestamp with time zone", nullable: true, cite: "25 §24" },
   { key: "quotation_threads.closed_by_user_id", type: "uuid", nullable: true, cite: "25 §24" },
 ];
@@ -245,28 +247,29 @@ const WITHDRAWN = [
   "pipeline_snapshots.warmth",
 ];
 
-/** `tasks` gains nothing `[25 §20]` — the exact shape it already had. */
-const TASK_COLUMNS = [
-  "id",
-  "title",
-  "description",
-  "origin",
-  "assigned_to_user_id",
-  "created_by_user_id",
-  "record_type",
-  "record_id",
-  "due_date",
-  "status",
-  "completed_at",
-  "system_trigger",
-  "created_at",
+/**
+ * Columns feature slice 6 dropped `[26 §2]`. Same shape as `WITHDRAWN` —
+ * present means the migration did not apply — kept as a separate list
+ * because the two batches were withdrawn for different reasons three
+ * documents apart, and a future reader should be able to tell which is
+ * which without diffing git blame.
+ */
+const SLICE6_DROPPED_COLUMNS = [
+  "quotation_lines.colour_id",
+  "roles.sees_all_records_readonly",
 ];
+
+/** Whole tables feature slice 6 dropped `[26 §2, §6]`. */
+const SLICE6_DROPPED_TABLES = ["product_colours", "activities", "tasks"];
+
+/** Enum types feature slice 6 dropped along with the `tasks` table. */
+const SLICE6_DROPPED_TYPES = ["task_origin", "task_status"];
 
 /**
  * Every column this pass added **that nothing writes yet**, by the table it
  * sits on, and what "unwritten" means for it: null for a nullable column,
  * `false` for a boolean that has a default and therefore can never be null.
- * Section 8.
+ * Section 7.
  *
  * **The three `next_follow_up_at` columns have left this list.** Feature slice
  * 4 built `25 §18`, so they are written now — `setNextFollowUp` in
@@ -277,7 +280,7 @@ const TASK_COLUMNS = [
  * **The three loss columns, and `in_production`, have left too.** Feature
  * slice 5 built the nine-reason picker and the production checkbox —
  * `createProject`/`updateProject` write all four for real now, proved by
- * section 10 below (loss) and the round-trip check beside it
+ * section 9 below (loss) and the round-trip check beside it
  * (`in_production`). The three loss columns move together as one unit
  * (`lossFieldsFor`'s own framing) and leave together: before this slice
  * `lost_at` was already stamped, but on a reason the screen could not yet
@@ -336,9 +339,9 @@ async function main(): Promise<void> {
     }
   }
 
-  /* --- 2. Every withdrawn thing is gone [25 §6, §23, §35] ------------ */
+  /* --- 2. Every withdrawn thing is gone [25 §6, §23, §35], [26 §2] --- */
 
-  console.log("\n2. Warmth, tolerance and the sales desk are absent");
+  console.log("\n2. Warmth, tolerance, the sales desk, and feature slice 6's drops are absent");
 
   for (const key of WITHDRAWN) {
     check(`${key} is gone [25 §6]`, !columns.has(key));
@@ -350,6 +353,34 @@ async function main(): Promise<void> {
   check(
     "the warmth TYPE is dropped too, not merely unreferenced [25 §6]",
     warmthType.length === 0,
+  );
+
+  for (const key of SLICE6_DROPPED_COLUMNS) {
+    check(`${key} is gone [26 §2]`, !columns.has(key));
+  }
+
+  for (const table of SLICE6_DROPPED_TABLES) {
+    const exists = (await db.execute(
+      sql.raw(`select to_regclass('public.${table}') is not null as exists`),
+    )) as unknown as { exists: boolean }[];
+    check(`table ${table} is gone [26 §2, §6]`, exists[0]?.exists === false);
+  }
+
+  for (const typeName of SLICE6_DROPPED_TYPES) {
+    const dropped = (await db.execute(
+      sql.raw(`select typname from pg_type where typname = '${typeName}'`),
+    )) as unknown as { typname: string }[];
+    check(`type ${typeName} is gone [26 §6]`, dropped.length === 0);
+  }
+
+  const repOrigins = (await db.execute(
+    sql`select unnest(enum_range(null::company_rep_origin))::text as value`,
+  )) as unknown as { value: string }[];
+  const repOriginValues = repOrigins.map((row) => row.value).sort();
+  check(
+    "company_rep_origin carries exactly the two written origins, 'shared' and 'merge' gone [26 §2]",
+    repOriginValues.join(",") === "assigned,self_registered",
+    `got ${repOriginValues.join(", ")}`,
   );
 
   // `25 §23` chose no tolerance and `25 §35` models no sales desk. Both are
@@ -374,43 +405,9 @@ async function main(): Promise<void> {
     `got ${deskTables.map((row) => row.table_name).join(", ")}`,
   );
 
-  /* --- 3. tasks is unchanged [25 §19, §20] --------------------------- */
+  /* --- 3. Every CHECK refuses at the database [13 §1] ---------------- */
 
-  console.log("\n3. tasks gains nothing, and 'system' stays unwritten");
-
-  const taskColumns = [...columns.keys()]
-    .filter((key) => key.startsWith("tasks."))
-    .map((key) => key.slice("tasks.".length))
-    .sort();
-  check(
-    "tasks carries exactly the columns it already had [25 §20]",
-    taskColumns.join(",") === [...TASK_COLUMNS].sort().join(","),
-    `got ${taskColumns.join(", ")}`,
-  );
-
-  // The enum keeps `system` — `13 §2` keeps `form_factor` the same way — but
-  // `21` and `25 §19` mean nothing may ever write it.
-  const origins = (await db.execute(
-    sql`select unnest(enum_range(null::task_origin))::text as value`,
-  )) as unknown as { value: string }[];
-  check(
-    "task_origin still carries 'system', kept rather than dropped [13 §2]",
-    origins.some((row) => row.value === "system"),
-    `got ${origins.map((row) => row.value).join(", ")}`,
-  );
-  const [systemTasks] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(tasks)
-    .where(eq(tasks.origin, "system"));
-  check(
-    "*** no task has origin 'system' *** [21], [25 §19]",
-    systemTasks?.n === 0,
-    `got ${systemTasks?.n}`,
-  );
-
-  /* --- 4. Every CHECK refuses at the database [13 §1] ---------------- */
-
-  console.log("\n4. Every CHECK refuses at the database");
+  console.log("\n3. Every CHECK refuses at the database");
 
   const rep = await sessionFor("rep-a@example.test");
   const company = await createCompany(rep, {
@@ -452,7 +449,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // Any seeded reason that is not 'other' — section 10 needs one to prove the
+  // Any seeded reason that is not 'other' — section 9 needs one to prove the
   // forbidding half of assertLossReasonDetail, and which of the eight it is
   // does not matter.
   const nonOtherReason = seededReasons.find(
@@ -513,9 +510,9 @@ async function main(): Promise<void> {
      values ('${rep.user.id}', 'field_note', 'scouting', 'n', current_date, '168')`,
   );
 
-  /* --- 5. The seeds [25 §5, §28, §33] -------------------------------- */
+  /* --- 4. The seeds [25 §5, §33] --------------------------------------- */
 
-  console.log("\n5. The seeds");
+  console.log("\n4. The seeds");
 
   const categories = await db.select().from(companyCategories);
   const categoryNames = new Set(categories.map((row) => row.nameEn));
@@ -542,37 +539,13 @@ async function main(): Promise<void> {
     seededReasons.every((row) => row.nameEn !== "" && row.nameAr !== ""),
   );
 
-  // The negative half is the point of `25 §28`: a third tier that four roles
-  // already outrank would be a top-up, which is exactly what it is not.
-  const wantsReadOnly = new Set(
-    ROLE_SEED.filter((row) => row.seesAllRecordsReadonly).map(
-      (row) => row.nameEn as string,
-    ),
-  );
-  check(
-    "the seed grants the read-only flag to exactly Super Admin and Sales Coordinator [25 §28]",
-    wantsReadOnly.size === 2 &&
-      wantsReadOnly.has("Super Admin") &&
-      wantsReadOnly.has("Sales Coordinator"),
-    `got ${[...wantsReadOnly].join(", ")}`,
-  );
-  for (const role of seededRoles) {
-    check(
-      `${role.nameEn}: sees_all_records_readonly = ${wantsReadOnly.has(role.nameEn)} [25 §28]`,
-      role.seesAllRecordsReadonly === wantsReadOnly.has(role.nameEn),
-      `got ${role.seesAllRecordsReadonly}`,
-    );
-  }
-  check(
-    "Sales Manager and Executive do NOT hold it — it is a tier, not a top-up [25 §28]",
-    seededRoles
-      .filter((row) => row.nameEn === "Sales Manager" || row.nameEn === "Executive")
-      .every((row) => row.seesAllRecordsReadonly === false),
-  );
+  // `25 §28`'s read-only flag and its seed assertion were removed in feature
+  // slice 6 along with the column [26 §2] — section 2 now asserts the flag
+  // is gone rather than asserting what it was seeded to.
 
-  /* --- 6. The seeds are idempotent ----------------------------------- */
+  /* --- 5. The seeds are idempotent ----------------------------------- */
 
-  console.log("\n6. A second seed run inserts nothing");
+  console.log("\n5. A second seed run inserts nothing");
 
   await seedRoles();
   await seedLookups();
@@ -611,9 +584,9 @@ async function main(): Promise<void> {
     `got ${duplicateCodes.map((row) => row.code).join(", ")}`,
   );
 
-  /* --- 7. The enum agrees with the code at runtime [25 §2] ----------- */
+  /* --- 6. The enum agrees with the code at runtime [25 §2] ----------- */
 
-  console.log("\n7. rep_report_outcome and enums.ts agree");
+  console.log("\n6. rep_report_outcome and enums.ts agree");
 
   const outcomes = (await db.execute(
     sql`select unnest(enum_range(null::rep_report_outcome))::text as value`,
@@ -640,9 +613,9 @@ async function main(): Promise<void> {
     !columns.has("projects.stage"),
   );
 
-  /* --- 8. Nothing writes the new columns yet ------------------------- */
+  /* --- 7. Nothing writes the new columns yet ------------------------- */
 
-  console.log("\n8. *** Nothing writes the new columns yet ***");
+  console.log("\n7. *** Nothing writes the new columns yet ***");
 
   // This script's own rows are excluded by name. Without that, the second run
   // finds the first run's lost project and reports a writer that is this
@@ -707,7 +680,7 @@ async function main(): Promise<void> {
   //
   // 'other' requires loss_reason and every other code forbids it [25 §5]
   // LANDED in feature slice 5 — src/lib/projects.ts's assertLossReasonDetail,
-  // proved in section 10 below, four ways. This is why that bullet is gone.
+  // proved in section 9 below, four ways. This is why that bullet is gone.
   console.log(
     "\n  NOT ASSERTED, on purpose — still owed:\n" +
       "    · 'lost requires a reason' at the DATABASE. assertLossReason holds\n" +
@@ -715,17 +688,17 @@ async function main(): Promise<void> {
       "      deliberately one-way — the converse would need more than a\n" +
       "      CHECK, and the screen offering the nine was never what stood\n" +
       "      in its way.\n" +
-      "    · Nothing READS the new columns either: authz.ts does not consult\n" +
-      "      sees_all_records_readonly, so 25 §28's third tier is not live.\n" +
-      "      Feature slice 2 built comments THROUGH the existing two tiers, so\n" +
-      "      a coordinator reads every quotation conversation and no company\n" +
-      "      one. That is today's rule, not 25 §28's — visibleCommentsFilter\n" +
-      "      is where the third tier lands when somebody builds it.",
+      "    · 25 §28's third tier is not owed, it is closed: the flag it asked\n" +
+      "      for was seeded and read by nothing, so feature slice 6 dropped\n" +
+      "      it rather than build a tier nobody ended up needing [26 §3].\n" +
+      "      A coordinator still reads every quotation conversation and no\n" +
+      "      company one, through the existing two tiers — that stays true,\n" +
+      "      it was just never 25 §28's doing.",
   );
 
-  /* --- 9. The foreign keys ------------------------------------------ */
+  /* --- 8. The foreign keys ------------------------------------------ */
 
-  console.log("\n9. The foreign keys point where they should");
+  console.log("\n8. The foreign keys point where they should");
 
   const foreignKeys = (await db.execute(sql`
     select
@@ -763,9 +736,9 @@ async function main(): Promise<void> {
     );
   }
 
-  /* --- 10. The writer and the CHECK agree [25 §5] -------------------- */
+  /* --- 9. The writer and the CHECK agree [25 §5] ---------------------- */
 
-  console.log("\n10. *** The writer and the CHECK agree ***");
+  console.log("\n9. *** The writer and the CHECK agree ***");
 
   const lostProject = await createProject(
     rep,
@@ -870,7 +843,7 @@ async function main(): Promise<void> {
    * requires the free-text detail, and every other code forbids it. A CHECK
    * cannot subquery `loss_reasons` to read the code behind a uuid, so
    * `src/lib/projects.ts`'s `assertLossReasonDetail` holds it instead —
-   * proven the four ways below, replacing what section 8 used to print as a
+   * proven the four ways below, replacing what section 7 used to print as a
    * stated non-assertion.
    */
   await refuses(

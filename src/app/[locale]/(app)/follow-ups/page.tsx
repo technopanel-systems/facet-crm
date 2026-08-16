@@ -32,17 +32,17 @@ export const dynamic = "force-dynamic";
  * Follow-ups `[07 D5]`, `[21 §9]` — one work queue over everything past its
  * threshold, oldest first.
  *
- * **Not gated, scoped** — the same shape `/coverage` uses `[20 §7]`. A rep sees
- * their own, `sees_all_reps` sees everyone's, and no permission flag exists for
- * either. The predicates are `visibleCompaniesFilter`,
- * `visibleProjectsFilter` and `visibleQuotationThreadsFilter`, reused; this
- * phase writes none of its own.
+ * **Not gated, scoped** — the same shape `/performance`'s coverage section
+ * uses `[20 §7]`. A rep sees their own, `sees_all_reps` sees everyone's, and
+ * no permission flag exists for either. The predicates are
+ * `visibleCompaniesFilter`, `visibleProjectsFilter` and
+ * `visibleQuotationThreadsFilter`, reused; this phase writes none of its own.
  *
  * **Nothing on this page is stored.** Every row is derived on read `[21 §1]`,
  * which is why a company that was chased yesterday and logged this morning is
  * simply absent today, with nothing to clean up.
  *
- * `/coverage` is deliberately left alone `[21 §9]`: it lists every company with
+ * Coverage is deliberately left alone `[21 §9]`: it lists every company with
  * its age, which is the leading indicator. This lists only what is overdue.
  */
 export default async function FollowUpsPage({

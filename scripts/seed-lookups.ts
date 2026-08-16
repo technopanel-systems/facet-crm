@@ -14,8 +14,8 @@
  * not a reason to add one `[CLAUDE.md: never add what no document requires]`.
  *
  * Nothing here deletes. A value removed from a seed array stays in the
- * database — categories and colours end up on real records, and FACET does
- * not delete history `[12 §7]`.
+ * database — categories end up on real records, and FACET does not delete
+ * history `[12 §7]`.
  */
 
 process.loadEnvFile(".env");
@@ -29,7 +29,6 @@ import {
   leadSources,
   lossReasons,
   productClasses,
-  productColours,
   productFireRatings,
   productSuppliers,
   productThicknesses,
@@ -42,7 +41,6 @@ import { LEAD_SOURCE_SEED } from "./seed/lead-sources";
 import { LOSS_REASON_SEED } from "./seed/loss-reasons";
 import {
   PRODUCT_CLASS_SEED,
-  PRODUCT_COLOUR_SEED,
   PRODUCT_FIRE_RATING_SEED,
   PRODUCT_SUPPLIER_SEED,
   PRODUCT_THICKNESS_SEED,
@@ -282,34 +280,6 @@ async function seedFireRatings(): Promise<Counts> {
   return counts;
 }
 
-/** Colours — empty on purpose and permanently `[17 §2]`. The colour is typed
- *  into `quotation_lines.custom_colour`, not picked; the table stays because no
- *  document asks for it to be dropped. This loop therefore does nothing. */
-async function seedColours(): Promise<Counts> {
-  const counts = zero();
-  for (const row of PRODUCT_COLOUR_SEED as readonly CodeRow[]) {
-    const [existing] = await db
-      .select()
-      .from(productColours)
-      .where(eq(productColours.code, row.code))
-      .limit(1);
-
-    if (!existing) {
-      await db.insert(productColours).values(row);
-      counts.inserted += 1;
-    } else if (existing.nameEn !== row.nameEn || existing.nameAr !== row.nameAr) {
-      await db
-        .update(productColours)
-        .set({ nameEn: row.nameEn, nameAr: row.nameAr })
-        .where(eq(productColours.id, existing.id));
-      counts.updated += 1;
-    } else {
-      counts.unchanged += 1;
-    }
-  }
-  return counts;
-}
-
 /** 2 to 8 mm `[17 §3]`, 4 mm the only standard one. Keyed on the value;
  *  `numeric` reads back as a string, so the seed writes the same scale
  *  Postgres stores. */
@@ -373,7 +343,6 @@ export async function seedLookups(): Promise<void> {
   report("product suppliers", await seedSuppliers());
   report("product classes", await seedClasses());
   report("product fire ratings", await seedFireRatings());
-  report("product colours", await seedColours());
   report("product thicknesses", await seedThicknesses());
   report("service types", await seedServiceTypes());
 }

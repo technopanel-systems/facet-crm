@@ -6,10 +6,10 @@
  * change: adding a fifth service must be a seed edit, not a migration.
  *
  * The Arabic came from the founder `[16 §4]`, which is why these four are
- * seeded while `product_suppliers` and `product_colours` in `./products.ts`
- * stay empty. The difference is not effort: nobody has said which factory the
- * code `N` is, so a supplier name would be invented product data. A translation
- * of "Cutting" that the founder supplied is not.
+ * seeded while `product_suppliers` in `./products.ts` keeps the code as its
+ * own Arabic name. The difference is not effort: nobody has said which
+ * factory the code `N` is, so a supplier name would be invented product
+ * data. A translation of "Cutting" that the founder supplied is not.
  *
  * All services are priced **per square metre** `[12 §10]`, so there is no unit
  * on these rows — the application writes `unit = 'sqm'` on every service line,

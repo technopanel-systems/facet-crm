@@ -31,13 +31,11 @@
  *  - can_export: bulk export is super-admin only `[07 B8]`, plus the
  *    executive `[12 §3]`.
  *  - can_impersonate: super admin logs in as a rep `[07 A5 Q5]`.
- *  - sees_all_records_readonly: `25 §28` restores `04 Q10` and widens it. The
- *    **coordinator** is who it is for — coordinators already have full access
- *    to SMAC, so withholding a read in FACET protects nothing — plus the
- *    **super admin**, who is "yes to everything" `[07 A5]`. It is granted to
- *    nobody else, and deliberately NOT to the four roles that already hold
- *    `sees_all_reps`: `25 §28` makes this a separate, third visibility tier,
- *    not a top-up for people who can already see everything and act on it.
+ *
+ * `sees_all_records_readonly` was seeded here until feature slice 6 dropped
+ * it: `authz.ts` never consulted it, `25 §28`'s third visibility tier was
+ * never live, and the corrected decision — a name lookup, not a tier — needs
+ * no role flag of its own `[26 §2, §3]`.
  */
 
 export const ROLE_SEED = [
@@ -56,7 +54,6 @@ export const ROLE_SEED = [
     canSetCreditSplit: true,
     canApproveDelete: true,
     canResolveDuplicate: true,
-    seesAllRecordsReadonly: true,
   },
   {
     nameEn: "Executive",
@@ -73,7 +70,6 @@ export const ROLE_SEED = [
     canSetCreditSplit: true,
     canApproveDelete: true,
     canResolveDuplicate: true,
-    seesAllRecordsReadonly: false,
   },
   {
     nameEn: "Sales Manager",
@@ -90,7 +86,6 @@ export const ROLE_SEED = [
     canSetCreditSplit: true,
     canApproveDelete: true,
     canResolveDuplicate: true,
-    seesAllRecordsReadonly: false,
   },
   {
     nameEn: "Sales Coordinator",
@@ -107,7 +102,6 @@ export const ROLE_SEED = [
     canSetCreditSplit: true,
     canApproveDelete: false,
     canResolveDuplicate: false,
-    seesAllRecordsReadonly: true,
   },
   {
     nameEn: "Marketing",
@@ -124,7 +118,6 @@ export const ROLE_SEED = [
     canSetCreditSplit: false,
     canApproveDelete: false,
     canResolveDuplicate: false,
-    seesAllRecordsReadonly: false,
   },
   {
     nameEn: "Desk Rep",
@@ -141,7 +134,6 @@ export const ROLE_SEED = [
     canSetCreditSplit: false,
     canApproveDelete: false,
     canResolveDuplicate: false,
-    seesAllRecordsReadonly: false,
   },
   {
     nameEn: "Sales Rep",
@@ -158,7 +150,6 @@ export const ROLE_SEED = [
     canSetCreditSplit: false,
     canApproveDelete: false,
     canResolveDuplicate: false,
-    seesAllRecordsReadonly: false,
   },
 ] as const;
 

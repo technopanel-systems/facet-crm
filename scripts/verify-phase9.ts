@@ -395,10 +395,13 @@ async function main(): Promise<void> {
     });
   }
   // The sharer holds company A and NOT its project — section 15's trap.
+  // `origin: "assigned"` — a membership, not a share `[23]`; `company_rep_origin`
+  // dropped its own `'shared'` value in feature slice 6, unused by real code
+  // and only ever written by fixtures like this one `[26 §2]`.
   await db.insert(companyReps).values({
     companyId: companyA.id,
     userId: sharerUser.id,
-    origin: "shared",
+    origin: "assigned",
   });
 
   const [contactA] = await db

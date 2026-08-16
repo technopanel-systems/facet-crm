@@ -219,7 +219,6 @@ function NotificationEntry({
                 companies: row.payload.counts.companies,
                 projects: row.payload.counts.projects,
                 threads: row.payload.counts.quotationThreads,
-                tasks: row.payload.counts.tasks,
               })
             : t("notifications.detail.handoverUnknown")}
         </p>

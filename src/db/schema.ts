@@ -103,12 +103,14 @@ export const smacVerificationEnum = pgEnum("smac_reference_verification", [
   "verified",
 ]);
 
-/** `[09 §3.2]` — how a rep's membership of a company arose. */
+/**
+ * `[09 §3.2]` — how a rep's membership of a company arose. `'shared'` and
+ * `'merge'` were dropped in feature slice 6 `[26 §2]`: application code has
+ * never written either, only the two origins below.
+ */
 export const companyRepOriginEnum = pgEnum("company_rep_origin", [
   "self_registered",
   "assigned",
-  "shared",
-  "merge",
 ]);
 
 /**
@@ -180,20 +182,6 @@ export const duplicateResolutionEnum = pgEnum("duplicate_resolution", [
   "who_continues",
   "shared",
   "false_flag",
-]);
-
-/** `[07 A1]`, `[10 §9]` */
-export const taskOriginEnum = pgEnum("task_origin", [
-  "self",
-  "assigned",
-  "system",
-]);
-
-/** `[10 §9]` */
-export const taskStatusEnum = pgEnum("task_status", [
-  "open",
-  "done",
-  "cancelled",
 ]);
 
 /** `[07 E5]`, `[07 G1]` */
@@ -322,23 +310,6 @@ export const roles = pgTable(
     canApproveDelete: boolean("can_approve_delete").notNull().default(false),
     /** `[07 B5]`, `[12 §3]` — works the duplicate queue. */
     canResolveDuplicate: boolean("can_resolve_duplicate")
-      .notNull()
-      .default(false),
-    /**
-     * `[25 §28]` — reads every record without holding any of them.
-     *
-     * **A third visibility tier, which FACET has never had.** Every rule until
-     * now is all-or-nothing: `14 §2` makes a share grant edit, not merely view,
-     * and `sees_all_reps` is the manager tier that acts as well as sees. This
-     * one is deliberately **not** folded into `sees_all_reps` — `25 §28` is
-     * explicit that read-only is architectural, not a permission tweak.
-     *
-     * It restores and widens `04 Q10`, which `16 §8` and `18 §2` reversed
-     * silently `[24 §1.1]`, so today a coordinator searches company **names**
-     * and can open no company record. Coordinators already have full access to
-     * SMAC, so withholding a read in FACET protects nothing.
-     */
-    seesAllRecordsReadonly: boolean("sees_all_records_readonly")
       .notNull()
       .default(false),
     createdAt: createdAt(),
@@ -1117,19 +1088,6 @@ export const productFireRatings = pgTable("product_fire_ratings", {
   createdAt: createdAt(),
 });
 
-/**
- * **Unused since `17 §2`** — the colour is typed on the quotation line, not
- * picked, so this stays empty and no screen reads it. Kept because no document
- * asks for it to be dropped, and `quotation_lines.colour_id` still points here.
- */
-export const productColours = pgTable("product_colours", {
-  id: pk(),
-  code: text("code").notNull(),
-  nameEn: text("name_en").notNull(),
-  nameAr: text("name_ar").notNull(),
-  createdAt: createdAt(),
-});
-
 /** 4 mm is standard and omitted from the generated name `[08 B1, D1]`. */
 export const productThicknesses = pgTable("product_thicknesses", {
   id: pk(),
@@ -1201,11 +1159,11 @@ export const productSpecifications = pgTable(
  * `[08 D2]` — the same rule the project README states. `12 §11` confirms this
  * column unchanged and cancels the proposed `entered_sqm` / `COALESCE` change.
  *
- * Colour is one of two things, never both and never neither `[12 §12]`. Since
- * `17 §2` it is always the second: **`custom_colour` carries every line** — an
- * ordinary code like `168` as readily as a RAL or Pantone special — and
- * `colour_id` stays null. The CHECK is unchanged and still requires exactly
- * one.
+ * Colour is one required typed value, not a choice between two `[12 §12]`.
+ * `17 §2` made the lookup half dead — every line always carried
+ * `custom_colour` — and feature slice 6 `[26 §2]` removed the dead half
+ * entirely: `colour_id` and its CHECK are gone, and `custom_colour` is
+ * `NOT NULL` because that is now the only thing the CHECK ever said.
  */
 export const quotationLines = pgTable(
   "quotation_lines",
@@ -1223,10 +1181,8 @@ export const quotationLines = pgTable(
     fireRatingId: uuid("fire_rating_id")
       .notNull()
       .references(() => productFireRatings.id),
-    /** Always null since `17 §2` — the lookup is no longer offered. */
-    colourId: uuid("colour_id").references(() => productColours.id),
     /** The colour, typed `[17 §2]`: a code, or a RAL/Pantone special. */
-    customColour: text("custom_colour"),
+    customColour: text("custom_colour").notNull(),
     thicknessId: uuid("thickness_id")
       .notNull()
       .references(() => productThicknesses.id),
@@ -1249,15 +1205,7 @@ export const quotationLines = pgTable(
     vatAmount: numeric("vat_amount", MONEY),
     createdAt: createdAt(),
   },
-  (t) => [
-    index("quotation_lines_version_idx").on(t.versionId),
-    // "A line uses one or the other" `[12 §12]` — a data-integrity rule, not
-    // an authorization one, so the database is the right place for it.
-    check(
-      "quotation_lines_colour_choice",
-      sql`num_nonnulls(colour_id, custom_colour) = 1`,
-    ),
-  ],
+  (t) => [index("quotation_lines_version_idx").on(t.versionId)],
 );
 
 /** `10 §12` — accepted. CNC, cutting, bending, notching will change `[08 B4]`. */
@@ -1408,46 +1356,14 @@ export const nonDuplicates = pgTable(
 );
 
 /* ------------------------------------------------------------------ *
- * 8. Activity, reports, tasks — `09 §8`
+ * 8. Reports and tasks — `09 §8`
+ *
+ * `activities` — `09 §8.1`'s silent system-recorded events table — was
+ * dropped in feature slice 6 `[26 §2]`. It was never written: `20 §6`
+ * derives the timeline on read instead, the way this section's own comment
+ * once explained. See `docs/26-deletion-pass.md` §2 for why removing it,
+ * rather than leaving it empty, is now correct.
  * ------------------------------------------------------------------ */
-
-/**
- * `09 §8.1` — silent system-recorded events, written by the system and typed
- * by no one `[04 B3 confirmed]`. Private to the rep, without exception
- * `[04 Q6]`. Qualification is detected from these events, never set by a human
- * `[04 qualification]`, `[10 §1]`.
- *
- * `activity_type` is free text: the documents give examples (lead added,
- * catalogue sent, dispatch) but never a closed list, and no document makes it
- * a lookup — unlike notification type `[10 §10]`.
- *
- * **This table is empty on purpose and permanently `[20 §6]`**, the way
- * `product_colours` is `[17 §2]`. Phase 9's timeline derives the system events
- * on read from the tables that already hold them — `companies.created_at`,
- * `quotation_versions`, `quotation_threads.payment_confirmed_at`, `dispatches`
- * — so every record already in the database has a full history with no
- * backfill, and there is no second copy to keep in step. `09 §8.1`'s "written
- * by the system" is satisfied by deriving rather than duplicating, which is
- * what `04 C1` asks for anyway. Do not start writing rows here without a new
- * user-truth document: half a table is worse than none.
- */
-export const activities = pgTable(
-  "activities",
-  {
-    id: pk(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id),
-    activityType: text("activity_type").notNull(),
-    recordType: recordTypeEnum("record_type").notNull(),
-    recordId: uuid("record_id").notNull(),
-    createdAt: createdAt(),
-  },
-  (t) => [
-    index("activities_user_idx").on(t.userId, t.createdAt),
-    index("activities_record_idx").on(t.recordType, t.recordId),
-  ],
-);
 
 /**
  * `09 §8.2`, reshaped by `20 §2` and `20 §13` — the second reporting layer,
@@ -1594,48 +1510,14 @@ export const repReportSignals = pgTable(
 );
 
 /**
- * `09 §8.3` + `10 §9` — one entity for all three kinds, distinguished by
- * origin `[07 A1]`. System follow-ups are generated from the threshold
- * settings `[07 D5]` and carry the trigger that created them, so a follow-up
- * can close itself when the underlying condition clears `[10 §9]`.
- *
- * **`25 §20` adds nothing here, and that is the finding.** Manual tasks are
- * built small, for the **two human origins only** — a manager assigning a task
- * to a rep, and a rep writing his own to-do, the human half of `07 A1` that
- * `21` does not cover. `origin: 'system'` is never written: `21` overruled
- * `10 §9`'s self-closing system task, and `25 §19` confirms it — the follow-up
- * queue *is* the automatic task list, already generated, already ordered by
- * how long each thing has waited, and not stored as rows, which is why it
- * cannot go stale.
- *
- * So `system` and `system_trigger` stay, unused, the way `13 §2` keeps
- * `form_factor`. The columns already here cover both human origins.
+ * `tasks` — `09 §8.3` + `10 §9`'s manual-task table — was dropped in feature
+ * slice 6 `[26 §6]`. `25 §20` ("manual tasks are built, small") was withdrawn
+ * the same slice, founder-decided, "not needed for now": nothing ever wrote
+ * a row, `task_origin` and `task_status` went with it, and `19 §7`'s
+ * handover reassignment (which moved open tasks between reps) went too —
+ * see `docs/26-deletion-pass.md` §6 for what this supersedes without
+ * editing `07 A1`, `21 §1` or `19 §7` in place.
  */
-export const tasks = pgTable(
-  "tasks",
-  {
-    id: pk(),
-    title: text("title").notNull(),
-    description: text("description"),
-    origin: taskOriginEnum("origin").notNull(),
-    assignedToUserId: uuid("assigned_to_user_id")
-      .notNull()
-      .references(() => users.id),
-    createdByUserId: uuid("created_by_user_id").references(() => users.id),
-    recordType: recordTypeEnum("record_type"),
-    recordId: uuid("record_id"),
-    dueDate: date("due_date"),
-    status: taskStatusEnum("status").notNull().default("open"),
-    completedAt: timestamp("completed_at", { withTimezone: true }),
-    /** Set on system tasks: the condition that raised it `[10 §9]`. */
-    systemTrigger: text("system_trigger"),
-    createdAt: createdAt(),
-  },
-  (t) => [
-    index("tasks_assignee_status_idx").on(t.assignedToUserId, t.status),
-    index("tasks_record_idx").on(t.recordType, t.recordId),
-  ],
-);
 
 /* ------------------------------------------------------------------ *
  * 8A. Comments — `25 §9`–`§15`
@@ -1693,13 +1575,14 @@ export const comments = pgTable(
     /**
      * `13 §1`, `25 §9` — the five kinds §9 names, stated **positively**.
      *
-     * `record_type` is shared with `record_shares`, `tasks`, `activities`,
-     * `delete_requests`, `duplicate_flags`, `attachments` and
-     * `pipeline_snapshots`, so it will grow for reasons that have nothing to
-     * do with comments. A negative CHECK would silently admit every value
-     * added later; this one refuses until somebody decides. Today that
-     * excludes `quotation_version` — a comment belongs to the thread, which is
-     * the conversation, not to one superseded version of it.
+     * `record_type` is shared with `record_shares`, `delete_requests`,
+     * `duplicate_flags`, `attachments` and `pipeline_snapshots` (`tasks` and
+     * `activities` shared it too, until feature slice 6 dropped both
+     * `[26 §2, §6]`), so it will grow for reasons that have nothing to do
+     * with comments. A negative CHECK would silently admit every value added
+     * later; this one refuses until somebody decides. Today that excludes
+     * `quotation_version` — a comment belongs to the thread, which is the
+     * conversation, not to one superseded version of it.
      */
     check(
       "comments_record_type",
@@ -1832,11 +1715,15 @@ export const notifications = pgTable(
  * ------------------------------------------------------------------ */
 
 /**
- * `09 §10.2` — keyed configuration, manager-editable rather than in code.
- * Three separate decisions put values here: the five follow-up thresholds
- * `[07 D5]`, the quotation term defaults, and print-time boilerplate such as
- * bank account details `[08 D9]`. Changes are visible through the audit log,
- * so there is no `updated_at` here either.
+ * `09 §10.2` — keyed configuration, intended to be manager-editable rather
+ * than in code. Three separate decisions put values here: the five
+ * follow-up thresholds `[07 D5]`, the quotation term defaults, and
+ * print-time boilerplate such as bank account details `[08 D9]`. Changes
+ * are visible through the audit log, so there is no `updated_at` here
+ * either.
+ *
+ * **No screen edits it yet** `[26 §4]` — today a row only ever changes by a
+ * direct database edit. `09 §10.2`'s manager-editable screen does not exist.
  */
 export const settings = pgTable("settings", {
   key: text("key").primaryKey(),

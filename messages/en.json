@@ -15,7 +15,6 @@
     "quotations": "Quotations",
     "dispatches": "Dispatches",
     "reports": "Reports",
-    "coverage": "Coverage",
     "activity": "Activity",
     "targets": "Targets",
     "team": "Team",
@@ -89,9 +88,7 @@
     },
     "companyRepOrigin": {
       "self_registered": "Registered",
-      "assigned": "Assigned",
-      "shared": "Shared",
-      "merge": "Merged"
+      "assigned": "Assigned"
     },
     "quotationThreadEndState": {
       "accepted": "Accepted",
@@ -470,11 +467,7 @@
       "invalidCredentials": "Incorrect email or password."
     },
     "signOut": "Sign out",
-    "signedInAs": "Signed in as {name}",
-    "impersonation": {
-      "banner": "{real} acting as {target}",
-      "stop": "Stop impersonating"
-    }
+    "signedInAs": "Signed in as {name}"
   },
   "dispatches": {
     "title": "Dispatches",
@@ -640,14 +633,11 @@
       "companies": "Companies",
       "projects": "Projects",
       "quotations": "Quotation threads",
-      "tasks": "Open tasks",
       "noCompanies": "No company memberships.",
       "noProjects": "No projects owned.",
       "noQuotations": "No quotation threads raised.",
-      "noTasks": "No open tasks.",
       "nothing": "Nothing is left to hand over.",
       "primary": "Primary",
-      "noDueDate": "No due date",
       "reassignTo": "Hand over to",
       "reassignToPlaceholder": "Choose a colleague",
       "reassign": "Hand over selected",
@@ -803,7 +793,6 @@
     }
   },
   "coverage": {
-    "title": "Coverage",
     "empty": "No companies to cover.",
     "emptyFiltered": "No companies match this search.",
     "searchPlaceholder": "Search by company name",
@@ -811,9 +800,7 @@
       "company": "Company",
       "reps": "Reps",
       "lastInteraction": "Last interaction",
-      "daysSince": "Days",
       "status": "Status",
-      "person": "Rep",
       "allReps": "Everyone",
       "never": "Never",
       "quiet": "Quiet",
@@ -826,7 +813,6 @@
       "coveredFor": "Last recorded {count} days ago"
     },
     "detail": {
-      "hint": "Which companies have gone quiet. There is nothing to submit here, so there is nothing to miss and nothing is penalised.",
       "thresholds": "Quiet means {qualified} days without an interaction for a company that has asked for a quotation, and {unqualified} days for one that has not.",
       "onHoldUntil": "On hold until {date}",
       "yours": "Logging a visit is what takes a company off this list."
@@ -850,7 +836,7 @@
       "digest": "Daily summary",
       "persistent": "This stays until the work is done — it cannot be dismissed.",
       "anchorHidden": "The record this points at is no longer yours to open.",
-      "handover": "{name} handed over {companies} companies, {projects} projects, {threads} quotations and {tasks} tasks.",
+      "handover": "{name} handed over {companies} companies, {projects} projects and {threads} quotations.",
       "handoverUnknown": "Work was handed over to you.",
       "digestSummary": "{total} follow-ups on {date}.",
       "digestLink": "Open follow-ups",

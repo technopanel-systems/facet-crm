@@ -136,7 +136,6 @@ export async function reassignHandoverAction(
     membershipIds: fields.list("membershipIds"),
     projectIds: fields.list("projectIds"),
     threadIds: fields.list("threadIds"),
-    taskIds: fields.list("taskIds"),
   };
 
   if (!fields.ok || !toUserId) return fields.state;

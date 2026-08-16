@@ -101,7 +101,6 @@ export type HandoverCounts = {
   companies: number;
   projects: number;
   quotationThreads: number;
-  tasks: number;
 };
 
 /**
@@ -810,7 +809,6 @@ async function handoverPayload(
       companies: Number(c.companies ?? 0),
       projects: Number(c.projects ?? 0),
       quotationThreads: Number(c.quotationThreads ?? 0),
-      tasks: Number(c.tasks ?? 0),
     },
   };
 }

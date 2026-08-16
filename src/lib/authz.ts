@@ -280,25 +280,6 @@ export function can(session: AuthSession, flag: PermissionFlag): boolean {
   return session.user.role[flag];
 }
 
-/**
- * `requireSession` plus a flag check. Throws on denial — server actions
- * surface this as a failure, never as silent success.
- *
- * The refusal is a `RuleError` carrying a translation key, not a raw string:
- * `ruleErrorState` RETHROWS anything else, so a plain `Error` here would reach
- * the user as a 500 instead of a message `[19 §7]`. Currently unused — kept
- * because it is correct, harmless structure `[13 §2]`.
- */
-export async function requirePermission(
-  flag: PermissionFlag,
-): Promise<AuthSession> {
-  const session = await requireSession();
-  if (!can(session, flag)) {
-    throw new RuleError("team.errors.permissionDenied");
-  }
-  return session;
-}
-
 /* ------------------------------------------------------------------ *
  * Per-record visibility `[04 Q7]`
  * ------------------------------------------------------------------ */

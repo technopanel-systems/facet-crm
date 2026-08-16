@@ -1,6 +1,7 @@
 /**
- * The `settings` table `[09 §10.2]` — configuration a manager is meant to
- * change without a deploy.
+ * The `settings` table `[09 §10.2]` — configuration meant to be
+ * manager-editable without a deploy. **No screen edits it yet** `[26 §4]`:
+ * today a row only ever changes by a direct database edit.
  *
  * Reference data, so **no visibility filter**: these rows describe how the
  * system behaves, not anybody's customers. Same reasoning as `lookups.ts`.

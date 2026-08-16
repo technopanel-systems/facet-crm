@@ -101,8 +101,9 @@ export async function updateCompanyAction(
  * gate.
  *
  * `revalidatePath("/companies", "layout")` rather than the detail path alone,
- * because a decision here changes `/follow-ups` and `/coverage` too — a
- * re-included company leaves the queue, and an archived one leaves both.
+ * because a decision here changes `/follow-ups` and `/performance`'s coverage
+ * section too — a re-included company leaves the queue, and an archived one
+ * leaves both.
  */
 export async function reincludeCompanyAction(
   companyId: string,

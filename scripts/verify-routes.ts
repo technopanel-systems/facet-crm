@@ -23,7 +23,15 @@
  *      anywhere, because no in-process script crosses the action boundary.
  *  10. The sharing panel `[07 B1]`, `[25 §30]` grants and revokes for real, and
  *      the rep who may not share is not offered the form.
- *  11. No screen renders anything shaped like an unresolved message key.
+ *  11. The next follow-up date `[25 §18]` is set and cleared for real, over
+ *      HTTP, in both locales — the manual date that outranks the automatic
+ *      clock, replayed the same way section 7 replays a lost project.
+ *  12. No screen renders anything shaped like an unresolved message key.
+ *
+ * This was 11 sections until feature slice 6: the old item 11 (the
+ * message-key scan) is now section 12, and section 11 above — the
+ * follow-up-date replay — existed in the code for a phase but was never
+ * added to this list. Not a renumbering; a correction `[26 §4]`.
  *
  * Section 0 runs before all of them, and refuses a server that booted before
  * the build — the hole every one of the above passed straight through `[23]`.
@@ -235,7 +243,6 @@ const STATIC_ROUTES = [
   "/dispatches/new",
   "/reports",
   "/reports/new",
-  "/coverage",
   "/activity",
   "/follow-ups",
   "/notifications",
@@ -269,7 +276,7 @@ function firstId(body: string, section: string): string | null {
  * The archetype markers.
  *
  * **Asserted for the manager only.** `sees_all_reps` is the one identity with
- * rows on every list; a coordinator's `/companies` and `/coverage` are
+ * rows on every list; a coordinator's `/companies` and `/performance` are
  * legitimately empty `[16 §8]`, `[18 §2]` — they see quotation threads and
  * company NAMES, not company records — so a list card that is absent there is
  * the empty state working, not a missing frame. Asserting it for everyone
@@ -281,7 +288,9 @@ const MARKERS: Record<string, readonly string[]> = {
   "/quotations": ['data-slot="list-card"'],
   "/companies/new": ['data-slot="form-shell"', 'name="nameEn"'],
   "/reports/new": ['data-slot="form-shell"'],
-  "/coverage": ['data-slot="turn"'],
+  // `/coverage` carried this marker until feature slice 6 moved the table
+  // it comes from onto `/performance` and deleted the route `[26 §2]`.
+  "/performance": ['data-slot="turn"'],
 };
 
 const MARKER_IDENTITY = "manager@example.test";

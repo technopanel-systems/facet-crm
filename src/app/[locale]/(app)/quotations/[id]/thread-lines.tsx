@@ -40,7 +40,6 @@ export type LineRow = {
   supplierId: string;
   classId: string;
   fireRatingId: string;
-  colourId: string | null;
   customColour: string | null;
   thicknessId: string;
   widthM: string;

@@ -228,9 +228,8 @@ export async function assertLeadSourceSelectable(
  * which supplier.
  *
  * **There is no colour reader here.** `17 §2` makes the colour free text on
- * the line, so `product_colours` is never read by a screen and stays empty; the
- * value lives in `quotation_lines.custom_colour`. `src/lib/quotations.ts` still
- * joins the table, for a row a non-form caller wrote with a `colour_id`.
+ * the line; the lookup table it once pointed at is gone since feature slice 6
+ * `[26 §2]`, and the value lives only in `quotation_lines.custom_colour`.
  *
  * Suppliers are seeded `[17 §1]`, which is what makes a quotation line saveable
  * at all — `supplier_id` is `NOT NULL`. The screens still handle an empty list,

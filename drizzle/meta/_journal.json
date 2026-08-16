@@ -57,6 +57,13 @@
       "when": 1786607448311,
       "tag": "0007_redesign_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786868178775,
+      "tag": "0008_deletion_pass",
+      "breakpoints": true
     }
   ]
 }

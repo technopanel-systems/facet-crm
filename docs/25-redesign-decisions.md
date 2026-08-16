@@ -220,13 +220,19 @@ Already generated, already ordered by how long each thing has waited, and not
 stored as rows — which is why it cannot go stale. **`21`'s refusal to write
 `tasks` for follow-ups stands.**
 
-### 20. Manual tasks are built, small **[founder]**
+### 20. ~~Manual tasks are built, small~~ **[founder]**
 
-What `21` does not cover is the human half of `07 A1`: a manager assigning a
+**WITHDRAWN — feature slice 6, 2026-08-16, founder-decided.** Not needed for
+now. A marketing rep judging qualification from what the customer states,
+before any quotation exists, is a different case — `§16`, not this one — so
+withdrawing this does not reopen that. See `docs/26-deletion-pass.md` §6.
+
+~~What `21` does not cover is the human half of `07 A1`: a manager assigning a
 task to a rep, and a rep writing his own to-do. Neither is derivable. The
-founder asked for something non-complex, to test and see how it is used.
+founder asked for something non-complex, to test and see how it is used.~~
 
-Built for the **two human origins only**. `origin: 'system'` is never written.
+~~Built for the **two human origins only**. `origin: 'system'` is never
+written.~~
 
 ---
 
@@ -311,19 +317,31 @@ visibility for its own sake.
 
 ## Part E — The coordinator, and rules nobody built
 
-### 28. Coordinators get read-only access across everything **[founder]**
+### 28. ~~Coordinators get read-only access across everything~~ **[founder]**
 
-Closes `24 §1.1`. `04 Q10` granted it; `16 §8` and `18 §2` reversed it silently
-and the code followed them, so today a coordinator can search company **names**
-and open no company record.
+**CORRECTED — feature slice 6, 2026-08-16, founder-decided.** See
+`docs/26-deletion-pass.md` §3. What the founder actually asked for is a name
+lookup, not a tier: coordinators must see every company and project **by
+name**, so they can reference them when writing quotations — not the record's
+contents unless it is shared with them. `18 §2` already built exactly this
+pattern for companies, on the dispatch form; a later slice extends it to
+projects, at the screen where the coordinator raises a quotation. The flag
+this section asked for, `roles.sees_all_records_readonly`, was seeded and
+never read by `authz.ts` — feature slice 6 drops the column rather than build
+a tier nobody ended up needing.
 
-**The founder restores `04 Q10`** and widens it — coordinators already have full
-access to the internal ERP, so withholding a read in FACET protects nothing.
+~~Closes `24 §1.1`. `04 Q10` granted it; `16 §8` and `18 §2` reversed it
+silently and the code followed them, so today a coordinator can search company
+**names** and open no company record.~~
 
-**This introduces a third visibility tier, which FACET has never had**
+~~**The founder restores `04 Q10`** and widens it — coordinators already have
+full access to the internal ERP, so withholding a read in FACET protects
+nothing.~~
+
+~~**This introduces a third visibility tier, which FACET has never had**
 `[derived]`. Every rule so far is all-or-nothing: `14 §2` makes a share grant
 edit, not merely view. Read-only is architectural, not a permission tweak, and
-needs **its own flag** rather than being folded into `sees_all_reps`.
+needs **its own flag** rather than being folded into `sees_all_reps`.~~
 
 ### 29. A delete request is really a release **[founder]**
 
@@ -428,8 +446,11 @@ None of these are presentation. Each needs a migration.
 6. `comments` — record type, record id, author, body, edited at (§9)
 7. `comment_mentions` — for people first (§11)
 8. `rep_reports.reference` (§34)
-9. `tasks` gets its two human origins written; `origin: 'system'` stays unwritten (§20)
-10. Roles gain a read-only visibility flag (§28)
+9. ~~`tasks` gets its two human origins written; `origin: 'system'` stays
+   unwritten (§20)~~ — **§20 withdrawn, feature slice 6**; `tasks` itself was
+   dropped, not given a writer (`docs/26-deletion-pass.md` §6)
+10. ~~Roles gain a read-only visibility flag (§28)~~ — **§28 corrected,
+    feature slice 6**; no flag, a name lookup instead (`docs/26-deletion-pass.md` §3)
 11. Quotation thread: `closed_at`, `closed_by` (§24)
 12. Outcome enum gains **technical_submitting** (§2)
 

@@ -125,7 +125,7 @@ export async function createReportAction(
 
   const locale = await getLocale();
   revalidatePath("/reports");
-  revalidatePath("/coverage");
+  revalidatePath("/performance");
   revalidatePath("/activity");
   if (input.companyId) revalidatePath(`/companies/${input.companyId}`);
   if (input.projectId) revalidatePath(`/projects/${input.projectId}`);
@@ -151,7 +151,7 @@ export async function updateReportAction(
 
   const locale = await getLocale();
   revalidatePath("/reports");
-  revalidatePath("/coverage");
+  revalidatePath("/performance");
   revalidatePath("/activity");
   // The anchor may have MOVED `[20 §9]`, so both timelines are stale: the one
   // it left and the one it joined. Revalidating the section covers both.

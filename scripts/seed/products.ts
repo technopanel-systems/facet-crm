@@ -5,11 +5,10 @@
  * real product code (`N- CA FR 168`) and lists the classes and the fire
  * ratings outright; `17 §1` and `17 §3` give the suppliers and the thicknesses.
  *
- * **Colours are the one list still empty, and now permanently so** `[17 §2]`:
- * the colour is typed, not picked. `quotation_lines.custom_colour` carries
- * every line — a plain code like `168` as readily as a RAL or Pantone special
- * — and `colour_id` stays null. The table is left in place because no document
- * asks for it to be dropped.
+ * **There is no colour list here at all** `[17 §2]`: the colour is typed, not
+ * picked. `quotation_lines.custom_colour` carries every line — a plain code
+ * like `168` as readily as a RAL or Pantone special. The lookup table this
+ * once seeded (empty) was dropped in feature slice 6 `[26 §2]`.
  *
  * `12 §8` also settles what is NOT here: no constraint ties a class to a fire
  * rating, because which combinations are real varies by factory. What exists
@@ -50,18 +49,6 @@ export const PRODUCT_FIRE_RATING_SEED = [
   { code: "A2", nameEn: "A2", nameAr: "A2" },
   { code: "Normal", nameEn: "Normal", nameAr: "عادي" },
 ] as const;
-
-/**
- * Empty, and staying empty `[17 §2]`. The colour is free text on the line, not
- * a lookup — `08 B1` says only "many" about colours, and a list nobody
- * maintains would be a dropdown that is always missing the colour in front of
- * the coordinator.
- */
-export const PRODUCT_COLOUR_SEED: readonly {
-  code: string;
-  nameEn: string;
-  nameAr: string;
-}[] = [];
 
 /**
  * `17 §3` — 2 to 8 mm. **4 mm is the default and the only `isStandard` row**,

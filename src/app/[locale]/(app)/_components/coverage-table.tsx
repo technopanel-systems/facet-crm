@@ -20,16 +20,21 @@ import { Turn, turnTone } from "./turn";
  * The coverage table — every company this identity may read, with how long it
  * has been since anyone logged against it.
  *
- * Extracted so `/coverage` and `/performance` render the identical table
- * `[22 §7]`. It renders **only** the table: the empty state and the `ListCard`
- * frame belong to the caller, because an empty state inside a card with a
- * pagination footer reads as a broken page rather than an empty one.
+ * Extracted so `/coverage` and `/performance` would always render the
+ * identical table `[22 §7]` — `/coverage` is gone since feature slice 6
+ * `[26 §2]`, but the extraction stays: `/performance` is now this table's
+ * only caller, and the component boundary is still the right shape if a
+ * second one ever needs it. It renders **only** the table: the empty state
+ * and the `ListCard` frame belong to the caller, because an empty state
+ * inside a card with a pagination footer reads as a broken page rather than
+ * an empty one.
  *
  * **`quietOnly` is not offered here**, and the reason is `22 §6.5`: `coverage()`
  * filters it after paginating, so a caller asking for quiet companies gets the
  * quiet ones among the alphabetically first 25 rather than the first 25 quiet
- * ones. The filter still exists on `/coverage`, where it always has; nothing new
- * is built on top of it until it is fixed in the data layer.
+ * ones. The filter moved to `/performance` along with the rest of `/coverage`'s
+ * capability `[26 §2]`; the defect moved with it, unfixed — nothing new is
+ * built on top of it until it is fixed in the data layer.
  */
 export async function CoverageTable({
   rows,

@@ -25,7 +25,7 @@ import { emptyFormState, type FormState } from "@/lib/validation";
 
 type Bucket = {
   /** The form field each checked row posts under. */
-  name: "membershipIds" | "projectIds" | "threadIds" | "taskIds";
+  name: "membershipIds" | "projectIds" | "threadIds";
   title: string;
   empty: string;
   rows: { id: string; label: string; note?: string; badge?: string }[];

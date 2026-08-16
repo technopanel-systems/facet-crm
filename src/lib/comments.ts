@@ -5,8 +5,8 @@
  * the customer — visit, call, outcome, signals — and it feeds metrics. A
  * *comment* is what colleagues say to each other about a record `[25 §9]`. It
  * never feeds a metric, never counts as activity toward anything, and never
- * appears where a report belongs: not in `/reports`, not in `/coverage`, not in
- * `reportsInRange`, and never inside a coverage threshold. `25 §14` puts the
+ * appears where a report belongs: not in `/reports`, not in `reportsInRange`,
+ * and never inside a coverage threshold. `25 §14` puts the
  * two counts side by side on `/activity` precisely so they cannot be added —
  * merging them would let a rep raise his activity number by talking to
  * colleagues.

@@ -72,7 +72,6 @@ import {
   repReports,
   roles,
   settings,
-  tasks,
   users,
 } from "@/db/schema";
 import {
@@ -672,20 +671,20 @@ async function main(): Promise<void> {
 
   /* --- 5. A follow-up writes nothing [21 §1] ------------------------ */
 
-  console.log("\n5. *** A follow-up writes NO task row and NO notification row ***");
+  console.log("\n5. *** A follow-up writes NO notification row ***");
 
-  const [tasksBefore] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(tasks);
+  // `21 §1`'s claim was that FACET never writes `10 §9`'s SYSTEM task, proved
+  // by counting `tasks` rows before and after. Feature slice 6 withdrew `25
+  // §20` ("not needed for now") and dropped `tasks` entirely along with it
+  // `[26 §6]` — there is no table left to count, so the claim this section
+  // once proved is now proved by the table's absence, asserted once in
+  // `verify:schema25` rather than here on every run.
   const [notificationsBefore] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(notifications);
 
   const ownerFollowUps = await followUps(owner);
 
-  const [tasksAfter] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(tasks);
   const [notificationsAfter] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(notifications);
@@ -696,39 +695,9 @@ async function main(): Promise<void> {
     `got ${ownerFollowUps.total}`,
   );
   check(
-    "*** it wrote no `tasks` row — 10 §9's system task is declined [21 §1] ***",
-    tasksAfter.n === tasksBefore.n,
-    `${tasksBefore.n} -> ${tasksAfter.n}`,
-  );
-  check(
-    "*** and no `notifications` row: a follow-up is a condition [21 §1] ***",
+    "*** it wrote no `notifications` row: a follow-up is a condition [21 §1] ***",
     notificationsAfter.n === notificationsBefore.n,
     `${notificationsBefore.n} -> ${notificationsAfter.n}`,
-  );
-  // The precise claim, and not a broader one. `tasks` is NOT empty in a dev
-  // database — `verify-phase11.ts` inserts `origin: 'assigned'` rows as
-  // scaffolding for the handover screen, and `12 §7` keeps them. What `21 §1`
-  // actually claims is that FACET never writes `10 §9`'s SYSTEM task, and that
-  // is what is asserted. The first draft claimed the table was empty and failed
-  // on another script's fixtures — the same family of over-claim as the flaw
-  // found in `verify:phase11` §16.
-  const [systemTasks] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(tasks)
-    .where(eq(tasks.origin, "system"));
-  check(
-    "no task anywhere carries origin 'system' — 10 §9 is declined [21 §1]",
-    systemTasks.n === 0,
-    `got ${systemTasks.n}`,
-  );
-  const [triggered] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(tasks)
-    .where(sql`${tasks.systemTrigger} is not null`);
-  check(
-    "and `system_trigger` is unused, as 21 §1 records it will stay [21 §1]",
-    triggered.n === 0,
-    `got ${triggered.n}`,
   );
 
   /* --- 6. Each kind fires at its threshold, not a day early --------- */
@@ -1093,10 +1062,12 @@ async function main(): Promise<void> {
   const assignedTypeId = typeByKey.get(NOTIFICATION_TYPES.recordAssigned)?.id;
   const reachCompany = await makeCompany("reach", 1);
   const reach = await makeProject("reach", reachCompany.id, 1, "requested");
+  // `origin: "assigned"` — `company_rep_origin` dropped `'shared'` in feature
+  // slice 6, unused by real code and only ever written by fixtures `[26 §2]`.
   await db.insert(companyReps).values({
     companyId: reachCompany.id,
     userId: otherUser.id,
-    origin: "shared",
+    origin: "assigned",
   });
 
   const planted = await db
@@ -1211,7 +1182,6 @@ async function main(): Promise<void> {
       membershipIds: handoverCompanies.map((row) => row.membership.id),
       projectIds: [departingProject.id],
       threadIds: [],
-      taskIds: [],
     },
   );
 

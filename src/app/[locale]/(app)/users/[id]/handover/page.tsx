@@ -1,4 +1,4 @@
-import { getFormatter, getTranslations, setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/page-header";
@@ -29,7 +29,6 @@ export default async function HandoverPage({
   if (!book) notFound();
 
   const t = await getTranslations();
-  const format = await getFormatter();
 
   // Only an active colleague may receive work, and never the departing person
   // themselves — though the data layer refuses that too.
@@ -71,21 +70,6 @@ export default async function HandoverPage({
           { nameEn: row.companyNameEn, nameAr: row.companyNameAr },
           locale,
         ),
-      })),
-    },
-    {
-      name: "taskIds" as const,
-      title: t("team.handover.tasks"),
-      empty: t("team.handover.noTasks"),
-      rows: book.tasks.map((row) => ({
-        id: row.id,
-        label: row.title,
-        note: row.dueDate
-          ? format.dateTime(new Date(`${row.dueDate}T00:00:00Z`), {
-              dateStyle: "medium",
-              timeZone: "UTC",
-            })
-          : t("team.handover.noDueDate"),
       })),
     },
   ];

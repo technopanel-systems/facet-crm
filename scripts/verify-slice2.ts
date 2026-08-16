@@ -36,8 +36,7 @@
  * statement in this file runs.
  *
  * **It refuses to run outside development** `[15 §7]`, for the same reason
- * `dev-fixtures.ts` does: it writes real rows, including a dev-only colour that
- * must never reach a real database.
+ * `dev-fixtures.ts` does.
  *
  * It needs a seeded database — `npm run db:seed`. Suppliers come from the seed
  * since `17 §1`, so the supplier fixture this script used to insert is gone.
@@ -55,7 +54,6 @@ import {
   companies,
   companyReps,
   productClasses,
-  productColours,
   productFireRatings,
   productSuppliers,
   productThicknesses,
@@ -133,30 +131,6 @@ async function sessionFor(email: string): Promise<AuthSession> {
   };
 }
 
-/**
- * One dev-only colour row.
- *
- * `product_colours` is empty by decision `[17 §2]` — the colour is typed into
- * `custom_colour`, and no screen offers the lookup. This row exists purely so
- * the "never both" half of the CHECK can still be exercised below; it is a
- * fixture, in a script that cannot run outside development, and it is the one
- * thing here the seed will never create.
- */
-async function ensureColourFixture(): Promise<void> {
-  const [colour] = await db
-    .select()
-    .from(productColours)
-    .where(eq(productColours.code, "168"))
-    .limit(1);
-  if (!colour) {
-    await db.insert(productColours).values({
-      code: "168",
-      nameEn: "168 (dev fixture)",
-      nameAr: "168 (بيانات تجريبية)",
-    });
-  }
-}
-
 async function main(): Promise<void> {
   if (process.env.NODE_ENV !== "development") {
     console.error(
@@ -165,8 +139,6 @@ async function main(): Promise<void> {
     );
     process.exit(1);
   }
-
-  await ensureColourFixture();
 
   const repA = await sessionFor("rep-a@example.test");
   const repB = await sessionFor("rep-b@example.test");
@@ -179,7 +151,6 @@ async function main(): Promise<void> {
     .limit(1);
   const [productClass] = await db.select().from(productClasses).limit(1);
   const [fireRating] = await db.select().from(productFireRatings).limit(1);
-  const [colour] = await db.select().from(productColours).limit(1);
   const [thickness] = await db
     .select()
     .from(productThicknesses)
@@ -192,8 +163,8 @@ async function main(): Promise<void> {
     .limit(1);
   const [service] = await db.select().from(serviceTypes).limit(1);
 
-  // Everything above except the colour comes from `npm run db:seed`. Say so
-  // rather than failing later on an undefined `.id`.
+  // Everything above comes from `npm run db:seed`. Say so rather than
+  // failing later on an undefined `.id`.
   if (!supplier || !productClass || !fireRating || !thickness || !thickThickness || !service) {
     console.error("The lookups are not seeded. Run: npm run db:seed");
     process.exit(1);
@@ -255,8 +226,7 @@ async function main(): Promise<void> {
       supplierCode: "N",
       classCode: "CA",
       fireRatingCode: "FR",
-      colourCode: "168",
-      customColour: null,
+      customColour: "168",
       thicknessMm: "4.00",
       thicknessIsStandard: true,
     }) === "N- CA FR 168",
@@ -267,19 +237,17 @@ async function main(): Promise<void> {
       supplierCode: "N",
       classCode: "CA",
       fireRatingCode: "FR",
-      colourCode: "168",
-      customColour: null,
+      customColour: "168",
       thicknessMm: "5.00",
       thicknessIsStandard: false,
     }) === "N- CA FR 168 5mm",
   );
   check(
-    "a custom colour takes the code's place [12 §12]",
+    "a RAL or Pantone special reads the same way [12 §12], [26 §2]",
     productDisplayName({
       supplierCode: "N",
       classCode: "CA",
       fireRatingCode: "FR",
-      colourCode: null,
       customColour: "RAL 9016",
       thicknessMm: "4.00",
       thicknessIsStandard: true,
@@ -303,8 +271,7 @@ async function main(): Promise<void> {
         supplierId: supplier.id,
         classId: productClass.id,
         fireRatingId: fireRating.id,
-        // Typed, not picked `[17 §2]` — this is what every form now writes.
-        colourId: null,
+        // Typed, not picked `[17 §2]` — the only shape a line has since `26 §2`.
         customColour: "168",
         thicknessId: thickness.id,
         // Quotation 9592, verbatim: 12 × 1.24 × 5.8 = 86.3040 m².
@@ -415,7 +382,6 @@ async function main(): Promise<void> {
         supplierId: supplier.id,
         classId: productClass.id,
         fireRatingId: fireRating.id,
-        colourId: null,
         customColour: "168",
         thicknessId: thickness.id,
         widthM: "1.2400",
@@ -454,7 +420,6 @@ async function main(): Promise<void> {
     supplierId: supplier.id,
     classId: productClass.id,
     fireRatingId: fireRating.id,
-    colourId: null,
     customColour: "RAL 9016",
     thicknessId: thickThickness.id,
     widthM: "1.2400",
@@ -476,15 +441,14 @@ async function main(): Promise<void> {
     detail?.live.lines.map((l) => l.displayName).join(" | "),
   );
   await refuses(
-    "a line cannot carry both a colour and a custom one [12 §12]",
+    "a line with no colour is refused [12 §12], [26 §2]",
     "quotations.errors.colourChoice",
     () =>
       addQuotationLine(repA, thread.id, {
         supplierId: supplier.id,
         classId: productClass.id,
         fireRatingId: fireRating.id,
-        colourId: colour.id,
-        customColour: "RAL 9016",
+        customColour: null,
         thicknessId: thickness.id,
         widthM: "1.2400",
         lengthM: "5.8000",
@@ -609,7 +573,6 @@ async function main(): Promise<void> {
             supplierId: supplier.id,
             classId: productClass.id,
             fireRatingId: fireRating.id,
-            colourId: null,
             customColour: "168",
             thicknessId: thickness.id,
             widthM: "1.2400",
@@ -665,7 +628,6 @@ async function main(): Promise<void> {
         supplierId: supplier.id,
         classId: productClass.id,
         fireRatingId: fireRating.id,
-        colourId: null,
         customColour: "168",
         thicknessId: thickness.id,
         widthM: "1.2400",

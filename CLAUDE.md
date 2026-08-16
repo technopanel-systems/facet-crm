@@ -88,14 +88,19 @@ ones most likely to be got wrong from memory:
 
 - `21` **overrules `10 §9`'s self-closing system task.** Follow-ups are computed
   on read — the pattern `16 §3`, `20 §5` and coverage already use — and surface
-  as **one digest notification per recipient per day** `[07 E5]`. So **`tasks`
-  stays empty and `system_trigger` permanently unused**, kept rather than
-  dropped the way `13 §2` keeps `form_factor`.
+  as **one digest notification per recipient per day** `[07 E5]`. `21` kept
+  `tasks` empty and `system_trigger` unused rather than drop them, the way
+  `13 §2` keeps `form_factor` — but `25 §20` (manual tasks) was later
+  withdrawn too, feature slice 6, "not needed for now," and `tasks` was
+  dropped along with it `[26 §6]`. Kept-empty and dropped are different
+  answers at different times; don't cite this bullet for the current state
+  of `tasks`.
 - `20` **supersedes `04 Q6`'s "activities are private to the rep, without
   exception"** — visibility follows the anchor — **and `07 D6`'s submission
   model with its two-day grace**: nothing is handed in, so nothing can be
-  missed, and no working-day arithmetic is needed there. `activities` stays
-  permanently empty the way `product_colours` does `[17 §2]`. `20 §8.2` adds
+  missed, and no working-day arithmetic is needed there. `activities` was
+  kept permanently empty the way `product_colours` was `[17 §2]` — feature
+  slice 6 dropped both tables `[26 §2]`. `20 §8.2` adds
   that **`audit_log` is never read directly for a user-facing view**.
 - `16 §8` and `18 §2` **reverse `04 Q10`'s coordinator read-across.** The
   coordinator does **not** see all companies and projects read-only. They see
@@ -106,7 +111,9 @@ ones most likely to be got wrong from memory:
   it. Credit is fixed to the dispatch, so no past month moves when an owner or a
   rep does.
 - `17` **drops `08 B1`'s G, G1 and Y suppliers** for N, K, D, C, and makes
-  colour typed rather than looked up, so `colour_id` is always null.
+  colour typed rather than looked up — `colour_id` was always null from that
+  point on, and feature slice 6 dropped the column and `product_colours`
+  with it `[26 §2]`.
 - `12 §7` **supersedes `04 Q8.1`'s "or delete them"** — only redistribution is
   built — and `14` corrects `12 §3`: the executive may edit records.
 
@@ -129,6 +136,22 @@ kept to understand what was attempted, not what should be built.
   for.** Correct, harmless structure is left alone (`13 §2`).
 - Where something is undecided, write it under `OPEN — not chosen` rather than
   filling the gap.
+
+## Simplicity
+
+- The smallest implementation that satisfies the document wins. Not the
+  most thorough — the smallest.
+- Every plan states what it is NOT building, and why that is enough.
+- Delete before adding. If a slice can remove a column, a flag or a
+  screen, that is part of the slice.
+- A plan over 800 words is too big. Split it or cut it.
+- Do not build machinery for a case the founder called rare.
+- Do not add an assertion about an assertion.
+- Unused structure is a defect, not neutral. A column nothing writes, a
+  flag nothing reads, a table nothing fills — each one is a lie about
+  what the system does.
+- Never land a column, flag or table without its writer in the same slice.
+  If the writer is not ready, the column is not ready.
 
 ## Design principles
 
@@ -174,10 +197,11 @@ The verify-script shape is the `facet-verify` skill.
 ## Verification
 
 There is **no test harness.** `npm run typecheck` · `lint` · `build` ·
-`check:messages`, then `npm run verify:{slice2,slice3,phase9,phase11,phase10a}`
-— kept behavioural scripts driven in process against `src/lib`, **development
-only**, each needing `db:seed` and `dev:fixtures` first. **`build` is not
-optional**: typecheck passed while a client component imported a data module.
+`check:messages`, then `npm run verify:{slice2,slice3,phase9,phase11,phase10a,
+followups,comments,sharing,schema25}` — kept behavioural scripts driven in
+process against `src/lib`, **development only**, each needing `db:seed` and
+`dev:fixtures` first. **`build` is not optional**: typecheck passed while a
+client component imported a data module.
 
 **A phase is not done until its screens have been driven over HTTP, in both
 locales** — a green suite once sat beside a 500 on every company detail page.
@@ -190,8 +214,8 @@ Two of its sections assert something about **the run itself**, because a suite
 that only checks what it expects to see will pass against the wrong server —
 twice in one afternoon it did. **Section 0** refuses a server that booted
 before `.next/BUILD_ID` was written (`/api/health` carries `bootedAt`); if it
-fires, stop the port's holder **by PID** and start again. **Section 9** fails on
-any visible text shaped like `<namespace>.<key>`, the namespaces read from
+fires, stop the port's holder **by PID** and start again. **Section 12** fails
+on any visible text shaped like `<namespace>.<key>`, the namespaces read from
 `messages/en.json` itself — that is not asserting a translation, it is
 asserting that no lookup silently failed.
 

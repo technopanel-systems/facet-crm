@@ -40,8 +40,9 @@ const QUEUE_ROWS = 6;
  * The `company_quiet` tile below is safe and does render: that number comes from
  * `followUps().counts`, computed over the whole scope rather than over a page.
  *
- * **Scoped, never gated** — like `/follow-ups` and `/coverage`, every identity
- * gets the same screen and the visibility filters decide the rows.
+ * **Scoped, never gated** — like `/follow-ups` and `/performance`'s coverage
+ * section, every identity gets the same screen and the visibility filters
+ * decide the rows.
  */
 export default async function TodayPage({
   params,
