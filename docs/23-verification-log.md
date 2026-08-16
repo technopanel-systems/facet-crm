@@ -1226,6 +1226,45 @@ trap. Any assertion that something stopped needs a sibling proving it started.
 
 ---
 
+## Looked at by a person
+
+Every visual risk named across stages 1–2 and slices 1–4, collected so the
+polish pass starts from a checklist rather than from memory. **Nothing here has
+been seen.** `verify:routes` proves markup and status codes; none of it proves
+a layout.
+
+**Check 1366 first, then 1440, then wide** — with the 236px rail, content is
+capped by the *screen* at those two (≈1078 and ≈1152 usable) and by the 1320px
+column at 1920, which leaves 364px of bare canvas. The one real visual defect
+found so far — `Facts` painting its empty seventh track as a block of `--line`
+— was visible at 1366 and hidden at 1920.
+
+The general rule the same defect produced, since every row below is a candidate
+for it: **container-drawn line work assumes a full last row, and an `auto-fit`
+grid is the one thing that cannot promise one.**
+
+| # | Screen | Viewport | Locale | What would break |
+|---|---|---|---|---|
+| 1 | `/companies/[id]` — `Facts` | 1366 | both | Thirteen facts wrap to seven tracks then six. Fixed by moving the rules onto the cells; **the fix has not been re-checked at width** `[stage 2]` |
+| 2 | `/` — Today KPI row | 1366, 1440 | both | Now **six** tiles at `minmax(178px,1fr)`. 6×178 + gaps = 1128 < 1320 on paper, which is arithmetic, not an observation. A seventh kind wraps it `[slice 4]` |
+| 3 | `/follow-ups` — `FilterNav` | 1366 | both | **Six** kind chips plus "All follow-ups", each carrying a count badge. Arabic labels are longer than the English `[slice 4]` |
+| 4 | `/quotations/[id]`, `/projects/[id]` — chain strip | 1366, 1440 | both | Six `flex-1 min-w-0` steps with `truncate` labels. Structurally cannot overflow; the truncation point is what nobody has seen `[slice 1]` |
+| 5 | Comment composer — mention chip row | 1366 | both | Every active colleague as a checkbox under every comment box. Readable at fourteen people, a wall at thirty, unusable at sixty. The trigger for `22 §6.9` is the row ceasing to fit `[slice 2]` |
+| 6 | Comment body | 1366 | both | Long bodies and the 5000-char cap; wrapping inside the timeline card `[slice 2]` |
+| 7 | `SharingPanel` rows | 1366 | both | Sits in the company screen's **narrow** column. A long name beside "Stop sharing" is the pair that wraps; the row is `flex-wrap`, which is an argument `[slice 3]` |
+| 8 | `NextFollowUpPanel` — the value row | 1366 | both | Same narrow column. The date, "set by <name> on <date>" and the Clear button share one `flex-wrap` row; an Arabic name plus a medium date is the long case `[slice 4]` |
+| 9 | `NextFollowUpPanel` — the on-hold note | 1366 | both | `"{company} is on hold until {date}. This follow-up will not raise until then."` — a full sentence with a company name in it, in a narrow column `[slice 4]` |
+| 10 | `/follow-ups` — the age column | any | both | The `date_due` tone is `soon` (amber) at zero days, not `late`. Nobody has seen the amber, or checked it against `--a-amber-fg` in **both** themes `[slice 4]` |
+| 11 | `not-found.tsx` | any | both | Next replaces the whole `(app)` subtree, layout included, so there is **no rail**. Its one link out is the only way back that is not the browser's button `[stage 2]` |
+| 12 | Every screen | any | **ar** | RTL beyond the logical utilities: the native `<input type="date">` and `<select>` popups are placed by the browser, and no one has watched them open in Arabic `[slice 3, 4]` |
+| 13 | Every screen | any | both | Both themes. A token defined in only one hides in the default — the lesson `verify:routes` §4 exists for `[stage 1]` |
+
+Two things would let a machine take most of this over, and neither is built: a
+browser driver (an npm dependency, not added without asking) and a screenshot
+diff. Until then this table is the pass.
+
+---
+
 ## Why the HTTP pass is not optional
 
 Also moved from `CLAUDE.md`, from its **Working style** section, which now
