@@ -237,21 +237,25 @@ const TASK_COLUMNS = [
 ];
 
 /**
- * Every column this pass added, by the table it sits on, and what "unwritten"
- * means for it: null for a nullable column, `false` for a boolean that has a
- * default and therefore can never be null. Section 8.
+ * Every column this pass added **that nothing writes yet**, by the table it
+ * sits on, and what "unwritten" means for it: null for a nullable column,
+ * `false` for a boolean that has a default and therefore can never be null.
+ * Section 8.
+ *
+ * **The three `next_follow_up_at` columns have left this list.** Feature slice
+ * 4 built `25 §18`, so they are written now — `setNextFollowUp` in
+ * `src/lib/follow-ups.ts`, proved by `npm run verify:followups`. The same
+ * inversion `comments` and `comment_mentions` got in slice 2. They stay in
+ * `LANDED` above: that they exist with the right type is still true.
  */
 const NEW_COLUMNS: { table: string; column: string; boolean?: true }[] = [
   { table: "companies", column: "has_credit_terms", boolean: true },
-  { table: "companies", column: "next_follow_up_at" },
   { table: "projects", column: "lost_reason_id" },
   { table: "projects", column: "lost_at" },
   { table: "projects", column: "loss_reason" },
   { table: "projects", column: "in_production", boolean: true },
-  { table: "projects", column: "next_follow_up_at" },
   { table: "quotation_threads", column: "closed_at" },
   { table: "quotation_threads", column: "closed_by_user_id" },
-  { table: "quotation_threads", column: "next_follow_up_at" },
   { table: "rep_reports", column: "reference" },
 ];
 

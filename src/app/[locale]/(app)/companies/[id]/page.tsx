@@ -28,6 +28,7 @@ import {
   reincludeCompanyAction,
 } from "../actions";
 import { CommentBox } from "../../_components/comment-box";
+import { NextFollowUpPanel } from "../../_components/next-follow-up-panel";
 import { SharingPanel } from "../../_components/sharing-panel";
 import {
   TurnPanel,
@@ -346,6 +347,17 @@ export default async function CompanyDetailPage({
             session={session}
             recordType="company"
             recordId={company.id}
+          />
+
+          {/* `25 §18` — the rep's own date, which outranks the automatic
+              clock. On a company it suppresses the quiet and catalogue chases
+              until it arrives, and then becomes the follow-up itself. */}
+          <NextFollowUpPanel
+            session={session}
+            locale={locale}
+            recordType="company"
+            recordId={company.id}
+            value={company.nextFollowUpAt}
           />
 
           <Card>

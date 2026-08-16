@@ -41,6 +41,7 @@ import { recordTimeline } from "@/lib/timeline";
 import { ChainStrip } from "../../_components/chain-strip";
 import { CommentBox } from "../../_components/comment-box";
 import { ListPagination } from "../../_components/list-controls";
+import { NextFollowUpPanel } from "../../_components/next-follow-up-panel";
 import { SharingPanel } from "../../_components/sharing-panel";
 import {
   TurnPanel,
@@ -474,6 +475,19 @@ export default async function QuotationDetailPage({
         session={session}
         recordType="quotation_thread"
         recordId={thread.id}
+      />
+
+      {/* `25 §18` — the rep's own date. On a thread it suppresses both the
+          no-response chase and `22 §6.11`'s returned-for-edits one until it
+          arrives, which is the escape hatch for a rep who has nothing to
+          change: they say when they will get to it, and the queue believes
+          them. */}
+      <NextFollowUpPanel
+        session={session}
+        locale={locale}
+        recordType="quotation_thread"
+        recordId={thread.id}
+        value={thread.nextFollowUpAt}
       />
 
       {/* `25 §9` — the thread this screen exists to replace WhatsApp for. The

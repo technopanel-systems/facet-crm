@@ -25,6 +25,7 @@ import { projectTimeline, TIMELINE_CARD_LIMIT } from "@/lib/timeline";
 import { setCreditSplitAction } from "../actions";
 import { ChainStrip } from "../../_components/chain-strip";
 import { CommentBox } from "../../_components/comment-box";
+import { NextFollowUpPanel } from "../../_components/next-follow-up-panel";
 import { SharingPanel } from "../../_components/sharing-panel";
 import {
   TurnPanel,
@@ -334,6 +335,18 @@ export default async function ProjectDetailPage({
         session={session}
         recordType="project"
         recordId={project.id}
+      />
+
+      {/* `25 §18` — the rep's own date. On a project it suppresses the
+          stage-unchanged chase until it arrives, and then becomes the
+          follow-up itself. The founder's own case: a project going overdue in
+          two days, with the follow-up already set for next week. */}
+      <NextFollowUpPanel
+        session={session}
+        locale={locale}
+        recordType="project"
+        recordId={project.id}
+        value={project.nextFollowUpAt}
       />
 
       {/* `20 §6` — the project's own history. A report naming this project

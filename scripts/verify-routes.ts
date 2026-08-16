@@ -1109,7 +1109,129 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log("\n11. Nothing reads like a message key that failed to resolve");
+  console.log("\n11. The next follow-up date, set and cleared for real [25 §18]");
+  {
+    // **`verify:followups` drives `setNextFollowUp`; this drives the FORM.**
+    // The two do not overlap: the in-process script never touches
+    // `readFields`, the bound `$ACTION` envelope, or the native date input —
+    // and the panel is on three screens, so a marker check on each is the only
+    // thing that catches one wired up wrong.
+    const jar = jars["manager@example.test"];
+
+    const envelopeOf = (form: string): FormData => {
+      const fields = new FormData();
+      for (const input of form.matchAll(/<input[^>]*>/g)) {
+        const name = input[0].match(/name="([^"]+)"/)?.[1];
+        if (!name?.startsWith("$ACTION")) continue;
+        fields.append(
+          name,
+          unescapeHtml(input[0].match(/value="([^"]*)"/)?.[1] ?? ""),
+        );
+      }
+      return fields;
+    };
+
+    // The panel hangs on all three anchors `25 §18` names, so all three are
+    // walked rather than one standing in for the others.
+    const anchors = [
+      { section: "companies", label: "company" },
+      { section: "projects", label: "project" },
+      { section: "quotations", label: "quotation thread" },
+    ] as const;
+
+    for (const locale of ["en", "ar"] as const) {
+      for (const anchor of anchors) {
+        const list = await get(jar, `/${locale}/${anchor.section}`);
+        const id = firstId(list.body, anchor.section);
+        if (!id) {
+          console.log(`  --    ${locale}: no ${anchor.label} to date`);
+          continue;
+        }
+
+        const path = `/${locale}/${anchor.section}/${id}`;
+        const page = await get(jar, path);
+        check(
+          `${locale}: the ${anchor.label} screen carries the panel [25 §18]`,
+          page.body.includes('data-slot="next-follow-up"'),
+        );
+
+        const setForm = page.body.match(
+          /<form[^>]*data-slot="next-follow-up-set"[\s\S]*?<\/form>/,
+        )?.[0];
+        check(
+          `${locale}: the ${anchor.label} panel offers the date field`,
+          Boolean(setForm?.includes('name="nextFollowUpAt"')),
+        );
+        if (!setForm) continue;
+
+        const post = async (body: FormData): Promise<number> => {
+          const response = await fetch(`${BASE}${path}`, {
+            method: "POST",
+            headers: { cookie: header(jar), origin: BASE },
+            body,
+            redirect: "manual",
+          });
+          store(jar, response);
+          return response.status;
+        };
+
+        // Far enough ahead that it cannot be today's date by accident, which
+        // would make the "it is set" assertion pass on an empty write.
+        const future = new Date(Date.now() + 30 * 86_400_000)
+          .toISOString()
+          .slice(0, 10);
+        const set = envelopeOf(setForm);
+        set.set("nextFollowUpAt", future);
+        const stored = await post(set);
+        check(
+          `${locale}: *** dating a ${anchor.label} answers 200, not 500 *** [25 §18]`,
+          stored === 200,
+          `got ${stored}`,
+        );
+
+        const afterSet = await get(jar, path);
+        check(
+          `${locale}: the ${anchor.label} panel now names who set it [20 §8.1]`,
+          afterSet.body.includes('data-slot="next-follow-up-set-by"'),
+        );
+
+        // A past date is a `RuleError` through `ruleErrorState`, so the right
+        // answer is a 200 carrying the message. A 500 is the defect.
+        const past = envelopeOf(setForm);
+        past.set("nextFollowUpAt", "2020-01-01");
+        const refused = await post(past);
+        check(
+          `${locale}: a past date on a ${anchor.label} is refused, not a 500`,
+          refused === 200,
+          `got ${refused}`,
+        );
+
+        const clearForm = afterSet.body.match(
+          /<form[^>]*data-slot="next-follow-up-clear"[\s\S]*?<\/form>/,
+        )?.[0];
+        check(
+          `${locale}: a dated ${anchor.label} offers the clear`,
+          Boolean(clearForm),
+        );
+        if (!clearForm) continue;
+
+        const cleared = await post(envelopeOf(clearForm));
+        check(
+          `${locale}: *** clearing answers 200, not 500 *** [25 §18]`,
+          cleared === 200,
+          `got ${cleared}`,
+        );
+
+        const afterClear = await get(jar, path);
+        check(
+          `${locale}: cleared, the ${anchor.label} names nobody`,
+          !afterClear.body.includes('data-slot="next-follow-up-set-by"'),
+        );
+      }
+    }
+  }
+
+  console.log("\n12. Nothing reads like a message key that failed to resolve");
   {
     // Accumulated by `scanForUnresolvedKeys` over every page fetched above —
     // so this covers all three identities, both locales, both themes and every

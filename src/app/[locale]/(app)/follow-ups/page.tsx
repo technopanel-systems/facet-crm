@@ -83,6 +83,7 @@ export default async function FollowUpsPage({
       <p className="text-muted-foreground text-start text-sm">
         {t("followUps.detail.thresholds", {
           quotation: thresholds.quotationNoResponse,
+          returned: thresholds.quotationReturned,
           catalogue: thresholds.catalogueNoResponse,
           project: thresholds.projectStageUnchanged,
           qualified: thresholds.qualified,
@@ -193,25 +194,40 @@ export default async function FollowUpsPage({
                     })}
                   </TableCell>
                   {/* `22 §4` — waiting time coloured by lateness. **Every row
-                      on this screen is late**, and not by a judgement made
-                      here: `follow-ups.ts` put it in the queue precisely
-                      because it passed its threshold `[07 D5]`. The colour
-                      reads that fact rather than re-deriving it `[21 §7]`. */}
+                      on this screen is past its threshold**, and not by a
+                      judgement made here: `follow-ups.ts` put it in the queue
+                      precisely for that reason `[07 D5]`. The colour reads
+                      that fact rather than re-deriving it `[21 §7]`.
+
+                      The exception is a `date_due` on the day it arrives. Its
+                      threshold is zero, so an age of zero says the rep's date
+                      is today — due, not late `[25 §18]`. Still no threshold
+                      here: this reads the age the data layer computed. */}
                   <TableCell
                     numeric
                     className={cn(
                       "font-semibold",
-                      toneClass(turnTone({ overdue: true })),
+                      toneClass(
+                        turnTone({
+                          overdue: row.ageDays > 0,
+                          dueSoon: row.ageDays === 0,
+                        }),
+                      ),
                     )}
                     dir="ltr"
                   >
-                    {/* Working days for the two thresholds `07 D5` states
-                        that way; calendar days for the rest `[21 §8]`. */}
-                    {row.inWorkingDays
-                      ? t("followUps.fields.workingDays", {
-                          count: row.ageDays,
-                        })
-                      : t("followUps.fields.days", { count: row.ageDays })}
+                    {/* Working days for the thresholds stated that way,
+                        calendar days for the rest `[21 §8]` — and its own
+                        phrase at zero, which only `date_due` reaches: a rep's
+                        date that arrived today has waited no days, and "0
+                        days" in this column reads as a defect `[25 §18]`. */}
+                    {row.ageDays === 0
+                      ? t("followUps.fields.dueToday")
+                      : row.inWorkingDays
+                        ? t("followUps.fields.workingDays", {
+                            count: row.ageDays,
+                          })
+                        : t("followUps.fields.days", { count: row.ageDays })}
                   </TableCell>
                   <TableCell className="text-start">
                     {row.companyId ? (

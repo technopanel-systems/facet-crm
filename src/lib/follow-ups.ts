@@ -1,12 +1,17 @@
 /**
- * Follow-ups — `07 D5`, `21 §1`.
+ * Follow-ups — `07 D5`, `21 §1`, `22 §6.11`, `25 §18`.
  *
- * **A follow-up is a condition, not a record.** Nothing here writes anything.
- * Every kind below is a query over real events and a `settings` threshold,
- * computed on read — the pattern the codebase has already chosen three times:
- * the quotation expiry sweep `[16 §3]`, Phase 9's coverage, and `on hold`
- * `[20 §5]`. `20 §9` states it outright: *"Follow-up timers are computed on
- * read, never fired and stored."*
+ * **A follow-up is a condition, not a record.** Every kind below is a query
+ * over real events and a `settings` threshold, computed on read — the pattern
+ * the codebase has already chosen three times: the quotation expiry sweep
+ * `[16 §3]`, Phase 9's coverage, and `on hold` `[20 §5]`. `20 §9` states it
+ * outright: *"Follow-up timers are computed on read, never fired and stored."*
+ *
+ * **The one thing written here is the rep's own date** — `setNextFollowUp`,
+ * `25 §18`. That is an **input to** the derivation and not a timer: no
+ * follow-up, no due date and no age is stored, and clearing the date restores
+ * `07 D5`'s thresholds with nothing to unwind. Read it as evidence that
+ * follow-ups are stored and the next change will store one.
  *
  * **It is therefore not a task.** `10 §9` designed a system task that closes
  * itself when its trigger clears, and `21 §1` overrules it: a task row is a
@@ -15,25 +20,37 @@
  * correction failure `20 §9`'s end-of-day rule exists to prevent. `tasks` stays
  * empty and `tasks.system_trigger` stays unused.
  *
- * **The only thing a follow-up ever writes is one digest notification per
- * recipient per day** — `src/lib/notifications.ts`, `07 E5`.
+ * **The only thing a follow-up ever raises is one digest notification per
+ * recipient per day** — `src/lib/notifications.ts`, `07 E5`. Six kinds, still
+ * one delivery: `21 §2`'s "five types and no sixth" is about deliveries.
  *
  * **No predicate is written here.** Each source composes an existing filter
  * from `authz` — `visibleCompaniesFilter`, `visibleProjectsFilter`,
- * `visibleQuotationThreadsFilter` — and nothing else.
+ * `visibleQuotationThreadsFilter` — and nothing else. `setNextFollowUp` gates
+ * on `canViewRecord`, which `authz.ts` documents as the write-path check.
  *
- * **Three suppressions apply to every kind**, so a customer who has asked to be
- * left alone is never chased:
+ * ## Two suppressions, with deliberately different reach
  *
- *  1. `on hold until` still in the future `[20 §5]`, derived from the reports.
- *  2. The company is archived — out of scope by its own lifecycle `[07 E6]` —
- *     or is a merge tombstone `[07 B5]`.
- *  3. A `reincluded` dormancy review inside one threshold period `[21 §7]`.
- *     Without this, route 1 of `07 E6` does nothing and the company is back in
- *     tomorrow's digest, which teaches a rep to ignore the list.
+ * `gather` drops rows twice, and the two do not cover the same ground. A
+ * reader who notices that and takes one for a bug will "fix" it, so the reason
+ * is here rather than left to be inferred:
  *
- * The four sources are merged and sorted in TypeScript rather than unioned in
- * SQL — the shape `timeline.ts` already uses for six sources, and for the same
+ * **On hold is about the CUSTOMER.** They asked to be left alone, so
+ * everything about them goes quiet — every kind on that company, including
+ * rows anchored to its projects and threads. That is `suppressedCompanies`,
+ * and it covers three company-level facts: `on hold until` still in the future
+ * `[20 §5]`; the company archived `[07 E6]` or a merge tombstone `[07 B5]`;
+ * and a `reincluded` dormancy review inside one threshold period `[21 §7]`,
+ * without which route 1 of `07 E6` does nothing and the company is back in
+ * tomorrow's digest.
+ *
+ * **A follow-up date is about the RECORD** — *"I will get to this one then"*.
+ * So it drops only rows whose own anchor carries the date. Suppressing a
+ * quotation because somebody set a date on its company would hide real work on
+ * a different piece of business.
+ *
+ * The sources are merged and sorted in TypeScript rather than unioned in SQL —
+ * the shape `timeline.ts` already uses for six sources, and for the same
  * reason: each source composes its own visibility filter, which a union would
  * have to flatten. Each source applies its threshold in SQL, so only overdue
  * rows come back; a work queue is small by construction.
@@ -41,11 +58,13 @@
 
 import {
   and,
-  asc,
+  desc,
   eq,
+  asc,
   gt,
   inArray,
   isNull,
+  isNotNull,
   lte,
   notExists,
   or,
@@ -67,7 +86,9 @@ import {
   repReports,
   users,
 } from "@/db/schema";
+import { withAudit } from "@/lib/audit";
 import {
+  canViewRecord,
   visibleCompaniesFilter,
   visibleProjectsFilter,
   visibleQuotationThreadsFilter,
@@ -76,6 +97,7 @@ import {
 import { FOLLOW_UP_KINDS, type FollowUpKind } from "@/lib/enums";
 import { onHoldByCompany, today } from "@/lib/reports";
 import { getFollowUpThresholds, type FollowUpThresholds } from "@/lib/settings";
+import { RuleError } from "@/lib/validation";
 import {
   calendarDaysBetween,
   riyadhDayOf,
@@ -258,6 +280,152 @@ async function quotationNoResponse(
       ageDays: workingDaysBetween(since, now),
       inWorkingDays: true,
       thresholdDays: thresholds.quotationNoResponse,
+    };
+  });
+}
+
+/**
+ * The six audit actions that are the rep fixing what was sent back.
+ *
+ * They carry the LINE's id in `entity_id`, not the version's, and a removal
+ * deletes the line — so neither `entity_id` nor a join to `quotation_lines`
+ * can find them. The version is read out of the payload instead: `after` for
+ * an add or an edit, `before` for a removal, both of which are the whole row
+ * `[07 E1]`.
+ */
+const REP_EDIT_ACTIONS = [
+  "quotation_line.added",
+  "quotation_line.updated",
+  "quotation_line.removed",
+  "quotation_service_line.added",
+  "quotation_service_line.updated",
+  "quotation_service_line.removed",
+];
+
+/**
+ * `22 §6.11` — returned for edits and not yet resubmitted.
+ *
+ * The gap that item recorded: `returnForEdit` leaves the version `requested`
+ * and only increments a counter, so `quotationNoResponse` — which wants
+ * `issued` — never sees it, and a returned quotation reached the rep's Today
+ * screen through **nothing**. The slice-2 tag `[22 §6.10]` was a patch over
+ * this: a notification is read once and gone, where a follow-up persists until
+ * its condition clears `[21 §1]`.
+ *
+ * **The clock starts at the return**, read from the audit log for the reason
+ * `quotationNoResponse` records above and `20 §8.1` licenses — there is no
+ * `returned_at` column and adding one would be null for every return already
+ * made. `20 §8.2` is honoured the same way: the joins to `quotation_versions`
+ * and `quotation_threads` plus `visibleQuotationThreadsFilter` are what gate
+ * it, never the audit row.
+ *
+ * **What counts as resubmitted, stated here rather than left in the query.**
+ * There is no resubmit act in FACET — the version stays `requested` and stays
+ * editable, and only the coordinator issuing it or a revision superseding it
+ * moves its status. So the condition clears on **the rep touching the lines**:
+ * that is what `22 §4` means by whose move it is, and once they have acted the
+ * ball is with the coordinator. Leaving the status as the only clearing
+ * condition would keep chasing the rep for work already done.
+ *
+ * **A rep who changes nothing is not stuck**, and the escape hatch is the
+ * other half of this slice: they set a `next_follow_up_at` on the thread and
+ * the chase stops until that date `[25 §18]`. That is not a substitute for a
+ * resubmit act — the gap stays real — but it is not a dead end.
+ */
+async function quotationReturned(
+  session: AuthSession,
+  thresholds: FollowUpThresholds,
+): Promise<FollowUpRow[]> {
+  const cutoff = shiftWorkingDays(today(), thresholds.quotationReturned);
+  const returnedOn = riyadhDay(auditLog.createdAt);
+  const laterReturn = alias(auditLog, "later_return");
+  const repEdit = alias(auditLog, "rep_edit");
+
+  const rows = await db
+    .select({
+      threadId: quotationThreads.id,
+      companyId: quotationThreads.companyId,
+      companyNameEn: companies.nameEn,
+      companyNameAr: companies.nameAr,
+      projectNameEn: projects.nameEn,
+      projectNameAr: projects.nameAr,
+      smacReference: quotationVersions.smacReference,
+      // The plain timestamp, converted below — see `riyadhDay`'s note.
+      returnedAt: auditLog.createdAt,
+    })
+    .from(quotationThreads)
+    .innerJoin(
+      quotationVersions,
+      and(
+        eq(quotationVersions.threadId, quotationThreads.id),
+        // Still the live, editable version: an issued or superseded one has
+        // moved on, whatever its counter says.
+        eq(quotationVersions.status, "requested"),
+        gt(quotationVersions.returnForEditRound, 0),
+      ),
+    )
+    .innerJoin(auditLog, eq(auditLog.entityId, quotationVersions.id))
+    .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
+    .innerJoin(projects, eq(projects.id, quotationThreads.projectId))
+    .where(
+      and(
+        visibleQuotationThreadsFilter(session),
+        eq(auditLog.action, "quotation_version.returned_for_edit"),
+        isNull(quotationThreads.endState),
+        isNull(quotationThreads.paymentConfirmedAt),
+        isNull(companies.archivedAt),
+        isNull(companies.mergedIntoId),
+        lte(returnedOn, cutoff),
+        // The latest return. The round is a counter, so one version can carry
+        // several, and the clock runs from the most recent.
+        notExists(
+          subquery
+            .select({ one: sql`1` })
+            .from(laterReturn)
+            .where(
+              and(
+                eq(laterReturn.entityId, quotationVersions.id),
+                eq(laterReturn.action, "quotation_version.returned_for_edit"),
+                gt(laterReturn.createdAt, auditLog.createdAt),
+              ),
+            ),
+        ),
+        // The rep has not touched the lines since it came back.
+        notExists(
+          subquery
+            .select({ one: sql`1` })
+            .from(repEdit)
+            .where(
+              and(
+                inArray(repEdit.action, REP_EDIT_ACTIONS),
+                sql`coalesce(
+                  ${repEdit.after} ->> 'versionId',
+                  ${repEdit.before} ->> 'versionId'
+                ) = ${quotationVersions.id}::text`,
+                gt(repEdit.createdAt, auditLog.createdAt),
+              ),
+            ),
+        ),
+      ),
+    );
+
+  const now = today();
+  return rows.map((row) => {
+    const since = riyadhDayOf(row.returnedAt);
+    return {
+      kind: "quotation_returned" as const,
+      anchorType: "quotation_thread" as const,
+      anchorId: row.threadId,
+      anchorNameEn: row.smacReference ?? row.projectNameEn,
+      anchorNameAr: row.smacReference ? null : row.projectNameAr,
+      companyId: row.companyId,
+      companyNameEn: row.companyNameEn,
+      companyNameAr: row.companyNameAr,
+      ownerNames: [],
+      since,
+      ageDays: workingDaysBetween(since, now),
+      inWorkingDays: true,
+      thresholdDays: thresholds.quotationReturned,
     };
   });
 }
@@ -544,6 +712,151 @@ async function companyQuiet(
   });
 }
 
+/**
+ * `25 §18` — the rep's own date has arrived.
+ *
+ * *"A rep may set next follow-up on a project, quotation or company. That date
+ * suppresses the automatic chase until it arrives. When it arrives, it becomes
+ * the follow-up."* This is the second half. The first is `gather`'s override
+ * step, and the third — an arrived date **superseding** the automatic kinds on
+ * the same anchor, so *"the follow-up"* is one row and not two — is there too.
+ *
+ * **It produces, rather than merely un-suppressing.** A record with a date and
+ * no threshold met still raises a row: that is the difference between `25 §18`
+ * and `20 §5`, whose past date suppresses nothing and produces nothing.
+ *
+ * **Nothing is stored but the date.** No due row, no age, no timer — `20 §9`
+ * is intact and the date is an input, exactly as `schema.ts` says at the
+ * column.
+ *
+ * Three queries rather than one union, each composing the filter its own table
+ * already has, for the reason the module docblock gives.
+ */
+async function manualDateDue(session: AuthSession): Promise<FollowUpRow[]> {
+  const now = today();
+
+  const [companyRows, projectRows, threadRows] = await Promise.all([
+    db
+      .select({
+        id: companies.id,
+        nameEn: companies.nameEn,
+        nameAr: companies.nameAr,
+        due: companies.nextFollowUpAt,
+      })
+      .from(companies)
+      .where(
+        and(
+          visibleCompaniesFilter(session),
+          isNull(companies.archivedAt),
+          isNull(companies.mergedIntoId),
+          isNotNull(companies.nextFollowUpAt),
+          lte(companies.nextFollowUpAt, now),
+        ),
+      ),
+    db
+      .select({
+        id: projects.id,
+        nameEn: projects.nameEn,
+        nameAr: projects.nameAr,
+        due: projects.nextFollowUpAt,
+      })
+      .from(projects)
+      .where(
+        and(
+          visibleProjectsFilter(session),
+          isNull(projects.endState),
+          isNotNull(projects.nextFollowUpAt),
+          lte(projects.nextFollowUpAt, now),
+        ),
+      ),
+    db
+      .select({
+        id: quotationThreads.id,
+        companyId: quotationThreads.companyId,
+        companyNameEn: companies.nameEn,
+        companyNameAr: companies.nameAr,
+        projectNameEn: projects.nameEn,
+        projectNameAr: projects.nameAr,
+        due: quotationThreads.nextFollowUpAt,
+      })
+      .from(quotationThreads)
+      .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
+      .innerJoin(projects, eq(projects.id, quotationThreads.projectId))
+      .where(
+        and(
+          visibleQuotationThreadsFilter(session),
+          isNull(quotationThreads.endState),
+          isNull(companies.archivedAt),
+          isNull(companies.mergedIntoId),
+          isNotNull(quotationThreads.nextFollowUpAt),
+          lte(quotationThreads.nextFollowUpAt, now),
+        ),
+      ),
+  ]);
+
+  // A thread's own label is its SMAC reference where it has one, so a date_due
+  // row names the thread the same way `quotationNoResponse` does. Decorated
+  // afterwards, the shape `buyerOrFirstCompany` already uses here.
+  const [companiesByProject, referenceByThread] = await Promise.all([
+    buyerOrFirstCompany(projectRows.map((row) => row.id)),
+    liveReferenceByThread(threadRows.map((row) => row.id)),
+  ]);
+
+  /** Every row is due by construction, so the age runs from the date itself. */
+  const row = (
+    partial: Omit<FollowUpRow, "kind" | "ownerNames" | "ageDays" | "inWorkingDays" | "thresholdDays">,
+  ): FollowUpRow => ({
+    ...partial,
+    kind: "date_due",
+    ownerNames: [],
+    ageDays: calendarDaysBetween(partial.since, now),
+    inWorkingDays: false,
+    // There is no threshold: the rep's date IS the condition `[25 §18]`.
+    thresholdDays: 0,
+  });
+
+  return [
+    ...companyRows.map((company) =>
+      row({
+        anchorType: "company",
+        anchorId: company.id,
+        anchorNameEn: company.nameEn,
+        anchorNameAr: company.nameAr,
+        companyId: company.id,
+        companyNameEn: company.nameEn,
+        companyNameAr: company.nameAr,
+        since: company.due as string,
+      }),
+    ),
+    ...projectRows.map((project) => {
+      const company = companiesByProject.get(project.id) ?? null;
+      return row({
+        anchorType: "project",
+        anchorId: project.id,
+        anchorNameEn: project.nameEn,
+        anchorNameAr: project.nameAr,
+        companyId: company?.id ?? null,
+        companyNameEn: company?.nameEn ?? null,
+        companyNameAr: company?.nameAr ?? null,
+        since: project.due as string,
+      });
+    }),
+    ...threadRows.map((thread) => {
+      const reference = referenceByThread.get(thread.id) ?? null;
+      return row({
+        anchorType: "quotation_thread",
+        anchorId: thread.id,
+        anchorNameEn: reference ?? thread.projectNameEn,
+        anchorNameAr: reference ? null : thread.projectNameAr,
+        companyId: thread.companyId,
+        companyNameEn: thread.companyNameEn,
+        companyNameAr: thread.companyNameAr,
+        since: thread.due as string,
+      });
+    }),
+  ];
+}
+
 /* ------------------------------------------------------------------ *
  * Suppression and decoration `[21 §1]`
  * ------------------------------------------------------------------ */
@@ -631,6 +944,110 @@ async function buyerOrFirstCompany(
   return byProject;
 }
 
+/** The SMAC reference of a thread's highest version, where it has one. */
+async function liveReferenceByThread(
+  threadIds: string[],
+): Promise<Map<string, string>> {
+  if (threadIds.length === 0) return new Map();
+
+  const rows = await db
+    .select({
+      threadId: quotationVersions.threadId,
+      reference: quotationVersions.smacReference,
+    })
+    .from(quotationVersions)
+    .where(
+      and(
+        inArray(quotationVersions.threadId, threadIds),
+        isNotNull(quotationVersions.smacReference),
+      ),
+    )
+    .orderBy(asc(quotationVersions.versionNumber));
+
+  // Ascending, overwriting: the highest version number wins.
+  const byThread = new Map<string, string>();
+  for (const row of rows) {
+    if (row.reference) byThread.set(row.threadId, row.reference);
+  }
+  return byThread;
+}
+
+/** `${anchorType}:${anchorId}` — the key the two record-level steps share. */
+function anchorKey(anchorType: FollowUpAnchorType, anchorId: string): string {
+  return `${anchorType}:${anchorId}`;
+}
+
+/**
+ * The rep's date per anchor, for the records already in hand `[25 §18]`.
+ *
+ * `onHoldByCompany`'s shape (`reports.ts`), and **deliberately unfiltered by
+ * the viewer** for the same reason: the date is a property of the record, not
+ * of who is looking, and the caller has already scoped which records it may
+ * ask about. A manager who cannot read the rep's reports must still not chase
+ * a record the rep has already scheduled.
+ */
+async function nextFollowUpByAnchor(
+  anchors: { anchorType: FollowUpAnchorType; anchorId: string }[],
+): Promise<Map<string, string>> {
+  const idsOf = (type: FollowUpAnchorType) => [
+    ...new Set(
+      anchors.filter((a) => a.anchorType === type).map((a) => a.anchorId),
+    ),
+  ];
+
+  const companyIds = idsOf("company");
+  const projectIds = idsOf("project");
+  const threadIds = idsOf("quotation_thread");
+
+  const [companyRows, projectRows, threadRows] = await Promise.all([
+    companyIds.length
+      ? db
+          .select({ id: companies.id, at: companies.nextFollowUpAt })
+          .from(companies)
+          .where(
+            and(
+              inArray(companies.id, companyIds),
+              isNotNull(companies.nextFollowUpAt),
+            ),
+          )
+      : Promise.resolve([]),
+    projectIds.length
+      ? db
+          .select({ id: projects.id, at: projects.nextFollowUpAt })
+          .from(projects)
+          .where(
+            and(
+              inArray(projects.id, projectIds),
+              isNotNull(projects.nextFollowUpAt),
+            ),
+          )
+      : Promise.resolve([]),
+    threadIds.length
+      ? db
+          .select({ id: quotationThreads.id, at: quotationThreads.nextFollowUpAt })
+          .from(quotationThreads)
+          .where(
+            and(
+              inArray(quotationThreads.id, threadIds),
+              isNotNull(quotationThreads.nextFollowUpAt),
+            ),
+          )
+      : Promise.resolve([]),
+  ]);
+
+  const byAnchor = new Map<string, string>();
+  for (const row of companyRows) {
+    if (row.at) byAnchor.set(anchorKey("company", row.id), row.at);
+  }
+  for (const row of projectRows) {
+    if (row.at) byAnchor.set(anchorKey("project", row.id), row.at);
+  }
+  for (const row of threadRows) {
+    if (row.at) byAnchor.set(anchorKey("quotation_thread", row.id), row.at);
+  }
+  return byAnchor;
+}
+
 /** Live company reps, so a row can say who could act on it. */
 async function repNamesByCompany(
   companyIds: string[],
@@ -668,9 +1085,11 @@ async function gather(
 ): Promise<FollowUpRow[]> {
   const parts = await Promise.all([
     quotationNoResponse(session, thresholds),
+    quotationReturned(session, thresholds),
     catalogueNoResponse(session, thresholds),
     projectStageUnchanged(session, thresholds),
     companyQuiet(session, thresholds),
+    manualDateDue(session),
   ]);
 
   const all = parts.flat();
@@ -678,21 +1097,57 @@ async function gather(
     ...new Set(all.map((row) => row.companyId).filter((id): id is string => !!id)),
   ];
 
-  const [suppressed, repNames] = await Promise.all([
+  const [suppressed, repNames, overrides] = await Promise.all([
     suppressedCompanies(companyIds, thresholds),
     repNamesByCompany(companyIds),
+    nextFollowUpByAnchor(all),
   ]);
 
-  return all
-    .filter((row) => !(row.companyId && suppressed.has(row.companyId)))
-    .map((row) => ({
-      ...row,
-      ownerNames: row.companyId ? (repNames.get(row.companyId) ?? []) : [],
-    }))
-    // Oldest first: a work queue is ordered by what has waited longest.
-    .sort(
-      (a, b) => a.since.localeCompare(b.since) || a.kind.localeCompare(b.kind),
-    );
+  const now = today();
+
+  // Every anchor the rep's own date has already produced a row for. Used to
+  // supersede, so `25 §18`'s "it becomes THE follow-up" is one row per record
+  // rather than the rep's date beside the automatic chase it replaced.
+  const dueAnchors = new Set(
+    all
+      .filter((row) => row.kind === "date_due")
+      .map((row) => anchorKey(row.anchorType, row.anchorId)),
+  );
+
+  return (
+    all
+      // 1. The CUSTOMER is out of scope — on hold, archived, a tombstone, or
+      //    recently re-included. Everything about them goes quiet, including
+      //    rows anchored to their projects and threads. See the module note.
+      .filter((row) => !(row.companyId && suppressed.has(row.companyId)))
+      // 2. The RECORD is scheduled: the rep's own date has not arrived yet
+      //    `[25 §18]`. Only this anchor, never the company's other work.
+      //
+      //    `>` and not `>=`, which is where this parts company with `on hold`:
+      //    `on_hold_until` is an inclusive until-date and suppresses through
+      //    it, while `next_follow_up_at` is a due-on date and stops
+      //    suppressing ON the day it arrives — because that is the day it
+      //    becomes the follow-up. A `date_due` row can never be dropped here:
+      //    its own date is by construction not in the future.
+      .filter((row) => {
+        const due = overrides.get(anchorKey(row.anchorType, row.anchorId));
+        return !(due && due > now);
+      })
+      // 3. An arrived date supersedes the automatic kinds on its own anchor.
+      .filter(
+        (row) =>
+          row.kind === "date_due" ||
+          !dueAnchors.has(anchorKey(row.anchorType, row.anchorId)),
+      )
+      .map((row) => ({
+        ...row,
+        ownerNames: row.companyId ? (repNames.get(row.companyId) ?? []) : [],
+      }))
+      // Oldest first: a work queue is ordered by what has waited longest.
+      .sort(
+        (a, b) => a.since.localeCompare(b.since) || a.kind.localeCompare(b.kind),
+      )
+  );
 }
 
 const EMPTY_COUNTS = (): Record<FollowUpKind, number> =>
@@ -748,4 +1203,295 @@ export async function followUpsForRecipient(
 ): Promise<FollowUpRow[]> {
   const thresholds = await getFollowUpThresholds();
   return gather(scope, thresholds);
+}
+
+/* ------------------------------------------------------------------ *
+ * The rep's own date `[25 §18]` — the one write in this module
+ * ------------------------------------------------------------------ */
+
+/**
+ * Set, move or clear `next_follow_up_at` on a company, project or thread.
+ *
+ * **No new predicate.** The gate is `canViewRecord`, which `authz.ts` names as
+ * the write-path check, and it is the only authorization this act needs: the
+ * date is the rep's note to themself about a record they already hold.
+ *
+ * **A consequence, recorded rather than patched:** `canViewRecord`'s
+ * `quotation_thread` case admits `can_approve_quotation` `[16 §10]`, so a
+ * coordinator can set a date on a thread a rep is working. That is one column
+ * per record and the last writer wins, silently — which is why
+ * `nextFollowUpContext` reads back who set it, and why the panel says so.
+ * Neither of them is prevented from moving it; both of them may legitimately
+ * need to.
+ *
+ * **A past date is refused.** It would be a follow-up due now, entered by
+ * mistake, and `manualDateDue` would raise it on the next read with no way for
+ * the rep to tell that from a date they meant.
+ */
+export async function setNextFollowUp(
+  session: AuthSession,
+  recordType: FollowUpAnchorType,
+  recordId: string,
+  date: string | null,
+): Promise<void> {
+  if (!(await canViewRecord(session, recordType, recordId))) {
+    throw new RuleError("followUps.errors.notYours");
+  }
+  if (date && date < today()) {
+    throw new RuleError("followUps.errors.pastDate", "nextFollowUpAt");
+  }
+
+  await withAudit(session.actor, async (tx, log) => {
+    let before: string | null;
+
+    // Three explicit branches rather than a table looked up by name: Drizzle's
+    // update is generic over one table, and a union of three would type-check
+    // by accident or not at all.
+    switch (recordType) {
+      case "company": {
+        const [row] = await tx
+          .select({ at: companies.nextFollowUpAt })
+          .from(companies)
+          .where(eq(companies.id, recordId))
+          .limit(1);
+        if (!row) throw new RuleError("followUps.errors.notYours");
+        before = row.at;
+        await tx
+          .update(companies)
+          .set({ nextFollowUpAt: date })
+          .where(eq(companies.id, recordId));
+        break;
+      }
+      case "project": {
+        const [row] = await tx
+          .select({ at: projects.nextFollowUpAt })
+          .from(projects)
+          .where(eq(projects.id, recordId))
+          .limit(1);
+        if (!row) throw new RuleError("followUps.errors.notYours");
+        before = row.at;
+        await tx
+          .update(projects)
+          .set({ nextFollowUpAt: date })
+          .where(eq(projects.id, recordId));
+        break;
+      }
+      case "quotation_thread": {
+        const [row] = await tx
+          .select({ at: quotationThreads.nextFollowUpAt })
+          .from(quotationThreads)
+          .where(eq(quotationThreads.id, recordId))
+          .limit(1);
+        if (!row) throw new RuleError("followUps.errors.notYours");
+        before = row.at;
+        await tx
+          .update(quotationThreads)
+          .set({ nextFollowUpAt: date })
+          .where(eq(quotationThreads.id, recordId));
+        break;
+      }
+    }
+
+    // One action name for setting, moving and clearing: when the value is null
+    // the panel shows no attribution at all, and when it is not null the
+    // latest row for this record is by definition the one that set it.
+    log({
+      action: `${recordType}.next_follow_up_set`,
+      entityType: recordType,
+      entityId: recordId,
+      before: { nextFollowUpAt: before },
+      after: { nextFollowUpAt: date },
+    });
+  });
+}
+
+/** What the panel says beside the date, beyond the date itself. */
+export type NextFollowUpContext = {
+  /** Who set the value in force, and when. Null if no audit row is found. */
+  setByName: string | null;
+  setOn: string | null;
+  /**
+   * The company's `on hold until`, when it falls **after** the date — so the
+   * follow-up will not raise on the day it is set for. Null otherwise.
+   */
+  heldUntil: string | null;
+  heldCompanyNameEn: string | null;
+  heldCompanyNameAr: string | null;
+};
+
+const NO_CONTEXT: NextFollowUpContext = {
+  setByName: null,
+  setOn: null,
+  heldUntil: null,
+  heldCompanyNameEn: null,
+  heldCompanyNameAr: null,
+};
+
+/**
+ * Who set the date, read from the audit log.
+ *
+ * `20 §8.1`'s "quotation issued" case exactly: an act with no actor column of
+ * its own, read from the entry `07 E1` already has the data layer write. No
+ * column is added — one would be null for every date set before it landed,
+ * which is the backfill objection `20 §8.1` itself makes.
+ *
+ * **`20 §8.2` is honoured**: the query joins to the record it describes and
+ * applies that record's own existing filter, so an identity who cannot see the
+ * record gets nothing back. The audit row supplies the actor and the moment
+ * and contributes nothing to the access question.
+ *
+ * The actor is `coalesce(acting_as, actor)`, as `timeline.ts` reads it, so an
+ * impersonated write attributes to whoever was acted as `[07 A6]`.
+ */
+async function nextFollowUpSetBy(
+  session: AuthSession,
+  recordType: FollowUpAnchorType,
+  recordId: string,
+): Promise<{ setByName: string | null; setOn: string | null }> {
+  const effectiveActor = sql<
+    string | null
+  >`coalesce(${auditLog.actingAsUserId}, ${auditLog.actorUserId})`;
+
+  const base = db
+    .select({ name: users.name, at: auditLog.createdAt })
+    .from(auditLog)
+    .leftJoin(users, eq(users.id, effectiveActor));
+
+  const scoped = and(
+    eq(auditLog.action, `${recordType}.next_follow_up_set`),
+    eq(auditLog.entityType, recordType),
+    eq(auditLog.entityId, recordId),
+  );
+
+  const rows =
+    recordType === "company"
+      ? await base
+          .innerJoin(companies, eq(companies.id, auditLog.entityId))
+          .where(and(scoped, visibleCompaniesFilter(session)))
+          .orderBy(desc(auditLog.createdAt))
+          .limit(1)
+      : recordType === "project"
+        ? await base
+            .innerJoin(projects, eq(projects.id, auditLog.entityId))
+            .where(and(scoped, visibleProjectsFilter(session)))
+            .orderBy(desc(auditLog.createdAt))
+            .limit(1)
+        : await base
+            .innerJoin(
+              quotationThreads,
+              eq(quotationThreads.id, auditLog.entityId),
+            )
+            .where(and(scoped, visibleQuotationThreadsFilter(session)))
+            .orderBy(desc(auditLog.createdAt))
+            .limit(1);
+
+  const row = rows[0];
+  if (!row) return { setByName: null, setOn: null };
+  return { setByName: row.name ?? null, setOn: riyadhDayOf(row.at) };
+}
+
+/**
+ * The company whose on-hold state will decide whether this anchor's date can
+ * raise anything — **resolved exactly as `gather` resolves it**.
+ *
+ * That "exactly" is the whole point. `gather` suppresses a project row on
+ * `row.companyId`, which comes from `buyerOrFirstCompany`; resolving the
+ * company a second way here would let the panel name one company while a
+ * different one did the suppressing, which is the second-derivation trap
+ * `21 §7` names.
+ *
+ * The record's own filter is applied first, so this leaks nothing.
+ */
+async function anchorCompany(
+  session: AuthSession,
+  recordType: FollowUpAnchorType,
+  recordId: string,
+): Promise<{ id: string; nameEn: string; nameAr: string | null } | null> {
+  switch (recordType) {
+    case "company": {
+      const [row] = await db
+        .select({
+          id: companies.id,
+          nameEn: companies.nameEn,
+          nameAr: companies.nameAr,
+        })
+        .from(companies)
+        .where(and(eq(companies.id, recordId), visibleCompaniesFilter(session)))
+        .limit(1);
+      return row ?? null;
+    }
+    case "project": {
+      const [row] = await db
+        .select({ id: projects.id })
+        .from(projects)
+        .where(and(eq(projects.id, recordId), visibleProjectsFilter(session)))
+        .limit(1);
+      if (!row) return null;
+      return (await buyerOrFirstCompany([recordId])).get(recordId) ?? null;
+    }
+    case "quotation_thread": {
+      const [row] = await db
+        .select({
+          id: companies.id,
+          nameEn: companies.nameEn,
+          nameAr: companies.nameAr,
+        })
+        .from(quotationThreads)
+        .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
+        .where(
+          and(
+            eq(quotationThreads.id, recordId),
+            visibleQuotationThreadsFilter(session),
+          ),
+        )
+        .limit(1);
+      return row ?? null;
+    }
+  }
+}
+
+/**
+ * Everything the panel says beside the date: who set it, and whether it can
+ * actually fire.
+ *
+ * **The second half is the reason this exists.** `setNextFollowUp` refuses a
+ * past date, so every accepted date is in the future — but `gather`'s step 1
+ * means a date on a record whose company is on hold **past** that date raises
+ * nothing when the day comes, and the person who set it watches the day pass
+ * and hears nothing. The sharp case is two people: a coordinator sets a date
+ * on a thread, a different rep has that company on hold until December, and
+ * her reminder is silently deferred with neither of them able to see why.
+ *
+ * **It is not refused and the precedence does not change.** On hold is about
+ * the customer and it is right that it wins; the founder should see that in
+ * behaviour. It is only *said*. A control that accepts input which can never
+ * produce an effect is worse than one that refuses it.
+ *
+ * A hold that lapses **before** the date defers nothing, so it is not
+ * reported: the condition is `on_hold_until > next_follow_up_at`.
+ */
+export async function nextFollowUpContext(
+  session: AuthSession,
+  recordType: FollowUpAnchorType,
+  recordId: string,
+  value: string | null,
+): Promise<NextFollowUpContext> {
+  if (!value) return NO_CONTEXT;
+
+  const [setBy, company] = await Promise.all([
+    nextFollowUpSetBy(session, recordType, recordId),
+    anchorCompany(session, recordType, recordId),
+  ]);
+
+  if (!company) return { ...NO_CONTEXT, ...setBy };
+
+  const until = (await onHoldByCompany([company.id])).get(company.id) ?? null;
+  const deferred = until !== null && until > value;
+
+  return {
+    ...setBy,
+    heldUntil: deferred ? until : null,
+    heldCompanyNameEn: deferred ? company.nameEn : null,
+    heldCompanyNameAr: deferred ? company.nameAr : null,
+  };
 }

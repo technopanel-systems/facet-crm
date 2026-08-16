@@ -292,16 +292,17 @@ async function main(): Promise<void> {
   );
   // `20 §11` held three of `07 D5`'s five back because nothing read them — rows
   // nothing reads are the shape of v1's dead approval gate. `21 §2` adds them,
-  // because `src/lib/follow-ups.ts` now reads all five. The claim is unchanged;
-  // the number it resolves to is not, and this assertion moves with it rather
-  // than being deleted.
+  // because `src/lib/follow-ups.ts` now reads all five, and feature slice 4
+  // adds a sixth for `22 §6.11`'s returned quotation on the same terms. The
+  // claim is unchanged; the number it resolves to is not, and this assertion
+  // moves with it rather than being deleted.
   const followupRows = await db
     .select({ key: settings.key })
     .from(settings)
     .where(sql`${settings.key} like 'followup.%'`);
   check(
-    "every seeded threshold has a reader — five since Phase 10a [20 §11], [21 §2]",
-    followupRows.length === 5,
+    "every seeded threshold has a reader — six since feature slice 4 [20 §11], [21 §2], [22 §6.11]",
+    followupRows.length === 6,
     `got ${followupRows.map((row) => row.key).join(", ")}`,
   );
 

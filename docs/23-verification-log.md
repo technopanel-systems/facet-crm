@@ -1111,6 +1111,121 @@ proves from one. Each insert now carries a comment saying so.
 
 ---
 
+## Feature slice 4 — follow-ups (2026-08-16)
+
+`25 §18` and `22 §6.11` built together, because the second needs the first: a
+returned quotation now raises a follow-up, and a rep with nothing to change
+needs a way to say when they will get to it.
+
+**All four checks, the whole verify suite and the HTTP pass are green:**
+`typecheck` · `lint` · `build` · `check:messages` (748 keys), then
+`verify:{followups,schema25,phase10a,sharing,comments,slice2,slice3,phase9,phase11}`
+and `npm run verify:routes` — **466 checks**, three identities, both locales,
+both themes.
+
+**No migration.** `next_follow_up_at` has been on all three tables since `0007`
+and this slice is the first thing to write any of them.
+
+### The four decisions this slice needed, none of them in `docs/`
+
+Founder-answered in session, and recorded here because they are the basis of
+what was built rather than something derivable from the code:
+
+1. **An arrived date produces, it does not merely stop suppressing.** `25 §18`'s
+   *"when it arrives it becomes the follow-up"* is a **sixth kind**, `date_due`,
+   which supersedes the automatic kinds on its own anchor. A record with a date
+   and no threshold met still raises a row.
+2. **The returned kind clears on the rep editing a line**, read from the audit
+   log — not on the version's status alone. There is no resubmit act in FACET,
+   so the status would keep chasing the rep for work already done.
+3. **The write path is inline on all three detail screens**, one action, three
+   call sites. A thread has no `/edit` route, so nothing else covers all three.
+4. **The new threshold is 5 working days**, both borrowed from `07 D5`'s nearest
+   analogue. This stretches `21 §8`'s *"for those two thresholds only"* past the
+   two it names — that sentence scopes which of `07 D5`'s five come back, and is
+   not read as forbidding a sixth.
+
+### What `verify-followups.ts` asserts
+
+Sixteen sections. Five worth naming:
+
+1. **§8 is the one that fails if the override is ever rebuilt as a suppressor.**
+   A company created today, never logged against, no quotation — nothing
+   automatic to un-suppress — raises `date_due` and nothing else once its date
+   arrives.
+2. **§7 pins the boundary without faking a clock**, which cannot be done:
+   `today()` reads the real one and nothing under test takes a date. Tomorrow
+   suppresses, today does not, yesterday does not. `>` not `>=`, where
+   `on_hold_until` is inclusive — a due-on date stops suppressing **on** the day
+   it arrives, because that is the day it becomes the follow-up.
+3. **§6's last check is the one that proves the two suppressions have different
+   reach.** `stage-co` is quiet in its own right *and* holds the stale project;
+   the date goes on the project only, and the company must still fire. Without
+   it the override could be cascading like `on hold` and every other assertion
+   in §6 would still pass.
+4. **§14 pins the deferred-date note both ways**, including that the company it
+   names is the one `gather` suppresses on — asserted on a **project** anchor,
+   where the two resolutions could diverge.
+5. **§13 pins the overwrite.** One column, last writer wins; the second writer
+   is named and the first's audit row is still there.
+
+### The defect it caught, and it was §2 that caught it
+
+**Every clearing assertion was passing against nothing.** §4's *"the rep edits a
+line and the follow-up is gone"*, §5's two status routes and §6's *"the returned
+thread is suppressed"* were all green on the first run — while
+`quotation_returned` **never fired at all**.
+
+The cause was in the fixture, not the feature. `createQuotationThread` writes
+its `quotation_line.added` audit entries at the real `now()`, and the helper
+backdated only the return — so every thread looked like a rep who had already
+resubmitted, which is the exact inverse of the real sequence. The lines are
+written, and *then* the coordinator sends them back; they are now dated a day
+before it.
+
+**What made it visible was §2 and §3's "before" assertions** — a plain check
+that the thing is firing *before* the act that should clear it. Four
+"it cleared" checks cannot distinguish a working clear from an empty queue, and
+this is the fourth outing of that family after `verify:sharing`'s planted-row
+trap. Any assertion that something stopped needs a sibling proving it started.
+
+### Three scripts had to move, all three by design
+
+- **`verify-schema25` §8** asserts the `0007` columns are unwritten. The three
+  `next_follow_up_at` entries left `NEW_COLUMNS`; they stay in `LANDED`, because
+  that they exist with the right type is still true. The inversion `comments`
+  got in slice 2.
+- **`verify-phase10a` §1 and `verify-phase9` §1** both count
+  `settings.key like 'followup.%'`. Five became six. The claim `20 §11` set is
+  unchanged — a threshold row is seeded when, and only when, something reads it
+  — and `verify:phase9` is the one that found this, on the full-suite run rather
+  than in the slice's own script.
+
+### What is still manual
+
+- **Nobody has looked at it.** No screenshot at 1366 or 1440, in either locale.
+  Two things gained a column this slice and both are the wrapping risk: the
+  Today KPI row is now **six** tiles at `minmax(178px,1fr)` and `/follow-ups`'
+  `FilterNav` is **six** chips plus "All". Six by 178 plus gaps fits 1320px on
+  paper, which is an argument rather than an observation. Driving it would need
+  a browser dependency, which is not added without asking.
+- **The client half is untested**, as everywhere: one `useActionState` per form
+  means a rejected set cannot blank the clear, asserted only by both POSTs
+  answering 200.
+- **The `date_due` tone.** A row whose age is zero is coloured `soon` rather
+  than `late` — due today, not overdue. It reads the age the data layer
+  computed and derives no threshold, but nobody has seen the amber.
+- **A coordinator can date a thread a rep is working.** `canViewRecord` admits
+  `can_approve_quotation` `[16 §10]`, and the brief's rule was to reuse the
+  existing predicate rather than invent one. The panel names whoever set it, so
+  the overwrite is visible; it is not prevented, and no document says it should
+  be.
+- **A deferred date is delayed, not consumed.** When the hold lapses, the row
+  appears. Whether an arrived-but-deferred date should instead be spent is a
+  rule no document states.
+
+---
+
 ## Why the HTTP pass is not optional
 
 Also moved from `CLAUDE.md`, from its **Working style** section, which now

@@ -209,9 +209,9 @@ there is no flash and no inline script.
 ## 6. OPEN — not chosen
 
 Recorded rather than filled in. Some need founder input, one is a defect.
-**6.1 closed in stage 2, 6.6's strip in feature slice 1, and 6.10 in feature
-slice 2**; all three are kept here, struck, so the decision is legible where the
-question was asked.
+**6.1 closed in stage 2, 6.6's strip in feature slice 1, 6.10 in feature slice
+2 and 6.11 in feature slice 4**; all four are kept here, struck, so the decision
+is legible where the question was asked.
 
 | # | Open item | Why it is open |
 |---|---|---|
@@ -225,7 +225,7 @@ question was asked.
 | 6.8 | **Second person for the rep half of a quotation's turn** `[new in stage 2]` | `22 §4` says second person *where that person is the reader*. The coordinator half can be: `canApproveQuotation` names that identity exactly. The rep half names the raiser instead, because `QuotationThreadListRow` carries `raisedByName` and no id — and two people called Mohammed would read each other's turn as their own. A `raisedById` on the row would close it |
 | 6.9 | **The mention chip row does not scale** `[new in feature slice 2]` | Every active colleague is offered as a checkbox under every comment box. At fourteen people that is a readable row; at thirty it is a wall, and at sixty it is unusable. **The trigger:** when the row stops fitting on a laptop, it becomes a scoped picker — and the people worth offering are the ones already on the record, its reps, its shares, its thread raiser. Nothing of that is built now. Choosing a threshold today would be guessing at a number nobody has hit, which is what `25 §23` refused for quantity tolerance and for the same reason |
 | ~~6.10~~ | ~~**A return for edit tells nobody**~~ `[new in feature slice 2]` | **CLOSED — feature slice 2, founder-decided.** Returning a quotation now tags the thread's raiser. **This is `25 §13`, not `25 §11`:** it is not a manual tag but *the act notifying the person it creates work for*. `25 §13` folds the reason into a comment so the round-trip stops happening on WhatsApp `[25 §9]` — and a reason nobody is told about does not stop it, because the rep learns of the return by opening a screen they have no reason to open. So there is no control for it and no way to return without it. It tags `raisedByUserId`, which `19 §1` rewrites on handover, so whoever holds the thread now is the one told |
-| 6.11 | **A returned quotation appears in no queue** `[new in feature slice 2]` | **Larger than 6.10, which is only a patch over it.** `followUps()`'s four kinds `[07 D5]` have nothing for *"returned for edits and not yet resubmitted"*, so a returned quotation reaches the rep's Today screen through **nothing**. The approved concept shows exactly that row — *"Rawan returned the quotation for edits · Your turn"* (`docs/design/facet-concept-v2.html`, Today tab) — and it has no producer. A **fifth follow-up kind** is the shape of the fix, computed on read from `return_for_edit_round` and the version's status, per `21 §1`'s rule that a follow-up is a condition and never a stored row. The difference this leaves standing: a notification is read once and gone, where a follow-up persists until the condition clears. **Not built now** — the founder should see the tag working before a fifth kind is added |
+| ~~6.11~~ | ~~**A returned quotation appears in no queue**~~ `[new in feature slice 2]` | **CLOSED — feature slice 4, founder-decided.** The fifth kind is built: `quotation_returned`, computed on read from `return_for_edit_round` and the live version's status, per `21 §1`. Its threshold is a sixth `settings` row — **5 working days**, both number and unit borrowed from `07 D5`'s quotation no-response row, which stretches `21 §8` past the two thresholds it names. **What "resubmitted" means was the open half, and no document defined it:** there is no resubmit act, so the founder decided it clears on **the rep touching the lines**, read from the audit log the way `20 §8.1` reads "issued at". Clearing on the status alone would keep chasing a rep for work already done. A rep with nothing to change has an escape hatch built in the same slice — a `next_follow_up_at` on the thread `[25 §18]` — which defers the chase rather than ending it |
 
 ### 6.5 The coverage defect, in full
 

@@ -174,9 +174,11 @@
     },
     "followUpKind": {
       "quotation_no_response": "Quotation, no response",
+      "quotation_returned": "Returned for edits",
       "catalogue_no_response": "Catalogue sent, no response",
       "project_stage_unchanged": "Project stage unchanged",
-      "company_quiet": "Company gone quiet"
+      "company_quiet": "Company gone quiet",
+      "date_due": "Your date has come"
     },
     "dormancyOutcome": {
       "reincluded": "Re-included",
@@ -876,12 +878,27 @@
       "age": "Waiting",
       "allKinds": "All follow-ups",
       "days": "{count} days",
-      "workingDays": "{count} working days"
+      "workingDays": "{count} working days",
+      "dueToday": "Due today"
     },
     "detail": {
       "hint": "Everything past its threshold, oldest first. Nothing here is stored — it is worked out each time the page is opened.",
-      "thresholds": "Quotation {quotation} working days · catalogue {catalogue} working days · project stage {project} days · quiet company {qualified}/{unqualified} days.",
-      "suppressed": "Companies on hold, archived, or re-included recently do not appear."
+      "thresholds": "Quotation {quotation} working days · returned for edits {returned} working days · catalogue {catalogue} working days · project stage {project} days · quiet company {qualified}/{unqualified} days.",
+      "suppressed": "Companies on hold, archived, or re-included recently do not appear, nor does a record whose next follow-up date has not arrived."
+    },
+    "nextFollowUp": {
+      "title": "Next follow-up",
+      "none": "No date set. The usual thresholds apply.",
+      "label": "Follow up on",
+      "save": "Save date",
+      "clear": "Clear",
+      "setBy": "Set by {name} on {date}",
+      "heldUntil": "{company} is on hold until {date}. This follow-up will not raise until then.",
+      "hint": "Your own date outranks the automatic chase: nothing is raised about this record until the date arrives, and then it becomes the follow-up."
+    },
+    "errors": {
+      "notYours": "That record is not yours to set a follow-up on.",
+      "pastDate": "A follow-up date cannot be in the past."
     }
   },
   "dormancy": {

@@ -10,11 +10,12 @@
  * them, and a seed run that quietly reset the number to 30 would undo that
  * without saying so.
  *
- * **All five of `07 D5`'s thresholds are now here.** `20 §11` held three back
- * because nothing read them, which is the shape of v1's dead approval gate;
- * `21 §2` adds them because `src/lib/follow-ups.ts` reads all five. The test
- * `20 §11` set is unchanged — a row is seeded when, and only when, something
- * reads it.
+ * **All five of `07 D5`'s thresholds are here, and a sixth.** `20 §11` held
+ * three back because nothing read them, which is the shape of v1's dead
+ * approval gate; `21 §2` adds them because `src/lib/follow-ups.ts` reads all
+ * five, and feature slice 4 adds `22 §6.11`'s returned quotation for the same
+ * reason. The test `20 §11` set is unchanged — a row is seeded when, and only
+ * when, something reads it.
  */
 
 process.loadEnvFile(".env");
@@ -34,12 +35,15 @@ import {
   QUIET_DAYS_UNQUALIFIED_KEY,
   QUOTATION_NO_RESPONSE_DEFAULT,
   QUOTATION_NO_RESPONSE_KEY,
+  QUOTATION_RETURNED_DEFAULT,
+  QUOTATION_RETURNED_KEY,
 } from "@/lib/settings";
 
 const SETTING_SEED: { key: string; value: unknown }[] = [
   { key: QUIET_DAYS_QUALIFIED_KEY, value: QUIET_DAYS_QUALIFIED_DEFAULT },
   { key: QUIET_DAYS_UNQUALIFIED_KEY, value: QUIET_DAYS_UNQUALIFIED_DEFAULT },
   { key: QUOTATION_NO_RESPONSE_KEY, value: QUOTATION_NO_RESPONSE_DEFAULT },
+  { key: QUOTATION_RETURNED_KEY, value: QUOTATION_RETURNED_DEFAULT },
   { key: CATALOGUE_NO_RESPONSE_KEY, value: CATALOGUE_NO_RESPONSE_DEFAULT },
   { key: PROJECT_STAGE_UNCHANGED_KEY, value: PROJECT_STAGE_UNCHANGED_DEFAULT },
 ];

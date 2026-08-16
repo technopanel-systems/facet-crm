@@ -112,6 +112,7 @@ import {
   QUIET_DAYS_QUALIFIED_KEY,
   QUIET_DAYS_UNQUALIFIED_KEY,
   QUOTATION_NO_RESPONSE_KEY,
+  QUOTATION_RETURNED_KEY,
   getFollowUpThresholds,
 } from "@/lib/settings";
 import { reassignHandover } from "@/lib/team";
@@ -345,13 +346,17 @@ async function main(): Promise<void> {
     .select({ key: settings.key })
     .from(settings)
     .where(sql`${settings.key} like 'followup.%'`);
+  // Six since feature slice 4: `07 D5`'s five, and `22 §6.11`'s returned
+  // quotation. The claim `20 §11` set is unchanged — a threshold row is seeded
+  // when, and only when, something reads it.
   check(
-    "all five of 07 D5's thresholds are seeded, and every one has a reader [21 §2]",
-    thresholdKeys.length === 5 &&
+    "all six thresholds are seeded, and every one has a reader [21 §2], [22 §6.11]",
+    thresholdKeys.length === 6 &&
       [
         QUIET_DAYS_QUALIFIED_KEY,
         QUIET_DAYS_UNQUALIFIED_KEY,
         QUOTATION_NO_RESPONSE_KEY,
+        QUOTATION_RETURNED_KEY,
         CATALOGUE_NO_RESPONSE_KEY,
         PROJECT_STAGE_UNCHANGED_KEY,
       ].every((key) => thresholdKeys.some((row) => row.key === key)),

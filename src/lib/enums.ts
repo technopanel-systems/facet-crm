@@ -301,15 +301,29 @@ export function notificationTypeName(
 }
 
 /**
- * `[07 D5]` — the four follow-up conditions `src/lib/follow-ups.ts` derives.
- * `07 D5` lists five thresholds; the last two — qualified and unqualified —
- * are the same condition read at two different numbers, so they are one kind.
+ * The six follow-up conditions `src/lib/follow-ups.ts` derives.
+ *
+ * Four are `07 D5`'s: it lists five thresholds, and the last two — qualified
+ * and unqualified — are the same condition read at two different numbers, so
+ * they are one kind.
+ *
+ * Two are newer, and neither is a notification type — `21 §2`'s "five types
+ * and no sixth" is about deliveries, and both of these reach the rep through
+ * the one `followup.digest` that already summarises whatever is true:
+ *
+ *  - `quotation_returned` — returned for edits and not yet resubmitted, the
+ *    gap `22 §6.11` recorded and held back until the slice-2 tag had been
+ *    seen working. Its threshold is a sixth `settings` row, `07 D5`'s shape.
+ *  - `date_due` — the rep's own `next_follow_up_at` has arrived `[25 §18]`.
+ *    It has no threshold: the date IS the condition.
  */
 export const FOLLOW_UP_KINDS = [
   "quotation_no_response",
+  "quotation_returned",
   "catalogue_no_response",
   "project_stage_unchanged",
   "company_quiet",
+  "date_due",
 ] as const;
 export type FollowUpKind = (typeof FOLLOW_UP_KINDS)[number];
 

@@ -180,19 +180,33 @@ export default async function TodayPage({
                         : ""
                     }`}
                     // Elapsed time, coloured by lateness `[22 §4]`. Every row
-                    // here is late by construction — `follow-ups.ts` put it in
-                    // the queue because it passed its threshold — so the tone
-                    // reads that fact through the same helper the lists use
-                    // rather than hard-coding red, as this row used to.
-                    whenClassName={toneClass(turnTone({ overdue: true }))}
+                    // here is past its threshold by construction —
+                    // `follow-ups.ts` put it in the queue for that reason — so
+                    // the tone reads that fact through the same helper the
+                    // lists use rather than hard-coding red, as this row used
+                    // to. The one row that is due rather than late is a
+                    // `date_due` on the day it arrives: its threshold is zero,
+                    // so age zero means the rep's date is today, not that they
+                    // are behind `[25 §18]`. No threshold is derived here —
+                    // this reads the age the data layer already computed.
+                    whenClassName={toneClass(
+                      turnTone({
+                        overdue: row.ageDays > 0,
+                        dueSoon: row.ageDays === 0,
+                      }),
+                    )}
                     when={
-                      // Working days for the two thresholds `07 D5` states
-                      // that way, calendar days for the rest `[21 §8]`.
-                      row.inWorkingDays
-                        ? t("followUps.fields.workingDays", {
-                            count: row.ageDays,
-                          })
-                        : t("followUps.fields.days", { count: row.ageDays })
+                      // Working days for the thresholds stated that way,
+                      // calendar days for the rest `[21 §8]` — and its own
+                      // phrase at zero, which only `date_due` reaches
+                      // `[25 §18]`.
+                      row.ageDays === 0
+                        ? t("followUps.fields.dueToday")
+                        : row.inWorkingDays
+                          ? t("followUps.fields.workingDays", {
+                              count: row.ageDays,
+                            })
+                          : t("followUps.fields.days", { count: row.ageDays })
                     }
                   />
                 ))}

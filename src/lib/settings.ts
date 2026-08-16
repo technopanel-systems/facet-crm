@@ -8,8 +8,9 @@
  * `07 D5` names five follow-up thresholds and says they are settings rather
  * than code. `20 §11` seeded the two that Phase 9's coverage screen reads and
  * deliberately not the other three; `21 §2` adds those three, because
- * `src/lib/follow-ups.ts` now reads them. All five are here and all five have a
- * reader — which is the test `20 §11` set and the reason it held three back.
+ * `src/lib/follow-ups.ts` now reads them. Feature slice 4 adds a sixth for
+ * `22 §6.11`'s returned quotation. **All six are here and all six have a
+ * reader** — which is the test `20 §11` set and the reason it held three back.
  *
  * **A missing row is not an error.** Every reader takes a fallback, because a
  * database seeded before this phase is a normal state and a coverage screen
@@ -47,6 +48,23 @@ export const CATALOGUE_NO_RESPONSE_KEY =
 export const CATALOGUE_NO_RESPONSE_DEFAULT = 10;
 
 /**
+ * A quotation returned for edits and not yet resubmitted `[22 §6.11]`.
+ *
+ * **The sixth row, and the only one `07 D5` does not name.** `22 §6.11` asked
+ * for the kind and gave it no number, so both the unit and the default are
+ * borrowed from `07 D5`'s nearest analogue — the quotation no-response
+ * threshold — because it is the same family: a quotation waiting on somebody.
+ * A rep's turn runs on the working week, so Friday and Saturday should not age
+ * it.
+ *
+ * **This stretches `21 §8` past the two thresholds it names.** That sentence
+ * scopes which of `07 D5`'s five come back to working days; it is not read as
+ * forbidding a sixth. Recorded here rather than left to be discovered.
+ */
+export const QUOTATION_RETURNED_KEY = "followup.quotation_returned.working_days";
+export const QUOTATION_RETURNED_DEFAULT = 5;
+
+/**
  * `07 D5` — a project whose stage has not moved. **Calendar** days, as `07 D5`
  * writes it. Stage is derived from events `[10 §1]`; there is no stage column,
  * so "unchanged" means no stage-advancing event `[21 §10]`.
@@ -60,9 +78,10 @@ export type QuietThresholds = {
   unqualified: number;
 };
 
-/** All five of `07 D5`'s thresholds. */
+/** `07 D5`'s five thresholds, and `22 §6.11`'s sixth. */
 export type FollowUpThresholds = QuietThresholds & {
   quotationNoResponse: number;
+  quotationReturned: number;
   catalogueNoResponse: number;
   projectStageUnchanged: number;
 };
@@ -104,12 +123,13 @@ export async function getQuietThresholds(): Promise<QuietThresholds> {
   return { qualified, unqualified };
 }
 
-/** All five of `07 D5`'s thresholds, for `src/lib/follow-ups.ts` `[21 §2]`. */
+/** Every threshold `src/lib/follow-ups.ts` reads `[21 §2]`, `[22 §6.11]`. */
 export async function getFollowUpThresholds(): Promise<FollowUpThresholds> {
   const [
     qualified,
     unqualified,
     quotationNoResponse,
+    quotationReturned,
     catalogueNoResponse,
     projectStageUnchanged,
   ] = await Promise.all([
@@ -122,6 +142,7 @@ export async function getFollowUpThresholds(): Promise<FollowUpThresholds> {
       QUOTATION_NO_RESPONSE_KEY,
       QUOTATION_NO_RESPONSE_DEFAULT,
     ),
+    getPositiveIntSetting(QUOTATION_RETURNED_KEY, QUOTATION_RETURNED_DEFAULT),
     getPositiveIntSetting(
       CATALOGUE_NO_RESPONSE_KEY,
       CATALOGUE_NO_RESPONSE_DEFAULT,
@@ -135,6 +156,7 @@ export async function getFollowUpThresholds(): Promise<FollowUpThresholds> {
     qualified,
     unqualified,
     quotationNoResponse,
+    quotationReturned,
     catalogueNoResponse,
     projectStageUnchanged,
   };
