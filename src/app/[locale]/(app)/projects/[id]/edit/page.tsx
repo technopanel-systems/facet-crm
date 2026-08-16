@@ -3,7 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { PageHeader } from "@/components/page-header";
 import { requireSession } from "@/lib/authz";
-import { listCities } from "@/lib/lookups";
+import { listCities, listLossReasons } from "@/lib/lookups";
 import { getProject } from "@/lib/projects";
 
 import { updateProjectAction } from "../../actions";
@@ -24,7 +24,10 @@ export default async function EditProjectPage({
   if (!project) notFound();
 
   const t = await getTranslations();
-  const cities = await listCities();
+  const [cities, lossReasons] = await Promise.all([
+    listCities(),
+    listLossReasons(),
+  ]);
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
@@ -38,6 +41,7 @@ export default async function EditProjectPage({
         cancelHref={`/projects/${project.id}`}
         cities={cities}
         companies={[]}
+        lossReasons={lossReasons}
         locale={locale}
       />
     </div>

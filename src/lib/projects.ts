@@ -29,6 +29,7 @@ import { db } from "@/db";
 import {
   cities,
   companies,
+  lossReasons,
   projectCompanies,
   projects,
   users,
@@ -41,13 +42,14 @@ import {
   type AuthSession,
 } from "@/lib/authz";
 import {
+  OTHER_LOSS_REASON_CODE,
   PROJECT_END_STATES,
   REGIONS,
   type ProjectEndState,
   type Region,
   type SameValues,
 } from "@/lib/enums";
-import { otherLossReasonId, regionForCity } from "@/lib/lookups";
+import { lossReasonCode, regionForCity } from "@/lib/lookups";
 import { normalizedNameFor } from "@/lib/normalize";
 import { RuleError } from "@/lib/validation";
 
@@ -69,7 +71,16 @@ export type ProjectInput = {
   region: Region | null;
   cityId: string | null;
   endState: ProjectEndState | null;
+  /** Which of the nine `[25 §5]`; required when `endState` is `lost`. */
+  lostReasonId: string | null;
+  /** The `other` intake, and forbidden for every other code `[25 §5]`. */
   lossReason: string | null;
+  /**
+   * `[25 §4]` — a plain label the rep sets, deliberately unverified and
+   * never to be derived from or checked against the production module:
+   * production sometimes changes and stock sometimes covers an order.
+   */
+  inProduction: boolean;
 };
 
 /** One row of the project–company join `[12 §5, §6]`. */
@@ -191,6 +202,9 @@ export type ProjectDetail = Project & {
   ownerName: string;
   cityNameEn: string | null;
   cityNameAr: string | null;
+  /** The picked reason's own name `[25 §5]` — null unless the project is lost. */
+  lostReasonNameEn: string | null;
+  lostReasonNameAr: string | null;
   createdByName: string | null;
   links: ProjectCompanyRow[];
 };
@@ -205,10 +219,13 @@ export async function getProject(
       ownerName: users.name,
       cityNameEn: cities.nameEn,
       cityNameAr: cities.nameAr,
+      lostReasonNameEn: lossReasons.nameEn,
+      lostReasonNameAr: lossReasons.nameAr,
     })
     .from(projects)
     .innerJoin(users, eq(projects.ownerUserId, users.id))
     .leftJoin(cities, eq(projects.cityId, cities.id))
+    .leftJoin(lossReasons, eq(projects.lostReasonId, lossReasons.id))
     .where(and(eq(projects.id, id), visibleProjectsFilter(session)))
     .limit(1);
 
@@ -229,6 +246,8 @@ export async function getProject(
     ownerName: row.ownerName,
     cityNameEn: row.cityNameEn,
     cityNameAr: row.cityNameAr,
+    lostReasonNameEn: row.lostReasonNameEn,
+    lostReasonNameAr: row.lostReasonNameAr,
     createdByName: creator?.name ?? null,
     links,
   };
@@ -292,10 +311,42 @@ export async function listProjectCompanies(
  * Business rules, checked in the application layer
  * ------------------------------------------------------------------ */
 
-/** `07 C5`, `04 Q18` — a lost project has to say why. */
+/** `07 C5`, `04 Q18`, `25 §5` — a lost project has to say which of the nine. */
 function assertLossReason(input: ProjectInput): void {
-  if (input.endState === "lost" && !input.lossReason) {
-    throw new RuleError("projects.errors.lossReasonRequired", "lossReason");
+  if (input.endState === "lost" && !input.lostReasonId) {
+    throw new RuleError("projects.errors.lossReasonRequired", "lostReasonId");
+  }
+}
+
+/**
+ * `25 §5`'s remaining half, owed since migration 0007 `[23]`: **`other`
+ * requires the free-text detail; every other code forbids it.** A CHECK
+ * cannot subquery `loss_reasons` to read the code behind a uuid, so it lives
+ * here — `verify:schema25` §10 proves the writer and this rule agree.
+ *
+ * Gated on `endState === "lost"` first, same as `assertLossReason`: a stale
+ * `lostReasonId` left in a hidden field by a rep who changed his mind about
+ * being lost at all must be discarded, not validated, or the outer toggle on
+ * the form would produce an error on a field the rep can no longer see.
+ */
+async function assertLossReasonDetail(input: ProjectInput): Promise<void> {
+  if (input.endState !== "lost" || !input.lostReasonId) return;
+
+  const code = await lossReasonCode(input.lostReasonId);
+  if (!code) throw new RuleError("validation.invalid", "lostReasonId");
+
+  const isOther = code === OTHER_LOSS_REASON_CODE;
+  if (isOther && !input.lossReason) {
+    throw new RuleError(
+      "projects.errors.lossReasonDetailRequired",
+      "lossReason",
+    );
+  }
+  if (!isOther && input.lossReason) {
+    throw new RuleError(
+      "projects.errors.lossReasonDetailForbidden",
+      "lossReason",
+    );
   }
 }
 
@@ -315,29 +366,26 @@ type ProjectLossFields = {
  * lost carries none of them. So the three are decided in one place rather than
  * three, and both writers call it.
  *
- * **The reason defaults to `other`** until the loss screen offers the nine.
- * That is not a placeholder: a reason typed with no list to pick from *is* an
- * `other` reason, which is exactly what `25 §5` keeps the free text for — it is
- * how the founder collects real entries and finds reasons ten and eleven.
+ * **The reason is the rep's pick.** `lostReasonId` comes straight from the
+ * form — `assertLossReason` already refused a loss with none, and
+ * `assertLossReasonDetail` already refused a mismatched detail, so by the
+ * time this runs the pair is known good.
  *
  * **Only becoming lost stamps the date.** Re-saving a project that is already
- * lost keeps the id and the date it already had, so an unrelated edit does not
- * rewrite when the loss happened. Moving off `lost` clears all three, or
- * `projects_loss_state` refuses the row.
- *
- * `assertLossReason` runs first and separately: it says a loss must have a
- * reason, which is `07 C5`'s rule and stays in the application layer because
- * the database cannot yet hold it — the current screen posts free text only.
+ * lost keeps the date it already had, so an unrelated edit — including
+ * correcting the reason itself — does not rewrite when the loss happened.
+ * Moving off `lost` clears all three, or `projects_loss_state` refuses the
+ * row.
  */
 async function lossFieldsFor(
   input: ProjectInput,
-  before?: Pick<Project, "lostReasonId" | "lostAt">,
+  before?: Pick<Project, "lostAt">,
 ): Promise<ProjectLossFields> {
   if (input.endState !== "lost") {
     return { lostReasonId: null, lostAt: null, lossReason: null };
   }
   return {
-    lostReasonId: before?.lostReasonId ?? (await otherLossReasonId()),
+    lostReasonId: input.lostReasonId,
     lostAt: before?.lostAt ?? new Date(),
     lossReason: input.lossReason,
   };
@@ -391,6 +439,7 @@ export async function createProject(
   links: ProjectCompanyLink[],
 ): Promise<Project> {
   assertLossReason(input);
+  await assertLossReasonDetail(input);
   assertLinksValid(links);
   await assertCompaniesUsable(
     session,
@@ -453,6 +502,7 @@ const EDITABLE = [
   "lostReasonId",
   "lostAt",
   "lossReason",
+  "inProduction",
 ] as const;
 
 export async function updateProject(
@@ -464,6 +514,7 @@ export async function updateProject(
     throw new RuleError("projects.errors.notFound");
   }
   assertLossReason(input);
+  await assertLossReasonDetail(input);
 
   return withAudit(session.actor, async (tx, log) => {
     const [before] = await tx

@@ -309,7 +309,9 @@
       "sqmExpected": "Expected m²",
       "endState": "End state",
       "endStateOpen": "Open",
-      "lossReason": "Reason for loss"
+      "lossReason": "Reason for loss",
+      "lossReasonDetail": "Details",
+      "inProduction": "In production"
     },
     "detail": {
       "details": "Details",
@@ -338,6 +340,8 @@
       "oneBuyerOnly": "Only one company can be the buyer.",
       "companyNotVisible": "You cannot use that company.",
       "lossReasonRequired": "A lost project needs a reason.",
+      "lossReasonDetailRequired": "Say more about \"Other\" — it is how the reason list grows.",
+      "lossReasonDetailForbidden": "Only \"Other\" takes a written detail. Clear it, or choose \"Other\".",
       "lossReasonsNotSeeded": "Loss reasons have not been set up yet. Ask an administrator to run the seed.",
       "lastCompany": "A project must keep at least one company.",
       "notFound": "That project does not exist, or it is not one of yours."

@@ -670,7 +670,9 @@ async function main(): Promise<void> {
     region: shared!.region,
     cityId: shared!.cityId,
     endState: shared!.endState,
+    lostReasonId: shared!.lostReasonId,
     lossReason: shared!.lossReason,
+    inProduction: shared!.inProduction,
   });
   check(
     "the shared rep EDITED the project too [14 §2]",

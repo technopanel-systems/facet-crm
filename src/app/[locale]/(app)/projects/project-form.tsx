@@ -9,12 +9,14 @@ import {
   SelectField,
 } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "@/i18n/navigation";
-import { PROJECT_END_STATES, REGIONS } from "@/lib/enums";
-import type { CityRow } from "@/lib/lookups";
+import { OTHER_LOSS_REASON_CODE, PROJECT_END_STATES, REGIONS } from "@/lib/enums";
+import type { CityRow, LossReasonRow } from "@/lib/lookups";
 import type { ProjectInput } from "@/lib/projects";
 import { emptyFormState, type FormState } from "@/lib/validation";
 
@@ -29,6 +31,7 @@ export function ProjectForm({
   cancelHref,
   cities,
   companies,
+  lossReasons,
   locale,
   /** Links are chosen at creation; afterwards they are managed on the detail
    *  page, where each row can be edited or removed on its own `[14 §4]`. */
@@ -40,6 +43,7 @@ export function ProjectForm({
   cancelHref: string;
   cities: CityRow[];
   companies: CompanyOption[];
+  lossReasons: LossReasonRow[];
   locale: string;
   withCompanies?: boolean;
 }) {
@@ -54,6 +58,13 @@ export function ProjectForm({
   // `15 §4` — display only; the data layer derives what is written.
   const [cityId, setCityId] = useState(value("cityId"));
   const cityRegion = cities.find((city) => city.id === cityId)?.region ?? null;
+
+  // `25 §5` — which of the nine, so the detail field knows whether it is
+  // `other`'s intake or forbidden. Matched by code, never the uuid itself.
+  const [lostReasonId, setLostReasonId] = useState(value("lostReasonId"));
+  const isOtherReason =
+    lossReasons.find((r) => r.id === lostReasonId)?.code ===
+    OTHER_LOSS_REASON_CODE;
 
   return (
     <FormShell
@@ -193,23 +204,67 @@ export function ProjectForm({
       </FormField>
 
       {/* Shown only for a lost project — the reason is required then `[07 C5]`,
-          and asking for it at other times invites a meaningless answer. */}
+          `[25 §5]`, and asking for it at other times invites a meaningless
+          answer. Left `hidden` rather than unmounted: a stale pick here is
+          discarded server-side the moment `endState` is not `lost`, so it
+          cannot produce an error on a field the rep can no longer see. */}
       <div hidden={endState !== "lost"}>
         <FormField
-          name="lossReason"
+          name="lostReasonId"
           label={t("projects.fields.lossReason")}
-          error={errors.lossReason}
+          error={errors.lostReasonId}
+          hint={lossReasons.length === 0 ? t("common.noOptions") : undefined}
           required={endState === "lost"}
         >
-          <Textarea
-            id="lossReason"
-            name="lossReason"
-            rows={3}
-            defaultValue={value("lossReason")}
-            aria-invalid={Boolean(errors.lossReason) || undefined}
-            className="text-start"
-          />
+          <SelectField
+            name="lostReasonId"
+            defaultValue={value("lostReasonId")}
+            placeholder={t("common.none")}
+            invalid={Boolean(errors.lostReasonId)}
+            disabled={lossReasons.length === 0}
+            onChange={setLostReasonId}
+          >
+            {lossReasons.map((reason) => (
+              <option key={reason.id} value={reason.id} data-code={reason.code}>
+                {locale === "ar" ? reason.nameAr || reason.nameEn : reason.nameEn}
+              </option>
+            ))}
+          </SelectField>
         </FormField>
+
+        {/* Unmounted, not merely `hidden` — a hidden textarea still posts its
+            value. A rep who types detail for `other` and then picks a real
+            reason must not have that stale text silently refused: removing
+            the field from the DOM removes it from the submit too `[25 §5]`. */}
+        {isOtherReason ? (
+          <FormField
+            name="lossReason"
+            label={t("projects.fields.lossReasonDetail")}
+            error={errors.lossReason}
+            required
+          >
+            <Textarea
+              id="lossReason"
+              name="lossReason"
+              rows={3}
+              defaultValue={value("lossReason")}
+              aria-invalid={Boolean(errors.lossReason) || undefined}
+              className="text-start"
+            />
+          </FormField>
+        ) : null}
+      </div>
+
+      <div className="flex h-9 items-center gap-2">
+        <Checkbox
+          id="inProduction"
+          name="inProduction"
+          defaultChecked={defaults?.inProduction ?? false}
+        />
+        {/* `25 §4` — a plain label the rep sets. Deliberately unverified, and
+            never wired to the production module: production sometimes
+            changes and stock sometimes covers an order. */}
+        <Label htmlFor="inProduction">{t("projects.fields.inProduction")}</Label>
       </div>
 
       {withCompanies ? (

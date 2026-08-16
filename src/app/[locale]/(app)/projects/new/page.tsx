@@ -3,7 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { PageHeader } from "@/components/page-header";
 import { requireSession } from "@/lib/authz";
 import { listCompanyOptions } from "@/lib/companies";
-import { listCities } from "@/lib/lookups";
+import { listCities, listLossReasons } from "@/lib/lookups";
 
 import { createProjectAction } from "../actions";
 import { ProjectForm } from "../project-form";
@@ -20,9 +20,10 @@ export default async function NewProjectPage({
 
   const session = await requireSession();
   const t = await getTranslations();
-  const [cities, companies] = await Promise.all([
+  const [cities, companies, lossReasons] = await Promise.all([
     listCities(),
     listCompanyOptions(session),
+    listLossReasons(),
   ]);
 
   return (
@@ -37,6 +38,7 @@ export default async function NewProjectPage({
         cancelHref="/projects"
         cities={cities}
         companies={companies}
+        lossReasons={lossReasons}
         locale={locale}
         withCompanies
       />

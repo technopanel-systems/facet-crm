@@ -653,7 +653,10 @@ async function main(): Promise<void> {
     //
     // `verify:schema25` drives `createProject` and `updateProject` in process.
     // This is the other half: the real browser POST, through `readFields` and
-    // the action, which no in-process script can reach.
+    // the action, which no in-process script can reach — including feature
+    // slice 5's own trap: a rep who picks `other`, types the detail, then
+    // picks a real reason, replayed below as a second POST rather than a
+    // client-only claim.
     for (const locale of ["en", "ar"] as const) {
       const jar = jars["rep-a@example.test"];
       const list = await get(jar, `/${locale}/projects`);
@@ -666,12 +669,16 @@ async function main(): Promise<void> {
 
       const page = await get(jar, `/${locale}/projects/${id}/edit`);
       check(`${locale}: the edit screen renders`, page.status === 200, `got ${page.status}`);
-      // The loss field is hidden until the end state is `lost`, but it is in
-      // the markup — `hidden`, not conditionally rendered — so this asserts the
-      // marker rather than a translated label `[23]`.
+      // The picker is hidden until the end state is `lost`, but it is in the
+      // markup — `hidden`, not conditionally rendered — so this asserts the
+      // marker rather than a translated label `[23]`. The free-text detail
+      // field is NOT asserted here the same way: it is genuinely conditional
+      // on the current pick being `other`, unmounted otherwise on purpose
+      // `[25 §5]`, so its presence depends on the fixture project's current
+      // state rather than being a fixed structural fact about this screen.
       check(
-        `${locale}: it carries the loss-reason field`,
-        page.body.includes('name="lossReason"'),
+        `${locale}: it carries the loss-reason picker`,
+        page.body.includes('name="lostReasonId"'),
       );
 
       const form = page.body.match(
@@ -680,8 +687,30 @@ async function main(): Promise<void> {
       check(`${locale}: the project form is a real form`, Boolean(form));
       if (!form) continue;
 
+      // The picker's `<option>` carries `data-code` — a DOM marker, not a
+      // translated string `[23]` — precisely so this black-box script can
+      // find the `other` row without a DB import of its own. `"other"` here
+      // is the literal `OTHER_LOSS_REASON_CODE` in `src/lib/enums.ts`; this
+      // file never imports `src/`, so it is repeated rather than shared.
+      const otherReasonId = form.match(
+        /<option value="([^"]+)"[^>]*data-code="other"/,
+      )?.[1];
+      const nonOtherReasonId = [
+        ...form.matchAll(/<option value="([^"]+)"[^>]*data-code="([^"]+)"/g),
+      ].find((match) => match[2] !== "other")?.[1];
+      check(`${locale}: the picker offers the 'other' reason`, Boolean(otherReasonId));
+      check(
+        `${locale}: the picker offers a non-'other' reason`,
+        Boolean(nonOtherReasonId),
+      );
+      if (!otherReasonId || !nonOtherReasonId) continue;
+
       /** The action envelope plus the fields a browser would send. */
-      const fieldsFor = (endState: string, lossReason: string): FormData => {
+      const fieldsFor = (
+        endState: string,
+        lostReasonId: string,
+        lossReason: string,
+      ): FormData => {
         const fields = new FormData();
         for (const input of form.matchAll(/<input[^>]*>/g)) {
           const name = input[0].match(/name="([^"]+)"/)?.[1];
@@ -704,6 +733,7 @@ async function main(): Promise<void> {
         fields.set("cityId", "");
         fields.set("region", "");
         fields.set("endState", endState);
+        fields.set("lostReasonId", lostReasonId);
         fields.set("lossReason", lossReason);
         return fields;
       };
@@ -719,11 +749,27 @@ async function main(): Promise<void> {
         return response.status;
       };
 
-      const lost = await post(fieldsFor("lost", `lost via ${locale}`));
+      const lost = await post(
+        fieldsFor("lost", otherReasonId, `lost via ${locale}`),
+      );
       check(
         `${locale}: *** POSTing endState=lost answers 303, not 500 *** [25 §5]`,
         lost === 303,
         `got ${lost}`,
+      );
+
+      // The sequence a real rep produces: pick `other`, type the detail, then
+      // decide it is actually a real reason. The client unmounts the stale
+      // detail field on that switch, but only a real browser POST through
+      // `readFields` proves the SERVER accepts the correction on its own
+      // terms — no in-process script crosses that boundary `[25 §5]`.
+      const corrected = await post(
+        fieldsFor("lost", nonOtherReasonId, ""),
+      );
+      check(
+        `${locale}: switching from 'other' to a real reason still answers 303 [25 §5]`,
+        corrected === 303,
+        `got ${corrected}`,
       );
 
       const detail = await get(jar, `/${locale}/projects/${id}`);
@@ -736,7 +782,7 @@ async function main(): Promise<void> {
       // Put it back: the three loss columns must clear together, or
       // `projects_loss_state` refuses the row — the case a rep hits the first
       // time he changes his mind. It also leaves the fixture as it was found.
-      const reopened = await post(fieldsFor("", ""));
+      const reopened = await post(fieldsFor("", "", ""));
       check(
         `${locale}: re-opening it answers 303, so all three columns cleared`,
         reopened === 303,

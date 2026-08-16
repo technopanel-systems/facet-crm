@@ -276,9 +276,19 @@ export default async function ProjectDetailPage({
             </Fact>
             {project.endState === "lost" ? (
               <Fact label={t("projects.fields.lossReason")}>
-                {project.lossReason ?? dash}
+                {pickName(locale, project.lostReasonNameEn, project.lostReasonNameAr) ??
+                  dash}
               </Fact>
             ) : null}
+            {project.endState === "lost" && project.lossReason ? (
+              <Fact label={t("projects.fields.lossReasonDetail")}>
+                {project.lossReason}
+              </Fact>
+            ) : null}
+            {/* `25 §4` — a plain label the rep set, nothing derived. */}
+            <Fact label={t("projects.fields.inProduction")}>
+              {project.inProduction ? t("common.yes") : t("common.no")}
+            </Fact>
             <Fact label={t("common.createdBy")}>
               {project.createdByName ?? t("common.unknownUser")}
             </Fact>

@@ -29,7 +29,11 @@ function readProjectForm(formData: FormData) {
     region: fields.option("region", REGIONS),
     cityId: fields.uuid("cityId"),
     endState: fields.option("endState", PROJECT_END_STATES),
+    // Shape only — "required when lost, one of the nine, and only 'other'
+    // takes the detail" is `assertLossReason`/`assertLossReasonDetail`'s job.
+    lostReasonId: fields.uuid("lostReasonId"),
     lossReason: fields.text("lossReason", { max: 2000 }),
+    inProduction: fields.checkbox("inProduction"),
   };
   return { fields, input };
 }

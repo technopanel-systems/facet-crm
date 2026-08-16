@@ -13,7 +13,10 @@
  * the first rep to mark one lost would have found a 500, and **none of the five
  * suites drives that path** — `verify:routes` replays only the theme toggle and
  * mark-read. A CHECK is only as good as the writer beside it, so the writer
- * changed in the same pass and section 10 proves the two agree.
+ * changed in the same pass and section 10 proves the two agree. Feature slice
+ * 5 later gave section 10 a second job: `assertLossReasonDetail`, the rule
+ * `25 §5` owed since that same migration because a CHECK cannot subquery
+ * `loss_reasons` to read the code behind a uuid.
  *
  *   1. Every column landed, with the right type and nullability `[25 G]`.
  *   2. Every withdrawn thing is gone — warmth, tolerance, sales desk
@@ -25,10 +28,11 @@
  *      exactly two roles `[25 §5, §28, §33]`.
  *   6. The seeds are idempotent.
  *   7. The outcome enum agrees with `enums.ts` at runtime `[25 §2]`.
- *   8. *** Nothing writes the new columns yet *** — plus what this pass
- *      deliberately does NOT enforce.
+ *   8. *** Nothing writes the remaining new columns yet *** — plus what this
+ *      pass deliberately does NOT enforce.
  *   9. The foreign keys point where they should.
- *  10. *** The writer and the CHECK agree *** `[25 §5]`.
+ *  10. *** The writer and the CHECK agree *** `[25 §5]` — and, since feature
+ *      slice 5, so does the `RuleError` a CHECK could never be.
  *
  * Usage: `npm run verify:schema25`
  *
@@ -44,9 +48,9 @@
  *
  * **Nothing is cleaned up** `[12 §7]`. Section 10's company and project carry
  * the run stamp in their names, which is also how section 8 tells this
- * script's own rows from everything else: without that, the second run would
- * find the first run's lost project and report that something writes
- * `lost_reason_id`.
+ * script's own rows from everything else on the `projects` table: without
+ * that, a second run would find the first run's own leftover rows and report
+ * that something writes a column this section still claims is untouched.
  */
 
 process.loadEnvFile(".env");
@@ -94,6 +98,28 @@ async function allows(label: string, fn: () => Promise<unknown>): Promise<void> 
   } catch (error) {
     failures += 1;
     console.error(`  FAIL  ${label} — it refused with ${causeChain(error)}`);
+  }
+}
+
+/**
+ * Assert that the APPLICATION LAYER refuses, by `RuleError` key.
+ *
+ * Copied from `verify-phase10a.ts`/`verify-slice3.ts`, same reason as
+ * `databaseRefuses` above: the negative half of a rule needs its own proof,
+ * not just that the positive half was allowed.
+ */
+async function refuses(
+  label: string,
+  expectedKey: string,
+  fn: () => Promise<unknown>,
+): Promise<void> {
+  try {
+    await fn();
+    failures += 1;
+    console.error(`  FAIL  ${label} — it was allowed`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    check(`${label} (${expectedKey})`, message === expectedKey, `threw ${message}`);
   }
 }
 
@@ -247,13 +273,19 @@ const TASK_COLUMNS = [
  * `src/lib/follow-ups.ts`, proved by `npm run verify:followups`. The same
  * inversion `comments` and `comment_mentions` got in slice 2. They stay in
  * `LANDED` above: that they exist with the right type is still true.
+ *
+ * **The three loss columns, and `in_production`, have left too.** Feature
+ * slice 5 built the nine-reason picker and the production checkbox —
+ * `createProject`/`updateProject` write all four for real now, proved by
+ * section 10 below (loss) and the round-trip check beside it
+ * (`in_production`). The three loss columns move together as one unit
+ * (`lossFieldsFor`'s own framing) and leave together: before this slice
+ * `lost_at` was already stamped, but on a reason the screen could not yet
+ * let a rep actually choose, so the feature `25 §5` describes was not done
+ * merely because one of its three columns had a writer.
  */
 const NEW_COLUMNS: { table: string; column: string; boolean?: true }[] = [
   { table: "companies", column: "has_credit_terms", boolean: true },
-  { table: "projects", column: "lost_reason_id" },
-  { table: "projects", column: "lost_at" },
-  { table: "projects", column: "loss_reason" },
-  { table: "projects", column: "in_production", boolean: true },
   { table: "quotation_threads", column: "closed_at" },
   { table: "quotation_threads", column: "closed_by_user_id" },
   { table: "rep_reports", column: "reference" },
@@ -401,7 +433,9 @@ async function main(): Promise<void> {
       region: null,
       cityId: null,
       endState: null,
+      lostReasonId: null,
       lossReason: null,
+      inProduction: false,
     },
     [{ companyId: company.id, role: null, isBuyer: false }],
   );
@@ -415,6 +449,21 @@ async function main(): Promise<void> {
   );
   if (!otherReason) {
     console.error("Cannot continue without the 'other' loss reason.");
+    process.exit(1);
+  }
+
+  // Any seeded reason that is not 'other' — section 10 needs one to prove the
+  // forbidding half of assertLossReasonDetail, and which of the eight it is
+  // does not matter.
+  const nonOtherReason = seededReasons.find(
+    (row) => row.code !== OTHER_LOSS_REASON_CODE,
+  );
+  check(
+    "loss_reasons carries a non-'other' code to test the forbidding half against [25 §5]",
+    nonOtherReason !== undefined,
+  );
+  if (!nonOtherReason) {
+    console.error("Cannot continue without a non-'other' loss reason.");
     process.exit(1);
   }
 
@@ -655,16 +704,17 @@ async function main(): Promise<void> {
   // check — the absence of the column IS the guarantee, asserted above.
 
   // A gap recorded in a script that runs is a gap that gets closed.
+  //
+  // 'other' requires loss_reason and every other code forbids it [25 §5]
+  // LANDED in feature slice 5 — src/lib/projects.ts's assertLossReasonDetail,
+  // proved in section 10 below, four ways. This is why that bullet is gone.
   console.log(
-    "\n  NOT ASSERTED, on purpose — the screen slice owes these:\n" +
-      "    · 'other' requires loss_reason and every other code forbids it\n" +
-      "      [25 §5]. A CHECK cannot subquery loss_reasons to read the code\n" +
-      "      behind a uuid, so it belongs in src/lib/projects.ts as a\n" +
-      "      RuleError — with its own assertion here. Until then every loss\n" +
-      "      carries 'other', so the rule is trivially true and untested.\n" +
+    "\n  NOT ASSERTED, on purpose — still owed:\n" +
       "    · 'lost requires a reason' at the DATABASE. assertLossReason holds\n" +
       "      it in the application layer today; projects_loss_state is\n" +
-      "      deliberately one-way until the screen offers the nine.\n" +
+      "      deliberately one-way — the converse would need more than a\n" +
+      "      CHECK, and the screen offering the nine was never what stood\n" +
+      "      in its way.\n" +
       "    · Nothing READS the new columns either: authz.ts does not consult\n" +
       "      sees_all_records_readonly, so 25 §28's third tier is not live.\n" +
       "      Feature slice 2 built comments THROUGH the existing two tiers, so\n" +
@@ -726,7 +776,9 @@ async function main(): Promise<void> {
       region: null,
       cityId: null,
       endState: "lost",
+      lostReasonId: otherReason.id,
       lossReason: "The customer chose a cheaper supplier.",
+      inProduction: false,
     },
     [{ companyId: company.id, role: null, isBuyer: false }],
   );
@@ -735,7 +787,7 @@ async function main(): Promise<void> {
     lostProject.endState === "lost",
   );
   check(
-    "it carries the 'other' reason, because a typed reason IS an other reason [25 §5]",
+    "it carries the reason it was given, not a default [25 §5]",
     lostProject.lostReasonId === otherReason.id,
     `got ${lostProject.lostReasonId}`,
   );
@@ -759,7 +811,9 @@ async function main(): Promise<void> {
       region: null,
       cityId: null,
       endState: "lost",
+      lostReasonId: otherReason.id,
       lossReason: "Delivery time was too long.",
+      inProduction: false,
     });
     if (updated.lostReasonId !== otherReason.id || updated.lostAt === null) {
       throw new Error(
@@ -782,12 +836,106 @@ async function main(): Promise<void> {
     region: null,
     cityId: null,
     endState: "lost",
+    lostReasonId: otherReason.id,
     lossReason: "Delivery time was too long.",
+    inProduction: false,
   });
   check(
     "re-saving a lost project does not restamp lost_at [25 §5]",
     resaved.lostAt?.getTime() === beforeResave?.lostAt?.getTime(),
     `${beforeResave?.lostAt?.toISOString()} → ${resaved.lostAt?.toISOString()}`,
+  );
+
+  // The rep is free to correct the reason on a later edit — the pick is no
+  // longer sticky the way the pre-screen default was `[23]`.
+  await allows("re-editing a lost project to a different reason is allowed [25 §5]", async () => {
+    const corrected = await updateProject(rep, openProject.id, {
+      nameEn: openProject.nameEn,
+      nameAr: null,
+      sqmExpected: null,
+      region: null,
+      cityId: null,
+      endState: "lost",
+      lostReasonId: nonOtherReason.id,
+      lossReason: null,
+      inProduction: false,
+    });
+    if (corrected.lostReasonId !== nonOtherReason.id) {
+      throw new Error(`still carries ${corrected.lostReasonId}`);
+    }
+  });
+
+  /**
+   * `25 §5`'s remaining half, owed since migration 0007 `[23]`: `other`
+   * requires the free-text detail, and every other code forbids it. A CHECK
+   * cannot subquery `loss_reasons` to read the code behind a uuid, so
+   * `src/lib/projects.ts`'s `assertLossReasonDetail` holds it instead —
+   * proven the four ways below, replacing what section 8 used to print as a
+   * stated non-assertion.
+   */
+  await refuses(
+    "'other' with no detail is refused [25 §5]",
+    "projects.errors.lossReasonDetailRequired",
+    () =>
+      updateProject(rep, openProject.id, {
+        nameEn: openProject.nameEn,
+        nameAr: null,
+        sqmExpected: null,
+        region: null,
+        cityId: null,
+        endState: "lost",
+        lostReasonId: otherReason.id,
+        lossReason: null,
+        inProduction: false,
+      }),
+  );
+
+  await refuses(
+    "a non-'other' reason with detail is refused [25 §5]",
+    "projects.errors.lossReasonDetailForbidden",
+    () =>
+      updateProject(rep, openProject.id, {
+        nameEn: openProject.nameEn,
+        nameAr: null,
+        sqmExpected: null,
+        region: null,
+        cityId: null,
+        endState: "lost",
+        lostReasonId: nonOtherReason.id,
+        lossReason: "This should not be allowed.",
+        inProduction: false,
+      }),
+  );
+
+  await allows("a non-'other' reason with no detail is allowed [25 §5]", () =>
+    updateProject(rep, openProject.id, {
+      nameEn: openProject.nameEn,
+      nameAr: null,
+      sqmExpected: null,
+      region: null,
+      cityId: null,
+      endState: "lost",
+      lostReasonId: nonOtherReason.id,
+      lossReason: null,
+      inProduction: false,
+    }),
+  );
+
+  await refuses(
+    "a lost project with no reason picked is refused [25 §5]",
+    "projects.errors.lossReasonRequired",
+    () =>
+      updateProject(rep, openProject.id, {
+        nameEn: openProject.nameEn,
+        nameAr: null,
+        sqmExpected: null,
+        region: null,
+        cityId: null,
+        endState: "lost",
+        lostReasonId: null,
+        lossReason: null,
+        inProduction: false,
+      }),
   );
 
   // And moving off `lost` must clear all three, or projects_loss_state refuses
@@ -800,12 +948,33 @@ async function main(): Promise<void> {
       region: null,
       cityId: null,
       endState: "won",
+      lostReasonId: null,
       lossReason: null,
+      inProduction: false,
     });
     if (won.lostReasonId !== null || won.lostAt !== null || won.lossReason !== null) {
       throw new Error(
         `left lost_reason_id=${won.lostReasonId} lost_at=${won.lostAt} loss_reason=${won.lossReason}`,
       );
+    }
+  });
+
+  // `25 §4` — a plain label, no invariant to prove beyond a round-trip: this
+  // is the whole of what "deliberately unverified" leaves to check.
+  await allows("in_production round-trips through updateProject [25 §4]", async () => {
+    const updated = await updateProject(rep, openProject.id, {
+      nameEn: openProject.nameEn,
+      nameAr: null,
+      sqmExpected: null,
+      region: null,
+      cityId: null,
+      endState: "won",
+      lostReasonId: null,
+      lossReason: null,
+      inProduction: true,
+    });
+    if (updated.inProduction !== true) {
+      throw new Error(`got inProduction=${updated.inProduction}`);
     }
   });
 }

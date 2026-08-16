@@ -36,7 +36,7 @@ import {
   serviceTypes,
 } from "@/db/schema";
 import { can, type AuthSession } from "@/lib/authz";
-import { OTHER_LOSS_REASON_CODE, type Region } from "@/lib/enums";
+import type { Region } from "@/lib/enums";
 import { RuleError } from "@/lib/validation";
 
 /** The shape every lookup shares: an id and a name in both languages. */
@@ -102,46 +102,49 @@ export async function listCompanyCategories(): Promise<LookupRow[]> {
     .orderBy(asc(companyCategories.nameEn));
 }
 
+/** A loss reason carries its `code` `[25 §5]` — the token `projects.ts` branches
+ *  on to tell `other` apart from the rest, without hardcoding its uuid. */
+export type LossReasonRow = LookupRow & { code: string };
+
 /**
- * The nine loss reasons `[25 §5]`, for the screen that will offer them.
+ * The nine loss reasons `[25 §5]`, for the screen that offers them.
  *
  * No selectability filter and no visibility filter: a reason describes the
  * world, like a city. Ordered by the English name for now, as every other
  * lookup here is — `25 §5` states the list, not an order to display it in.
  */
-export async function listLossReasons(): Promise<LookupRow[]> {
+export async function listLossReasons(): Promise<LossReasonRow[]> {
   return db
     .select({
       id: lossReasons.id,
       nameEn: lossReasons.nameEn,
       nameAr: lossReasons.nameAr,
+      code: lossReasons.code,
     })
     .from(lossReasons)
     .orderBy(asc(lossReasons.nameEn));
 }
 
 /**
- * The id of the `other` loss reason `[25 §5]`.
+ * The code behind a loss-reason id `[25 §5]`.
  *
- * `projects.ts` writes it behind every free-text loss reason until the loss
- * screen offers the nine, because a typed reason with no list to pick from
- * **is** an `other` reason. It is also what the screen slice will compare
- * against to require the free text for `other` and forbid it for the rest —
- * the rule a CHECK cannot hold, because it would have to subquery this table
- * to read the code behind a uuid.
+ * `projects.ts` reads it to decide whether the free-text detail is required
+ * (`other`) or forbidden (every other code) — the rule a CHECK cannot hold,
+ * because it would have to subquery this table to read the code behind a
+ * uuid. One query does double duty: it also catches a tampered or stale id
+ * from a `<select>` that no longer offers it, the same job `regionForCity`
+ * and `assertLeadSourceSelectable` do for `cityId` and `leadSourceId`.
  *
- * A missing row means the database is unseeded rather than that the caller
- * did anything wrong, so this reports against no field.
+ * Returns `null` for an id that does not resolve, rather than throwing —
+ * the caller knows the field name to report against and this does not.
  */
-export async function otherLossReasonId(): Promise<string> {
+export async function lossReasonCode(id: string): Promise<string | null> {
   const [reason] = await db
-    .select({ id: lossReasons.id })
+    .select({ code: lossReasons.code })
     .from(lossReasons)
-    .where(eq(lossReasons.code, OTHER_LOSS_REASON_CODE))
+    .where(eq(lossReasons.id, id))
     .limit(1);
-
-  if (!reason) throw new RuleError("projects.errors.lossReasonsNotSeeded");
-  return reason.id;
+  return reason?.code ?? null;
 }
 
 /**
