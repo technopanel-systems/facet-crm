@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FACET — concept v4 · dashboards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --red-600:#C8102E; --red-500:#E5233C;
+  --radius:10px; --radius-lg:14px;
+  --font:'IBM Plex Sans',system-ui,sans-serif; --mono:'IBM Plex Mono',monospace;
+  --ease:cubic-bezier(.2,.7,.3,1);
+}
+html[data-theme="dark"]{
+  --canvas:#151211; --surface:#1D1A18; --surface-2:#252120; --surface-3:#2C2725;
+  --line:#302B29; --line-strong:#403A37;
+  --text:#F0EBE8; --text-muted:#A29996; --text-faint:#756C69;
+  --rail:#0E0C0B; --rail-text:#918885; --rail-text-strong:#FFF8F5; --rail-active:#211D1B;
+  --brand:#F2566B; --brand-ink:#FFF;
+  --a-red-bg:#2E1418; --a-red-fg:#F98A98; --a-blue-bg:#141F31; --a-blue-fg:#7FADEE;
+  --a-amber-bg:#2B1F0C; --a-amber-fg:#E3A63E; --a-green-bg:#0F2417; --a-green-fg:#57C57E;
+  --shadow:0 1px 2px rgba(0,0,0,.5);
+}
+html[data-theme="light"]{
+  --canvas:#F8F6F4; --surface:#FFFFFF; --surface-2:#FAF8F6; --surface-3:#F1EDE9;
+  --line:#E8E3DE; --line-strong:#D6CFC9;
+  --text:#1A1614; --text-muted:#6B615C; --text-faint:#9A908A;
+  --rail:#171311; --rail-text:#B5ABA6; --rail-text-strong:#FFFFFF; --rail-active:#26201D;
+  --brand:#C8102E; --brand-ink:#FFF;
+  --a-red-bg:#FDF1F2; --a-red-fg:#C8102E; --a-blue-bg:#EEF4FC; --a-blue-fg:#2B5CA8;
+  --a-amber-bg:#FDF4E6; --a-amber-fg:#B45309; --a-green-bg:#EFF9F1; --a-green-fg:#15803D;
+  --shadow:0 1px 2px rgba(26,22,20,.05),0 6px 20px -12px rgba(26,22,20,.18);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--canvas);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+.app{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+@media (max-width:980px){.app{grid-template-columns:1fr}.rail{display:none}}
+.rail{background:var(--rail);display:flex;flex-direction:column;padding:18px 12px;gap:2px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 8px 16px}
+.mark{width:30px;height:30px;border-radius:8px;background:var(--red-600);display:grid;place-items:center;flex:none;color:#fff;font-weight:700;font-size:14px}
+.brand b{color:var(--rail-text-strong);font-size:14.5px;font-weight:600;display:block}
+.brand small{color:var(--rail-text);font-size:11px;opacity:.7}
+.rail-group{color:var(--rail-text);opacity:.45;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:15px 10px 5px}
+.nav{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;color:var(--rail-text);font-size:13.5px;font-weight:500}
+.nav:hover,.nav.on{background:var(--rail-active);color:var(--rail-text-strong)}
+.nav .count{margin-inline-start:auto;font-size:11px;font-weight:600;background:var(--red-600);color:#fff;border-radius:20px;padding:1px 6px;min-width:19px;text-align:center}
+.me{margin-top:auto;border-top:1px solid rgba(255,255,255,.06);padding-top:13px;display:flex;align-items:center;gap:10px}
+.av{width:30px;height:30px;border-radius:50%;background:#7A2A38;display:grid;place-items:center;color:#fff;font-weight:600;font-size:12px;flex:none}
+.av.s{width:22px;height:22px;font-size:10px}
+.av.b{background:#2C4A78}.av.g{background:#245A3E}.av.v{background:#4E3A7A}
+.me b{color:var(--rail-text-strong);font-size:13px;display:block;line-height:1.3}
+.me small{color:var(--rail-text);font-size:11px;opacity:.8}
+
+.main{display:flex;flex-direction:column;min-width:0}
+.top{position:sticky;top:0;z-index:20;background:var(--canvas);border-bottom:1px solid var(--line);padding:10px 24px;display:flex;align-items:center;gap:12px}
+.search{flex:1;max-width:400px;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:7px 12px;color:var(--text-faint);font-size:13px}
+.kbd{margin-inline-start:auto;font-family:var(--mono);font-size:10.5px;border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+.add{background:var(--brand);color:var(--brand-ink);border-radius:9px;padding:7px 14px;font-size:13px;font-weight:600}
+.seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px}
+.seg button{font-size:12px;font-weight:600;padding:4px 9px;border-radius:6px;color:var(--text-faint)}
+.seg button.on{background:var(--surface-2);color:var(--text)}
+
+.page{padding:20px 24px 48px;max-width:1320px;width:100%}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:20px}
+.tab{font-size:13.5px;font-weight:600;padding:9px 13px;color:var(--text-faint);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.on{color:var(--text);border-bottom-color:var(--brand)}
+.view{display:none}.view.on{display:block}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:16px;flex-wrap:wrap}
+h1{font-size:24px;font-weight:600;letter-spacing:-.025em;line-height:1.15}
+.sub{color:var(--text-muted);font-size:13px;margin-top:3px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:var(--shadow)}
+.label{font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint)}
+.card-h{padding:14px 18px 0;display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.card-h h2{font-size:14px;font-weight:600}
+.card-h .note{font-size:12px;color:var(--text-faint)}
+.link{font-size:12.5px;font-weight:600;color:var(--a-blue-fg)}
+.foot{padding:10px 18px;border-top:1px solid var(--line);font-size:12px;color:var(--text-faint);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.pill{font-size:11px;font-weight:600;border-radius:20px;padding:2px 9px;white-space:nowrap;flex:none;display:inline-flex;align-items:center;gap:5px}
+.p-plain{background:var(--surface-2);color:var(--text-muted);border:1px solid var(--line)}
+.p-red{background:var(--a-red-bg);color:var(--a-red-fg)}
+.p-amber{background:var(--a-amber-bg);color:var(--a-amber-fg)}
+.p-green{background:var(--a-green-bg);color:var(--a-green-fg)}
+.late{color:var(--a-red-fg)}.soon{color:var(--a-amber-fg)}.okc{color:var(--text-faint)}
+
+/* ═══ SIGNATURE — the target with the pace line ═══ */
+.sig{padding:20px 22px 20px;margin-bottom:14px}
+.sig-top{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:16px}
+.big{font-family:var(--mono);font-size:38px;font-weight:600;letter-spacing:-.035em;line-height:1;font-variant-numeric:tabular-nums}
+.big em{font-style:normal;font-size:15px;color:var(--text-muted);font-family:var(--font);font-weight:500;margin-inline-start:6px}
+.of{font-size:13px;color:var(--text-muted);margin-top:5px}
+.pace{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--a-amber-fg);background:var(--a-amber-bg);border-radius:20px;padding:4px 11px}
+.pace.ok{color:var(--a-green-fg);background:var(--a-green-bg)}
+.pace.late{color:var(--a-red-fg);background:var(--a-red-bg)}
+.track{position:relative;height:38px;border-radius:7px;background:var(--surface-2);border:1px solid var(--line);overflow:hidden}
+.fill{position:absolute;inset:0 auto 0 0;background:var(--red-600)}
+.paceline{position:absolute;top:0;bottom:0;width:2px;background:var(--text);opacity:.85}
+.paceline::after{content:"today";position:absolute;top:-1px;inset-inline-start:6px;font-size:10px;font-family:var(--mono);color:var(--text);opacity:.9;white-space:nowrap}
+.legend{display:flex;justify-content:space-between;margin-top:7px;font-size:11px;color:var(--text-faint);font-family:var(--mono)}
+.sig-side{display:grid;grid-template-columns:repeat(3,auto);gap:22px;font-size:12.5px}
+.sig-side .label{margin-bottom:3px}
+.sig-side b{font-family:var(--mono);font-size:16px;font-weight:600;display:block}
+.sig-side small{color:var(--text-muted);font-size:11.5px}
+
+/* ═══ COUNTS ROW — deliberately not "KPI cards" ═══ */
+.counts{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line)}
+.counts a{padding:13px 18px;border-inline-end:1px solid var(--line);display:block}
+.counts a:last-child{border-inline-end:none}
+.counts a:hover{background:var(--surface-2)}
+.counts .n{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+.counts .c{font-size:12px;color:var(--text-muted);margin-top:4px}
+@media (max-width:760px){.counts{grid-template-columns:1fr 1fr}.counts a:nth-child(2){border-inline-end:none}}
+
+/* ═══ WAITING LIST ═══ */
+.cols{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;align-items:start;margin-top:14px}
+@media (max-width:1040px){.cols{grid-template-columns:1fr}}
+.grp{display:flex;align-items:center;gap:9px;padding:12px 18px 6px}
+.grp .ct{font-family:var(--mono);font-size:11px;color:var(--text-faint)}
+.wrow{display:grid;grid-template-columns:auto 1fr auto auto;gap:12px;align-items:center;padding:10px 18px;border-top:1px solid var(--line)}
+.wrow:hover{background:var(--surface-2)}
+.kind{width:20px;height:20px;border-radius:5px;display:grid;place-items:center;font-size:10px;font-weight:700;flex:none;background:var(--surface-2);border:1px solid var(--line);color:var(--text-muted)}
+.wrow .t{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wrow .m{font-size:12px;color:var(--text-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.when{font-size:11.5px;font-weight:600;font-family:var(--mono);white-space:nowrap}
+.act{font-size:11.5px;font-weight:600;border:1px solid var(--line-strong);border-radius:7px;padding:4px 10px;color:var(--text-muted)}
+.act:hover{border-color:var(--text);color:var(--text)}
+
+/* ═══ WEEK STRIP ═══ */
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:12px 18px 0}
+.day{background:var(--surface);padding:8px 6px 9px;text-align:center}
+.day .dn{font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em}
+.day .dd{font-family:var(--mono);font-size:13px;font-weight:600;margin:2px 0 6px}
+.day .bars{display:flex;justify-content:center;gap:2px;align-items:flex-end;height:22px}
+.day .bars i{width:5px;border-radius:2px;background:var(--line-strong)}
+.day.today .dd{color:var(--brand)}
+.day.off{background:var(--surface-2)}
+.day.off .dd,.day.off .dn{opacity:.5}
+.mini-legend{display:flex;gap:14px;font-size:11px;color:var(--text-faint);padding:8px 18px 12px}
+.mini-legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-inline-end:5px;vertical-align:middle}
+
+/* ═══ MANAGER: TEAM TABLE ═══ */
+.tt{width:100%;border-collapse:collapse}
+.tt th{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);font-weight:600;text-align:start;padding:10px 14px;border-bottom:1px solid var(--line)}
+.tt th.n,.tt td.n{text-align:end}
+.tt td{padding:11px 14px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:middle}
+.tt tr:hover td{background:var(--surface-2)}
+.tt .rep{display:flex;align-items:center;gap:9px;font-weight:600}
+.tt .rep small{display:block;font-weight:500;color:var(--text-muted);font-size:11.5px}
+.mbar{position:relative;height:6px;border-radius:3px;background:var(--surface-2);border:1px solid var(--line);min-width:110px;overflow:hidden}
+.mbar i{position:absolute;inset:0 auto 0 0;background:var(--red-600)}
+.mbar s{position:absolute;top:-1px;bottom:-1px;width:1.5px;background:var(--text);opacity:.6}
+.tt .waiting{display:flex;gap:4px}
+.tt .waiting b{font-family:var(--mono);font-size:11px;font-weight:600;padding:1px 6px;border-radius:4px;background:var(--surface-2);border:1px solid var(--line)}
+.tt .waiting b.hot{background:var(--a-red-bg);border-color:transparent;color:var(--a-red-fg)}
+
+/* ═══ MANAGER: ROLLUP ═══ */
+.roll{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;align-items:start}
+@media (max-width:1040px){.roll{grid-template-columns:1fr}}
+.gap-rows{padding:6px 0 4px}
+.gap-row{display:grid;grid-template-columns:150px 1fr auto;gap:12px;align-items:center;padding:8px 18px}
+.gap-row .r{font-size:12.5px}
+.gap-row .r small{display:block;color:var(--text-faint);font-size:11px}
+.gbar{height:14px;border-radius:3px;background:var(--surface-2);overflow:hidden;display:flex;border:1px solid var(--line)}
+.gbar i{height:100%}
+.gbar .d{background:var(--red-600)}
+.gbar .q{background:var(--line-strong)}
+.gap-row .v{font-family:var(--mono);font-size:12px;text-align:end;white-space:nowrap}
+.reasons{padding:4px 0 8px}
+.reason{display:grid;grid-template-columns:1fr auto 60px;gap:12px;align-items:center;padding:7px 18px;font-size:13px}
+.reason .rb{height:8px;border-radius:2px;background:var(--a-amber-fg);opacity:.75}
+.reason .rn{font-family:var(--mono);font-size:12px;text-align:end;color:var(--text-muted)}
+.note{font-size:12px;color:var(--text-faint)}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="rail">
+  <div class="brand"><div class="mark">F</div><div><b>FACET</b><small>Technopanel</small></div></div>
+  <div class="rail-group">Work</div>
+  <a class="nav on">Waiting on me<span class="count">7</span></a>
+  <a class="nav">Companies</a><a class="nav">Projects</a><a class="nav">Quotations</a><a class="nav">Dispatches</a>
+  <div class="rail-group">Team</div>
+  <a class="nav">Activity</a><a class="nav">Targets</a>
+  <div class="me"><div class="av">JM</div><div><b>Jerom M.</b><small>Super Admin</small></div></div>
+</aside>
+
+<div class="main">
+  <div class="top">
+    <div class="search">Search<span class="kbd">⌘K</span></div>
+    <div class="seg"><button class="on" onclick="th('dark',this)">Dark</button><button onclick="th('light',this)">Light</button></div>
+    <button class="add">+ New</button>
+  </div>
+  <div class="page">
+    <div class="tabs">
+      <button class="tab on" onclick="go('rep',this)">Rep — Today</button>
+      <button class="tab" onclick="go('mgr',this)">Manager — Team</button>
+      <button class="tab" onclick="go('roll',this)">Manager — Monthly rollup</button>
+    </div>
+
+<!-- ═══════════ REP DASHBOARD ═══════════ -->
+<section class="view on" id="v-rep">
+  <div class="head">
+    <div><h1>Sunday, 16 August</h1><div class="sub">Rawan · Riyadh · 11 working days left in August</div></div>
+    <span class="pace">Behind pace by 190 m²</span>
+  </div>
+
+  <div class="card sig">
+    <div class="sig-top">
+      <div>
+        <div class="label">August · dispatched square metres</div>
+        <div class="big" style="margin-top:6px">1,340<em>of 2,400 m²</em></div>
+        <div class="of">56% of target · 52% of the month gone · <span class="num">1,060</span> m² to go</div>
+      </div>
+      <div class="sig-side">
+        <div><div class="label">Paid, not yet out</div><b class="num">620</b><small>would put you at 82%</small></div>
+        <div><div class="label">Awaiting signature</div><b class="num">1,200</b><small>2 quotations</small></div>
+        <div><div class="label">Last month</div><b class="num">2,180</b><small>91% of 2,400</small></div>
+      </div>
+    </div>
+    <div class="track">
+      <div class="fill" style="width:56%"></div>
+      <div class="paceline" style="left:52%"></div>
+    </div>
+    <div class="legend"><span>0</span><span>1,200</span><span>2,400 m²</span></div>
+  </div>
+
+  <div class="card" style="margin-bottom:0">
+    <div class="counts">
+      <a><div class="n late">4</div><div class="c">companies gone quiet</div></a>
+      <a><div class="n soon">2</div><div class="c">quotations on you</div></a>
+      <a><div class="n">3</div><div class="c">projects not moved in 14d</div></a>
+      <a><div class="n okc">1</div><div class="c">on hold, resuming this week</div></a>
+    </div>
+  </div>
+
+  <div class="cols">
+    <div class="card">
+      <div class="card-h"><h2>Waiting on you</h2><span class="note">oldest first</span></div>
+      <div class="grp"><span class="label">Overdue</span><span class="ct">4</span></div>
+      <div class="wrow"><span class="kind">Q</span><div><div class="t">Zamil Tower cladding — returned for edits</div><div class="m">Rawan wrote: fix the colour code on line 2 · <span class="num">9614 · v2</span></div></div><span class="when late">6d</span><button class="act">Open</button></div>
+      <div class="wrow"><span class="kind">C</span><div><div class="t">Al-Bawani Contracting</div><div class="m">Nothing recorded for 61 days · 2 live projects · 1,840 m² expected</div></div><span class="when late">61d</span><button class="act">Log</button></div>
+      <div class="wrow"><span class="kind">C</span><div><div class="t">مؤسسة الواحة للمقاولات</div><div class="m">Nothing recorded for 38 days · no project yet</div></div><span class="when late">38d</span><button class="act">Log</button></div>
+      <div class="wrow"><span class="kind">P</span><div><div class="t">KAFD Parcel 4.11</div><div class="m">Quotation requested 16 days ago, nothing since · Rawabi Holding</div></div><span class="when late">16d</span><button class="act">Open</button></div>
+      <div class="grp"><span class="label">Due soon</span><span class="ct">3</span></div>
+      <div class="wrow"><span class="kind">Q</span><div><div class="t">ALJ Showroom — Tahlia · confirm payment</div><div class="m">Customer says transferred Thursday · <span class="num">9602</span></div></div><span class="when soon">3d</span><button class="act">Confirm</button></div>
+      <div class="wrow"><span class="kind">C</span><div><div class="t">Rawabi Holding</div><div class="m">22 days since last visit · 3 live projects</div></div><span class="when soon">22d</span><button class="act">Log</button></div>
+      <div class="wrow"><span class="kind">C</span><div><div class="t">Almarai Facilities</div><div class="m">18 days · quotation 9571 out, no response</div></div><span class="when soon">18d</span><button class="act">Log</button></div>
+      <div class="foot"><span>7 waiting · nothing else is</span><span class="link">Everything I own →</span></div>
+    </div>
+
+    <div>
+      <div class="card">
+        <div class="card-h"><h2>This week</h2><span class="note">what you did, and what happened</span></div>
+        <div class="week">
+          <div class="day"><div class="dn">Sun</div><div class="dd">10</div><div class="bars"><i style="height:14px;background:var(--a-red-fg)"></i><i style="height:8px;background:var(--a-blue-fg)"></i></div></div>
+          <div class="day"><div class="dn">Mon</div><div class="dd">11</div><div class="bars"><i style="height:20px;background:var(--a-red-fg)"></i><i style="height:12px;background:var(--a-blue-fg)"></i></div></div>
+          <div class="day"><div class="dn">Tue</div><div class="dd">12</div><div class="bars"><i style="height:6px;background:var(--a-red-fg)"></i><i style="height:16px;background:var(--a-blue-fg)"></i></div></div>
+          <div class="day"><div class="dn">Wed</div><div class="dd">13</div><div class="bars"><i style="height:18px;background:var(--a-red-fg)"></i><i style="height:4px;background:var(--a-blue-fg)"></i></div></div>
+          <div class="day"><div class="dn">Thu</div><div class="dd">14</div><div class="bars"><i style="height:10px;background:var(--a-red-fg)"></i><i style="height:22px;background:var(--a-blue-fg)"></i></div></div>
+          <div class="day off"><div class="dn">Fri</div><div class="dd">15</div><div class="bars"></div></div>
+          <div class="day off today"><div class="dn">Sat</div><div class="dd">16</div><div class="bars"><i style="height:4px;background:var(--a-red-fg)"></i></div></div>
+        </div>
+        <div class="mini-legend"><span><i style="background:var(--a-red-fg)"></i>you logged</span><span><i style="background:var(--a-blue-fg)"></i>system events on your records</span></div>
+        <div class="foot"><span>14 logged · 9 companies touched · 3 signals raised</span></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div class="card-h"><h2>Recently</h2><span class="link">Full stream →</span></div>
+        <div class="wrow" style="grid-template-columns:auto 1fr auto"><span class="kind" style="background:var(--a-blue-bg);border-color:transparent;color:var(--a-blue-fg)">◆</span><div><div class="t" style="font-weight:500">620 m² dispatched to Nesma &amp; Partners</div><div class="m">recorded by Rawan · credited to Mohammed</div></div><span class="when okc">09:31</span></div>
+        <div class="wrow" style="grid-template-columns:auto 1fr auto"><span class="kind" style="background:var(--a-blue-bg);border-color:transparent;color:var(--a-blue-fg)">◆</span><div><div class="t" style="font-weight:500">Quotation 9602 accepted — signatures in</div><div class="m">ALJ Showroom · internal approval, not a won deal</div></div><span class="when okc">yest.</span></div>
+        <div class="wrow" style="grid-template-columns:auto 1fr auto"><span class="kind" style="background:var(--a-red-bg);border-color:transparent;color:var(--a-red-fg)">✎</span><div><div class="t" style="font-weight:500">You visited Al-Bawani — discussed pricing</div><div class="m">signal: price too high · with Eng. Faisal</div></div><span class="when okc">yest.</span></div>
+        <div class="foot"><span class="note">Three kinds of mark: ✎ you typed it · ◆ the system saw it · 💬 a colleague said it</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ MANAGER: TEAM ═══════════ -->
+<section class="view" id="v-mgr">
+  <div class="head">
+    <div><h1>Team · August</h1><div class="sub">Same numbers the reps see, laid side by side. Nothing here is a score.</div></div>
+    <div class="seg"><button class="on">August</button><button>July</button><button>Q3</button></div>
+  </div>
+
+  <div class="card sig">
+    <div class="sig-top">
+      <div>
+        <div class="label">Company · dispatched square metres</div>
+        <div class="big" style="margin-top:6px">7,910<em>of 12,000 m²</em></div>
+        <div class="of">66% of target · 52% of the month gone · ahead of pace by <span class="num">1,650</span> m²</div>
+      </div>
+      <div class="sig-side">
+        <div><div class="label">Paid, not out</div><b class="num">2,140</b><small>4 quotations</small></div>
+        <div><div class="label">Awaiting signature</div><b class="num">3,600</b><small>6 quotations · oldest 11d</small></div>
+        <div><div class="label">Quiet companies</div><b class="num late">14</b><small>across 5 reps</small></div>
+      </div>
+    </div>
+    <div class="track"><div class="fill" style="width:66%"></div><div class="paceline" style="left:52%"></div></div>
+    <div class="legend"><span>0</span><span>6,000</span><span>12,000 m²</span></div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h2>By rep</h2><span class="note">click a row to see their waiting list</span></div>
+    <table class="tt" style="margin-top:8px">
+      <thead><tr><th>Rep</th><th style="min-width:180px">Dispatched vs target</th><th class="n">m²</th><th>Waiting on them</th><th class="n">Logged this week</th><th class="n">Quiet</th></tr></thead>
+      <tbody>
+        <tr><td><div class="rep"><span class="av s">RA</span><div>Rawan A.<small>Riyadh</small></div></div></td><td><div class="mbar"><i style="width:56%"></i><s style="left:52%"></s></div></td><td class="n num">1,340 / 2,400</td><td><div class="waiting"><b class="hot">4</b><b>3</b></div></td><td class="n num">14</td><td class="n num late">4</td></tr>
+        <tr><td><div class="rep"><span class="av s b">MH</span><div>Mohammed H.<small>Eastern</small></div></div></td><td><div class="mbar"><i style="width:81%"></i><s style="left:52%"></s></div></td><td class="n num">1,940 / 2,400</td><td><div class="waiting"><b>1</b><b>2</b></div></td><td class="n num">9</td><td class="n num">1</td></tr>
+        <tr><td><div class="rep"><span class="av s g">SK</span><div>Saad K.<small>Jeddah</small></div></div></td><td><div class="mbar"><i style="width:44%"></i><s style="left:52%"></s></div></td><td class="n num">880 / 2,000</td><td><div class="waiting"><b class="hot">3</b><b>4</b></div></td><td class="n num">21</td><td class="n num late">5</td></tr>
+        <tr><td><div class="rep"><span class="av s v">FA</span><div>Fahad A.<small>Riyadh · desk</small></div></div></td><td><div class="mbar"><i style="width:70%"></i><s style="left:52%"></s></div></td><td class="n num">1,400 / 2,000</td><td><div class="waiting"><b>0</b><b>2</b></div></td><td class="n num">6</td><td class="n num">2</td></tr>
+        <tr><td><div class="rep"><span class="av s">NR</span><div>Noura R.<small>Riyadh</small></div></div></td><td><div class="mbar"><i style="width:73%"></i><s style="left:52%"></s></div></td><td class="n num">2,350 / 3,200</td><td><div class="waiting"><b class="hot">2</b><b>1</b></div></td><td class="n num">17</td><td class="n num">2</td></tr>
+      </tbody>
+    </table>
+    <div class="foot"><span>The bar's tick is today's pace. Ahead of it is ahead of the month.</span><span>Saad logged the most and dispatched the least. That is a conversation, not a formula.</span></div>
+  </div>
+
+  <div class="cols">
+    <div class="card">
+      <div class="card-h"><h2>Waiting on the coordinator</h2><span class="note">the bottleneck row</span></div>
+      <div class="wrow"><span class="kind">Q</span><div><div class="t">Diyar office fitout — signatures</div><div class="m">Issued 11 days ago · 410 m² · Saad</div></div><span class="when late">11d</span><span></span></div>
+      <div class="wrow"><span class="kind">Q</span><div><div class="t">KAFD Parcel 4.11 — issue in SMAC</div><div class="m">Requested 2 days ago · 930 m² · Rawan</div></div><span class="when soon">2d</span><span></span></div>
+      <div class="wrow"><span class="kind">D</span><div><div class="t">Rawabi Staff Housing — dispatch</div><div class="m">Paid 4 days ago, nothing out · 1,100 m² · Rawan</div></div><span class="when soon">4d</span><span></span></div>
+      <div class="foot"><span>Rawan the coordinator is one person. Six things are on her.</span></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>Needs a decision</h2><span class="note">yours</span></div>
+      <div class="wrow"><span class="kind" style="background:var(--a-amber-bg);border-color:transparent;color:var(--a-amber-fg)">!</span><div><div class="t">Possible duplicate</div><div class="m">"Al Bawani Co." (Saad) · "Al-Bawani Contracting" (Rawan) · same phone</div></div><span></span><button class="act">Resolve</button></div>
+      <div class="wrow"><span class="kind" style="background:var(--a-amber-bg);border-color:transparent;color:var(--a-amber-fg)">!</span><div><div class="t">Archive request</div><div class="m">Fahad: "Gulf Signage — closed down, number disconnected"</div></div><span></span><button class="act">Review</button></div>
+      <div class="wrow"><span class="kind" style="background:var(--a-amber-bg);border-color:transparent;color:var(--a-amber-fg)">!</span><div><div class="t">Credit request</div><div class="m">Noura asks credit terms for Rawabi Holding</div></div><span></span><button class="act">Review</button></div>
+      <div class="foot"><span>Duplicates, archive requests, credit approvals, shares — all here, nowhere else.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ MANAGER: ROLLUP ═══════════ -->
+<section class="view" id="v-roll">
+  <div class="head">
+    <div><h1>Monthly rollup · July</h1><div class="sub">Quoted against dispatched, and where the gap went. Reviewed once a month, acted on.</div></div>
+    <div class="seg"><button>August</button><button class="on">July</button><button>June</button></div>
+  </div>
+
+  <div class="card sig">
+    <div class="sig-top">
+      <div>
+        <div class="label">July · the funnel, in square metres</div>
+        <div style="display:flex;gap:28px;margin-top:8px;flex-wrap:wrap">
+          <div><b class="num" style="font-size:26px;font-weight:600">18,400</b><div class="of" style="margin-top:0">quoted · 41 quotations</div></div>
+          <div><b class="num" style="font-size:26px;font-weight:600">11,200</b><div class="of" style="margin-top:0">approved · 27</div></div>
+          <div><b class="num" style="font-size:26px;font-weight:600">9,650</b><div class="of" style="margin-top:0">paid · 22</div></div>
+          <div><b class="num" style="font-size:26px;font-weight:600;color:var(--brand)">10,340</b><div class="of" style="margin-top:0">dispatched · 31 dispatches</div></div>
+        </div>
+      </div>
+      <div class="sig-side">
+        <div><div class="label">Lost</div><b class="num">4,900</b><small>9 projects</small></div>
+        <div><div class="label">Still open from July</div><b class="num">2,300</b><small>5 quotations</small></div>
+      </div>
+    </div>
+    <div class="note" style="margin-top:6px">Quoted counts each thread's latest live version once. Dispatched can exceed paid because credit customers ship before payment.</div>
+  </div>
+
+  <div class="roll">
+    <div class="card">
+      <div class="card-h"><h2>Quoted vs dispatched, by rep</h2><span class="note">the first cut</span></div>
+      <div class="gap-rows">
+        <div class="gap-row"><div class="r">Noura R.<small>Riyadh</small></div><div class="gbar"><i class="d" style="width:78%"></i><i class="q" style="width:22%"></i></div><div class="v">3,120 / 4,000</div></div>
+        <div class="gap-row"><div class="r">Mohammed H.<small>Eastern</small></div><div class="gbar"><i class="d" style="width:71%"></i><i class="q" style="width:29%"></i></div><div class="v">2,480 / 3,500</div></div>
+        <div class="gap-row"><div class="r">Rawan A.<small>Riyadh</small></div><div class="gbar"><i class="d" style="width:52%"></i><i class="q" style="width:48%"></i></div><div class="v">2,180 / 4,200</div></div>
+        <div class="gap-row"><div class="r">Fahad A.<small>desk</small></div><div class="gbar"><i class="d" style="width:61%"></i><i class="q" style="width:39%"></i></div><div class="v">1,400 / 2,300</div></div>
+        <div class="gap-row"><div class="r">Saad K.<small>Jeddah</small></div><div class="gbar"><i class="d" style="width:27%"></i><i class="q" style="width:73%"></i></div><div class="v">1,160 / 4,400</div></div>
+      </div>
+      <div class="foot"><span>Red is dispatched. Grey is the gap.</span><span>Saad quoted the most and shipped the least of it. Why is on the right.</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>Where the gap went</h2><span class="note">loss reasons · July · 9 projects, 4,900 m²</span></div>
+      <div class="reasons">
+        <div class="reason"><span>Competitor cheaper</span><div class="rb" style="width:130px"></div><span class="rn">1,900</span></div>
+        <div class="reason"><span>Price too high</span><div class="rb" style="width:96px"></div><span class="rn">1,400</span></div>
+        <div class="reason"><span>Project delayed / cancelled</span><div class="rb" style="width:62px"></div><span class="rn">900</span></div>
+        <div class="reason"><span>Lead time too long</span><div class="rb" style="width:30px"></div><span class="rn">450</span></div>
+        <div class="reason"><span>Colour unavailable</span><div class="rb" style="width:17px"></div><span class="rn">250</span></div>
+      </div>
+      <div class="foot" style="flex-direction:column;align-items:flex-start;gap:4px">
+        <span>7 of 9 losses had the same reason logged as a <b>signal</b> before the loss — on average 19 days before.</span>
+        <span class="note">That is the number to move. Seeing it coming is only useful if someone acts.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+  </div>
+</div>
+</div>
+<script>
+function go(id,el){document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));document.getElementById('v-'+id).classList.add('on');document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));el.classList.add('on');}
+function th(t,el){document.documentElement.dataset.theme=t;el.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
+</script>
+</body>
+</html>
