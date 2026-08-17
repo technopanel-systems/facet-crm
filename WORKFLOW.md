@@ -106,7 +106,7 @@ Schema and data layer first, because the UI renders whatever the model says.
 | 6 | VAT fixed at 15%; validity becomes a note, not a gate; readable product fields | `S53` `S57` `S67` |
 | 7 | Report splits into shared half and private note; same-day edit only; author keeps their own | `S38` `S39` `S40` |
 | 8 | Coordinator sees projects and contacts | `S76` |
-| 9 | Drop dead structure — `accounts`, `verificationTokens`, both snapshot tables, `project_companies.role` | `SPEC §15` |
+| 9 | Drop dead structure — `accounts`, `verificationTokens`, both snapshot tables, `project_companies.role` | `SPEC §15` |; re-cite verify-routes.ts assertion labels to S numbers
 
 > **AUDIT 1 — the model.** See §5.
 

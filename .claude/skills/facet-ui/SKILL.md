@@ -1,203 +1,188 @@
 ---
 name: facet-ui
-description: FACET's screen conventions — translation keys, RTL logical utilities, the server-page shape, server actions and FormState, native selects, list search and pagination. Use for any work under src/app or src/components: building, editing or reviewing a page, form, table, detail screen or React component, and before calling a screen done.
+description: FACET's screen conventions as an index into DESIGN.md (D rules) and SPEC.md (S rules) — palette and effect tokens, colour semantics, type, the four archetypes, per-object row anatomy, view modes, the server-page shape, forms and server actions, RTL logical utilities, and the pre-flight list. Use for any work under src/app or src/components: building, editing or reviewing a page, form, table, detail screen or React component, and before calling a screen done.
 ---
 
 # FACET UI conventions
 
-Established across slices 1–3 and holding across all 22 pages. Follow them;
-they are not preferences. Doc citations like `[15 §5]` point at `docs/`.
+An index into **`DESIGN.md`** (`D…`, how it looks) and **`SPEC.md`** (`S…`, what it does).
+Where this file and `DESIGN.md` disagree, **`DESIGN.md` wins**. `DESIGN.md` may never change
+behaviour, visibility or what a record may contain: where the two appear to conflict on any
+of those, **`SPEC.md` wins**. `docs/design/facet-concept-v5-premium.html` is the visual
+target, not authority — a screen that pixel-matches the concept against a `D` rule is wrong.
+A line here with no `D`, `S` or `CLAUDE.md` behind it is a repo mechanic.
 
 ## Non-negotiable
 
-**Every user-facing string goes through the translation layer** (EN + AR).
-No English in a `.tsx` or `.ts` file. `useTranslations` in client components,
-`getTranslations` in server components. Keys live in `messages/en.json` and
-`messages/ar.json` with the same tree — `npm run check:messages` enforces it.
-
-**Logical Tailwind utilities only.** This is the convention that rots fastest.
+- **Every user-facing string through the translation layer** (EN + AR) `S113`;
+  `useTranslations` client-side, `getTranslations` server-side, one shared tree in
+  `en.json`/`ar.json`, enforced by `npm run check:messages`.
+- **Logical utilities only** `D57` `S113`, the convention that rots fastest. Arabic then
+  needs no `rtl:` variants, and the mini-chain, silence meter and pace line are flex rows
+  needing none. Radix reads `DirectionProvider` in the locale layout.
+- **Navigation from `@/i18n/navigation`** — `next/*` drops the locale prefix.
+- **No `@/lib/*` data-module import in a client component** — it bundles the Postgres driver
+  and only `build` catches it (`CLAUDE.md`); re-declare option types client-side.
 
 | Use | Never |
 |---|---|
-| `ms-*` `me-*` | `ml-*` `mr-*` |
-| `ps-*` `pe-*` | `pl-*` `pr-*` |
+| `ms-*` `me-*` `ps-*` `pe-*` | `ml-*` `mr-*` `pl-*` `pr-*` |
 | `text-start` `text-end` | `text-left` `text-right` |
-| `start-*` `end-*` | `left-*` `right-*` |
-| `border-s` `border-e` | `border-l` `border-r` |
+| `start-*` `end-*` `border-s` `border-e` | `left-*` `right-*` `border-l` `border-r` |
 
-They flip from `<html dir>`, so Arabic needs no `rtl:` variants. Radix gets
-direction from `DirectionProvider` in the locale layout.
+## Palette, colour and type
 
-**Import navigation from `@/i18n/navigation`** — `Link`, `redirect`,
-`usePathname`, `useRouter`. The `next/*` versions drop the locale prefix.
+**Both themes are designed, not inverted** `D5` — dark default, rail dark in both — and
+**every neutral carries a red undertone** `D4`; one drifting blue is a bug. Values live in
+`D5` and in the stylesheet: **never type a hex into a component.**
 
-**A client component must never import a value from `@/lib/*` data modules.**
-It bundles the Postgres driver for the browser. `next dev` and `typecheck`
-both tolerate it; only `npm run build` catches it. Re-declare option types in
-the client file (see `dispatch-form.tsx`).
-
-## The page shape
-
-Every page under `src/app/[locale]/(app)/`:
-
-```tsx
-export const dynamic = "force-dynamic";   // all 22 pages carry this
-
-export default async function ThingPage({ params, searchParams }: {
-  params: Promise<{ locale: string; id: string }>;      // Next 16: Promises
-  searchParams: Promise<{ q?: string; page?: string }>;
-}) {
-  const { locale, id } = await params;
-  setRequestLocale(locale);
-  const session = await requireSession();
-  const t = await getTranslations();
-
-  const thing = await getThing(session, id);
-  if (!thing) notFound();   // hidden and non-existent must look identical
-  ...
-  return <div className="flex flex-col gap-6">
-```
-
-**The `(app)` layout owns the content column** `[22 §6.1]` — width, padding and
-the `<main>` landmark. A page returns a `<div>` carrying only its flow, and
-**never** `mx-auto`, `px-*` or `py-*`: start-aligned is the proportion, and a
-stray `mx-auto` centres one screen inside a start-aligned column.
-
-A narrower measure goes on that same `<div>`, never on the form, because
-`PageHeader` is its sibling:
-
-| Measure | Screens |
+| Token | For |
 |---|---|
-| the full column | lists, detail screens, `/notifications`, and the repeater forms (quotation lines, handover buckets) |
-| `max-w-2xl` | field-stack forms — company, contact, project, user, dispatch, report |
-| `max-w-4xl` | the two full-history timeline pages, which are a reading surface |
+| `--canvas` · `--rail` | page ground · rail ground, dark in both themes |
+| `--surface` `--surface-2` `--surface-3` | card, inset, inset-within-inset |
+| `--line` `--line-strong` · `--text` `--text-muted` `--text-faint` | dividers · body, secondary, faint |
+| `--brand` · `--a-{red,blue,amber,green}-bg`/`-fg` | brand red · the four tone pairs |
 
-**Permission shapes.** A screen the role may not use returns `notFound()`, not
-a message — a 404 must not confirm that a record or capability exists. An
-action a role may not perform is simply not rendered:
-`can(session, "canDispatch") ? <Button…/> : undefined`. The data layer
-re-checks either way; the UI never is the gate.
+**Colour means elapsed time, never outcome** `D6` — past due red, due soon amber, otherwise
+faint, and **no status→colour map**: `accepted` keeps a plain pill, since a green pill is
+where "internal approval, never a won deal" `S65` gets lost. The five **identity colours**
+appear on the rail marker, a page title's spine and a card's edge, **nowhere else** `D7`.
 
-**Structure.** Beside each section: `page.tsx`, `new/page.tsx`,
-`[id]/page.tsx`, `[id]/edit/page.tsx`, `actions.ts` (server actions),
-`thing-form.tsx` (the `"use client"` form). New top-level section → add it to
-`GROUPS` in `src/components/app-rail.tsx` — but the rail is deliberately six
-items in two groups `[22 §7]`, so most new screens belong inside an existing
-section rather than beside it.
+**IBM Plex Sans**, **Sans Arabic** on `html[lang="ar"]`, **Mono for every number** `D10`;
+every number is mono and tabular through one class, **`num`** `D11`; scale `D12`, and
+**nothing under 10.5px**.
 
-## Building blocks
+## Effects
 
-**Pick an archetype `[22 §3]`; do not invent a fifth.**
+Every effect is a named token with a named list of places it may be used; one used anywhere
+else is a **defect**, not a flourish `D8`.
 
-*List* — `SearchForm` · `FilterNav` · `ListCard` from
-`(app)/_components/list-controls`. `ListCard` is the bordered card with the
-table inside and pagination in its footer; it replaced the hand-rolled
-`overflow-x-auto rounded-lg border` div, which also double-wrapped `Table`'s own
-scroll container. **`FilterNav` chips carry the current search** — a chip
-linking to a bare `?type=…` silently throws the query away, which is how three
-lists were broken. `PAGE_SIZE` is kept in step with the data modules.
+| Token | Where it may be used |
+|---|---|
+| `--canvas-glow` | the two fixed radial gradients on the page background — the only background gradient in the product `D13` |
+| `--surface` + `--blur` + `--line-hi` + `--shadow`/`--shadow-lift` | the card texture, identical on every card; resting and hovered depth `D14` `D8` |
+| `--surface-solid` | the fallback below 980px and under `prefers-reduced-transparency` `D18` `D19` |
+| `--brand-grad` | **five uses**: primary button · active rail marker · target bar fill · rail count badge · dispatched segment of a rollup bar `D15` |
+| `--brand-glow` | **four uses**: primary button and app mark · the pace badge's ring · today's cell in the week strip · the target fill's bloom `D16` |
 
-*Detail* — `DetailHeader` (name · state · mono reference) · `TurnPanel` ·
-`Facts` / `Fact` · `RecordRow`, all from `@/components/page-header`, plus
-`Turn` from `(app)/_components/turn`. `DetailRow` survives for a label/value
-list that is genuinely a list — a totals block — but `Facts` is the archetype.
+Motion is the closed list in `D17`, `prefers-reduced-motion` is the tested path, radius is
+`D9`, and `D21` names the forbidden tells. **JavaScript stays near zero** `D20`: depth is
+CSS, filters are GET forms in the URL, the theme is a server-read cookie, and the only
+exceptions are the city combobox, the view-mode switch and the board's scroll.
 
-*Form* — `FormShell` from `@/components/form-field`: single column in a Card,
-actions in `CardFooter`. `wide` is the exception, for repeating rows only.
+## Page and permission shape
 
-*Dashboard* — the Today screen is the reference.
+- A page under `(app)/` is `export const dynamic = "force-dynamic"`, awaits its
+  `params`/`searchParams` Promises, calls `setRequestLocale`, `requireSession()`, then its
+  data module; a missing record is `notFound()`.
+- **The `(app)` layout owns the content column** — 1320px cap, **start-aligned**, hugging
+  the rail `D23`, spaced per `D22`; a page returns a `<div>` of its own flow and **never**
+  `mx-auto`, `px-*` or `py-*`. A narrower measure goes on that `<div>`, never the form:
+  `max-w-2xl` for field-stack forms, `max-w-4xl` for the two timeline pages, the full
+  column for lists, detail screens and repeaters.
+- **Permission shapes** — a route the role may not use returns `notFound()` `D53`, never a
+  message; an unavailable action is not rendered; rail visibility is a boolean from the
+  layout, never a `can()` in a client component `D50`; the data layer re-checks either way
+  `S109`, so the UI is never the gate.
+- **Structure** — `page.tsx`, `new/`, `[id]/`, `[id]/edit/`, `actions.ts`, `thing-form.tsx`.
+  The rail is `D49`'s seven items, with Reports, Coverage, Follow-ups, Notifications and
+  Performance **not** top-level, so **a new screen usually belongs inside an existing
+  section** `D49`, and nothing renders until something is behind it `D51`. (`GROUPS` still
+  holds the older six — the shell slice builds it to `D49`.)
 
-**Two numeric treatments, not one** `[22 §2, §3]`:
+## Archetypes and building blocks
 
-- **Magnitudes, money, counts, dates** → the `numeric` prop on `TableHead` and
-  `TableCell`, or `numeric` on a `Fact`. Mono **and** end-aligned, together,
-  as one prop rather than two classes remembered separately.
-- **Identifiers** — a SMAC reference, a phone, an email → `className="num"`
-  alone. They are read as strings; end-aligning the column a list leads with
-  would read as a magnitude.
+**Pick one of `D24`'s four; do not invent a fifth.** Lists are **grouped by whose move it
+is** `D25`, each header naming the group and its count.
 
-**Whose move it is, never only the status** `[22 §4]`. `Turn` and `TurnPanel`
-take a `tone` from `turnTone({ overdue })` — and that boolean must come from a
-derivation the data layer already made (`isQuiet`, a follow-up's existence).
-**Never derive a threshold in a screen**: a second answer to "is this quiet" is
-the trap `21 §7` names. For a quotation, the position comes from
-`chainState()` in `src/lib/chain.ts`, which is the **one** definition of
-`25 §3`'s six chain positions — the deferred chain strip and the board consume
-it too.
+- *List* — `SearchForm` · `FilterNav` · `ListCard` (`_components/list-controls`), the
+  bordered card with table and pagination footer; `PAGE_SIZE` tracks the data modules.
+  **`FilterNav` chips must carry the current search**: a chip linking to a bare `?type=…`
+  throws the query away, which broke three lists.
+- *Detail* — `DetailHeader` · `Facts`/`Fact` · `RecordRow` (`page-header`) and
+  `Turn`/`TurnPanel` (`_components/turn`); **the turn panel is the screen's most important
+  element** `D24`; `DetailRow` survives only for a totals block.
+- *Form* — `FormShell` (`form-field`), shaped by `D24`, phone-first `D55`; `wide` is for
+  repeating rows only. *Dashboard* — `D24`, contents `D32`–`D41`.
 
-**Where no document decides whose move it is, do not invent one.** A dispatch,
-a contact and a filed report owe nobody the next action.
+**Two numeric treatments**: magnitudes, money, counts and dates take the `numeric` prop on
+`TableHead`/`TableCell`/`Fact` — mono **and** end-aligned together `D11` `D24`; identifiers
+(SMAC reference, phone, email) take `className="num"` alone, since end-aligning a column a
+list leads with reads as a magnitude.
 
-Empty list: `<p className="text-muted-foreground rounded-lg border
-border-dashed p-8 text-center text-sm">`, with a different key when a search
-filtered it away — **outside** the `ListCard`, since an empty state inside a
-card with a pagination footer reads as a broken page rather than an empty one.
+**A row says whose move it is, not what the status is** `D2`, and the boolean behind
+`turnTone({ overdue })` must come from a derivation the data layer already made — **never
+derive a threshold in a screen** (`CLAUDE.md`: derived conditions are resolved in SQL,
+before pagination). Where no rule decides whose move it is, do not invent one: a dispatch, a
+contact and a filed report owe nobody `D26`.
 
-**Container-drawn line work assumes a full last row.** An `auto-fit` grid
-cannot promise one, and the empty track paints as a solid rule. Put the borders
-on the cells.
+**An empty list** says what would make it non-empty and offers the action `D52`, takes a
+different key when a search filtered it away, and sits **outside** `ListCard`, where a
+pagination footer would make it read as broken; no skeleton state `D54`. **Container-drawn
+line work assumes a full last row** — an `auto-fit` grid cannot promise one, so put the
+borders on the cells.
 
-## Forms
+## Rows and views
 
-`FormField` (label + control + error) and `SelectField` from
-`@/components/form-field`.
+Each object type has its own **first column** — same table, different lead cell `D26`:
 
-- **A native `<select>`, deliberately.** No hidden-input bridge, no client
-  state, no JavaScript to submit, and the browser places the RTL popup.
-- **`Combobox` is the one documented exception** `[15 §5]` — the ~200-item
-  city list. Do not reach for it for a short list.
-- The form is `"use client"` with `useActionState(action, emptyFormState)`;
-  the submit button shows `t("common.saving")` while `pending`.
-- **Errors are translation keys, never text.** The action returns keys; the
-  form calls `t(key)`. `state.values` re-fills a rejected form.
-- **Filters and search are GET forms in the URL**, not client state — a
-  search is then shareable, survives reload and needs no JavaScript. The
-  dispatch form's linked/direct mode follows this too.
+| Object | Lead cell | The question it answers |
+|---|---|---|
+| Company | a silence meter — small bar and day count, coloured by lateness | have I neglected this? |
+| Project | a six-dot mini-chain, plus a quoted-vs-dispatched bar | where is this? |
+| Quotation | an avatar and whose move it is | who does this wait on? |
+| Dispatch | the square metres, mono, large | how much went out? |
+| Contact | name and position | who is this? |
 
-Server actions in `actions.ts`:
+The mini-chain draws from `chainState()` in `src/lib/chain.ts` and nothing else, and
+**derives nothing** `D27`; that file is the one definition of the six chain positions the
+board's columns use `D29`. On a phone a row collapses to lead cell, name and elapsed
+time `D56`.
 
-```ts
-"use server";
-export async function doThingAction(_previous: FormState, formData: FormData) {
-  const session = await requireSession();   // an action is its own POST
-  const fields = readFields(formData);      // shape only; accumulates errors
-  const sqm = fields.decimal("sqm", { required: true, min: 0, maxScale: 4 });
-  if (!fields.ok || !sqm) return fields.state;
-  try { … } catch (error) { return ruleErrorState(error, fields.values); }
-  revalidatePath("/things");
-  redirect({ href: `/things/${id}`, locale });   // from @/i18n/navigation
-  throw new Error("unreachable");
-}
-```
+**One query parameter, no second screen** `D28` — `?view=` over the same filters, URL and
+data: quotations default `table`, projects `board`, plus `cards`; Activity is `stream`
+(default), `by-rep`, `calendar` `D30`. Board columns are the six chain positions and **cards
+do not drag** `D29`. Build order `D31`.
 
-No layout wraps a server action, so the session gate cannot be inherited.
-Shape validation belongs here; business invariants belong in the data layer
-and arrive as `RuleError` — also a key.
+## Forms, actions and values
 
-## Numbers, dates, names
+- **A native `<select>`, deliberately** `D20` — no hidden-input bridge, no client state, no
+  JavaScript to submit, and the browser places the RTL popup. **`Combobox` is the one
+  documented exception** `D20`, for the ~200-item city list.
+- **Filters and search are GET forms in the URL** `D20` `D45`, never client state: shareable,
+  survives reload, needs no JavaScript.
+- The form is `"use client"` with `useActionState(action, emptyFormState)`; submit shows
+  `t("common.saving")` while `pending`; **errors are translation keys, never text**;
+  `state.values` re-fills a rejected form.
+- An action takes `(_previous: FormState, formData)` and is its own POST — no layout wraps
+  it, so it calls `requireSession()` itself `S109`. `readFields` checks shape and accumulates
+  errors; invariants come back from the data layer as `RuleError` → `ruleErrorState()`, also
+  a key; then `revalidatePath()` and `redirect()` from `@/i18n/navigation`. The audit row is
+  the data layer's `S112`.
+- Wrap LTR content in Arabic with `dir="ltr"` — references, decimals, dates, percentages, m².
+  Decimals stay **strings** end to end; square metres are computed, never typed `S55`.
+- Dates: `format.dateTime(new Date(value + "T00:00:00Z"), { dateStyle: "medium", timeZone:
+  "UTC" })` from `getFormatter()` — a calendar day in Riyadh, not an instant. **One name
+  field** `S12` `S19`; `bilingualName` is still in the code and goes in the model slice — do
+  not use it in a new screen.
 
-- Wrap LTR content in Arabic with `dir="ltr"`: references, decimals, dates,
-  percentages, m². Used in 81 places; keep it up.
-- Decimals stay **strings** end to end — never `Number()` a square-metre or
-  money value.
-- Dates: `format.dateTime(new Date(`${value}T00:00:00Z`), { dateStyle:
-  "medium", timeZone: "UTC" })` from `getFormatter()`. A `date` column is a
-  calendar day in Riyadh, not an instant.
-- Bilingual records render through `bilingualName(row, locale)`.
+Screen contents when you need them: rep dashboard `D32`–`D37` · manager `D38`–`D41` · rollup
+`D42`–`D44` · stream, Log button, private note `D45`–`D47` · comments on quotation threads
+and projects only `D48` `S114` · responsive `D55` `D56` · deliberately not built `D58` `D21`.
 
 ## Before calling a screen done
 
-1. `npm run typecheck` · `npm run lint` · `npm run build` ·
-   `npm run check:messages`. **`build` is not optional** — it is the only one
-   that catches a client component importing a data module.
-2. Grep for physical utilities (currently zero in `src`):
-   `ml-|mr-|pl-|pr-|text-left|text-right|border-l-|border-r-`
-3. `npm run build && npm run start`, then **`npm run verify:routes`** — every
-   `(app)` route, three identities, both locales, both themes. Not `next dev`.
-4. Open `/ar` and look at it — **at 1366 or 1440 first**, not wide. The content
-   column is capped at 1320px, so a wide screen hides the wrapping defects a
-   laptop shows.
-5. Client-side interaction is untested in this repo (`CLAUDE.md`, verification
-   debt). Asserting on rendered markup proves little: next-intl ships the
-   whole catalogue to every page, so grep for a DOM marker like
-   `name="smacReference"`, never for a translated string.
+1. Does every row say whose move it is, not only its status? `D2`
+2. Is it one of the four archetypes, and is the list grouped? `D24` `D25`
+3. Is every number `num`, mono and tabular, and nothing under 10.5px? `D11` `D12`
+4. Is colour only elapsed time, and identity colour only in `D7`'s three places? `D6` `D7`
+5. Is every effect one of its token's named uses? `D13`–`D17` `D21`
+6. Does it look right with blur off `D18` `D19`, and did you test `prefers-reduced-motion`? `D17`
+7. Is the physical-utility grep still zero `D57` `S113` —
+   `ml-|mr-|pl-|pr-|text-left|text-right|border-l-|border-r-`?
+8. Driven in **both locales** `D57`, at **1366 and 1440 first** `D23`?
+9. `npm run typecheck` · `lint` · `build` · `check:messages`, then `npm run build && npm run
+   start` and `npm run verify:routes`, never `next dev`. **`build` is not optional**: it
+   alone catches a client component importing a data module (`CLAUDE.md`).
+10. Asserting on markup? A DOM marker like `name="smacReference"`, never a translated string
+    (`CLAUDE.md`).

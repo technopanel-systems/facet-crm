@@ -123,7 +123,7 @@ the primary button, the active rail marker, the target bar's fill, the rail
 count badge, and the dispatched segment of a rollup bar. Nowhere else. Not on
 text, not on pills, not on borders.
 
-**D16. Glow has exactly four uses.** `--brand-glow` on the primary button and
+**D16. Glow has exactly five uses.** `--brand-glow` on the primary button and
 the app mark; a soft ring on the pace badge; a ring on today's cell in the week
 strip; the target fill's bloom. Nothing else glows. A glow is emphasis, and
 everything emphasised is nothing emphasised.
@@ -393,3 +393,15 @@ The mini-chain, the silence meter and the pace line are flex rows and need no
 No saved views. No keyboard command palette. No charts beyond bars and the pace
 line. No toasts — the row changing is the feedback. Each of these can be argued
 for later; none is argued for now, and each would breach D21.
+
+**D59.** A filter chip carries the current search. A chip linking to a bare
+`?type=…` throws the query away and the list silently returns the wrong rows.
+This broke three lists.
+
+**D60.** The empty state sits outside the list card, not inside it. D52 decides
+what it says; this decides where. Inside a card with a pagination footer, an
+empty list reads as a broken page rather than an empty one.
+
+**D61.** Container-drawn line work assumes a full last row, and an `auto-fit`
+grid cannot promise one — the empty track paints as a solid rule. Borders go on
+the cells.
