@@ -76,7 +76,7 @@ they are inspectable rather than scattered as inline values.
 | `--surface-solid` | the reduced-blur rule (D19) |
 | `--line-hi` | the one-pixel top-edge highlight on a card |
 | `--brand-grad` | red→orange, five uses only (D15) |
-| `--brand-glow` | four uses only (D16) |
+| `--brand-glow` | five uses only (D16) |
 | `--shadow` / `--shadow-lift` | resting and hovered depth |
 | `--blur` | 18px + saturation, cards and bars only |
 
