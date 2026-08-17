@@ -541,3 +541,6 @@ Ordered by what unblocks what.
   never combined into one score. Nothing scores a rep.
 - **Whether an unlinked quotation should ever be forced to gain a project**
   before dispatch, or whether S74's write-back is always enough.
+- **Project names.** Companies and contacts have one name field (S12, S19).
+  Projects still have two, and no rule says why. Same reasoning appears to
+  apply. Decide before the projects slice.
