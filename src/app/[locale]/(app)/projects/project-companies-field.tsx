@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
@@ -15,13 +14,15 @@ export type CompanyOption = {
 };
 
 /**
- * The company links chosen while creating a project.
+ * The participants chosen while creating a project.
  *
- * A project requires at least one company `[07 A9]`, so the field starts with
- * one row and refuses to drop below one.
+ * A project keeps at least one participant `S27`, so the field starts with one
+ * row and refuses to drop below one. A participant carries no role label `S25`,
+ * so a row is a company and nothing else — it stays a repeater because a
+ * project involves several companies `S24`, not because a row is complicated.
  *
  * The buyer is a **radio group with a "none" option**, not a checkbox per row.
- * `12 §6` says zero or one buyer, and a radio group is that rule: the invalid
+ * `S26` says zero or one buyer, and a radio group is that rule: the invalid
  * two-buyer state is unreachable in the UI, so the server's check and the
  * partial unique index are backstops rather than the thing users hit.
  */
@@ -59,7 +60,7 @@ export function ProjectCompaniesField({
         {rows.map((index) => (
           <div
             key={index}
-            className="grid items-end gap-3 sm:grid-cols-[2fr_2fr_auto]"
+            className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto]"
           >
             <div className="flex flex-col gap-1.5">
               <Label
@@ -83,24 +84,6 @@ export function ProjectCompaniesField({
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label
-                htmlFor={`role-${index}`}
-                className="text-muted-foreground text-start text-xs"
-              >
-                {t("projects.detail.role")}
-              </Label>
-              {/* Free text `[12 §5]` — two contractors may compete on one
-                  project, and a fixed vocabulary would force a false choice. */}
-              <Input
-                id={`role-${index}`}
-                name="role"
-                defaultValue=""
-                placeholder={t("projects.detail.rolePlaceholder")}
-                className="text-start"
-              />
             </div>
 
             <label className="flex h-9 items-center gap-2 text-sm">

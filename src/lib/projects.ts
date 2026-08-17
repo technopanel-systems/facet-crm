@@ -83,11 +83,10 @@ export type ProjectInput = {
   inProduction: boolean;
 };
 
-/** One row of the project–company join `[12 §5, §6]`. */
+/** One row of the project–company join: a participant `S25`, and whether it
+ *  is the buyer `S26`. */
 export type ProjectCompanyLink = {
   companyId: string;
-  /** Free text, never a vocabulary `[12 §5]`. */
-  role: string | null;
   isBuyer: boolean;
 };
 
@@ -184,7 +183,6 @@ export type ProjectCompanyRow = {
   id: string;
   companyId: string;
   companyName: string;
-  role: string | null;
   isBuyer: boolean;
   /**
    * Whether the viewer may open this company's own record.
@@ -268,7 +266,6 @@ export async function listProjectCompanies(
       id: projectCompanies.id,
       companyId: projectCompanies.companyId,
       companyName: companies.name,
-      role: projectCompanies.role,
       isBuyer: projectCompanies.isBuyer,
     })
     .from(projectCompanies)
@@ -651,7 +648,7 @@ export async function updateProjectCompany(
   session: AuthSession,
   projectId: string,
   linkId: string,
-  patch: { role: string | null; isBuyer: boolean },
+  patch: { isBuyer: boolean },
 ): Promise<void> {
   await assertProjectEditable(session, projectId);
 
@@ -669,14 +666,14 @@ export async function updateProjectCompany(
       .limit(1);
     if (!before) throw new RuleError("projects.errors.notFound");
 
-    if (before.role === patch.role && before.isBuyer === patch.isBuyer) return;
+    if (before.isBuyer === patch.isBuyer) return;
 
     // Clear any other buyer first, or the partial unique index raises.
     if (patch.isBuyer) await clearBuyer(tx, projectId, log, before.companyId);
 
     const [after] = await tx
       .update(projectCompanies)
-      .set({ role: patch.role, isBuyer: patch.isBuyer })
+      .set({ isBuyer: patch.isBuyer })
       .where(eq(projectCompanies.id, linkId))
       .returning();
 
@@ -684,8 +681,8 @@ export async function updateProjectCompany(
       action: "project_company.updated",
       entityType: "project_company",
       entityId: linkId,
-      before: { role: before.role, isBuyer: before.isBuyer },
-      after: { role: after.role, isBuyer: after.isBuyer },
+      before: { isBuyer: before.isBuyer },
+      after: { isBuyer: after.isBuyer },
     });
   });
 }

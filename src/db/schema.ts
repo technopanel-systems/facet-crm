@@ -841,24 +841,26 @@ export const projects = pgTable(
 );
 
 /**
- * `09 §3.5` — the join that makes a company's involvement meaningful
- * `[04 Q2]`.
+ * The join that makes a company's involvement meaningful: one project can
+ * involve several companies `S24`.
  *
- * `12 §5`, `12 §6` correct this table twice. The role is a **free text label**
- * describing what that company is on that project, not a foreign key into a
- * vocabulary — competing contractors must both be describable `[12 §5]`. And
- * the buyer is **zero or one**, never exactly one: while two companies compete
- * there is no buyer, and there may never be one `[12 §6]`. The partial unique
+ * **A linked company is simply a participant** `S25`. There is no role label —
+ * the free-text `role` column this table used to carry was dropped, because a
+ * participant is described by being on the project, not by a word someone typed
+ * about it. What a company *is* on a project is therefore the two things below:
+ * whether it buys, and whether it is still involved.
+ *
+ * The buyer is **zero or one**, never exactly one `S26`: while two companies
+ * compete there is no buyer, and there may never be one. The partial unique
  * index below is what "at most one" means in SQL, and it says nothing when no
  * row is flagged.
  *
- * `14 §4` adds removal: links are meant to be flexible and changeable, so a
- * company can be taken off a project. Soft, like every other state change in
- * FACET `[09 §1]` — the row is kept and hidden. Both unique indexes are
- * therefore partial on `removed_at is null` `[14 §5]`: without that, a removed
- * company could never be re-linked and a removed buyer would permanently block
- * naming a new one. A project still requires one live link `[07 A9]`, which is
- * an application-layer rule because SQL cannot express "at least one" here.
+ * Removal is soft and re-linkable `S27` — the row is kept and hidden, like
+ * every other state change in FACET. Both unique indexes are therefore partial
+ * on `removed_at is null`: without that, a removed company could never be
+ * re-linked and a removed buyer would permanently block naming a new one. A
+ * project still keeps at least one participant `S27`, which is an
+ * application-layer rule because SQL cannot express "at least one" here.
  */
 export const projectCompanies = pgTable(
   "project_companies",
@@ -870,10 +872,8 @@ export const projectCompanies = pgTable(
     companyId: uuid("company_id")
       .notNull()
       .references(() => companies.id),
-    /** Free text `[12 §5]`. */
-    role: text("role"),
     isBuyer: boolean("is_buyer").notNull().default(false),
-    /** `[14 §4]` — the link was taken off the project. Never a deleted row. */
+    /** `S27` — the link was taken off the project. Never a deleted row. */
     removedAt: timestamp("removed_at", { withTimezone: true }),
     createdAt: createdAt(),
   },

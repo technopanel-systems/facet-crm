@@ -39,20 +39,19 @@ function readProjectForm(formData: FormData) {
 }
 
 /**
- * The company-link rows arrive as parallel repeated inputs plus a single
- * `buyerIndex`, because "at most one buyer" `[12 §6]` is a radio group: the
- * invalid two-buyer state cannot be expressed in the form at all.
+ * The participant rows arrive as repeated `companyId` inputs plus a single
+ * `buyerIndex`, because "at most one buyer" `S26` is a radio group: the invalid
+ * two-buyer state cannot be expressed in the form at all. A participant carries
+ * nothing else `S25`, so one repeated input is the whole repeater.
  */
 function readLinks(formData: FormData): ProjectCompanyLink[] {
   const fields = readFields(formData);
   const companyIds = fields.list("companyId");
-  const roles = fields.list("role");
   const buyerIndex = formData.get("buyerIndex");
 
   return companyIds
     .map((companyId, index) => ({
       companyId,
-      role: roles[index]?.trim() || null,
       isBuyer: buyerIndex === String(index),
     }))
     .filter((link) => link.companyId !== "");
@@ -113,13 +112,11 @@ export async function addProjectCompanyAction(
   const session = await requireSession();
   const fields = readFields(formData);
   const companyId = fields.uuid("companyId", { required: true });
-  const role = fields.text("role", { max: 200 });
   if (!fields.ok || !companyId) return fields.state;
 
   try {
     await addProjectCompany(session, projectId, {
       companyId,
-      role,
       isBuyer: fields.checkbox("isBuyer"),
     });
   } catch (error) {
@@ -137,13 +134,13 @@ export async function updateProjectCompanyAction(
   formData: FormData,
 ): Promise<FormState> {
   const session = await requireSession();
+  // Only the buyer flag is settable on a participant `S25`, `S26`, and a
+  // checkbox cannot fail to parse — so there is nothing to check before the
+  // call. `fields` is still read for `values`, which re-fills a rejected form.
   const fields = readFields(formData);
-  const role = fields.text("role", { max: 200 });
-  if (!fields.ok) return fields.state;
 
   try {
     await updateProjectCompany(session, projectId, linkId, {
-      role,
       isBuyer: fields.checkbox("isBuyer"),
     });
   } catch (error) {

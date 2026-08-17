@@ -1,0 +1,17 @@
+-- 0011 — S25: a company linked to a project is simply a participant.
+--
+-- There is no role label. The free-text `role` column described what a company
+-- was on a project; S25 says that is not a thing the system records, so the
+-- column goes rather than being left unwritten. S26's `is_buyer` and S27's
+-- `removed_at` — with both partial unique indexes — are untouched: what a
+-- participant *is* on a project is whether it buys and whether it is still
+-- involved.
+--
+-- **Nothing was lost.** Checked before generating this migration: 18 of 18
+-- `project_companies` rows, and every `project_company` entry in `audit_log`,
+-- carried `role` null. Every row belonged to a verify-script fixture; no value
+-- typed by a person existed anywhere. So there is no backfill, no archive step
+-- and no reason to keep the column nullable for a while first.
+--
+-- Reviewed as generated — one statement, no reordering needed, unlike 0010.
+ALTER TABLE "project_companies" DROP COLUMN "role";

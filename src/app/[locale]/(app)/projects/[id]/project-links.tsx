@@ -5,7 +5,6 @@ import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Link } from "@/i18n/navigation";
 import type { ProjectCompanyRow } from "@/lib/projects";
 import { emptyFormState } from "@/lib/validation";
@@ -19,12 +18,14 @@ import {
 import type { CompanyOption } from "../project-companies-field";
 
 /**
- * The company links on a project detail page: one small form per row, plus one
+ * The participants on a project detail page: one small form per row, plus one
  * to add.
  *
  * Separate forms rather than one big one, because each row is an independent
- * act with its own audit entry — editing a role and removing a company are
- * different things and should not travel together.
+ * act with its own audit entry — naming the buyer `S26` and taking a
+ * participant off the project `S27` are different things and should not travel
+ * together. A participant carries no role label `S25`, so the row is a name,
+ * the buyer flag, and removal.
  */
 export function ProjectLinks({
   projectId,
@@ -97,15 +98,19 @@ function LinkRow({
             without them is meaningless `[07 A9]` — but it does not grant
             access to the company record itself `[04 Q7]`. Not viewable means
             the name renders as plain text. */}
+        {/* One name field since `S12`, so it may hold either script and takes
+            `dir="auto"` `D62`. */}
         {link.viewable ? (
           <Link
             href={`/companies/${link.companyId}`}
+            dir="auto"
             className="text-start text-sm font-medium hover:underline"
           >
             {link.companyName}
           </Link>
         ) : (
           <span
+            dir="auto"
             className="text-start text-sm font-medium"
             title={t("projects.detail.hiddenCompany")}
           >
@@ -120,13 +125,6 @@ function LinkRow({
 
       <div className="flex flex-wrap items-center gap-2">
         <form action={updateAction} className="flex flex-wrap items-center gap-2">
-          <Input
-            name="role"
-            defaultValue={link.role ?? ""}
-            placeholder={t("projects.detail.rolePlaceholder")}
-            aria-label={t("projects.detail.role")}
-            className="h-8 max-w-xs text-start"
-          />
           <label className="flex items-center gap-1.5 text-xs">
             <input
               type="checkbox"
@@ -196,12 +194,6 @@ function AddLinkForm({
           </option>
         ))}
       </select>
-      <Input
-        name="role"
-        placeholder={t("projects.detail.rolePlaceholder")}
-        aria-label={t("projects.detail.role")}
-        className="h-8 max-w-xs text-start"
-      />
       <label className="flex h-8 items-center gap-1.5 text-xs">
         <input type="checkbox" name="isBuyer" className="size-3.5" />
         {t("projects.detail.buyer")}

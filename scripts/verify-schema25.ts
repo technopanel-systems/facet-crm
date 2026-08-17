@@ -270,6 +270,15 @@ const SLICE6_DROPPED_COLUMNS = [
   "roles.sees_all_records_readonly",
 ];
 
+/**
+ * The column `S25` drops: a company linked to a project is simply a
+ * participant, so there is no role label to hold. Same shape as the two lists
+ * above and kept separate for the same reason — this one answers to a numbered
+ * spec rule rather than to a document, and it is the kind of claim that
+ * silently regresses when a migration is regenerated from an older schema.
+ */
+const S25_DROPPED_COLUMNS = ["project_companies.role"];
+
 /** Whole tables feature slice 6 dropped `[26 §2, §6]`. */
 const SLICE6_DROPPED_TABLES = ["product_colours", "activities", "tasks"];
 
@@ -350,9 +359,11 @@ async function main(): Promise<void> {
     }
   }
 
-  /* --- 2. Every withdrawn thing is gone [25 §6, §23, §35], [26 §2] --- */
+  /* --- 2. Every withdrawn thing is gone [25 §6, §23, §35], [26 §2], S25 --- */
 
-  console.log("\n2. Warmth, tolerance, the sales desk, and feature slice 6's drops are absent");
+  console.log(
+    "\n2. Warmth, tolerance, the sales desk, slice 6's drops and the participant role are absent",
+  );
 
   for (const key of WITHDRAWN) {
     check(`${key} is gone [25 §6]`, !columns.has(key));
@@ -368,6 +379,10 @@ async function main(): Promise<void> {
 
   for (const key of SLICE6_DROPPED_COLUMNS) {
     check(`${key} is gone [26 §2]`, !columns.has(key));
+  }
+
+  for (const key of S25_DROPPED_COLUMNS) {
+    check(`${key} is gone [S25]`, !columns.has(key));
   }
 
   for (const table of SLICE6_DROPPED_TABLES) {
@@ -451,7 +466,7 @@ async function main(): Promise<void> {
       lossReason: null,
       inProduction: false,
     },
-    [{ companyId: company.id, role: null, isBuyer: false }],
+    [{ companyId: company.id, isBuyer: false }],
   );
 
   const otherReason = seededReasons.find(
@@ -770,7 +785,7 @@ async function main(): Promise<void> {
       lossReason: "The customer chose a cheaper supplier.",
       inProduction: false,
     },
-    [{ companyId: company.id, role: null, isBuyer: false }],
+    [{ companyId: company.id, isBuyer: false }],
   );
   check(
     "*** creating a LOST project through src/lib/projects.ts succeeds *** [25 §5]",

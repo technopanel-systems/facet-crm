@@ -119,7 +119,7 @@ main problem it was designed to be.
 **S24.** A project is a first-class record, not a child of a company. One
 project can involve several companies.
 
-**S25. [CHANGE]** A company linked to a project is simply a **participant, and
+**S25.** A company linked to a project is simply a **participant, and
 therefore a potential buyer**. There is **no role label** — the free-text role
 column is dropped.
 
