@@ -534,8 +534,7 @@ Ordered by what unblocks what.
 
 ## 16. Open
 
-- **The quiet thresholds.** How long before a company, project or quotation is
-  considered to be waiting. Not decided; possibly not one global number.
+- **The quiet thresholds.** Start at 30 days qualified, 60 unqualified, stored in settings and editable by a manager rather than hardcoded. Revisit once there are three months of real data.
 - **Product specifications.** The standards-and-alloy block was designed to print
   onto quotations, but SMAC prints the quotation. Needed at all?
 - **The performance formula.** Activity and target are shown side by side and
