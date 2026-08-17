@@ -65,6 +65,3 @@ next-env.d.ts
 .claude-flow/data/
 .claude-flow/logs/
 .claude-flow/sessions/
-SPEC.md
-DESIGN.md
-WORKFLOW.md
