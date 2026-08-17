@@ -43,7 +43,11 @@ const adapter = DrizzleAdapter(db, {
   verificationTokensTable: verificationTokens,
 });
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+// NextAuth accepts a config OR a function returning one. It MUST stay a
+// function: an object literal evaluates `env.AUTH_SECRET` at module load,
+// and there is no .env during `docker compose build`. Unwrapping this
+// breaks the container build only — never the host build. See session 1.
+export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
   adapter,
   // Database sessions. The strategy is deliberately NOT written out:
   // with an adapter present, @auth/core already defaults to "database" —
@@ -120,7 +124,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return defaultEncode(params);
     },
   },
-});
+}));
 
 declare module "next-auth" {
   interface Session {
