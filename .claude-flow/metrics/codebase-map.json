@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-08-16T12:59:29.271Z",
+  "projectRoot": "C:\\Projects\\facet-crm",
+  "structure": {
+    "hasPackageJson": true,
+    "hasTsConfig": true,
+    "hasClaudeConfig": true,
+    "hasClaudeFlow": true
+  },
+  "scannedAt": 1786885169271
+}

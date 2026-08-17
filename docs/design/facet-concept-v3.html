@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FACET — concept v3 · per-object views</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══ TOKENS — v2 palette unchanged, plus object accents ═══ */
+:root{
+  --red-600:#C8102E; --red-500:#E5233C;
+  --radius:10px; --radius-lg:14px;
+  --font:'IBM Plex Sans',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',monospace;
+  --ease:cubic-bezier(.2,.7,.3,1);
+}
+html[data-theme="dark"]{
+  --canvas:#151211; --surface:#1D1A18; --surface-2:#252120;
+  --line:#302B29; --line-strong:#403A37;
+  --text:#F0EBE8; --text-muted:#A29996; --text-faint:#756C69;
+  --rail:#0E0C0B; --rail-text:#918885; --rail-text-strong:#FFF8F5; --rail-active:#211D1B;
+  --brand:#F2566B; --brand-ink:#FFF;
+  --a-red-bg:#2E1418; --a-red-fg:#F98A98;
+  --a-blue-bg:#141F31; --a-blue-fg:#7FADEE;
+  --a-amber-bg:#2B1F0C; --a-amber-fg:#E3A63E;
+  --a-green-bg:#0F2417; --a-green-fg:#57C57E;
+  --a-violet-bg:#1E1630; --a-violet-fg:#B08AE8;
+  --shadow:0 1px 2px rgba(0,0,0,.5);
+}
+html[data-theme="light"]{
+  --canvas:#F8F6F4; --surface:#FFFFFF; --surface-2:#FAF8F6;
+  --line:#E8E3DE; --line-strong:#D6CFC9;
+  --text:#1A1614; --text-muted:#6B615C; --text-faint:#9A908A;
+  --rail:#171311; --rail-text:#B5ABA6; --rail-text-strong:#FFFFFF; --rail-active:#26201D;
+  --brand:#C8102E; --brand-ink:#FFF;
+  --a-red-bg:#FDF1F2; --a-red-fg:#C8102E;
+  --a-blue-bg:#EEF4FC; --a-blue-fg:#2B5CA8;
+  --a-amber-bg:#FDF4E6; --a-amber-fg:#B45309;
+  --a-green-bg:#EFF9F1; --a-green-fg:#15803D;
+  --a-violet-bg:#F4EFFC; --a-violet-fg:#6D3FBF;
+  --shadow:0 1px 2px rgba(26,22,20,.05),0 6px 20px -12px rgba(26,22,20,.18);
+}
+/* object identity — used ONLY on spines, rail icons and headers. Never for state. */
+:root{ --o-company:var(--a-blue-fg); --o-project:var(--a-amber-fg);
+       --o-quote:var(--brand); --o-contact:var(--a-violet-fg); --o-dispatch:var(--a-green-fg); }
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--canvas);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+.app{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+@media (max-width:980px){.app{grid-template-columns:1fr}.rail{display:none}}
+
+/* ═══ RAIL ═══ */
+.rail{background:var(--rail);display:flex;flex-direction:column;padding:18px 12px;gap:2px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 8px 16px}
+.mark{width:30px;height:30px;border-radius:8px;background:linear-gradient(140deg,var(--red-500),#7A1020);display:grid;place-items:center;flex:none;color:#fff;font-weight:700;font-size:14px}
+.brand b{color:var(--rail-text-strong);font-size:14.5px;font-weight:600;display:block}
+.brand small{color:var(--rail-text);font-size:11px;opacity:.7}
+.rail-group{color:var(--rail-text);opacity:.45;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:15px 10px 5px}
+.nav{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;color:var(--rail-text);font-size:13.5px;font-weight:500;transition:background .15s,color .15s}
+.nav:hover{background:var(--rail-active);color:var(--rail-text-strong)}
+.nav.on{background:var(--rail-active);color:var(--rail-text-strong)}
+.dotmark{width:7px;height:7px;border-radius:2px;flex:none;opacity:.85}
+.nav .count{margin-inline-start:auto;font-size:11px;font-weight:600;background:var(--red-600);color:#fff;border-radius:20px;padding:1px 6px;min-width:19px;text-align:center}
+.me{margin-top:auto;border-top:1px solid rgba(255,255,255,.06);padding-top:13px;display:flex;align-items:center;gap:10px}
+.av{width:30px;height:30px;border-radius:50%;background:linear-gradient(140deg,#8A3244,#4A1622);display:grid;place-items:center;color:#fff;font-weight:600;font-size:12px;flex:none}
+.av.s{width:21px;height:21px;font-size:9.5px}
+.av.b{background:linear-gradient(140deg,#31527F,#1B2F4C)}
+.av.g{background:linear-gradient(140deg,#2C6647,#14361F)}
+.av.v{background:linear-gradient(140deg,#5B3E8C,#2E1E4C)}
+.me b{color:var(--rail-text-strong);font-size:13px;display:block;line-height:1.3}
+.me small{color:var(--rail-text);font-size:11px;opacity:.8}
+
+/* ═══ TOP ═══ */
+.main{display:flex;flex-direction:column;min-width:0}
+.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--canvas) 88%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);padding:10px 24px;display:flex;align-items:center;gap:12px}
+.search{flex:1;max-width:400px;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:7px 12px;color:var(--text-faint);font-size:13px}
+.kbd{margin-inline-start:auto;font-family:var(--mono);font-size:10.5px;border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+.add{background:var(--brand);color:var(--brand-ink);border-radius:9px;padding:7px 14px;font-size:13px;font-weight:600}
+.seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px}
+.seg button{font-size:12px;font-weight:600;padding:4px 9px;border-radius:6px;color:var(--text-faint)}
+.seg button.on{background:var(--surface-2);color:var(--text)}
+
+/* ═══ PAGE ═══ */
+.page{padding:20px 24px 48px;max-width:1320px;width:100%}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:20px;overflow-x:auto}
+.tab{font-size:13.5px;font-weight:600;padding:9px 13px;color:var(--text-faint);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.tab.on{color:var(--text);border-bottom-color:var(--brand)}
+.view{display:none}.view.on{display:block}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:16px;flex-wrap:wrap}
+h1{font-size:24px;font-weight:600;letter-spacing:-.025em;line-height:1.15;display:flex;align-items:center;gap:10px}
+h1 .oi{width:9px;height:22px;border-radius:3px}
+.sub{color:var(--text-muted);font-size:13px;margin-top:3px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:var(--shadow)}
+.label{font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint)}
+
+/* group header — the thing that stops a list reading as an endless wall */
+.grp{display:flex;align-items:center;gap:10px;padding:15px 4px 7px}
+.grp .label{white-space:nowrap}
+.grp .ln{height:1px;background:var(--line);flex:1}
+.grp .ct{font-family:var(--mono);font-size:11px;color:var(--text-faint)}
+
+.pill{font-size:11px;font-weight:600;border-radius:20px;padding:2px 9px;white-space:nowrap;flex:none;display:inline-flex;align-items:center;gap:5px}
+.p-plain{background:var(--surface-2);color:var(--text-muted);border:1px solid var(--line)}
+.p-red{background:var(--a-red-bg);color:var(--a-red-fg)}
+.p-amber{background:var(--a-amber-bg);color:var(--a-amber-fg)}
+.p-blue{background:var(--a-blue-bg);color:var(--a-blue-fg)}
+.p-green{background:var(--a-green-bg);color:var(--a-green-fg)}
+.late{color:var(--a-red-fg)}.soon{color:var(--a-amber-fg)}.okc{color:var(--text-faint)}
+
+/* ═══ COMPANIES — anatomy: the silence meter ═══ */
+.crow{display:grid;grid-template-columns:64px 1fr auto auto;gap:14px;align-items:center;padding:11px 16px;border-top:1px solid var(--line);transition:background .13s}
+.crow:hover{background:var(--surface-2)}
+.silence{display:flex;flex-direction:column;gap:4px}
+.sbar{height:5px;border-radius:3px;background:var(--surface-2);overflow:hidden;border:1px solid var(--line)}
+.sbar i{display:block;height:100%;border-radius:3px}
+.sdays{font-family:var(--mono);font-size:11px;font-weight:600;line-height:1}
+.cname{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmeta{font-size:11.5px;color:var(--text-muted);margin-top:2px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cmeta .sep{color:var(--text-faint)}
+.mini{font-family:var(--mono);font-size:11.5px;color:var(--text-muted);text-align:end;white-space:nowrap}
+.mini b{display:block;color:var(--text);font-size:13px;font-weight:600}
+@media (max-width:820px){.crow{grid-template-columns:56px 1fr auto}.crow .mini{display:none}}
+
+/* ═══ PROJECTS — anatomy: the mini chain + fill bar ═══ */
+.prow{display:grid;grid-template-columns:1fr 132px 150px auto;gap:14px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
+.prow:hover{background:var(--surface-2)}
+.chain{display:flex;align-items:center;gap:0}
+.chain i{width:7px;height:7px;border-radius:50%;background:var(--surface-2);border:1.5px solid var(--line-strong);flex:none}
+.chain i.done{background:var(--a-green-fg);border-color:var(--a-green-fg)}
+.chain i.now{background:var(--a-amber-fg);border-color:var(--a-amber-fg);box-shadow:0 0 0 3px var(--a-amber-bg)}
+.chain s{display:block;height:1.5px;width:11px;background:var(--line-strong);flex:none}
+.chain s.done{background:var(--a-green-fg)}
+.qbar{height:6px;border-radius:3px;background:var(--surface-2);border:1px solid var(--line);overflow:hidden;display:flex}
+.qbar i{height:100%}
+.qbar .disp{background:var(--a-green-fg)}
+.qbar .quo{background:var(--a-amber-fg);opacity:.55}
+@media (max-width:900px){.prow{grid-template-columns:1fr auto}.prow .chain,.prow .qwrap{display:none}}
+
+/* ═══ KANBAN ═══ */
+.kb{display:grid;grid-template-columns:repeat(6,minmax(210px,1fr));gap:11px;overflow-x:auto;padding-bottom:8px}
+.kcol{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:9px;min-width:210px}
+.kch{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 4px 9px}
+.kch .label{font-size:10px}
+.kch .ct{font-family:var(--mono);font-size:11px;color:var(--text-faint);background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:0 6px}
+.kcard{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:10px 11px;margin-bottom:8px;border-inline-start:3px solid var(--o-project)}
+.kcard:hover{border-color:var(--line-strong)}
+.kcard .t{font-size:13px;font-weight:600;line-height:1.3}
+.kcard .c{font-size:11.5px;color:var(--text-muted);margin-top:2px}
+.kcard .f{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:9px}
+.kempty{font-size:11.5px;color:var(--text-faint);text-align:center;padding:14px 0}
+
+/* ═══ CARDS VIEW ═══ */
+.cardsgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:12px}
+.pcard{padding:14px 15px;border-inline-start:3px solid var(--o-project)}
+.pcard h3{font-size:14px;font-weight:600;line-height:1.3}
+.pcard .c{font-size:12px;color:var(--text-muted);margin-top:2px}
+.pcard .stat{display:flex;gap:16px;margin:12px 0 10px}
+.pcard .stat div .label{font-size:9.5px}
+.pcard .stat div b{font-family:var(--mono);font-size:16px;font-weight:600;display:block;margin-top:2px}
+
+/* ═══ QUOTATIONS — anatomy: the turn ═══ */
+.qrow{display:grid;grid-template-columns:auto 1fr auto auto auto;gap:14px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
+.qrow:hover{background:var(--surface-2)}
+.turnav{display:flex;align-items:center;gap:8px;min-width:126px}
+.turnav .who{font-size:12px;font-weight:600;line-height:1.2}
+.turnav .what{font-size:10.5px;color:var(--text-faint)}
+.ref{font-family:var(--mono);font-size:12px;color:var(--text-faint)}
+@media (max-width:880px){.qrow{grid-template-columns:auto 1fr auto}.qrow .hidesm{display:none}}
+
+/* ═══ ACTIVITY — one stream ═══ */
+.stream{display:grid;grid-template-columns:1fr 232px;gap:16px;align-items:start}
+@media (max-width:960px){.stream{grid-template-columns:1fr}}
+.daygrp{padding:13px 16px 3px;display:flex;align-items:center;gap:10px}
+.ev{display:grid;grid-template-columns:26px 1fr;gap:11px;padding:9px 16px 11px}
+.ev:hover{background:var(--surface-2)}
+.ev .d{width:25px;height:25px;border-radius:50%;display:grid;place-items:center;font-size:11px;flex:none;border:1px solid var(--line);background:var(--surface-2)}
+.ev.sys .d{background:var(--a-blue-bg);border-color:transparent;color:var(--a-blue-fg)}
+.ev.log .d{background:var(--a-red-bg);border-color:transparent;color:var(--a-red-fg)}
+.ev.talk .d{background:var(--a-violet-bg);border-color:transparent;color:var(--a-violet-fg)}
+.ev .txt{font-size:13px;line-height:1.45}
+.ev .txt b{font-weight:600}
+.ev .meta{font-size:11px;color:var(--text-faint);margin-top:2px;display:flex;gap:7px;flex-wrap:wrap}
+.ev .quote{font-size:12.5px;color:var(--text-muted);background:var(--surface-2);border-inline-start:2px solid var(--line-strong);border-radius:0 6px 6px 0;padding:6px 10px;margin-top:6px}
+.filters{padding:13px 14px}
+.fgroup{margin-bottom:15px}
+.fchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.chip{font-size:11.5px;font-weight:500;border:1px solid var(--line);border-radius:20px;padding:3px 9px;color:var(--text-muted)}
+.chip.on{background:var(--brand);border-color:var(--brand);color:var(--brand-ink);font-weight:600}
+.foot{padding:11px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--text-faint);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.note{font-size:12px;color:var(--text-faint)}
+.vswitch{display:flex;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:2px}
+.vswitch button{font-size:12px;font-weight:600;padding:4px 10px;border-radius:6px;color:var(--text-faint)}
+.vswitch button.on{background:var(--surface-2);color:var(--text)}
+</style>
+</head>
+<body>
+<div class="app">
+
+<aside class="rail">
+  <div class="brand"><div class="mark">F</div><div><b>FACET</b><small>Technopanel</small></div></div>
+  <div class="rail-group">Work</div>
+  <a class="nav on"><span class="dotmark" style="background:var(--brand)"></span>Waiting on me<span class="count">7</span></a>
+  <a class="nav"><span class="dotmark" style="background:var(--o-company)"></span>Companies</a>
+  <a class="nav"><span class="dotmark" style="background:var(--o-project)"></span>Projects</a>
+  <a class="nav"><span class="dotmark" style="background:var(--o-quote)"></span>Quotations</a>
+  <a class="nav"><span class="dotmark" style="background:var(--o-dispatch)"></span>Dispatches</a>
+  <div class="rail-group">Team</div>
+  <a class="nav"><span class="dotmark" style="background:var(--o-contact)"></span>Activity</a>
+  <a class="nav"><span class="dotmark" style="background:var(--text-faint)"></span>Targets</a>
+  <div class="me"><div class="av">JM</div><div><b>Jerom M.</b><small>Super Admin</small></div></div>
+</aside>
+
+<div class="main">
+  <div class="top">
+    <div class="search">Search companies, projects, quotations<span class="kbd">⌘K</span></div>
+    <div class="seg"><button class="on" onclick="th('dark',this)">Dark</button><button onclick="th('light',this)">Light</button></div>
+    <button class="add">+ New</button>
+  </div>
+
+  <div class="page">
+    <div class="tabs">
+      <button class="tab on" onclick="go('co',this)">Companies</button>
+      <button class="tab" onclick="go('pr',this)">Projects</button>
+      <button class="tab" onclick="go('qu',this)">Quotations</button>
+      <button class="tab" onclick="go('ac',this)">Activity</button>
+    </div>
+
+<!-- ═══════════ COMPANIES ═══════════ -->
+<section class="view on" id="v-co">
+  <div class="head">
+    <div>
+      <h1><span class="oi" style="background:var(--o-company)"></span>Companies</h1>
+      <div class="sub">Sorted by silence. The ones at the top have not been touched.</div>
+    </div>
+    <div class="vswitch"><button class="on">Table</button><button>Cards</button><button>Map</button></div>
+  </div>
+
+  <div class="grp"><span class="label">Gone quiet</span><span class="ct">4</span><span class="ln"></span></div>
+  <div class="card">
+    <div class="crow">
+      <div class="silence"><div class="sbar"><i style="width:100%;background:var(--a-red-fg)"></i></div><span class="sdays late">61d</span></div>
+      <div><div class="cname">Al-Bawani Contracting</div><div class="cmeta">Contractor<span class="sep">·</span>Riyadh<span class="sep">·</span>2 live projects</div></div>
+      <div class="mini"><b>1,840</b>expected m²</div>
+      <div class="av s b">RA</div>
+    </div>
+    <div class="crow">
+      <div class="silence"><div class="sbar"><i style="width:100%;background:var(--a-red-fg)"></i></div><span class="sdays late">47d</span></div>
+      <div><div class="cname">Nesma &amp; Partners</div><div class="cmeta">Contractor<span class="sep">·</span>Al Khobar<span class="sep">·</span>1 live project</div></div>
+      <div class="mini"><b>620</b>expected m²</div>
+      <div class="av s">MH</div>
+    </div>
+    <div class="crow">
+      <div class="silence"><div class="sbar"><i style="width:100%;background:var(--a-red-fg)"></i></div><span class="sdays late">38d</span></div>
+      <div><div class="cname">مؤسسة الواحة للمقاولات</div><div class="cmeta">Contractor<span class="sep">·</span>Buraydah<span class="sep">·</span>no project</div></div>
+      <div class="mini"><b>—</b>unqualified</div>
+      <div class="av s b">RA</div>
+    </div>
+    <div class="crow">
+      <div class="silence"><div class="sbar"><i style="width:92%;background:var(--a-red-fg)"></i></div><span class="sdays late">33d</span></div>
+      <div><div class="cname">Saudi Diyar Consultants</div><div class="cmeta">Consultant<span class="sep">·</span>Jeddah<span class="sep">·</span>1 live project</div></div>
+      <div class="mini"><b>410</b>expected m²</div>
+      <div class="av s g">SK</div>
+    </div>
+  </div>
+
+  <div class="grp"><span class="label">Due soon</span><span class="ct">2</span><span class="ln"></span></div>
+  <div class="card">
+    <div class="crow">
+      <div class="silence"><div class="sbar"><i style="width:73%;background:var(--a-amber-fg)"></i></div><span class="sdays soon">22d</span></div>
+      <div><div class="cname">Rawabi Holding</div><div class="cmeta">Factory<span class="sep">·</span>Dammam<span class="sep">·</span>3 live projects</div></div>
+      <div class="mini"><b>2,900</b>expected m²</div>
+      <div class="av s b">RA</div>
+    </div>
+    <div class="crow">
+      <div class="silence"><div class="sbar"><i style="width:60%;background:var(--a-amber-fg)"></i></div><span class="sdays soon">18d</span></div>
+      <div><div class="cname">Almarai Facilities</div><div class="cmeta">Owner<span class="sep">·</span>Riyadh<span class="sep">·</span>1 live project</div></div>
+      <div class="mini"><b>750</b>expected m²</div>
+      <div class="av s">MH</div>
+    </div>
+  </div>
+
+  <div class="grp"><span class="label">Recently touched</span><span class="ct">31</span><span class="ln"></span></div>
+  <div class="card">
+    <div class="crow">
+      <div class="silence"><div class="sbar"><i style="width:13%;background:var(--text-faint)"></i></div><span class="sdays okc">4d</span></div>
+      <div><div class="cname">Zamil Industrial</div><div class="cmeta">Factory<span class="sep">·</span>Dammam<span class="sep">·</span>samples sent</div></div>
+      <div class="mini"><b>1,200</b>expected m²</div>
+      <div class="av s g">SK</div>
+    </div>
+    <div class="crow">
+      <div class="silence"><div class="sbar"><i style="width:7%;background:var(--text-faint)"></i></div><span class="sdays okc">2d</span></div>
+      <div><div class="cname">Abdul Latif Jameel Real Estate</div><div class="cmeta">Real estate<span class="sep">·</span>Jeddah<span class="sep">·</span>discussed pricing</div></div>
+      <div class="mini"><b>3,400</b>expected m²</div>
+      <div class="av s b">RA</div>
+    </div>
+    <div class="foot"><span>37 companies</span><span>Threshold: 30 days qualified · 60 unqualified</span></div>
+  </div>
+</section>
+
+<!-- ═══════════ PROJECTS ═══════════ -->
+<section class="view" id="v-pr">
+  <div class="head">
+    <div>
+      <h1><span class="oi" style="background:var(--o-project)"></span>Projects</h1>
+      <div class="sub">Position is computed from real events. Cards do not drag.</div>
+    </div>
+    <div class="vswitch"><button class="on" onclick="pv('k',this)">Board</button><button onclick="pv('t',this)">Table</button><button onclick="pv('c',this)">Cards</button></div>
+  </div>
+
+  <!-- KANBAN -->
+  <div id="p-k">
+    <div class="kb">
+      <div class="kcol"><div class="kch"><span class="label">New</span><span class="ct">3</span></div>
+        <div class="kcard"><div class="t">Riyadh Front — Block C</div><div class="c">Al-Bawani</div><div class="f"><span class="num" style="font-size:12px">900 m²</span><span class="av s b">RA</span></div></div>
+        <div class="kcard"><div class="t">Qassim Mall façade</div><div class="c">الواحة</div><div class="f"><span class="num" style="font-size:12px">340 m²</span><span class="av s b">RA</span></div></div>
+        <div class="kcard"><div class="t">Jubail warehouse</div><div class="c">Nesma</div><div class="f"><span class="num" style="font-size:12px">620 m²</span><span class="av s">MH</span></div></div>
+      </div>
+      <div class="kcol"><div class="kch"><span class="label">Requested</span><span class="ct">2</span></div>
+        <div class="kcard"><div class="t">KAFD Parcel 4.11</div><div class="c">Rawabi Holding</div><div class="f"><span class="num" style="font-size:12px">1,450 m²</span><span class="av s b">RA</span></div></div>
+        <div class="kcard"><div class="t">Almarai HQ recladding</div><div class="c">Almarai</div><div class="f"><span class="num" style="font-size:12px">750 m²</span><span class="av s">MH</span></div></div>
+      </div>
+      <div class="kcol"><div class="kch"><span class="label">Signature</span><span class="ct">2</span></div>
+        <div class="kcard"><div class="t">Zamil Tower cladding</div><div class="c">Zamil Industrial</div><div class="f"><span class="pill p-amber">6d</span><span class="av s g">SK</span></div></div>
+        <div class="kcard"><div class="t">Diyar office fitout</div><div class="c">Saudi Diyar</div><div class="f"><span class="pill p-red">11d</span><span class="av s g">SK</span></div></div>
+      </div>
+      <div class="kcol"><div class="kch"><span class="label">Payment</span><span class="ct">1</span></div>
+        <div class="kcard"><div class="t">ALJ Showroom — Tahlia</div><div class="c">Abdul Latif Jameel</div><div class="f"><span class="pill p-amber">3d</span><span class="av s b">RA</span></div></div>
+      </div>
+      <div class="kcol"><div class="kch"><span class="label">Paid</span><span class="ct">1</span></div>
+        <div class="kcard"><div class="t">Rawabi Staff Housing</div><div class="c">Rawabi Holding</div><div class="f"><span class="num" style="font-size:12px">1,100 m²</span><span class="av s b">RA</span></div></div>
+      </div>
+      <div class="kcol"><div class="kch"><span class="label">Dispatched</span><span class="ct">2</span></div>
+        <div class="kcard"><div class="t">Nesma Camp Phase 1</div><div class="c">Nesma &amp; Partners</div><div class="f"><span class="pill p-green">620 / 620</span><span class="av s">MH</span></div></div>
+        <div class="kcard"><div class="t">Zamil Annex</div><div class="c">Zamil Industrial</div><div class="f"><span class="pill p-amber">380 / 900</span><span class="av s g">SK</span></div></div>
+      </div>
+    </div>
+    <div class="note" style="margin-top:12px">Lost projects leave the board and live in a filter — otherwise the board becomes a graveyard nobody clears.</div>
+  </div>
+
+  <!-- TABLE -->
+  <div id="p-t" style="display:none">
+    <div class="grp"><span class="label">Your move</span><span class="ct">2</span><span class="ln"></span></div>
+    <div class="card">
+      <div class="prow">
+        <div><div class="cname">Zamil Tower cladding</div><div class="cmeta">Zamil Industrial<span class="sep">·</span>Dammam</div></div>
+        <div class="chain"><i class="done"></i><s class="done"></s><i class="done"></i><s class="done"></s><i class="now"></i><s></s><i></i><s></s><i></i><s></s><i></i></div>
+        <div class="qwrap"><div class="qbar"><i class="disp" style="width:0%"></i><i class="quo" style="width:88%"></i></div><div class="cmeta" style="margin-top:4px"><span class="num">790</span> quoted / <span class="num">900</span> expected</div></div>
+        <span class="pill p-amber">6d</span>
+      </div>
+      <div class="prow">
+        <div><div class="cname">ALJ Showroom — Tahlia</div><div class="cmeta">Abdul Latif Jameel<span class="sep">·</span>Jeddah</div></div>
+        <div class="chain"><i class="done"></i><s class="done"></s><i class="done"></i><s class="done"></s><i class="done"></i><s class="done"></s><i class="now"></i><s></s><i></i><s></s><i></i></div>
+        <div class="qwrap"><div class="qbar"><i class="disp" style="width:0%"></i><i class="quo" style="width:100%"></i></div><div class="cmeta" style="margin-top:4px"><span class="num">3,400</span> quoted / <span class="num">3,400</span> expected</div></div>
+        <span class="pill p-amber">3d</span>
+      </div>
+    </div>
+    <div class="grp"><span class="label">Moving — nobody blocked</span><span class="ct">4</span><span class="ln"></span></div>
+    <div class="card">
+      <div class="prow">
+        <div><div class="cname">Zamil Annex</div><div class="cmeta">Zamil Industrial<span class="sep">·</span>Dammam</div></div>
+        <div class="chain"><i class="done"></i><s class="done"></s><i class="done"></i><s class="done"></s><i class="done"></i><s class="done"></s><i class="done"></i><s class="done"></s><i class="done"></i><s class="done"></s><i class="now"></i></div>
+        <div class="qwrap"><div class="qbar"><i class="disp" style="width:42%"></i><i class="quo" style="width:58%"></i></div><div class="cmeta" style="margin-top:4px"><span class="num">380</span> dispatched / <span class="num">900</span></div></div>
+        <span class="pill p-plain">partial</span>
+      </div>
+      <div class="prow">
+        <div><div class="cname">KAFD Parcel 4.11</div><div class="cmeta">Rawabi Holding<span class="sep">·</span>Riyadh</div></div>
+        <div class="chain"><i class="done"></i><s class="done"></s><i class="now"></i><s></s><i></i><s></s><i></i><s></s><i></i><s></s><i></i></div>
+        <div class="qwrap"><div class="qbar"><i class="disp" style="width:0%"></i><i class="quo" style="width:64%"></i></div><div class="cmeta" style="margin-top:4px"><span class="num">930</span> quoted / <span class="num">1,450</span> expected</div></div>
+        <span class="pill p-plain">—</span>
+      </div>
+      <div class="foot"><span>11 live projects · 2 lost this month</span><span>Quoted is the latest live version, never a sum</span></div>
+    </div>
+  </div>
+
+  <!-- CARDS -->
+  <div id="p-c" style="display:none">
+    <div class="cardsgrid">
+      <div class="card pcard"><h3>Zamil Tower cladding</h3><div class="c">Zamil Industrial · Dammam</div>
+        <div class="stat"><div><span class="label">Expected</span><b>900</b></div><div><span class="label">Quoted</span><b>790</b></div><div><span class="label">Out</span><b>0</b></div></div>
+        <div class="chain"><i class="done"></i><s class="done"></s><i class="done"></i><s class="done"></s><i class="now"></i><s></s><i></i><s></s><i></i><s></s><i></i></div>
+        <div class="f" style="display:flex;justify-content:space-between;align-items:center;margin-top:11px"><span class="pill p-amber">Waiting on Rawan · 6d</span><span class="av s g">SK</span></div>
+      </div>
+      <div class="card pcard"><h3>Nesma Camp Phase 1</h3><div class="c">Nesma &amp; Partners · Jubail</div>
+        <div class="stat"><div><span class="label">Expected</span><b>620</b></div><div><span class="label">Quoted</span><b>620</b></div><div><span class="label">Out</span><b>620</b></div></div>
+        <div class="chain"><i class="done"></i><s class="done"></s><i class="done"></i><s class="done"></s><i class="done"></i><s class="done"></s><i class="done"></i><s class="done"></s><i class="done"></i><s class="done"></s><i class="done"></i></div>
+        <div class="f" style="display:flex;justify-content:space-between;align-items:center;margin-top:11px"><span class="pill p-green">Complete</span><span class="av s">MH</span></div>
+      </div>
+      <div class="card pcard"><h3>KAFD Parcel 4.11</h3><div class="c">Rawabi Holding · Riyadh</div>
+        <div class="stat"><div><span class="label">Expected</span><b>1,450</b></div><div><span class="label">Quoted</span><b>930</b></div><div><span class="label">Out</span><b>0</b></div></div>
+        <div class="chain"><i class="done"></i><s class="done"></s><i class="now"></i><s></s><i></i><s></s><i></i><s></s><i></i><s></s><i></i></div>
+        <div class="f" style="display:flex;justify-content:space-between;align-items:center;margin-top:11px"><span class="pill p-plain">In production</span><span class="av s b">RA</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ QUOTATIONS ═══════════ -->
+<section class="view" id="v-qu">
+  <div class="head">
+    <div>
+      <h1><span class="oi" style="background:var(--o-quote)"></span>Quotations</h1>
+      <div class="sub">Grouped by whose move it is — not by status.</div>
+    </div>
+    <div class="vswitch"><button class="on">Table</button><button>Board</button><button>Calendar</button></div>
+  </div>
+
+  <div class="grp"><span class="label">Your move</span><span class="ct">2</span><span class="ln"></span></div>
+  <div class="card">
+    <div class="qrow">
+      <div class="turnav"><div class="av s">You</div><div><div class="who">Returned to you</div><div class="what">fix the colour code</div></div></div>
+      <div><div class="cname">Zamil Tower cladding</div><div class="cmeta">Zamil Industrial<span class="sep">·</span><span class="ref">9614 · v2</span></div></div>
+      <div class="mini hidesm"><b class="num">790</b>m²</div>
+      <div class="mini hidesm"><b class="num">312,050</b>SAR</div>
+      <span class="pill p-red">6d</span>
+    </div>
+    <div class="qrow">
+      <div class="turnav"><div class="av s">You</div><div><div class="who">Confirm payment</div><div class="what">customer says paid</div></div></div>
+      <div><div class="cname">ALJ Showroom — Tahlia</div><div class="cmeta">Abdul Latif Jameel<span class="sep">·</span><span class="ref">9602</span></div></div>
+      <div class="mini hidesm"><b class="num">3,400</b>m²</div>
+      <div class="mini hidesm"><b class="num">1,346,000</b>SAR</div>
+      <span class="pill p-amber">3d</span>
+    </div>
+  </div>
+
+  <div class="grp"><span class="label">Waiting on the coordinator</span><span class="ct">2</span><span class="ln"></span></div>
+  <div class="card">
+    <div class="qrow">
+      <div class="turnav"><div class="av s v">RW</div><div><div class="who">Rawan</div><div class="what">issue in SMAC</div></div></div>
+      <div><div class="cname">KAFD Parcel 4.11</div><div class="cmeta">Rawabi Holding<span class="sep">·</span><span class="ref">requested</span></div></div>
+      <div class="mini hidesm"><b class="num">930</b>m²</div>
+      <div class="mini hidesm"><b class="num">368,900</b>SAR</div>
+      <span class="pill p-amber">2d</span>
+    </div>
+    <div class="qrow">
+      <div class="turnav"><div class="av s v">RW</div><div><div class="who">Rawan</div><div class="what">signatures</div></div></div>
+      <div><div class="cname">Diyar office fitout</div><div class="cmeta">Saudi Diyar<span class="sep">·</span><span class="ref">9598</span></div></div>
+      <div class="mini hidesm"><b class="num">410</b>m²</div>
+      <div class="mini hidesm"><b class="num">162,150</b>SAR</div>
+      <span class="pill p-red">11d</span>
+    </div>
+  </div>
+
+  <div class="grp"><span class="label">Waiting on the customer</span><span class="ct">3</span><span class="ln"></span></div>
+  <div class="card">
+    <div class="qrow">
+      <div class="turnav"><div class="av s b">—</div><div><div class="who">Almarai</div><div class="what">no response</div></div></div>
+      <div><div class="cname">Almarai HQ recladding</div><div class="cmeta">Almarai Facilities<span class="sep">·</span><span class="ref">9571</span></div></div>
+      <div class="mini hidesm"><b class="num">750</b>m²</div>
+      <div class="mini hidesm"><b class="num">296,600</b>SAR</div>
+      <span class="pill p-red">19d</span>
+    </div>
+    <div class="qrow">
+      <div class="turnav"><div class="av s b">—</div><div><div class="who">Nesma</div><div class="what">reviewing</div></div></div>
+      <div><div class="cname">Jubail warehouse</div><div class="cmeta">Nesma &amp; Partners<span class="sep">·</span><span class="ref">9589</span></div></div>
+      <div class="mini hidesm"><b class="num">620</b>m²</div>
+      <div class="mini hidesm"><b class="num">245,300</b>SAR</div>
+      <span class="pill p-amber">8d</span>
+    </div>
+    <div class="foot"><span>7 open threads</span><span>Validity is a note — an expired quotation stops nothing</span></div>
+  </div>
+</section>
+
+<!-- ═══════════ ACTIVITY ═══════════ -->
+<section class="view" id="v-ac">
+  <div class="head">
+    <div>
+      <h1><span class="oi" style="background:var(--o-contact)"></span>Activity</h1>
+      <div class="sub">One stream. What people typed and what the system saw, together.</div>
+    </div>
+    <div class="vswitch"><button class="on">Stream</button><button>By rep</button><button>Calendar</button></div>
+  </div>
+
+  <div class="stream">
+    <div class="card">
+      <div class="daygrp"><span class="label">Today</span><span class="ln" style="height:1px;background:var(--line);flex:1"></span><span class="ct num" style="font-size:11px;color:var(--text-faint)">9 events</span></div>
+      <div class="ev log"><div class="d">✍</div><div><div class="txt"><b>Rawan A.</b> visited <b>Al-Bawani Contracting</b> — discussed pricing</div>
+        <div class="quote">They want 5 mm this time, and asked whether we can hold the price to end of quarter.</div>
+        <div class="meta"><span>Riyadh Front — Block C</span>·<span>with Eng. Faisal</span>·<span class="pill p-amber" style="font-size:10px">price too high</span></div></div></div>
+      <div class="ev sys"><div class="d">◆</div><div><div class="txt">Quotation <span class="ref">9614</span> returned for edits on <b>Zamil Tower cladding</b></div>
+        <div class="meta"><span>by Rawan (coordinator)</span>·<span>11:20</span></div></div></div>
+      <div class="ev talk"><div class="d">💬</div><div><div class="txt"><b>Mohammed H.</b> commented on <b>Jubail warehouse</b></div>
+        <div class="quote">Customer is comparing us with Alucobond. Worth a call before Thursday.</div>
+        <div class="meta"><span>tagged Jerom</span>·<span>10:04</span></div></div></div>
+      <div class="ev sys"><div class="d">↑</div><div><div class="txt"><b>620 m²</b> dispatched to <b>Nesma &amp; Partners</b></div>
+        <div class="meta"><span>recorded by Rawan</span>·<span>credited to Mohammed H.</span>·<span>09:31</span></div></div></div>
+
+      <div class="daygrp"><span class="label">Yesterday</span><span class="ln" style="height:1px;background:var(--line);flex:1"></span><span class="ct num" style="font-size:11px;color:var(--text-faint)">14 events</span></div>
+      <div class="ev log"><div class="d">✍</div><div><div class="txt"><b>Saad K.</b> called <b>Saudi Diyar Consultants</b> — no answer</div>
+        <div class="meta"><span>Diyar office fitout</span>·<span>third attempt</span></div></div></div>
+      <div class="ev log"><div class="d">✍</div><div><div class="txt"><b>Rawan A.</b> — field note, <b>exhibition</b></div>
+        <div class="quote">Big5 Saudi. Three contractors asked about A2 fire rating specifically. Two took catalogues.</div>
+        <div class="meta"><span>Riyadh</span>·<span>no company</span></div></div></div>
+      <div class="ev sys"><div class="d">◆</div><div><div class="txt">Quotation <span class="ref">9602</span> accepted — signatures obtained</div>
+        <div class="meta"><span>ALJ Showroom — Tahlia</span>·<span>internal approval, not a won deal</span></div></div></div>
+      <div class="foot"><span>Showing 23 of 340 events</span><span>Load more</span></div>
+    </div>
+
+    <div class="card filters">
+      <div class="fgroup"><span class="label">Who</span>
+        <div class="fchips"><span class="chip on">Everyone</span><span class="chip">Just me</span><span class="chip">Rawan</span><span class="chip">Mohammed</span><span class="chip">Saad</span></div>
+      </div>
+      <div class="fgroup"><span class="label">What</span>
+        <div class="fchips"><span class="chip on">All</span><span class="chip">Logged</span><span class="chip">System</span><span class="chip">Comments</span></div>
+      </div>
+      <div class="fgroup"><span class="label">Outcome</span>
+        <div class="fchips"><span class="chip">Catalogue</span><span class="chip">Samples</span><span class="chip">Pricing</span><span class="chip">No answer</span><span class="chip">On hold</span></div>
+      </div>
+      <div class="fgroup"><span class="label">Signals raised</span>
+        <div class="fchips"><span class="chip">Price too high</span><span class="chip">Competitor</span><span class="chip">Lead time</span><span class="chip">Colour</span></div>
+      </div>
+      <div class="note" style="border-top:1px solid var(--line);padding-top:11px">Every filter is a URL parameter. This panel needs no JavaScript and the result is shareable.</div>
+    </div>
+  </div>
+</section>
+
+  </div>
+</div>
+</div>
+
+<script>
+/* Demo only. In the real app every switch below is a link with a URL parameter. */
+function go(id,el){document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
+  document.getElementById('v-'+id).classList.add('on');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));el.classList.add('on');}
+function pv(m,el){['k','t','c'].forEach(x=>document.getElementById('p-'+x).style.display='none');
+  document.getElementById('p-'+m).style.display='block';
+  el.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
+function th(t,el){document.documentElement.dataset.theme=t;
+  el.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
+</script>
+</body>
+</html>
