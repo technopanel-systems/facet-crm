@@ -19,7 +19,7 @@ either.
 
 **Claude (this chat)** is the planning and review layer. It holds context,
 reviews plans before they are approved, decides what a slice contains, and keeps
-`SPEC.md` and `DESIGN.md` honest. **It does not have access to the repository** —
+`SPEC.md` and `DESIGN.md` honest. **reads the repository through the GitHub connector, which syncs main — so an unpushed commit is invisible to it.** —
 it sees only what is pasted or uploaded.
 
 ---
@@ -204,7 +204,7 @@ block below is enough.
 
 ---
 
-## 7. The status block
+## 8. The status block
 
 Run this at the end of a session and paste the output. It is what Claude uses
 instead of repository access.
@@ -238,7 +238,7 @@ Better still, add the script to the repo once (see §9) and run `npm run status`
 
 ---
 
-## 8. Current state, verified from the repository
+## 9. Current state, verified from the repository
 
 Checked directly against `main` at commit `12689b4`.
 
@@ -274,7 +274,7 @@ chain reaches it at module load anyway.
 
 ---
 
-## 9. Repository housekeeping
+## 10. Repository housekeeping
 
 Four small changes. None affects the workflow; all of them remove friction.
 Do them in one commit before session 1.
