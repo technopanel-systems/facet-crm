@@ -1,17 +1,20 @@
 /**
- * The lookup tables the CRM forms select from: cities `[07 A7]`, `[15 §3]`,
- * company categories `[12 §4]` and lead sources `[10 §12]`, `[15 §1]`.
+ * The lookup tables the CRM forms select from: countries `S14`, cities
+ * `[07 A7]`, `[15 §3]`, company categories `[12 §4]` and lead sources
+ * `[10 §12]`, `[15 §1]`.
  *
  * Reference data, so no **visibility** filter — these rows describe the world,
  * not anybody's customers. Lead sources do carry a **selectability** filter,
  * which is a different question: see below.
  *
- * All three can still legitimately be empty. `15` supplies the city and
+ * Most can still legitimately be empty. `15` supplies the city and
  * lead-source values that `14` recorded as unknown, but the columns stay
  * nullable and a form must render an empty select and still save. An empty
- * lookup is a missing decision, not a broken screen.
+ * lookup is a missing decision, not a broken screen. Countries are the one
+ * exception, and not by choice here: `companies.country_id` is `NOT NULL`
+ * `S14`, so migration 0010 puts Saudi Arabia in the table itself.
  *
- * Two rules live here rather than in a feature module, because each has to
+ * Three rules live here rather than in a feature module, because each has to
  * give the same answer to a screen and to a write:
  *
  *  1. **Which lead sources may this identity choose** `[15 §2]` — the list and
@@ -19,6 +22,9 @@
  *     something the action then refuses, or hide something it would accept.
  *  2. **Which region a record gets** `[15 §4]` — derived from the city when
  *     there is one. The form displays it; the data layer decides it.
+ *  3. **Whether a company has a city and a region at all** `S14` `S15` — Saudi
+ *     companies do, everyone else has neither. The form hides the fields; the
+ *     data layer is what makes them null.
  */
 
 import { asc, eq, or, type SQL } from "drizzle-orm";
@@ -27,6 +33,7 @@ import { db } from "@/db";
 import {
   cities,
   companyCategories,
+  countries,
   leadSources,
   lossReasons,
   productClasses,
@@ -36,7 +43,7 @@ import {
   serviceTypes,
 } from "@/db/schema";
 import { can, type AuthSession } from "@/lib/authz";
-import type { Region } from "@/lib/enums";
+import { SAUDI_CODE, type Region } from "@/lib/enums";
 import { RuleError } from "@/lib/validation";
 
 /** The shape every lookup shares: an id and a name in both languages. */
@@ -89,6 +96,74 @@ export async function regionForCity(
   if (!city) throw new RuleError("validation.invalid", "cityId");
 
   return city.region;
+}
+
+/* ------------------------------------------------------------------ *
+ * Countries `S14`, and the Saudi-only rule `S15` hanging off them
+ * ------------------------------------------------------------------ */
+
+/**
+ * A country carries its ISO code, which is what the Saudi branch tests — here
+ * and in the form, which needs it to pick the default and to decide whether to
+ * render a city field. `SAUDI_CODE` itself lives in `lib/enums.ts`, the module
+ * a client component may import from.
+ */
+export type CountryRow = LookupRow & { code: string };
+
+export async function listCountries(): Promise<CountryRow[]> {
+  return db
+    .select({
+      id: countries.id,
+      code: countries.code,
+      nameEn: countries.nameEn,
+      nameAr: countries.nameAr,
+    })
+    .from(countries)
+    .orderBy(asc(countries.nameEn));
+}
+
+/**
+ * Where a company is, for the columns that record it `S14` `S15`.
+ *
+ * `S15` is Saudi-only: a Saudi company's region comes from its city, and a
+ * company anywhere else has neither. So this answers both columns at once
+ * rather than leaving a caller to remember the second — which is the shape
+ * that lets a non-Saudi company keep a stale Riyadh city through one edit.
+ *
+ * Three things happen here, in order:
+ *
+ *  1. **The country id is resolved**, so a tampered or stale `<select>` value
+ *     is reported against its field rather than surfacing as a foreign-key
+ *     500 — the job `regionForCity` and `assertLeadSourceSelectable` already
+ *     do for `cityId` and `leadSourceId`.
+ *  2. **Not Saudi Arabia → both are null.** Whatever the form posted is
+ *     discarded, not trusted: there are no foreign cities in `cities` for it
+ *     to have meant, and a region is a Saudi administrative region.
+ *  3. **Saudi Arabia → `regionForCity` decides**, exactly as it did before
+ *     this rule existed.
+ *
+ * It lives in the data layer for the reason `regionForCity` does: a form that
+ * hides the city field in JavaScript is a suggestion, and every caller has to
+ * get the same answer — including one that never rendered a form.
+ *
+ * Companies only. `regionForCity` stays as it is because `projects` has a city
+ * and a region and no country `S14`.
+ */
+export async function placeForCountry(
+  countryId: string,
+  cityId: string | null,
+  chosenRegion: Region | null,
+): Promise<{ cityId: string | null; region: Region | null }> {
+  const [country] = await db
+    .select({ code: countries.code })
+    .from(countries)
+    .where(eq(countries.id, countryId))
+    .limit(1);
+  if (!country) throw new RuleError("validation.invalid", "countryId");
+
+  if (country.code !== SAUDI_CODE) return { cityId: null, region: null };
+
+  return { cityId, region: await regionForCity(cityId, chosenRegion) };
 }
 
 export async function listCompanyCategories(): Promise<LookupRow[]> {

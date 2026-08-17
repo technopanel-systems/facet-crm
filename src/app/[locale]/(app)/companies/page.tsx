@@ -106,9 +106,11 @@ export default async function CompaniesPage({
                   </TableCell>
                   {/* A phone number is read left-to-right in both locales.
                       Mono but NOT end-aligned: it is an identifier, not a
-                      magnitude — the concept's `.code` rather than `.num`. */}
+                      magnitude — the concept's `.code` rather than `.num`.
+                      Mandatory since `S13`, so there is nothing to fall back
+                      to. */}
                   <TableCell className="num text-start" dir="ltr">
-                    {row.phone ?? t("common.none")}
+                    {row.phone}
                   </TableCell>
                   <TableCell className="text-start">
                     {pickName(locale, row.categoryNameEn, row.categoryNameAr) ??

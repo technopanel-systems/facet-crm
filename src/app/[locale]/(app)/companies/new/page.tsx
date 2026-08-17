@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/authz";
 import {
   listCities,
   listCompanyCategories,
+  listCountries,
   listLeadSources,
 } from "@/lib/lookups";
 
@@ -23,8 +24,9 @@ export default async function NewCompanyPage({
   const session = await requireSession();
 
   const t = await getTranslations();
-  const [categories, cities, leadSources] = await Promise.all([
+  const [categories, countries, cities, leadSources] = await Promise.all([
     listCompanyCategories(),
+    listCountries(),
     listCities(),
     // No current value on a new company, so a rep sees only the selectable
     // sources `[15 §2]`.
@@ -39,6 +41,7 @@ export default async function NewCompanyPage({
         submitLabel={t("common.create")}
         cancelHref="/companies"
         categories={categories}
+        countries={countries}
         cities={cities}
         leadSources={leadSources}
         locale={locale}

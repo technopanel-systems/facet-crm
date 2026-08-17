@@ -7,6 +7,7 @@ import { getCompany } from "@/lib/companies";
 import {
   listCities,
   listCompanyCategories,
+  listCountries,
   listLeadSources,
 } from "@/lib/lookups";
 
@@ -30,8 +31,9 @@ export default async function EditCompanyPage({
   if (!company) notFound();
 
   const t = await getTranslations();
-  const [categories, cities, leadSources] = await Promise.all([
+  const [categories, countries, cities, leadSources] = await Promise.all([
     listCompanyCategories(),
+    listCountries(),
     listCities(),
     // The company's own lead source is passed in so a rep editing a
     // marketing-sourced company keeps it rather than blanking it `[15 §2.1]`.
@@ -47,6 +49,7 @@ export default async function EditCompanyPage({
         submitLabel={t("common.save")}
         cancelHref={`/companies/${company.id}`}
         categories={categories}
+        countries={countries}
         cities={cities}
         leadSources={leadSources}
         locale={locale}

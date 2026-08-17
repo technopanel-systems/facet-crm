@@ -129,6 +129,7 @@ export function SelectField({
   placeholder,
   disabled,
   invalid,
+  required,
   onChange,
   children,
 }: {
@@ -137,6 +138,11 @@ export function SelectField({
   placeholder: string;
   disabled?: boolean;
   invalid?: boolean;
+  /** The native attribute, which makes the browser refuse the placeholder
+   *  option — its value is `""`. Off by default: most selects here are
+   *  genuinely optional. The server still validates; this only saves the rep a
+   *  round trip. */
+  required?: boolean;
   /** For the rare field that reveals another one. The select stays
    *  uncontrolled, so `defaultValue` still wins after a rejected submit. */
   onChange?: (value: string) => void;
@@ -148,6 +154,7 @@ export function SelectField({
       name={name}
       defaultValue={defaultValue ?? ""}
       disabled={disabled}
+      required={required}
       onChange={onChange ? (event) => onChange(event.target.value) : undefined}
       aria-invalid={invalid || undefined}
       aria-describedby={invalid ? `${name}-error` : undefined}

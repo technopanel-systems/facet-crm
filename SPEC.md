@@ -69,12 +69,12 @@ deactivated and re-enabled.
 
 ## 3. Companies and contacts
 
-**S12. [CHANGE]** A company has **one name field**, written in English or
+**S12.** A company has **one name field**, written in English or
 Arabic. Not two.
 
-**S13. [CHANGE]** **Phone is mandatory.**
+**S13.** **Phone is mandatory.**
 
-**S14. [BUILD]** A company carries a **country**. Most are Saudi; some are not —
+**S14.** A company carries a **country**. Most are Saudi; some are not —
 Egypt, Jordan, Syria and others.
 
 **S15.** For a Saudi company, the **region is derived from the city** and shown
@@ -92,7 +92,7 @@ it keeps it when a rep edits.
 **S18.** The rep who creates a company becomes its **primary rep**
 automatically. The primary rep is always the first rep who had the company.
 
-**S19. [CHANGE]** A **contact has one name field**, English or Arabic.
+**S19.** A **contact has one name field**, English or Arabic.
 
 **S20.** A contact has **no owner**. It is visible exactly when its company is,
 and moves with the company on handover.

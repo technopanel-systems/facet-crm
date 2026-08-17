@@ -2,8 +2,8 @@
  * Seed the lookup tables that `12 §14` calls for after the migration:
  * company categories `[12 §4]`, the product attribute lookups `[08 B1]`, and —
  * since `15` — lead sources `[15 §1]` and Saudi cities `[15 §3]`. `16 §4` adds
- * the service types, and `25` adds the loss reasons `[25 §5]` and a tenth
- * company category `[25 §33]`.
+ * the service types, `25` adds the loss reasons `[25 §5]` and a tenth
+ * company category `[25 §33]`, and `S14` adds the countries.
  * `npm run db:seed:lookups`, or `npm run db:seed` for these plus the roles.
  *
  * Idempotent by natural key — name for a category, code for a product
@@ -26,6 +26,7 @@ import { closeDatabase, db } from "@/db";
 import {
   cities,
   companyCategories,
+  countries,
   leadSources,
   lossReasons,
   productClasses,
@@ -37,6 +38,7 @@ import {
 
 import { CITY_SEED } from "./seed/cities";
 import { COMPANY_CATEGORY_SEED } from "./seed/company-categories";
+import { COUNTRY_SEED } from "./seed/countries";
 import { LEAD_SOURCE_SEED } from "./seed/lead-sources";
 import { LOSS_REASON_SEED } from "./seed/loss-reasons";
 import {
@@ -111,6 +113,47 @@ async function seedLeadSources(): Promise<Counts> {
         .update(leadSources)
         .set({ nameAr: row.nameAr, repSelectable: row.repSelectable })
         .where(eq(leadSources.id, existing.id));
+      counts.updated += 1;
+    } else {
+      counts.unchanged += 1;
+    }
+  }
+  return counts;
+}
+
+/**
+ * Countries `S14`, keyed on `code`.
+ *
+ * A true upsert like the loss reasons, and for the same reason: `code` is the
+ * identifier the application refers to — `SAUDI_CODE` decides whether a company
+ * is offered a city at all `S15` — so a second row carrying `SA` would be a
+ * live defect rather than untidiness. Both names are corrected on a re-run,
+ * because the code, not the text, is what anything holds onto.
+ *
+ * Migration 0010 has already inserted Saudi Arabia: `companies.country_id` is
+ * `NOT NULL` and its backfill needed a row to point at. This finds that row by
+ * its code and leaves it alone.
+ */
+async function seedCountries(): Promise<Counts> {
+  const counts = zero();
+  for (const row of COUNTRY_SEED) {
+    const [existing] = await db
+      .select()
+      .from(countries)
+      .where(eq(countries.code, row.code))
+      .limit(1);
+
+    if (!existing) {
+      await db.insert(countries).values(row);
+      counts.inserted += 1;
+    } else if (
+      existing.nameEn !== row.nameEn ||
+      existing.nameAr !== row.nameAr
+    ) {
+      await db
+        .update(countries)
+        .set({ nameEn: row.nameEn, nameAr: row.nameAr })
+        .where(eq(countries.id, existing.id));
       counts.updated += 1;
     } else {
       counts.unchanged += 1;
@@ -339,6 +382,7 @@ export async function seedLookups(): Promise<void> {
   report("company categories", await seedCompanyCategories());
   report("lead sources", await seedLeadSources());
   report("loss reasons", await seedLossReasons());
+  report("countries", await seedCountries());
   report("cities", await seedCities());
   report("product suppliers", await seedSuppliers());
   report("product classes", await seedClasses());

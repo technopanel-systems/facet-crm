@@ -27,17 +27,33 @@ import {
  * server action is a separately reachable POST endpoint and no layout wraps
  * it. The data layer then re-checks visibility before it writes.
  *
- * Only the name is required — one field, English or Arabic `S12`. `09 §3.1`
- * says fields become required progressively in the application layer but names
- * no thresholds, so none are invented `[14 §6]`.
+ * Three fields are required: the name — one field, English or Arabic `S12` —
+ * the phone `S13`, and the country `S14`. Beyond those, `09 §3.1` says fields
+ * become required progressively in the application layer but names no
+ * thresholds, so none are invented `[14 §6]`.
+ *
+ * The required check is here **as well as** on the input and in the database.
+ * That is not belt-and-braces for its own sake: the `required` attribute is a
+ * browser convenience a POST can skip entirely, the `NOT NULL` gives a 500
+ * rather than a message under the field, and only this layer can answer with a
+ * translation key the form renders where the rep is looking.
+ *
+ * `?? ""` on a required field is unreachable — `fields.ok` is false whenever
+ * one failed, and both actions return before the input is used. It is there to
+ * satisfy the non-nullable `CompanyInput`, which is what makes an edit path
+ * that drops the phone `S13` fail to compile.
  */
 function readCompanyForm(formData: FormData) {
   const fields = readFields(formData);
   const input: CompanyInput = {
     name: fields.text("name", { required: true, max: 200 }) ?? "",
-    phone: fields.text("phone", { max: 50 }),
+    phone: fields.text("phone", { required: true, max: 50 }) ?? "",
+    countryId: fields.uuid("countryId", { required: true }) ?? "",
     categoryId: fields.uuid("categoryId"),
     vatNumber: fields.text("vatNumber", { max: 50 }),
+    // Both are posted only for a Saudi country and `placeForCountry` discards
+    // them otherwise `S15` — the form does not render the fields, and the data
+    // layer does not trust that it didn't.
     region: fields.option("region", REGIONS),
     cityId: fields.uuid("cityId"),
     leadSourceId: fields.uuid("leadSourceId"),

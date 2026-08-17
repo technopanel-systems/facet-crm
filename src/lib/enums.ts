@@ -16,6 +16,19 @@
 export const REGIONS = ["center", "north", "south", "east", "west"] as const;
 export type Region = (typeof REGIONS)[number];
 
+/**
+ * `S14` `S15` — the ISO 3166-1 alpha-2 code of the one country the application
+ * knows by name. Saudi companies are asked for a city and get a derived region;
+ * everyone else has neither.
+ *
+ * Not a pg enum like the rest of this file — `countries` is a lookup table, so
+ * this is a row's `code`, not a type. It lives here anyway for the reason the
+ * file exists: the company form branches on it to decide whether to render the
+ * city field at all, and `lib/lookups.ts` branches on it to decide what is
+ * written. Two copies of a load-bearing string is how they drift apart.
+ */
+export const SAUDI_CODE = "SA";
+
 /* `WARMTHS` was here until `25 §6` cut it. Do not reintroduce it: the founder
  * does not recognise the term. Qualification is the founder's own word and the
  * thing warmth was reaching for — see `25 §16`, and `companyIsQualified`. */

@@ -27,11 +27,20 @@
  *      HTTP, in both locales — the manual date that outranks the automatic
  *      clock, replayed the same way section 7 replays a lost project.
  *  12. No screen renders anything shaped like an unresolved message key.
+ *  13. Registering a company replays `S13`, `S14`, `S15`: a POST with no phone
+ *      is refused as a message rather than a 500, and the same payload sent
+ *      twice — differing only in country — stores a region for Saudi Arabia
+ *      and none for anywhere else.
  *
  * This was 11 sections until feature slice 6: the old item 11 (the
  * message-key scan) is now section 12, and section 11 above — the
  * follow-up-date replay — existed in the code for a phase but was never
  * added to this list. Not a renumbering; a correction `[26 §4]`.
+ *
+ * **Section 13 sits after the key scan**, alone among the replays. Section 12
+ * is written to cover everything fetched before it, and every string 13
+ * renders is already on a page sections 2 and 3 fetched — so nothing is lost,
+ * and section 12 keeps the number `CLAUDE.md` gives it.
  *
  * Section 0 runs before all of them, and refuses a server that booted before
  * the build — the hole every one of the above passed straight through `[23]`.
@@ -287,7 +296,12 @@ const MARKERS: Record<string, readonly string[]> = {
   "/companies": ['data-slot="list-card"', 'data-slot="table-head"'],
   "/quotations": ['data-slot="list-card"'],
   // One name field `S12` — the input is `name`, not a locale-suffixed pair.
-  "/companies/new": ['data-slot="form-shell"', 'name="name"'],
+  // `countryId` is `S14`; section 13 asserts it sits before the city.
+  "/companies/new": [
+    'data-slot="form-shell"',
+    'name="name"',
+    'name="countryId"',
+  ],
   "/reports/new": ['data-slot="form-shell"'],
   // `/coverage` carried this marker until feature slice 6 moved the table
   // it comes from onto `/performance` and deleted the route `[26 §2]`.
@@ -1310,6 +1324,241 @@ async function main(): Promise<void> {
       );
     }
   }
+
+  console.log(
+    "\n13. Registering a company, posted for real [S13], [S14], [S15]",
+  );
+  {
+    // **Deliberately after the key sweep**, unlike every other replay section.
+    // Section 12 is written to scan everything fetched before it, and every
+    // string this section renders — `common.country` on the form and on the
+    // detail screen — is already on `/companies/new` and on a company detail
+    // that sections 2 and 3 fetched. Nothing is lost, and section 12 keeps the
+    // number `CLAUDE.md` gives it.
+    //
+    // A rep, not the manager: `S18` makes the creating rep the primary rep, and
+    // registering a company is the rep's screen `D55`.
+    //
+    // **The city is out of reach here, deliberately.** It is a `Combobox` in a
+    // Radix portal, so its options are not in the server HTML and this script
+    // has no city id to post. `verify:schema25` §10 proves the city half in
+    // process, where one is a query away. What is provable over HTTP is the
+    // REGION, and it is the sharper assertion anyway: the same payload is sent
+    // twice, differing only in country, and the two must store opposite things.
+    const jar = jars["rep-a@example.test"];
+    const stamp = `${Date.now()}`.slice(-7);
+    let phoneSeq = 0;
+
+    for (const locale of ["en", "ar"] as const) {
+      const form = await get(jar, `/${locale}/companies/new`);
+      check(
+        `${locale}: the register form asks country BEFORE city [S14]`,
+        form.body.includes('name="countryId"') &&
+          form.body.indexOf('name="countryId"') <
+            form.body.indexOf('name="cityId"'),
+      );
+
+      // `data-code` is a DOM marker, not a translated string `[23]`, exactly so
+      // this black-box script can find Saudi Arabia. `"SA"` here is the literal
+      // `SAUDI_CODE` in `src/lib/enums.ts`; this file never imports `src/`, so
+      // it is repeated rather than shared — the same trade as section 7's
+      // `"other"`.
+      const countrySelect = form.body.match(
+        /<select[^>]*name="countryId"[\s\S]*?<\/select>/,
+      )?.[0];
+      const optionFor = (code: string) =>
+        countrySelect?.match(
+          new RegExp(`<option value="([0-9a-f-]{36})"[^>]*data-code="${code}"`),
+        )?.[1];
+      const saudiId = optionFor("SA");
+      const foreignId = countrySelect
+        ? [
+            ...countrySelect.matchAll(
+              /<option value="([0-9a-f-]{36})"[^>]*data-code="([A-Z]{2})"/g,
+            ),
+          ].find((match) => match[2] !== "SA")?.[1]
+        : undefined;
+      check(
+        `${locale}: the country select offers Saudi Arabia and somewhere else [S14]`,
+        Boolean(saudiId) && Boolean(foreignId),
+        `SA ${saudiId ?? "missing"}, other ${foreignId ?? "missing"}`,
+      );
+      if (!saudiId || !foreignId) continue;
+
+      // Saudi is preselected `S14`, which is why the city and region fields are
+      // on the page at all before a rep touches anything.
+      check(
+        `${locale}: Saudi Arabia is preselected, so the city field is rendered`,
+        form.body.includes('name="cityId"') &&
+          form.body.includes('name="region"'),
+      );
+
+      /**
+       * The action envelope plus what a browser would send.
+       *
+       * **The phone is set here, not by each caller.** It was a caller's job
+       * for one revision, and the abroad POST was written without one — which
+       * the action then refused with a 200, exactly as `S13` says it should.
+       * The check that caught it was reading the country, so a real defect in
+       * this section's own fixture looked like a defect in `placeForCountry`.
+       * One place sets it; the no-phone case clears it deliberately.
+       */
+      const fieldsFor = (country: string, label: string): FormData => {
+        const fields = new FormData();
+        for (const input of form.body.matchAll(/<input[^>]*>/g)) {
+          const name = input[0].match(/name="([^"]+)"/)?.[1];
+          if (!name?.startsWith("$ACTION")) continue;
+          fields.append(
+            name,
+            unescapeHtml(input[0].match(/value="([^"]*)"/)?.[1] ?? ""),
+          );
+        }
+        fields.set("name", `routes-${stamp}-${locale}-${label}`);
+        // Distinct per run and per company: `S23` makes the phone the matching
+        // key, and this script keeps its rows `[12 §7]`, so a fixed literal
+        // would make every run's companies duplicates of the last run's.
+        fields.set("phone", `+9665${stamp}${phoneSeq++}`);
+        fields.set("countryId", country);
+        // **Posted for both**, which is the point: `15 §4` keeps a manually
+        // chosen region when there is no city, so Saudi must store it — and
+        // `S15` says a company abroad must not, however insistent the POST.
+        fields.set("region", "center");
+        // The rest, empty, exactly as an untouched form would send them.
+        for (const empty of [
+          "cityId",
+          "vatNumber",
+          "categoryId",
+          "leadSourceId",
+          "notes",
+        ]) {
+          fields.set(empty, "");
+        }
+        return fields;
+      };
+
+      const post = async (body: FormData) => {
+        const response = await fetch(`${BASE}/${locale}/companies/new`, {
+          method: "POST",
+          headers: { cookie: header(jar), origin: BASE },
+          body,
+          redirect: "manual",
+        });
+        store(jar, response);
+        return {
+          status: response.status,
+          location: response.headers.get("location") ?? "",
+        };
+      };
+
+      /* --- S13: no phone is refused, and refused as a MESSAGE --------- */
+
+      // `required` on the input is the browser's, and a POST skips it entirely.
+      // This is the only proof the SERVER refuses on its own terms — and that
+      // it refuses with a field error rather than letting the NOT NULL surface
+      // as a 500. `useActionState` re-renders the form, so 200, not 303.
+      const noPhone = fieldsFor(saudiId, "nophone");
+      noPhone.set("phone", "");
+      const refused = await post(noPhone);
+      check(
+        `${locale}: *** registering with no phone answers 200, not 303 or 500 *** [S13]`,
+        refused.status === 200,
+        `got ${refused.status} ${refused.location}`,
+      );
+
+      /* --- S15: Saudi keeps the region, abroad does not --------------- */
+
+      const created = await post(fieldsFor(saudiId, "saudi"));
+      check(
+        `${locale}: registering a Saudi company answers 303 [S13], [S14]`,
+        created.status === 303,
+        `got ${created.status} ${created.location}`,
+      );
+      if (created.status !== 303) continue;
+
+      const saudiDetail = await get(jar, created.location.replace(BASE, ""));
+      check(
+        `${locale}: *** a Saudi company KEPT the posted region *** [15 §4]`,
+        factOf(saudiDetail.body, "region") !== DASH,
+        `region reads "${factOf(saudiDetail.body, "region")}"`,
+      );
+      check(
+        `${locale}: …and its country reads back [S14]`,
+        factOf(saudiDetail.body, "country") !== DASH,
+        `country reads "${factOf(saudiDetail.body, "country")}"`,
+      );
+
+      // **The assertion that matters.** A 303 proves nothing here: the broken
+      // version, where the Saudi token never matches, answers 303 just as
+      // happily. Only the stored value says which branch `placeForCountry`
+      // took — and this pair catches the token being wrong in EITHER
+      // direction, because the two POSTs differ in nothing but the country.
+      const abroad = await post(fieldsFor(foreignId, "abroad"));
+      check(
+        `${locale}: registering a company outside Saudi Arabia answers 303 [S14]`,
+        abroad.status === 303,
+        `got ${abroad.status}`,
+      );
+      if (abroad.status !== 303) continue;
+
+      const abroadPath = abroad.location.replace(BASE, "");
+      const abroadDetail = await get(jar, abroadPath);
+      check(
+        `${locale}: *** a company abroad stores NO region, though one was posted *** [S15]`,
+        factOf(abroadDetail.body, "region") === DASH,
+        `region reads "${factOf(abroadDetail.body, "region")}"`,
+      );
+      check(
+        `${locale}: …and no city [S15]`,
+        factOf(abroadDetail.body, "city") === DASH,
+        `city reads "${factOf(abroadDetail.body, "city")}"`,
+      );
+      check(
+        `${locale}: …and it is not the Saudi one [S14]`,
+        factOf(abroadDetail.body, "country") !==
+          factOf(saudiDetail.body, "country"),
+        `both read "${factOf(abroadDetail.body, "country")}"`,
+      );
+
+      // The edit screen drops both fields abroad — the form half of the same
+      // rule. Asserted AFTER the stored values, never instead of them: this
+      // branch is computed in the browser from the same constant, so it would
+      // agree with a `placeForCountry` that had the token wrong.
+      const edit = await get(jar, `${abroadPath}/edit`);
+      check(
+        `${locale}: the edit form drops the city and region abroad [S15]`,
+        !edit.body.includes('name="cityId"') &&
+          !edit.body.includes('name="region"'),
+      );
+      const saudiEdit = await get(
+        jar,
+        `${created.location.replace(BASE, "")}/edit`,
+      );
+      check(
+        `${locale}: …and keeps them for a Saudi company [S15]`,
+        saudiEdit.body.includes('name="cityId"') &&
+          saudiEdit.body.includes('name="region"'),
+      );
+    }
+  }
+}
+
+/** `common.none` — the same glyph in both locales, so it is a value, not a
+ *  translated string this script would be wrong to grep for. */
+const DASH = "—";
+
+/**
+ * The rendered text of one `Fact`, by its `data-fact` handle.
+ *
+ * A fact's label is translated and next-intl ships every message to every
+ * page, so the label cannot identify a cell. `data-fact` is the DOM marker
+ * that can — the same device as the loss reason's `data-code` in section 7.
+ */
+function factOf(body: string, name: string): string {
+  const cell = body.match(
+    new RegExp(`<div[^>]*data-fact="${name}"[\\s\\S]*?</div>`),
+  )?.[0];
+  const value = cell?.match(/<dd[^>]*>([\s\S]*?)<\/dd>/)?.[1] ?? "";
+  return value.replace(/<[^>]*>/g, "").trim();
 }
 
 /** The strip's position and the state of each of its six nodes, or null. */

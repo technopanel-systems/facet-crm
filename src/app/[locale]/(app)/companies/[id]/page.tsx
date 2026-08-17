@@ -148,8 +148,9 @@ export default async function CompanyDetailPage({
         </CardHeader>
         <CardContent className="px-0">
           <Facts>
+            {/* No dash branch: mandatory since `S13`. */}
             <Fact label={t("common.phone")} numeric>
-              <span dir="ltr">{company.phone ?? dash}</span>
+              <span dir="ltr">{company.phone}</span>
             </Fact>
             <Fact label={t("companies.fields.category")}>
               {pickName(locale, company.categoryNameEn, company.categoryNameAr) ??
@@ -158,10 +159,24 @@ export default async function CompanyDetailPage({
             <Fact label={t("companies.fields.vatNumber")} numeric>
               <span dir="ltr">{company.vatNumber ?? dash}</span>
             </Fact>
-            <Fact label={t("common.region")}>
+            {/* Country above region and city, the order the form asks in and
+                the order they depend in `S14` `S15`. Always present, so no
+                dash branch; the two below hold one for a company outside
+                Saudi Arabia, which is a real and permanent state, not a gap
+                somebody forgot to fill. */}
+            <Fact label={t("common.country")} name="country">
+              {lookupName(
+                {
+                  nameEn: company.countryNameEn,
+                  nameAr: company.countryNameAr,
+                },
+                locale,
+              )}
+            </Fact>
+            <Fact label={t("common.region")} name="region">
               {company.region ? t(`enums.region.${company.region}`) : dash}
             </Fact>
-            <Fact label={t("common.city")}>
+            <Fact label={t("common.city")} name="city">
               {pickName(locale, company.cityNameEn, company.cityNameAr) ?? dash}
             </Fact>
             <Fact label={t("companies.fields.leadSource")}>

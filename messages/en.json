@@ -55,6 +55,7 @@
     "phone": "Phone",
     "email": "Email",
     "notes": "Notes",
+    "country": "Country",
     "region": "Region",
     "city": "City",
     "unknownUser": "Unknown",

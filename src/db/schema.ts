@@ -321,7 +321,37 @@ export const roles = pgTable(
 );
 
 /**
+ * `S14` — a company carries a country. Most are Saudi; some are not.
+ *
+ * A lookup table, the shape `cities` and `company_categories` already use, so
+ * the founder adds a country by editing a seed file rather than a migration.
+ *
+ * `code` is the ISO 3166-1 alpha-2 token, and it is here for the reason
+ * `loss_reasons.code` and `notification_types.key` are: exactly one row —
+ * Saudi Arabia — changes what the form asks for, because `S15` derives a
+ * region from a city only for a Saudi company. Matching that on `name_en`
+ * would break the first time somebody edits the English text, and it would
+ * break **silently**: every Saudi company would stop being offered a city,
+ * with no error anywhere.
+ */
+export const countries = pgTable(
+  "countries",
+  {
+    id: pk(),
+    code: text("code").notNull(),
+    nameEn: text("name_en").notNull(),
+    nameAr: text("name_ar").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("countries_code_key").on(t.code)],
+);
+
+/**
  * `09 §3.6` — "city, with a Saudi city lookup" `[07 A7]`.
+ *
+ * Saudi cities only, and `S15` keeps it that way: a company outside Saudi
+ * Arabia has no city and no region. There are no foreign cities here to
+ * invent.
  *
  * `region` is `NOT NULL` because `15 §3` maps every city: the grouping is
  * stated per administrative region, never per city, so a row with no region
@@ -491,9 +521,13 @@ export const leadSources = pgTable("lead_sources", {
  *
  * One table for qualified and unqualified alike `[10 §2]`: qualification is
  * derived from events `[04 qualification]`, and the unqualified pipeline is a
- * filter, not a second table. That is why almost everything here is nullable —
- * unqualified entry requires only name, phone, source and what they asked
- * about; fields become required progressively in the application layer.
+ * filter, not a second table. That is why most of this is nullable — the rest
+ * becomes required progressively in the application layer.
+ *
+ * The exceptions are the four a company cannot exist without: its `name`
+ * `S12`, its `phone` `S13`, its `country_id` `S14`, and the `name_normalized`
+ * the first of those derives. Those are invariants about what a row may
+ * contain, so they are held by the database `[CLAUDE.md]`.
  *
  * Warmth `[10 §1]` was here until `25 §6` cut it. Nothing had written a value,
  * so the three columns went with the enum.
@@ -505,11 +539,28 @@ export const companies = pgTable(
     /** One field, English or Arabic `S12`. */
     name: text("name").notNull(),
     nameNormalized: text("name_normalized").notNull(),
-    /** The strongest duplicate-matching key `[07 B6]`, and the primary one `S23`. */
-    phone: text("phone"),
+    /**
+     * The strongest duplicate-matching key `[07 B6]`, and the primary one
+     * `S23` — which is exactly why `S13` makes it `NOT NULL`. A placeholder
+     * would be worse than the null it replaced, because `S23` matches on it:
+     * one fake number typed twice makes two unrelated companies duplicates of
+     * each other. Migration 0010 therefore cleared the rows rather than
+     * backfilling them, and refuses to run against a table still holding one.
+     */
+    phone: text("phone").notNull(),
     categoryId: uuid("category_id").references(() => companyCategories.id),
     /** The customer's VAT number `[08 D7]`. */
     vatNumber: text("vat_number"),
+    /**
+     * `S14` — every company has one. `NOT NULL` because every company today is
+     * Saudi in practice, so there is no such thing as a company whose country
+     * is unknown; migration 0010 defaults the existing rows to Saudi Arabia.
+     */
+    countryId: uuid("country_id")
+      .notNull()
+      .references(() => countries.id),
+    /** `S15` — Saudi only. Both stay null when the country is not Saudi
+     *  Arabia, and the data layer, not the form, is what enforces that. */
     region: regionEnum("region"),
     cityId: uuid("city_id").references(() => cities.id),
     leadSourceId: uuid("lead_source_id").references(() => leadSources.id),

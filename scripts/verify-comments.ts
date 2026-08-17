@@ -76,7 +76,8 @@ import {
   updateComment,
 } from "@/lib/comments";
 import { dailyActivity } from "@/lib/daily-activity";
-import { NOTIFICATION_TYPES } from "@/lib/enums";
+import { NOTIFICATION_TYPES, SAUDI_CODE } from "@/lib/enums";
+import { listCountries } from "@/lib/lookups";
 import { listNotifications, markRead, unresolvedCount } from "@/lib/notifications";
 import {
   createQuotationThread,
@@ -274,11 +275,21 @@ async function main(): Promise<void> {
 
   /* --- Fixtures: a company and a project held by rep A ------------- */
 
+  // `S13` makes the phone mandatory and `S23` matches companies on it, so every
+  // fixture gets its own — derived from the run stamp, because a shared literal
+  // would make each run's companies duplicates of the last run's. `S14` — and
+  // every fixture company is Saudi, so `S15`'s city and region still apply.
+  const saudiId = (await listCountries()).find(
+    (row) => row.code === SAUDI_CODE,
+  )!.id;
+
   const [company] = await db
     .insert(companies)
     .values({
       name: `${stamp} Co`,
       nameNormalized: stamp,
+      phone: `+9665${stamp.slice(-7)}1`,
+      countryId: saudiId,
       createdBy: repA.user.id,
     })
     .returning();

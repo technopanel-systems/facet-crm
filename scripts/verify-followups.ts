@@ -83,13 +83,14 @@ import {
   type Role,
   type User,
 } from "@/lib/authz";
-import { FOLLOW_UP_KINDS, type FollowUpKind } from "@/lib/enums";
+import { FOLLOW_UP_KINDS, SAUDI_CODE, type FollowUpKind } from "@/lib/enums";
 import {
   followUps,
   followUpsForRecipient,
   nextFollowUpContext,
   setNextFollowUp,
 } from "@/lib/follow-ups";
+import { listCountries } from "@/lib/lookups";
 import {
   createQuotationThread,
   createRevision,
@@ -294,13 +295,25 @@ async function main(): Promise<void> {
     return new Date(Date.now() - days * 86_400_000);
   }
 
+  // `S13` makes the phone mandatory and `S23` matches companies on it, so every
+  // fixture gets its own — from the run stamp plus a counter, because a shared
+  // literal would make each run's companies duplicates of the last run's.
+  // `S14` — all of them are Saudi, so `S15`'s city and region still apply.
+  const saudiId = (await listCountries()).find(
+    (row) => row.code === SAUDI_CODE,
+  )!.id;
+  let phoneSeq = 0;
+
   /** A company held by the owner, created `ageDays` ago. */
   async function makeCompany(slug: string, ageDays: number) {
+    phoneSeq += 1;
     const [company] = await db
       .insert(companies)
       .values({
         name: `${stamp} ${slug}`,
         nameNormalized: `${stamp}-${slug}`,
+        phone: `+9665${stamp.slice(-7)}${phoneSeq}`,
+        countryId: saudiId,
         createdBy: ownerUser.id,
         createdAt: instantDaysAgo(ageDays),
       })

@@ -38,6 +38,10 @@
  *   8. The foreign keys point where they should.
  *   9. *** The writer and the CHECK agree *** `[25 §5]` — and, since feature
  *      slice 5, so does the `RuleError` a CHECK could never be.
+ *  10. *** The writer and the constraint agree, again *** `S13`, `S14` — the
+ *      two new NOT NULLs, and the rule no CHECK can hold beside them: a
+ *      company outside Saudi Arabia keeps no city and no region `S15`, which
+ *      would need a subquery into `countries` to state in SQL.
  *
  * Usage: `npm run verify:schema25`
  *
@@ -64,6 +68,7 @@ import { eq, sql } from "drizzle-orm";
 
 import { closeDatabase, db } from "@/db";
 import {
+  cities,
   commentMentions,
   comments,
   companyCategories,
@@ -73,8 +78,14 @@ import {
   users,
 } from "@/db/schema";
 import type { AuthSession } from "@/lib/authz";
-import { createCompany } from "@/lib/companies";
-import { OTHER_LOSS_REASON_CODE, REPORT_OUTCOMES } from "@/lib/enums";
+import { createCompany, updateCompany } from "@/lib/companies";
+import {
+  OTHER_LOSS_REASON_CODE,
+  REGIONS,
+  REPORT_OUTCOMES,
+  SAUDI_CODE,
+} from "@/lib/enums";
+import { listCountries } from "@/lib/lookups";
 import { createProject, updateProject } from "@/lib/projects";
 
 import { seedLookups } from "./seed-lookups";
@@ -410,9 +421,16 @@ async function main(): Promise<void> {
   console.log("\n3. Every CHECK refuses at the database");
 
   const rep = await sessionFor("rep-a@example.test");
+  // A phone `S13` and a country `S14` are the two the data layer will not
+  // accept as null. The phone is derived from the run stamp because `S23`
+  // matches on it and this script keeps its rows `[12 §7]`.
+  const saudiId = (await listCountries()).find(
+    (row) => row.code === SAUDI_CODE,
+  )!.id;
   const company = await createCompany(rep, {
     name: `${stamp} company`,
-    phone: null,
+    phone: `+9665${stamp.slice(-7)}1`,
+    countryId: saudiId,
     categoryId: null,
     vatNumber: null,
     region: null,
@@ -949,6 +967,160 @@ async function main(): Promise<void> {
       throw new Error(`got inProduction=${updated.inProduction}`);
     }
   });
+
+  /* --- 10. Phone, country, and the Saudi-only place [S13], [S14], [S15] -- */
+
+  console.log(
+    "\n10. *** The writer and the constraint agree, again *** [S13], [S14]",
+  );
+
+  // The same argument section 9 makes, one migration later. `S13` and `S14`
+  // land two NOT NULLs, and a constraint is only as good as the writer beside
+  // it: `companies.phone` and `companies.country_id` refuse null at the
+  // database, `CompanyInput` refuses it at compile time, and the action refuses
+  // it as a message. What no CHECK can state is `S15` — that a company outside
+  // Saudi Arabia has no city and no region — because a CHECK would have to
+  // subquery `countries` to read the code behind a uuid. That is
+  // `placeForCountry`, and this is where it is proved.
+  //
+  // `verify:routes` §13 drives the same rule over HTTP, and stops at the
+  // region: the city is a `Combobox` in a portal, so no city id reaches the
+  // server HTML. Here one is a query away, which is the half that belongs
+  // in process.
+
+  const nullable = (key: string) => columns.get(key)?.is_nullable;
+  check(
+    "companies.phone is NOT NULL [S13]",
+    nullable("companies.phone") === "NO",
+    `got ${nullable("companies.phone")}`,
+  );
+  check(
+    "companies.country_id is NOT NULL [S14]",
+    nullable("companies.country_id") === "NO",
+    `got ${nullable("companies.country_id")}`,
+  );
+  check(
+    "…and city_id and region stay nullable, because S15 is Saudi-only",
+    nullable("companies.city_id") === "YES" &&
+      nullable("companies.region") === "YES",
+  );
+
+  const [aCity] = await db
+    .select({ id: cities.id, region: cities.region })
+    .from(cities)
+    .limit(1);
+  const allCountries = await listCountries();
+  const saudi = allCountries.find((row) => row.code === SAUDI_CODE);
+  const abroad = allCountries.find((row) => row.code !== SAUDI_CODE);
+  check(
+    "the countries lookup is seeded, Saudi Arabia included [S14]",
+    Boolean(saudi) && Boolean(abroad),
+    `${allCountries.length} rows`,
+  );
+
+  if (aCity && saudi && abroad) {
+    // Saudi: the city stands and the region comes from it `15 §4`. The posted
+    // region is deliberately wrong, so a pass cannot mean "it kept what I sent".
+    const wrongRegion = REGIONS.find((region) => region !== aCity.region)!;
+    const saudiCompany = await createCompany(rep, {
+      name: `${stamp} saudi company`,
+      phone: `+9665${stamp.slice(-7)}2`,
+      countryId: saudi.id,
+      categoryId: null,
+      vatNumber: null,
+      region: wrongRegion,
+      cityId: aCity.id,
+      leadSourceId: null,
+      notes: null,
+    });
+    check(
+      "*** a Saudi company keeps its city *** [S15]",
+      saudiCompany.cityId === aCity.id,
+      `got ${saudiCompany.cityId}`,
+    );
+    check(
+      "…and takes the region from that city, not from the form [15 §4]",
+      saudiCompany.region === aCity.region,
+      `got ${saudiCompany.region}, city says ${aCity.region}`,
+    );
+
+    // Abroad: the SAME input, one field different, and both must go.
+    const abroadCompany = await createCompany(rep, {
+      name: `${stamp} abroad company`,
+      phone: `+9665${stamp.slice(-7)}3`,
+      countryId: abroad.id,
+      categoryId: null,
+      vatNumber: null,
+      region: wrongRegion,
+      cityId: aCity.id,
+      leadSourceId: null,
+      notes: null,
+    });
+    check(
+      "*** a company outside Saudi Arabia stores NO city, though one was sent *** [S15]",
+      abroadCompany.cityId === null,
+      `got ${abroadCompany.cityId}`,
+    );
+    check(
+      "*** …and NO region *** [S15]",
+      abroadCompany.region === null,
+      `got ${abroadCompany.region}`,
+    );
+
+    // And an edit cannot smuggle either back on while the country stays abroad.
+    await allows("editing a company abroad still refuses a city [S15]", async () => {
+      const edited = await updateCompany(rep, abroadCompany.id, {
+        name: abroadCompany.name,
+        phone: abroadCompany.phone,
+        countryId: abroad.id,
+        categoryId: null,
+        vatNumber: null,
+        region: wrongRegion,
+        cityId: aCity.id,
+        leadSourceId: null,
+        notes: `${stamp} edited`,
+      });
+      if (edited.cityId !== null || edited.region !== null) {
+        throw new Error(`kept city=${edited.cityId} region=${edited.region}`);
+      }
+    });
+
+    // Moving a Saudi company abroad drops what S15 gave it — the case a rep
+    // hits the first time a customer turns out to be Egyptian.
+    await allows("moving a company abroad clears its city and region [S15]", async () => {
+      const moved = await updateCompany(rep, saudiCompany.id, {
+        name: saudiCompany.name,
+        phone: saudiCompany.phone,
+        countryId: abroad.id,
+        categoryId: null,
+        vatNumber: null,
+        region: null,
+        cityId: aCity.id,
+        leadSourceId: null,
+        notes: null,
+      });
+      if (moved.cityId !== null || moved.region !== null) {
+        throw new Error(`kept city=${moved.cityId} region=${moved.region}`);
+      }
+    });
+
+    await refuses(
+      "a country id that resolves to nothing is refused, not a 500 [S14]",
+      "validation.invalid",
+      () =>
+        createCompany(rep, {
+          name: `${stamp} nowhere`,
+          phone: `+9665${stamp.slice(-7)}4`,
+          countryId: "00000000-0000-0000-0000-000000000000",
+          categoryId: null,
+          vatNumber: null,
+          region: null,
+          cityId: null,
+          leadSourceId: null,
+          notes: null,
+        }),
+    );
+  }
 }
 
 main()

@@ -83,7 +83,12 @@ import { getCompany, listCompanies, updateCompany } from "@/lib/companies";
 import { listContacts } from "@/lib/contacts";
 import { coverage } from "@/lib/coverage";
 import { getDispatch, listDispatches } from "@/lib/dispatches";
-import { NOTIFICATION_TYPES, SHARED_RECORD_TYPES } from "@/lib/enums";
+import {
+  NOTIFICATION_TYPES,
+  SAUDI_CODE,
+  SHARED_RECORD_TYPES,
+} from "@/lib/enums";
+import { listCountries } from "@/lib/lookups";
 import { normalizeName } from "@/lib/normalize";
 import { sweepNotifications, unresolvedCount } from "@/lib/notifications";
 import { getProject, listProjects, updateProject } from "@/lib/projects";
@@ -323,11 +328,23 @@ async function main(): Promise<void> {
    * works one way and not the other is exactly the defect this script exists to
    * find, so the fixture is fixed rather than the assertion loosened.
    */
+  // `S13` makes the phone mandatory and `S23` matches companies on it, so every
+  // fixture gets its own — from the run stamp plus a counter, because a shared
+  // literal would make each run's companies duplicates of the last run's.
+  // `S14` — both of them are Saudi, so `S15`'s city and region still apply.
+  const saudiId = (await listCountries()).find(
+    (row) => row.code === SAUDI_CODE,
+  )!.id;
+  let phoneSeq = 0;
+  const nextPhone = () => `+9665${stamp.slice(-7)}${(phoneSeq += 1)}`;
+
   const [company] = await db
     .insert(companies)
     .values({
       name: `${stamp} Co`,
       nameNormalized: normalizeName(`${stamp} Co`),
+      phone: nextPhone(),
+      countryId: saudiId,
       createdBy: repA.user.id,
     })
     .returning();
@@ -535,9 +552,14 @@ async function main(): Promise<void> {
   console.log("\n4. *** A share grants EDIT, not view only [14 §2] ***");
 
   const detail = await getCompany(repB, company.id);
+  // Every field is round-tripped except the note, so the note is the only thing
+  // that can have changed. `phone` and `countryId` are mandatory `S13` `S14`,
+  // which is what makes this the check that an edit path cannot clear them:
+  // the input type refuses `null` and the column refuses it again.
   await updateCompany(repB, company.id, {
     name: detail!.name,
     phone: detail!.phone,
+    countryId: detail!.countryId,
     categoryId: detail!.categoryId,
     vatNumber: detail!.vatNumber,
     region: detail!.region,
@@ -551,13 +573,19 @@ async function main(): Promise<void> {
     edited?.notes === `${stamp} edited by the shared rep`,
     `got ${edited?.notes}`,
   );
+  check(
+    "…and the mandatory phone survived the round trip [S13]",
+    edited?.phone === detail!.phone,
+    `got ${edited?.phone}`,
+  );
   await refuses(
     "…while an outsider still cannot [04 Q7]",
     "companies.errors.notFound",
     () =>
       updateCompany(outsider, company.id, {
         name: detail!.name,
-        phone: null,
+        phone: detail!.phone,
+        countryId: detail!.countryId,
         categoryId: null,
         vatNumber: null,
         region: null,
@@ -750,6 +778,8 @@ async function main(): Promise<void> {
     .values({
       name: `${stamp} Lonely Co`,
       nameNormalized: normalizeName(`${stamp} Lonely Co`),
+      phone: nextPhone(),
+      countryId: saudiId,
       createdBy: repA.user.id,
     })
     .returning();

@@ -89,7 +89,8 @@ import {
   dailyActivityEntries,
   yesterday,
 } from "@/lib/daily-activity";
-import { REPORT_OUTCOMES } from "@/lib/enums";
+import { REPORT_OUTCOMES, SAUDI_CODE } from "@/lib/enums";
+import { listCountries } from "@/lib/lookups";
 import {
   companyOnHoldUntil,
   createReport,
@@ -351,11 +352,23 @@ async function main(): Promise<void> {
   const stranger = asSession(strangerUser, repRole);
   const sharer = asSession(sharerUser, repRole);
 
+  // `S13` makes the phone mandatory and `S23` matches companies on it, so every
+  // fixture gets its own — from the run stamp plus a counter, because a shared
+  // literal would make each run's companies duplicates of the last run's.
+  // `S14` — all of them are Saudi, so `S15`'s city and region still apply.
+  const saudiId = (await listCountries()).find(
+    (row) => row.code === SAUDI_CODE,
+  )!.id;
+  let phoneSeq = 0;
+  const nextPhone = () => `+9665${stamp.slice(-7)}${(phoneSeq += 1)}`;
+
   const [companyA] = await db
     .insert(companies)
     .values({
       name: `${stamp} Company A`,
       nameNormalized: `${stamp}-a`,
+      phone: nextPhone(),
+      countryId: saudiId,
       createdBy: authorUser.id,
     })
     .returning();
@@ -364,6 +377,8 @@ async function main(): Promise<void> {
     .values({
       name: `${stamp} Company B`,
       nameNormalized: `${stamp}-b`,
+      phone: nextPhone(),
+      countryId: saudiId,
       createdBy: authorUser.id,
     })
     .returning();
@@ -373,6 +388,8 @@ async function main(): Promise<void> {
     .values({
       name: `${stamp} Company Quiet`,
       nameNormalized: `${stamp}-quiet`,
+      phone: nextPhone(),
+      countryId: saudiId,
       createdBy: authorUser.id,
     })
     .returning();
@@ -382,6 +399,8 @@ async function main(): Promise<void> {
     .values({
       name: `${stamp} Company Never`,
       nameNormalized: `${stamp}-never`,
+      phone: nextPhone(),
+      countryId: saudiId,
       createdBy: authorUser.id,
     })
     .returning();

@@ -91,10 +91,12 @@ import {
 } from "@/lib/dormancy";
 import {
   NOTIFICATION_TYPES,
+  SAUDI_CODE,
   type FollowUpKind,
   type NotificationTypeKey,
 } from "@/lib/enums";
 import { followUps, followUpsForRecipient } from "@/lib/follow-ups";
+import { listCountries } from "@/lib/lookups";
 import {
   listNotifications,
   markRead,
@@ -405,6 +407,16 @@ async function main(): Promise<void> {
   const other = asSession(otherUser, repRole);
   const stranger = asSession(strangerUser, repRole);
 
+  // `S13` makes the phone mandatory and `S23` matches companies on it, so every
+  // fixture gets its own — from the run stamp plus a counter, because a shared
+  // literal would make each run's companies duplicates of the last run's.
+  // `S14` — all of them are Saudi, so `S15`'s city and region still apply.
+  const saudiId = (await listCountries()).find(
+    (row) => row.code === SAUDI_CODE,
+  )!.id;
+  let phoneSeq = 0;
+  const nextPhone = () => `+9665${stamp.slice(-7)}${(phoneSeq += 1)}`;
+
   /** A company owned by `ownerUser`, created `age` days ago. */
   async function makeCompany(slug: string, ageDays: number) {
     const [company] = await db
@@ -412,6 +424,8 @@ async function main(): Promise<void> {
       .values({
         name: `${stamp} ${slug}`,
         nameNormalized: `${stamp}-${slug}`,
+        phone: nextPhone(),
+        countryId: saudiId,
         createdBy: ownerUser.id,
         createdAt: instantDaysAgo(ageDays),
       })
@@ -1148,6 +1162,8 @@ async function main(): Promise<void> {
       .values({
         name: `${stamp} ${slug}`,
         nameNormalized: `${stamp}-${slug}`,
+        phone: nextPhone(),
+        countryId: saudiId,
         createdBy: departingUser.id,
       })
       .returning();

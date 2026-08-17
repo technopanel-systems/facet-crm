@@ -22,6 +22,7 @@ import {
   companies,
   companyCategories,
   companyReps,
+  countries,
   leadSources,
   users,
 } from "@/db/schema";
@@ -32,7 +33,7 @@ import {
   type AuthSession,
 } from "@/lib/authz";
 import { REGIONS, type Region, type SameValues } from "@/lib/enums";
-import { assertLeadSourceSelectable, regionForCity } from "@/lib/lookups";
+import { assertLeadSourceSelectable, placeForCountry } from "@/lib/lookups";
 import { normalizeName } from "@/lib/normalize";
 // Qualification is a quotation event, so its predicate lives with quotations
 // `[10 §1]`. The dependency runs one way only — that module never imports this
@@ -51,15 +52,23 @@ export type RegionMatchesSchema = SameValues<
 export { REGIONS };
 export type { Region };
 
-/** Everything a rep may type on the company form. The region is nullable —
+/** Everything a rep may type on the company form. Most of it is nullable —
  *  unqualified entry needs almost nothing `[10 §2]`.
+ *
+ *  Three are not: the name `S12`, the phone `S13` and the country `S14`. They
+ *  are non-nullable **here as well as in the database**, so an edit path that
+ *  forgets one fails to compile rather than clearing it — which is what
+ *  `updateCompany`'s callers get checked against.
  *
  *  `has_credit_terms` `[25 §7]` is deliberately NOT here: it is the manager's
  *  to set, not the rep's, and no screen sets it yet. */
 export type CompanyInput = {
   /** One field, English or Arabic `S12`. */
   name: string;
-  phone: string | null;
+  /** Mandatory `S13`, and the primary matching key `S23`. */
+  phone: string;
+  /** `S14`. Not nullable, and it decides the two below `S15`. */
+  countryId: string;
   categoryId: string | null;
   vatNumber: string | null;
   region: Region | null;
@@ -71,7 +80,8 @@ export type CompanyInput = {
 export type CompanyListRow = {
   id: string;
   name: string;
-  phone: string | null;
+  /** `S13` — always present, so the list never renders a dash for it. */
+  phone: string;
   region: Region | null;
   categoryNameEn: string | null;
   categoryNameAr: string | null;
@@ -88,7 +98,9 @@ const PAGE_SIZE = 25;
 /**
  * Free-text search. Matches the normalized name — so an Arabic query finds an
  * Arabic name written with different diacritics — or the phone, which `07 B6`
- * calls the strongest key a company has.
+ * calls the strongest key a company has and `S23` makes the primary one. Since
+ * `S13` every company has one, so the phone half can no longer miss a row for
+ * want of a value.
  */
 function searchFilter(query: string | undefined): SQL | undefined {
   const trimmed = query?.trim();
@@ -155,6 +167,10 @@ export async function listCompanyOptions(
 export type CompanyDetail = Company & {
   categoryNameEn: string | null;
   categoryNameAr: string | null;
+  /** Not nullable: `country_id` is `NOT NULL` `S14`, so this is an inner join
+   *  and the screen renders the name rather than a dash. */
+  countryNameEn: string;
+  countryNameAr: string;
   cityNameEn: string | null;
   cityNameAr: string | null;
   leadSourceNameEn: string | null;
@@ -189,6 +205,8 @@ export async function getCompany(
       company: companies,
       categoryNameEn: companyCategories.nameEn,
       categoryNameAr: companyCategories.nameAr,
+      countryNameEn: countries.nameEn,
+      countryNameAr: countries.nameAr,
       cityNameEn: cities.nameEn,
       cityNameAr: cities.nameAr,
       leadSourceNameEn: leadSources.nameEn,
@@ -198,6 +216,10 @@ export async function getCompany(
     })
     .from(companies)
     .leftJoin(companyCategories, eq(companies.categoryId, companyCategories.id))
+    // An INNER join, alone among these: every company has a country `S14`, and
+    // a left join here would type the name as nullable and make the screen
+    // carry a branch that can never be taken.
+    .innerJoin(countries, eq(companies.countryId, countries.id))
     .leftJoin(cities, eq(companies.cityId, cities.id))
     .leftJoin(leadSources, eq(companies.leadSourceId, leadSources.id))
     .leftJoin(users, eq(companies.createdBy, users.id))
@@ -209,6 +231,8 @@ export async function getCompany(
     ...row.company,
     categoryNameEn: row.categoryNameEn,
     categoryNameAr: row.categoryNameAr,
+    countryNameEn: row.countryNameEn,
+    countryNameAr: row.countryNameAr,
     cityNameEn: row.cityNameEn,
     cityNameAr: row.cityNameAr,
     leadSourceNameEn: row.leadSourceNameEn,
@@ -274,16 +298,21 @@ export async function createCompany(
   // Both rules run before the transaction opens: they only read, and a refusal
   // should not have started one.
   await assertLeadSourceSelectable(session, input.leadSourceId);
-  const region = await regionForCity(input.cityId, input.region);
+  const place = await placeForCountry(
+    input.countryId,
+    input.cityId,
+    input.region,
+  );
 
   return withAudit(session.actor, async (tx, log) => {
     const [company] = await tx
       .insert(companies)
       .values({
         ...input,
-        // The city decides the region when there is one `[15 §4]`; whatever
-        // the form posted is not consulted.
-        region,
+        // The country decides whether there is a city at all `S15`, and the
+        // city decides the region `[15 §4]`. Whatever the form posted for
+        // either is not consulted — it is spread first and overwritten here.
+        ...place,
         nameNormalized: normalizeName(input.name),
         createdBy: session.user.id,
       })
@@ -322,6 +351,7 @@ export async function createCompany(
 const EDITABLE = [
   "name",
   "phone",
+  "countryId",
   "categoryId",
   "vatNumber",
   "region",
@@ -358,11 +388,13 @@ export async function updateCompany(
     );
 
     // What will actually be written: the region comes from the city when there
-    // is one `[15 §4]`. The diff below compares against this, not against the
-    // form, so a derived region shows up in the audit log as a real change.
+    // is one `[15 §4]`, and both go when the country is not Saudi `S15`. The
+    // diff below compares against this, not against the form, so a derived
+    // region — or a city dropped by a change of country — shows up in the
+    // audit log as the real change it is.
     const values: CompanyInput = {
       ...input,
-      region: await regionForCity(input.cityId, input.region),
+      ...(await placeForCountry(input.countryId, input.cityId, input.region)),
     };
 
     const changed = EDITABLE.filter((key) => before[key] !== values[key]);

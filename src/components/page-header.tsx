@@ -121,14 +121,23 @@ export function Facts({ children }: { children: ReactNode }) {
  *
  * `numeric` is opt-in, not automatic: the concept's four facts happen to all
  * be numbers, but a fact whose value is a person's name must not render mono.
+ *
+ * `name` emits `data-fact`, for the same reason the loss-reason `<option>`
+ * carries `data-code`: `verify:routes` is a black-box script that may not
+ * import `src/`, and a fact's only other handle is its label — a translated
+ * string, which next-intl ships to every page whether it rendered or not.
+ * Opt-in, so a fact nothing asserts on stays plain markup.
  */
 export function Fact({
   label,
+  name,
   numeric,
   wide,
   children,
 }: {
   label: string;
+  /** A stable DOM handle for verification. Never displayed. */
+  name?: string;
   numeric?: boolean;
   /** For a value that is a sentence — notes, a reason — rather than a datum. */
   wide?: boolean;
@@ -136,6 +145,7 @@ export function Fact({
 }) {
   return (
     <div
+      data-fact={name}
       className={cn(
         // `border-t` is the row rule and, on the first row, the rule under the
         // card header. `border-s` is the column rule; the first column's is

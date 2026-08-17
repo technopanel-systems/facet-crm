@@ -127,6 +127,11 @@ Migrations under `drizzle/` **are committed**. They are the record of how
 production reached its current shape. Never use `db:push` against the office
 PC's database.
 
+`drizzle-kit migrate` prints nothing when a migration fails — it just exits 1.
+To see the actual Postgres error, pipe the migration's .sql through psql
+directly. The transaction rolls back atomically either way, ledger included,
+so a failed migration leaves nothing half-applied.
+
 ### Getting a clean database
 
 **Nothing in FACET deletes** (`docs/12-closing-open-items.md` §7), and the

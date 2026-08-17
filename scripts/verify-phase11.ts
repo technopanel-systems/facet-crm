@@ -86,6 +86,8 @@ import {
   type User,
 } from "@/lib/authz";
 import { creditForDispatches } from "@/lib/credit-splits";
+import { SAUDI_CODE } from "@/lib/enums";
+import { listCountries } from "@/lib/lookups";
 import { verifyPassword } from "@/lib/passwords";
 import { achievementForPeriod, currentPeriod } from "@/lib/targets";
 import {
@@ -511,11 +513,23 @@ async function main(): Promise<void> {
 
   console.log("\n   fixtures: a book of work for the departing rep");
 
+  // `S13` makes the phone mandatory and `S23` matches companies on it, so every
+  // fixture gets its own — from the run stamp plus a counter, because a shared
+  // literal would make each run's companies duplicates of the last run's.
+  // `S14` — all of them are Saudi, so `S15`'s city and region still apply.
+  const saudiId = (await listCountries()).find(
+    (row) => row.code === SAUDI_CODE,
+  )!.id;
+  let phoneSeq = 0;
+  const nextPhone = () => `+9665${stamp.slice(-7)}${(phoneSeq += 1)}`;
+
   const [companyA] = await db
     .insert(companies)
     .values({
       name: `${stamp} Company A`,
       nameNormalized: `${stamp}-a`,
+      phone: nextPhone(),
+      countryId: saudiId,
       createdBy: departing.user.id,
     })
     .returning();
@@ -524,6 +538,8 @@ async function main(): Promise<void> {
     .values({
       name: `${stamp} Company Shared`,
       nameNormalized: `${stamp}-shared`,
+      phone: nextPhone(),
+      countryId: saudiId,
       createdBy: departing.user.id,
     })
     .returning();
@@ -562,6 +578,8 @@ async function main(): Promise<void> {
     .values({
       name: `${stamp} Company Past`,
       nameNormalized: `${stamp}-past`,
+      phone: nextPhone(),
+      countryId: saudiId,
       createdBy: departing.user.id,
     })
     .returning();
@@ -830,6 +848,8 @@ async function main(): Promise<void> {
     .values({
       name: `${stamp} Stranded Company`,
       nameNormalized: `${stamp}-sc`,
+      phone: nextPhone(),
+      countryId: saudiId,
       createdBy: strandedUser.id,
     })
     .returning();
