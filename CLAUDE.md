@@ -102,6 +102,8 @@ under `.claude/skills/` is an installed dependency, not project configuration.
 There is **no test harness.** Run `npm run typecheck` · `lint` · `build` ·
 `check:messages`, then the kept verify scripts. **`build` is not optional** —
 typecheck has passed while a client component imported a data module.
+Derived conditions — quiet, overdue, whose move — are resolved in SQL before
+pagination, never in a screen. This has shipped broken once and fails silently.
 
 **A slice is not done until its screens have been driven over HTTP, in both
 locales** — `npm run verify:routes`, against `npm run build && npm run start`,
