@@ -239,3 +239,8 @@ It affects esbuild's development server only, `drizzle-kit` is a
 devDependency, and it is not present in the production image. `npm audit fix
 --force` would downgrade drizzle-kit to 0.18.1, which is a breaking change.
 Left as is deliberately; revisit when drizzle-kit updates its dependency.
+
+Anything in `.env` that names the site's own address — `AUTH_URL` — is right for
+the host and wrong for the container. `docker-compose.yml` overrides it from
+`PUBLIC_URL`, which is unset locally and set to the tunnel hostname in
+production.

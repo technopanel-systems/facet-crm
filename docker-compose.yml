@@ -31,12 +31,18 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    env_file: .env
     environment:
       # Inside the compose network the database is "db", not localhost. This is
       # set here so DATABASE_URL in .env can stay pointed at localhost for
       # host-side `npm run dev` and drizzle-kit.
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       NODE_ENV: production
+      # The container is reached through the tunnel, not at localhost. AUTH_URL
+      # in .env stays localhost for host-side `npm run dev`; this overrides it
+      # the same way DATABASE_URL above is overridden. Set PUBLIC_URL in .env
+      # to the tunnel hostname on the office PC; it falls back to localhost here.
+      AUTH_URL: ${PUBLIC_URL:-http://localhost:3000}
     ports:
       - "3000:3000"
     healthcheck:

@@ -123,8 +123,10 @@ project can involve several companies.
 therefore a potential buyer**. There is **no role label** — the free-text role
 column is dropped.
 
-**S26.** **At most one participant is the buyer**, and possibly none. The flag is
-set when someone actually buys.
+**S26. [CHANGE]** **Who bought is derived from dispatches, never flagged.** A
+dispatch names its company, so a project's buyers are the companies that have
+dispatched against it. No participant is marked as the buyer by hand, and
+nothing stops two participants both having bought.
 
 **S27.** A project keeps at least one participant. A participant can be removed;
 it is hidden, not deleted, and can be re-linked.

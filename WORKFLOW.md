@@ -253,7 +253,10 @@ Checked directly against `main` at commit `12689b4`.
 | Tables | 43, of which **8 have no reference anywhere**: `verificationTokens`, `deleteRequests`, `productSpecifications`, `duplicateFlags`, `nonDuplicates`, `pipelineSnapshots`, `personSnapshots`, `attachments` |
 | Code | `src/lib` 13,966 · `src/app` 14,272 · `src/components` 1,619 · `scripts` 13,120 |
 | Largest files | `quotations.ts` 1,965 · `schema.ts` 1,857 · `follow-ups.ts` 1,497 · `authz.ts` 1,318 · `notifications.ts` 1,011 |
-| Open markers | 26 `[CHANGE]`, 24 `[BUILD]` |
+| Open markers | 26 `[CHANGE]`, 24 `[BUILD]` | They start at **The last two numbers are the real progress bar. They start at **26 `[CHANGE]`
+and 24 `[BUILD]` — 50 open** as of commit `12689b4`, and should only ever go
+down. If they rise, something was decided outside the spec.** as of commit
+12689b4, and should only ever go down.
 | Blocking | the Docker build |
 
 **Session 11 is larger than it looks.** It deletes `follow-ups.ts` (1,497) and
