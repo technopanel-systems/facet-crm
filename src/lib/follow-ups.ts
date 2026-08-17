@@ -132,12 +132,16 @@ export type FollowUpRow = {
   kind: FollowUpKind;
   anchorType: FollowUpAnchorType;
   anchorId: string;
+  /**
+   * The anchor may be a project, which still carries two names, so this stays
+   * a pair. A company anchor fills the English slot and leaves the other null
+   * `S12`.
+   */
   anchorNameEn: string;
   anchorNameAr: string | null;
   /** Null only for a project with no live company link left `[14 §4]`. */
   companyId: string | null;
-  companyNameEn: string | null;
-  companyNameAr: string | null;
+  companyName: string | null;
   /** Every live rep who could act on it. A company can have several `[04 Q3]`. */
   ownerNames: string[];
   /** The calendar day the clock started. */
@@ -166,8 +170,9 @@ export type FollowUpResult = {
 function matchesSearch(row: FollowUpRow, query: string | undefined): boolean {
   const trimmed = query?.trim().toLowerCase();
   if (!trimmed) return true;
-  return [row.anchorNameEn, row.anchorNameAr, row.companyNameEn, row.companyNameAr]
-    .some((value) => value?.toLowerCase().includes(trimmed));
+  return [row.anchorNameEn, row.anchorNameAr, row.companyName].some((value) =>
+    value?.toLowerCase().includes(trimmed),
+  );
 }
 
 /* ------------------------------------------------------------------ *
@@ -207,8 +212,7 @@ async function quotationNoResponse(
     .select({
       threadId: quotationThreads.id,
       companyId: quotationThreads.companyId,
-      companyNameEn: companies.nameEn,
-      companyNameAr: companies.nameAr,
+      companyName: companies.name,
       projectNameEn: projects.nameEn,
       projectNameAr: projects.nameAr,
       smacReference: quotationVersions.smacReference,
@@ -273,8 +277,7 @@ async function quotationNoResponse(
       anchorNameEn: row.smacReference ?? row.projectNameEn,
       anchorNameAr: row.smacReference ? null : row.projectNameAr,
       companyId: row.companyId,
-      companyNameEn: row.companyNameEn,
-      companyNameAr: row.companyNameAr,
+      companyName: row.companyName,
       ownerNames: [],
       since,
       ageDays: workingDaysBetween(since, now),
@@ -345,8 +348,7 @@ async function quotationReturned(
     .select({
       threadId: quotationThreads.id,
       companyId: quotationThreads.companyId,
-      companyNameEn: companies.nameEn,
-      companyNameAr: companies.nameAr,
+      companyName: companies.name,
       projectNameEn: projects.nameEn,
       projectNameAr: projects.nameAr,
       smacReference: quotationVersions.smacReference,
@@ -419,8 +421,7 @@ async function quotationReturned(
       anchorNameEn: row.smacReference ?? row.projectNameEn,
       anchorNameAr: row.smacReference ? null : row.projectNameAr,
       companyId: row.companyId,
-      companyNameEn: row.companyNameEn,
-      companyNameAr: row.companyNameAr,
+      companyName: row.companyName,
       ownerNames: [],
       since,
       ageDays: workingDaysBetween(since, now),
@@ -447,8 +448,7 @@ async function catalogueNoResponse(
   const rows = await db
     .select({
       companyId: companies.id,
-      companyNameEn: companies.nameEn,
-      companyNameAr: companies.nameAr,
+      companyName: companies.name,
       sentOn: repReports.reportDate,
     })
     .from(companies)
@@ -486,11 +486,10 @@ async function catalogueNoResponse(
     kind: "catalogue_no_response" as const,
     anchorType: "company" as const,
     anchorId: row.companyId,
-    anchorNameEn: row.companyNameEn,
-    anchorNameAr: row.companyNameAr,
+    anchorNameEn: row.companyName,
+    anchorNameAr: null,
     companyId: row.companyId,
-    companyNameEn: row.companyNameEn,
-    companyNameAr: row.companyNameAr,
+    companyName: row.companyName,
     ownerNames: [],
     since: row.sentOn,
     ageDays: workingDaysBetween(row.sentOn, now),
@@ -598,8 +597,7 @@ async function projectStageUnchanged(
       anchorNameEn: row.projectNameEn,
       anchorNameAr: row.projectNameAr,
       companyId: company?.id ?? null,
-      companyNameEn: company?.nameEn ?? null,
-      companyNameAr: company?.nameAr ?? null,
+      companyName: company?.name ?? null,
       ownerNames: [],
       since,
       ageDays: calendarDaysBetween(since, now),
@@ -666,8 +664,7 @@ async function companyQuiet(
   const rows = await db
     .select({
       companyId: companies.id,
-      companyNameEn: companies.nameEn,
-      companyNameAr: companies.nameAr,
+      companyName: companies.name,
       createdAt: companies.createdAt,
       lastInteractionAt: lastInteraction.at,
       qualifiedId: qualified.companyId,
@@ -696,11 +693,10 @@ async function companyQuiet(
       kind: "company_quiet" as const,
       anchorType: "company" as const,
       anchorId: row.companyId,
-      anchorNameEn: row.companyNameEn,
-      anchorNameAr: row.companyNameAr,
+      anchorNameEn: row.companyName,
+      anchorNameAr: null,
       companyId: row.companyId,
-      companyNameEn: row.companyNameEn,
-      companyNameAr: row.companyNameAr,
+      companyName: row.companyName,
       ownerNames: [],
       since,
       ageDays: calendarDaysBetween(since, now),
@@ -739,8 +735,7 @@ async function manualDateDue(session: AuthSession): Promise<FollowUpRow[]> {
     db
       .select({
         id: companies.id,
-        nameEn: companies.nameEn,
-        nameAr: companies.nameAr,
+        name: companies.name,
         due: companies.nextFollowUpAt,
       })
       .from(companies)
@@ -773,8 +768,7 @@ async function manualDateDue(session: AuthSession): Promise<FollowUpRow[]> {
       .select({
         id: quotationThreads.id,
         companyId: quotationThreads.companyId,
-        companyNameEn: companies.nameEn,
-        companyNameAr: companies.nameAr,
+        companyName: companies.name,
         projectNameEn: projects.nameEn,
         projectNameAr: projects.nameAr,
         due: quotationThreads.nextFollowUpAt,
@@ -820,11 +814,10 @@ async function manualDateDue(session: AuthSession): Promise<FollowUpRow[]> {
       row({
         anchorType: "company",
         anchorId: company.id,
-        anchorNameEn: company.nameEn,
-        anchorNameAr: company.nameAr,
+        anchorNameEn: company.name,
+        anchorNameAr: null,
         companyId: company.id,
-        companyNameEn: company.nameEn,
-        companyNameAr: company.nameAr,
+        companyName: company.name,
         since: company.due as string,
       }),
     ),
@@ -836,8 +829,7 @@ async function manualDateDue(session: AuthSession): Promise<FollowUpRow[]> {
         anchorNameEn: project.nameEn,
         anchorNameAr: project.nameAr,
         companyId: company?.id ?? null,
-        companyNameEn: company?.nameEn ?? null,
-        companyNameAr: company?.nameAr ?? null,
+        companyName: company?.name ?? null,
         since: project.due as string,
       });
     }),
@@ -849,8 +841,7 @@ async function manualDateDue(session: AuthSession): Promise<FollowUpRow[]> {
         anchorNameEn: reference ?? thread.projectNameEn,
         anchorNameAr: reference ? null : thread.projectNameAr,
         companyId: thread.companyId,
-        companyNameEn: thread.companyNameEn,
-        companyNameAr: thread.companyNameAr,
+        companyName: thread.companyName,
         since: thread.due as string,
       });
     }),
@@ -906,7 +897,7 @@ async function suppressedCompanies(
 /** The buyer if one is flagged `[12 §6]`, else the first live link by name. */
 async function buyerOrFirstCompany(
   projectIds: string[],
-): Promise<Map<string, { id: string; nameEn: string; nameAr: string | null }>> {
+): Promise<Map<string, { id: string; name: string }>> {
   if (projectIds.length === 0) return new Map();
 
   const rows = await db
@@ -914,8 +905,7 @@ async function buyerOrFirstCompany(
       projectId: projectCompanies.projectId,
       isBuyer: projectCompanies.isBuyer,
       id: companies.id,
-      nameEn: companies.nameEn,
-      nameAr: companies.nameAr,
+      name: companies.name,
     })
     .from(projectCompanies)
     .innerJoin(companies, eq(companies.id, projectCompanies.companyId))
@@ -925,20 +915,13 @@ async function buyerOrFirstCompany(
         isNull(projectCompanies.removedAt),
       ),
     )
-    .orderBy(asc(companies.nameEn));
+    .orderBy(asc(companies.name));
 
-  const byProject = new Map<
-    string,
-    { id: string; nameEn: string; nameAr: string | null }
-  >();
+  const byProject = new Map<string, { id: string; name: string }>();
   for (const row of rows) {
     const existing = byProject.get(row.projectId);
     if (!existing || row.isBuyer) {
-      byProject.set(row.projectId, {
-        id: row.id,
-        nameEn: row.nameEn,
-        nameAr: row.nameAr,
-      });
+      byProject.set(row.projectId, { id: row.id, name: row.name });
     }
   }
   return byProject;
@@ -1315,16 +1298,14 @@ export type NextFollowUpContext = {
    * follow-up will not raise on the day it is set for. Null otherwise.
    */
   heldUntil: string | null;
-  heldCompanyNameEn: string | null;
-  heldCompanyNameAr: string | null;
+  heldCompanyName: string | null;
 };
 
 const NO_CONTEXT: NextFollowUpContext = {
   setByName: null,
   setOn: null,
   heldUntil: null,
-  heldCompanyNameEn: null,
-  heldCompanyNameAr: null,
+  heldCompanyName: null,
 };
 
 /**
@@ -1406,14 +1387,13 @@ async function anchorCompany(
   session: AuthSession,
   recordType: FollowUpAnchorType,
   recordId: string,
-): Promise<{ id: string; nameEn: string; nameAr: string | null } | null> {
+): Promise<{ id: string; name: string } | null> {
   switch (recordType) {
     case "company": {
       const [row] = await db
         .select({
           id: companies.id,
-          nameEn: companies.nameEn,
-          nameAr: companies.nameAr,
+          name: companies.name,
         })
         .from(companies)
         .where(and(eq(companies.id, recordId), visibleCompaniesFilter(session)))
@@ -1433,8 +1413,7 @@ async function anchorCompany(
       const [row] = await db
         .select({
           id: companies.id,
-          nameEn: companies.nameEn,
-          nameAr: companies.nameAr,
+          name: companies.name,
         })
         .from(quotationThreads)
         .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
@@ -1491,7 +1470,6 @@ export async function nextFollowUpContext(
   return {
     ...setBy,
     heldUntil: deferred ? until : null,
-    heldCompanyNameEn: deferred ? company.nameEn : null,
-    heldCompanyNameAr: deferred ? company.nameAr : null,
+    heldCompanyName: deferred ? company.name : null,
   };
 }

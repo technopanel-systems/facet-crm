@@ -28,14 +28,13 @@ export default async function EditContactPage({
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
-      <PageHeader title={t("contacts.editTitle")} description={contact.nameEn} />
+      <PageHeader title={t("contacts.editTitle")} description={contact.name} />
       <ContactForm
         action={updateContactAction.bind(null, contact.id)}
         defaults={contact}
         submitLabel={t("common.save")}
         cancelHref={`/contacts/${contact.id}`}
         companies={companies}
-        locale={locale}
       />
     </div>
   );

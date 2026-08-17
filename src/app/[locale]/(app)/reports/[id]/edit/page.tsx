@@ -12,7 +12,7 @@ import {
   REPORT_SIGNALS,
   SIGNALS_WITH_REFERENCE,
 } from "@/lib/enums";
-import { bilingualName, listCities } from "@/lib/lookups";
+import { listCities, lookupName } from "@/lib/lookups";
 import { listProjects } from "@/lib/projects";
 import { getReport } from "@/lib/reports";
 
@@ -88,21 +88,20 @@ export default async function EditReportPage({
         }}
         companies={companies.map((company) => ({
           id: company.id,
-          label: bilingualName(company, locale),
-          altLabel: company.nameAr ?? company.nameEn,
+          label: company.name,
         }))}
         companyLabel={null}
         contacts={contacts.map((contact) => ({
           id: contact.id,
-          label: bilingualName(contact, locale),
+          label: contact.name,
         }))}
         projects={projects.map((project) => ({
           id: project.id,
-          label: bilingualName(project, locale),
+          label: lookupName(project, locale),
         }))}
         cities={cities.map((city) => ({
           id: city.id,
-          label: bilingualName(city, locale),
+          label: lookupName(city, locale),
           altLabel: city.nameAr,
         }))}
         channels={REPORT_CHANNELS}

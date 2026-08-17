@@ -16,7 +16,7 @@ import { can, listActiveUsers, requireSession } from "@/lib/authz";
 import { getCompany, listCompanyReps } from "@/lib/companies";
 import { listContacts } from "@/lib/contacts";
 import { dormancyReviews, isCompanyQuiet } from "@/lib/dormancy";
-import { bilingualName, pickName } from "@/lib/lookups";
+import { lookupName, pickName } from "@/lib/lookups";
 import { listProjects } from "@/lib/projects";
 import { companyOnHoldUntil } from "@/lib/reports";
 import { getQuietThresholds } from "@/lib/settings";
@@ -99,7 +99,7 @@ export default async function CompanyDetailPage({
   return (
     <div className="flex flex-col gap-6">
       <DetailHeader
-        name={bilingualName(company, locale)}
+        name={company.name}
         state={[
           pickName(locale, company.categoryNameEn, company.categoryNameAr),
           pickName(locale, company.cityNameEn, company.cityNameAr),
@@ -148,8 +148,6 @@ export default async function CompanyDetailPage({
         </CardHeader>
         <CardContent className="px-0">
           <Facts>
-            <Fact label={t("common.nameEn")}>{company.nameEn}</Fact>
-            <Fact label={t("common.nameAr")}>{company.nameAr ?? dash}</Fact>
             <Fact label={t("common.phone")} numeric>
               <span dir="ltr">{company.phone ?? dash}</span>
             </Fact>
@@ -354,7 +352,6 @@ export default async function CompanyDetailPage({
               until it arrives, and then becomes the follow-up itself. */}
           <NextFollowUpPanel
             session={session}
-            locale={locale}
             recordType="company"
             recordId={company.id}
             value={company.nextFollowUpAt}
@@ -382,7 +379,7 @@ export default async function CompanyDetailPage({
                     <RecordRow
                       key={contact.id}
                       href={`/contacts/${contact.id}`}
-                      title={bilingualName(contact, locale)}
+                      title={contact.name}
                       meta={contact.position ?? dash}
                       when={contact.phone ?? undefined}
                     />
@@ -409,7 +406,7 @@ export default async function CompanyDetailPage({
                     <RecordRow
                       key={project.id}
                       href={`/projects/${project.id}`}
-                      title={bilingualName(project, locale)}
+                      title={lookupName(project, locale)}
                       meta={
                         project.endState
                           ? t(`enums.projectEndState.${project.endState}`)

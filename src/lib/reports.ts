@@ -156,13 +156,11 @@ export type ReportListRow = {
   category: FieldNoteCategory | null;
   onHoldUntil: string | null;
   companyId: string | null;
-  companyNameEn: string | null;
-  companyNameAr: string | null;
+  companyName: string | null;
   projectId: string | null;
   projectNameEn: string | null;
   projectNameAr: string | null;
-  contactNameEn: string | null;
-  contactNameAr: string | null;
+  contactName: string | null;
   cityNameEn: string | null;
   cityNameAr: string | null;
   signals: ReportSignalRow[];
@@ -496,7 +494,7 @@ function searchFilter(query: string | undefined) {
   const pattern = `%${trimmed}%`;
   return or(
     ilike(repReports.narrative, pattern),
-    ilike(companies.nameEn, pattern),
+    ilike(companies.name, pattern),
   );
 }
 
@@ -571,13 +569,11 @@ const listColumns = {
   category: repReports.category,
   onHoldUntil: repReports.onHoldUntil,
   companyId: repReports.companyId,
-  companyNameEn: companies.nameEn,
-  companyNameAr: companies.nameAr,
+  companyName: companies.name,
   projectId: repReports.projectId,
   projectNameEn: projects.nameEn,
   projectNameAr: projects.nameAr,
-  contactNameEn: contacts.nameEn,
-  contactNameAr: contacts.nameAr,
+  contactName: contacts.name,
   cityNameEn: cities.nameEn,
   cityNameAr: cities.nameAr,
   createdAt: repReports.createdAt,

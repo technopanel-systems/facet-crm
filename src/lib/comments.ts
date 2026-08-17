@@ -482,7 +482,7 @@ export async function commentRecordName(
 ): Promise<string | null> {
   if (recordType === "company") {
     const [row] = await db
-      .select({ name: companies.nameEn })
+      .select({ name: companies.name })
       .from(companies)
       .where(eq(companies.id, recordId))
       .limit(1);
@@ -490,7 +490,7 @@ export async function commentRecordName(
   }
   if (recordType === "contact") {
     const [row] = await db
-      .select({ name: contacts.nameEn })
+      .select({ name: contacts.name })
       .from(contacts)
       .where(eq(contacts.id, recordId))
       .limit(1);
@@ -506,7 +506,7 @@ export async function commentRecordName(
   }
   if (recordType === "quotation_thread") {
     const [row] = await db
-      .select({ name: companies.nameEn })
+      .select({ name: companies.name })
       .from(quotationThreads)
       .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
       .where(eq(quotationThreads.id, recordId))
@@ -517,7 +517,7 @@ export async function commentRecordName(
   // reads as the company it went to, which is how `anchorName` already names a
   // quotation thread.
   const [row] = await db
-    .select({ name: companies.nameEn })
+    .select({ name: companies.name })
     .from(dispatches)
     .innerJoin(companies, eq(companies.id, dispatches.companyId))
     .where(eq(dispatches.id, recordId))

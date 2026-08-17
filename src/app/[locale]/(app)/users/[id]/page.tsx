@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
 import { can, getManagedUser, requireSession } from "@/lib/authz";
-import { bilingualName } from "@/lib/lookups";
+import { lookupName } from "@/lib/lookups";
 
 import { deactivateUserAction, reactivateUserAction } from "../actions";
 import { AccountActionForm } from "./account-actions";
@@ -50,10 +50,7 @@ export default async function UserDetailPage({
       <DetailHeader
         name={user.name}
         state={[
-          bilingualName(
-            { nameEn: user.roleNameEn, nameAr: user.roleNameAr },
-            locale,
-          ),
+          lookupName({ nameEn: user.roleNameEn, nameAr: user.roleNameAr }, locale),
           user.region ? t(`enums.region.${user.region}`) : null,
         ]
           .filter(Boolean)
@@ -75,10 +72,7 @@ export default async function UserDetailPage({
               <span dir="ltr">{user.email}</span>
             </Fact>
             <Fact label={t("team.fields.role")}>
-              {bilingualName(
-                { nameEn: user.roleNameEn, nameAr: user.roleNameAr },
-                locale,
-              )}
+              {lookupName({ nameEn: user.roleNameEn, nameAr: user.roleNameAr }, locale)}
             </Fact>
             <Fact label={t("team.fields.region")}>
               {user.region ? t(`enums.region.${user.region}`) : null}

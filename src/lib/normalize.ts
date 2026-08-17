@@ -14,8 +14,9 @@
  *
  * Duplicate **detection** itself is Phase 10 `[07 B6]`. This only prepares the
  * key it will compare. Cross-script matching — an Arabic name against the
- * English name of the same company `[04 B3]` — needs transliteration, which no
- * document specifies, and is recorded as open in `14 §6`.
+ * English name of the same company — is no longer the problem it was designed
+ * to be: `S23` makes phone the primary matching key, precisely because `S12`
+ * and `S19` leave one name field that already holds either script.
  */
 
 /** Arabic diacritics: fathatan..sukun, plus the superscript alef. */
@@ -72,18 +73,9 @@ export function normalizeName(value: string): string {
   return folded || value.trim().toLowerCase();
 }
 
-/**
- * The value to store in `name_normalized`.
- *
- * `name_en` is the `NOT NULL` column and therefore the source of truth. The
- * Arabic name is deliberately not concatenated in: the column is single-valued
- * and indexed for equality and prefix matching, and gluing a second name onto
- * it would weaken both halves. A rep who works in Arabic types Arabic into
- * `name_en`, which the folding above handles.
- *
- * Phase 10 can compare `normalizeName(nameAr)` at query time if it wants dual
- * matching — that needs no schema change.
+/*
+ * There is no `normalizedNameFor` wrapper. It existed to say which half of a
+ * bilingual pair fed `name_normalized`; since `S12` and `S19` a company or
+ * contact has one name and there is nothing to choose. Callers fold that name
+ * with `normalizeName` directly.
  */
-export function normalizedNameFor(input: { nameEn: string }): string {
-  return normalizeName(input.nameEn);
-}

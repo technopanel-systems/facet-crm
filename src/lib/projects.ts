@@ -50,7 +50,7 @@ import {
   type SameValues,
 } from "@/lib/enums";
 import { lossReasonCode, regionForCity } from "@/lib/lookups";
-import { normalizedNameFor } from "@/lib/normalize";
+import { normalizeName } from "@/lib/normalize";
 import { RuleError } from "@/lib/validation";
 
 export type Project = typeof projects.$inferSelect;
@@ -111,7 +111,7 @@ function searchFilter(query: string | undefined): SQL | undefined {
   if (!trimmed) return undefined;
   return ilike(
     projects.nameNormalized,
-    `%${normalizedNameFor({ nameEn: trimmed })}%`,
+    `%${normalizeName(trimmed)}%`,
   );
 }
 
@@ -183,8 +183,7 @@ export async function listProjects(
 export type ProjectCompanyRow = {
   id: string;
   companyId: string;
-  companyNameEn: string;
-  companyNameAr: string | null;
+  companyName: string;
   role: string | null;
   isBuyer: boolean;
   /**
@@ -268,8 +267,7 @@ export async function listProjectCompanies(
     .select({
       id: projectCompanies.id,
       companyId: projectCompanies.companyId,
-      companyNameEn: companies.nameEn,
-      companyNameAr: companies.nameAr,
+      companyName: companies.name,
       role: projectCompanies.role,
       isBuyer: projectCompanies.isBuyer,
     })
@@ -281,7 +279,7 @@ export async function listProjectCompanies(
         isNull(projectCompanies.removedAt),
       ),
     )
-    .orderBy(desc(projectCompanies.isBuyer), companies.nameEn);
+    .orderBy(desc(projectCompanies.isBuyer), companies.name);
 
   if (rows.length === 0) return [];
 
@@ -459,7 +457,7 @@ export async function createProject(
         ...input,
         ...loss,
         region,
-        nameNormalized: normalizedNameFor(input),
+        nameNormalized: normalizeName(input.nameEn),
         // Created by a rep and belongs to him `[07 A8]`.
         ownerUserId: session.user.id,
         createdBy: session.user.id,
@@ -540,7 +538,7 @@ export async function updateProject(
 
     const [after] = await tx
       .update(projects)
-      .set({ ...values, nameNormalized: normalizedNameFor(values) })
+      .set({ ...values, nameNormalized: normalizeName(values.nameEn) })
       .where(eq(projects.id, id))
       .returning();
 

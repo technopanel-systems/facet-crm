@@ -266,7 +266,8 @@ async function companyAddedEvents(
       at: companies.createdAt,
       actorUserId: companies.createdBy,
       actorName: users.name,
-      nameEn: companies.nameEn,
+      // The company's own name is deliberately not selected: the mapped event
+      // links to the record rather than naming it.
     })
     .from(companies)
     .leftJoin(users, eq(users.id, companies.createdBy))

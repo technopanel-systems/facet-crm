@@ -6,7 +6,7 @@ import { Timeline } from "@/components/timeline";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
-import { bilingualName } from "@/lib/lookups";
+import { lookupName } from "@/lib/lookups";
 import { getProject } from "@/lib/projects";
 import { projectTimeline } from "@/lib/timeline";
 
@@ -40,7 +40,7 @@ export default async function ProjectTimelinePage({
     <div className="flex max-w-4xl flex-col gap-6">
       <PageHeader
         title={t("timeline.fullTitle")}
-        description={bilingualName(project, locale)}
+        description={lookupName(project, locale)}
         action={
           <Button asChild size="sm" variant="outline">
             <Link href={`/projects/${project.id}`}>{t("common.back")}</Link>

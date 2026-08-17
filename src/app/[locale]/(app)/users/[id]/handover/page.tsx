@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/page-header";
 import { can, listActiveUsers, requireSession } from "@/lib/authz";
-import { bilingualName } from "@/lib/lookups";
+import { lookupName } from "@/lib/lookups";
 import { getHandoverBook } from "@/lib/team";
 
 import { reassignHandoverAction } from "../../actions";
@@ -43,7 +43,7 @@ export default async function HandoverPage({
       empty: t("team.handover.noCompanies"),
       rows: book.companies.map((row) => ({
         id: row.membershipId,
-        label: bilingualName(row, locale),
+        label: row.name,
         badge: row.isPrimary ? t("team.handover.primary") : undefined,
       })),
     },
@@ -53,7 +53,7 @@ export default async function HandoverPage({
       empty: t("team.handover.noProjects"),
       rows: book.projects.map((row) => ({
         id: row.id,
-        label: bilingualName(row, locale),
+        label: lookupName(row, locale),
       })),
     },
     {
@@ -62,14 +62,8 @@ export default async function HandoverPage({
       empty: t("team.handover.noQuotations"),
       rows: book.quotationThreads.map((row) => ({
         id: row.id,
-        label: bilingualName(
-          { nameEn: row.projectNameEn, nameAr: row.projectNameAr },
-          locale,
-        ),
-        note: bilingualName(
-          { nameEn: row.companyNameEn, nameAr: row.companyNameAr },
-          locale,
-        ),
+        label: lookupName({ nameEn: row.projectNameEn, nameAr: row.projectNameAr }, locale),
+        note: row.companyName,
       })),
     },
   ];

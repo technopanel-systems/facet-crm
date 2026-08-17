@@ -13,7 +13,6 @@ import {
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
 import { listContacts } from "@/lib/contacts";
-import { bilingualName } from "@/lib/lookups";
 
 import { ListCard, SearchForm } from "../_components/list-controls";
 
@@ -64,7 +63,7 @@ export default async function ContactsPage({
             <TableHeader>
               <TableRow>
                 <TableHead className="text-start">
-                  {t("common.nameEn")}
+                  {t("common.name")}
                 </TableHead>
                 <TableHead className="text-start">
                   {t("contacts.fields.company")}
@@ -88,7 +87,7 @@ export default async function ContactsPage({
                       href={`/contacts/${row.id}`}
                       className="hover:underline"
                     >
-                      {bilingualName(row, locale)}
+                      {row.name}
                     </Link>
                   </TableCell>
                   <TableCell className="text-start">
@@ -96,10 +95,7 @@ export default async function ContactsPage({
                       href={`/companies/${row.companyId}`}
                       className="hover:underline"
                     >
-                      {bilingualName(
-                        { nameEn: row.companyNameEn, nameAr: row.companyNameAr },
-                        locale,
-                      )}
+                      {row.companyName}
                     </Link>
                   </TableCell>
                   <TableCell className="text-start">

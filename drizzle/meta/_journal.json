@@ -64,6 +64,13 @@
       "when": 1786868178775,
       "tag": "0008_deletion_pass",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786956814636,
+      "tag": "0009_one_name_field",
+      "breakpoints": true
     }
   ]
 }

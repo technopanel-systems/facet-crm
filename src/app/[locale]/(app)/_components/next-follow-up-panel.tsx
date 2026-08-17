@@ -6,7 +6,6 @@ import {
   nextFollowUpContext,
   type FollowUpAnchorType,
 } from "@/lib/follow-ups";
-import { bilingualName } from "@/lib/lookups";
 
 import {
   clearNextFollowUpAction,
@@ -37,13 +36,11 @@ import { NextFollowUpControls } from "./next-follow-up-controls";
  */
 export async function NextFollowUpPanel({
   session,
-  locale,
   recordType,
   recordId,
   value,
 }: {
   session: AuthSession;
-  locale: string;
   recordType: FollowUpAnchorType;
   recordId: string;
   /** The record's own `next_follow_up_at`, already on every detail type. */
@@ -77,15 +74,7 @@ export async function NextFollowUpPanel({
             setByName: context.setByName,
             setOnLabel: context.setOn ? day(context.setOn) : null,
             heldUntilLabel: context.heldUntil ? day(context.heldUntil) : null,
-            heldCompanyName: context.heldCompanyNameEn
-              ? bilingualName(
-                  {
-                    nameEn: context.heldCompanyNameEn,
-                    nameAr: context.heldCompanyNameAr,
-                  },
-                  locale,
-                )
-              : null,
+            heldCompanyName: context.heldCompanyName,
           }}
           setAction={setNextFollowUpAction.bind(null, recordType, recordId)}
           clearAction={clearNextFollowUpAction.bind(null, recordType, recordId)}

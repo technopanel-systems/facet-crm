@@ -37,6 +37,12 @@ export function PageHeader({
  * inline in that line. Not `PageHeader`: a detail screen's identity is three
  * things, and squeezing a reference and a state into `description` is how
  * `/dispatches/[id]` ended up titled with a quantity.
+ *
+ * The name takes `dir="auto"` `D62`: since `S12` and `S19` a company or
+ * contact name is one field holding either script, so its direction is a
+ * property of the value rather than of the page. A Latin-initial name is
+ * unaffected, which is why this sits on the shared heading rather than on an
+ * opt-in prop a later screen would forget to pass.
  */
 export function DetailHeader({
   name,
@@ -54,7 +60,10 @@ export function DetailHeader({
   return (
     <div className="flex flex-wrap items-end justify-between gap-5">
       <div className="min-w-0 text-start">
-        <h1 className="text-[25px] leading-tight font-semibold tracking-tight">
+        <h1
+          dir="auto"
+          className="text-[25px] leading-tight font-semibold tracking-tight"
+        >
           {name}
         </h1>
         {state || reference ? (

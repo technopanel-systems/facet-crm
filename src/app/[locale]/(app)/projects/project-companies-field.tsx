@@ -10,8 +10,8 @@ import { cn } from "@/lib/utils";
 
 export type CompanyOption = {
   id: string;
-  nameEn: string;
-  nameAr: string | null;
+  /** One field, English or Arabic `S12`. */
+  name: string;
 };
 
 /**
@@ -27,19 +27,14 @@ export type CompanyOption = {
  */
 export function ProjectCompaniesField({
   companies,
-  locale,
   error,
 }: {
   companies: CompanyOption[];
-  locale: string;
   error?: string;
 }) {
   const t = useTranslations();
   const [rowCount, setRowCount] = useState(1);
   const rows = Array.from({ length: rowCount }, (_, index) => index);
-
-  const optionName = (company: CompanyOption) =>
-    locale === "ar" ? company.nameAr || company.nameEn : company.nameEn;
 
   const selectClasses = cn(
     "border-input bg-background text-foreground h-9 w-full rounded-md border",
@@ -84,7 +79,7 @@ export function ProjectCompaniesField({
                 <option value="">{t("common.none")}</option>
                 {companies.map((company) => (
                   <option key={company.id} value={company.id}>
-                    {optionName(company)}
+                    {company.name}
                   </option>
                 ))}
               </select>

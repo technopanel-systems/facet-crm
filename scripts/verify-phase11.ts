@@ -514,7 +514,7 @@ async function main(): Promise<void> {
   const [companyA] = await db
     .insert(companies)
     .values({
-      nameEn: `${stamp} Company A`,
+      name: `${stamp} Company A`,
       nameNormalized: `${stamp}-a`,
       createdBy: departing.user.id,
     })
@@ -522,7 +522,7 @@ async function main(): Promise<void> {
   const [companyShared] = await db
     .insert(companies)
     .values({
-      nameEn: `${stamp} Company Shared`,
+      name: `${stamp} Company Shared`,
       nameNormalized: `${stamp}-shared`,
       createdBy: departing.user.id,
     })
@@ -560,7 +560,7 @@ async function main(): Promise<void> {
   const [companyPast] = await db
     .insert(companies)
     .values({
-      nameEn: `${stamp} Company Past`,
+      name: `${stamp} Company Past`,
       nameNormalized: `${stamp}-past`,
       createdBy: departing.user.id,
     })
@@ -577,7 +577,7 @@ async function main(): Promise<void> {
   // bucket of its own.
   await db.insert(contacts).values({
     companyId: companyA.id,
-    nameEn: `${stamp} Contact`,
+    name: `${stamp} Contact`,
     nameNormalized: `${stamp}-contact`,
     createdBy: departing.user.id,
   });
@@ -685,7 +685,7 @@ async function main(): Promise<void> {
   check(
     "an already-removed membership is NOT listed — nothing left to hand over",
     !book.companies.some((row) => row.companyId === companyPast.id),
-    `got ${book.companies.map((row) => row.nameEn).join(", ")}`,
+    `got ${book.companies.map((row) => row.name).join(", ")}`,
   );
   check(
     "the owned project is listed, the bystander's is not",
@@ -828,7 +828,7 @@ async function main(): Promise<void> {
   const [strandedCompany] = await db
     .insert(companies)
     .values({
-      nameEn: `${stamp} Stranded Company`,
+      name: `${stamp} Stranded Company`,
       nameNormalized: `${stamp}-sc`,
       createdBy: strandedUser.id,
     })

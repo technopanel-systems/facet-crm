@@ -30,8 +30,8 @@ export type ProjectOption = {
   nameAr: string | null;
   /** The project's live company links — the only companies a quotation on it
    *  may name `[16 §6]`. */
-  companies: { id: string; nameEn: string; nameAr: string | null }[];
-  contacts: { id: string; companyId: string; nameEn: string; nameAr: string | null }[];
+  companies: { id: string; name: string }[];
+  contacts: { id: string; companyId: string; name: string }[];
 };
 
 /**
@@ -143,7 +143,7 @@ export function QuotationForm({
             <option value="">{t("common.none")}</option>
             {companies.map((row) => (
               <option key={row.id} value={row.id}>
-                {name(row)}
+                {row.name}
               </option>
             ))}
           </select>
@@ -176,7 +176,7 @@ export function QuotationForm({
             <option value="">{t("common.none")}</option>
             {contacts.map((row) => (
               <option key={row.id} value={row.id}>
-                {name(row)}
+                {row.name}
               </option>
             ))}
           </select>

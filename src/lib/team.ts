@@ -61,8 +61,7 @@ export type HandoverCompany = {
   /** `company_reps.id` — the membership row that actually moves. */
   membershipId: string;
   companyId: string;
-  nameEn: string;
-  nameAr: string | null;
+  name: string;
   isPrimary: boolean;
 };
 
@@ -76,8 +75,7 @@ export type HandoverThread = {
   id: string;
   projectNameEn: string;
   projectNameAr: string | null;
-  companyNameEn: string;
-  companyNameAr: string | null;
+  companyName: string;
   createdAt: Date;
 };
 
@@ -140,8 +138,7 @@ export async function getHandoverBook(
       .select({
         membershipId: companyReps.id,
         companyId: companies.id,
-        nameEn: companies.nameEn,
-        nameAr: companies.nameAr,
+        name: companies.name,
         isPrimary: companyReps.isPrimary,
       })
       .from(companyReps)
@@ -149,7 +146,7 @@ export async function getHandoverBook(
       .where(
         and(eq(companyReps.userId, userId), isNull(companyReps.removedAt)),
       )
-      .orderBy(asc(companies.nameEn)),
+      .orderBy(asc(companies.name)),
 
     db
       .select({
@@ -166,8 +163,7 @@ export async function getHandoverBook(
         id: quotationThreads.id,
         projectNameEn: projects.nameEn,
         projectNameAr: projects.nameAr,
-        companyNameEn: companies.nameEn,
-        companyNameAr: companies.nameAr,
+        companyName: companies.name,
         createdAt: quotationThreads.createdAt,
       })
       .from(quotationThreads)

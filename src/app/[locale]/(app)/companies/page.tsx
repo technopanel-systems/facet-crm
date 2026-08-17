@@ -14,7 +14,7 @@ import {
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
 import { listCompanies } from "@/lib/companies";
-import { bilingualName, pickName } from "@/lib/lookups";
+import { pickName } from "@/lib/lookups";
 
 import { ListCard, SearchForm } from "../_components/list-controls";
 
@@ -70,7 +70,7 @@ export default async function CompaniesPage({
             <TableHeader>
               <TableRow>
                 <TableHead className="text-start">
-                  {t("common.nameEn")}
+                  {t("common.name")}
                 </TableHead>
                 <TableHead className="text-start">
                   {t("common.phone")}
@@ -101,7 +101,7 @@ export default async function CompaniesPage({
                       href={`/companies/${row.id}`}
                       className="hover:underline"
                     >
-                      {bilingualName(row, locale)}
+                      {row.name}
                     </Link>
                   </TableCell>
                   {/* A phone number is read left-to-right in both locales.

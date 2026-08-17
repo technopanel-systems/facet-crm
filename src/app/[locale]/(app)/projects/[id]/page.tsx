@@ -17,7 +17,7 @@ import { listCompanyOptions } from "@/lib/companies";
 import { getCreditSplitInForce } from "@/lib/credit-splits";
 import { fromScaled, SQM_SCALE, toScaled, ZERO } from "@/lib/decimal";
 import { listDispatches } from "@/lib/dispatches";
-import { bilingualName, pickName } from "@/lib/lookups";
+import { lookupName, pickName } from "@/lib/lookups";
 import { getProject } from "@/lib/projects";
 import { listQuotationThreads } from "@/lib/quotations";
 import { projectTimeline, TIMELINE_CARD_LIMIT } from "@/lib/timeline";
@@ -131,7 +131,7 @@ export default async function ProjectDetailPage({
   return (
     <div className="flex flex-col gap-6">
       <DetailHeader
-        name={bilingualName(project, locale)}
+        name={lookupName(project, locale)}
         state={[
           project.ownerName,
           project.endState
@@ -310,7 +310,6 @@ export default async function ProjectDetailPage({
             projectId={project.id}
             links={project.links}
             companies={companies}
-            locale={locale}
           />
         </CardContent>
       </Card>
@@ -353,7 +352,6 @@ export default async function ProjectDetailPage({
           two days, with the follow-up already set for next week. */}
       <NextFollowUpPanel
         session={session}
-        locale={locale}
         recordType="project"
         recordId={project.id}
         value={project.nextFollowUpAt}

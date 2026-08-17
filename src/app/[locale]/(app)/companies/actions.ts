@@ -27,15 +27,14 @@ import {
  * server action is a separately reachable POST endpoint and no layout wraps
  * it. The data layer then re-checks visibility before it writes.
  *
- * Only `name_en` is required. `09 §3.1` says fields become required
- * progressively in the application layer but names no thresholds, so none are
- * invented `[14 §6]`.
+ * Only the name is required — one field, English or Arabic `S12`. `09 §3.1`
+ * says fields become required progressively in the application layer but names
+ * no thresholds, so none are invented `[14 §6]`.
  */
 function readCompanyForm(formData: FormData) {
   const fields = readFields(formData);
   const input: CompanyInput = {
-    nameEn: fields.text("nameEn", { required: true, max: 200 }) ?? "",
-    nameAr: fields.text("nameAr", { max: 200 }),
+    name: fields.text("name", { required: true, max: 200 }) ?? "",
     phone: fields.text("phone", { max: 50 }),
     categoryId: fields.uuid("categoryId"),
     vatNumber: fields.text("vatNumber", { max: 50 }),

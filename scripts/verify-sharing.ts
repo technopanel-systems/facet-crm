@@ -326,7 +326,7 @@ async function main(): Promise<void> {
   const [company] = await db
     .insert(companies)
     .values({
-      nameEn: `${stamp} Co`,
+      name: `${stamp} Co`,
       nameNormalized: normalizeName(`${stamp} Co`),
       createdBy: repA.user.id,
     })
@@ -342,7 +342,7 @@ async function main(): Promise<void> {
     .insert(contacts)
     .values({
       companyId: company.id,
-      nameEn: `${stamp} Contact`,
+      name: `${stamp} Contact`,
       nameNormalized: normalizeName(`${stamp} Contact`),
       createdBy: repA.user.id,
     })
@@ -536,8 +536,7 @@ async function main(): Promise<void> {
 
   const detail = await getCompany(repB, company.id);
   await updateCompany(repB, company.id, {
-    nameEn: detail!.nameEn,
-    nameAr: `${stamp} بالعربية`,
+    name: detail!.name,
     phone: detail!.phone,
     categoryId: detail!.categoryId,
     vatNumber: detail!.vatNumber,
@@ -557,8 +556,7 @@ async function main(): Promise<void> {
     "companies.errors.notFound",
     () =>
       updateCompany(outsider, company.id, {
-        nameEn: detail!.nameEn,
-        nameAr: null,
+        name: detail!.name,
         phone: null,
         categoryId: null,
         vatNumber: null,
@@ -750,7 +748,7 @@ async function main(): Promise<void> {
   const [lonely] = await db
     .insert(companies)
     .values({
-      nameEn: `${stamp} Lonely Co`,
+      name: `${stamp} Lonely Co`,
       nameNormalized: normalizeName(`${stamp} Lonely Co`),
       createdBy: repA.user.id,
     })

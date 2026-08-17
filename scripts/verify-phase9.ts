@@ -354,7 +354,7 @@ async function main(): Promise<void> {
   const [companyA] = await db
     .insert(companies)
     .values({
-      nameEn: `${stamp} Company A`,
+      name: `${stamp} Company A`,
       nameNormalized: `${stamp}-a`,
       createdBy: authorUser.id,
     })
@@ -362,7 +362,7 @@ async function main(): Promise<void> {
   const [companyB] = await db
     .insert(companies)
     .values({
-      nameEn: `${stamp} Company B`,
+      name: `${stamp} Company B`,
       nameNormalized: `${stamp}-b`,
       createdBy: authorUser.id,
     })
@@ -371,7 +371,7 @@ async function main(): Promise<void> {
   const [companyQuiet] = await db
     .insert(companies)
     .values({
-      nameEn: `${stamp} Company Quiet`,
+      name: `${stamp} Company Quiet`,
       nameNormalized: `${stamp}-quiet`,
       createdBy: authorUser.id,
     })
@@ -380,7 +380,7 @@ async function main(): Promise<void> {
   const [companyNever] = await db
     .insert(companies)
     .values({
-      nameEn: `${stamp} Company Never`,
+      name: `${stamp} Company Never`,
       nameNormalized: `${stamp}-never`,
       createdBy: authorUser.id,
     })
@@ -408,7 +408,7 @@ async function main(): Promise<void> {
     .insert(contacts)
     .values({
       companyId: companyA.id,
-      nameEn: `${stamp} Contact A`,
+      name: `${stamp} Contact A`,
       nameNormalized: `${stamp}-contact-a`,
       createdBy: authorUser.id,
     })
@@ -417,7 +417,7 @@ async function main(): Promise<void> {
     .insert(contacts)
     .values({
       companyId: companyB.id,
-      nameEn: `${stamp} Contact B`,
+      name: `${stamp} Contact B`,
       nameNormalized: `${stamp}-contact-b`,
       createdBy: authorUser.id,
     })

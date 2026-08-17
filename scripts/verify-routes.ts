@@ -286,7 +286,8 @@ const MARKERS: Record<string, readonly string[]> = {
   "/": ['data-slot="today-queue"', 'data-slot="today-waiting"'],
   "/companies": ['data-slot="list-card"', 'data-slot="table-head"'],
   "/quotations": ['data-slot="list-card"'],
-  "/companies/new": ['data-slot="form-shell"', 'name="nameEn"'],
+  // One name field `S12` — the input is `name`, not a locale-suffixed pair.
+  "/companies/new": ['data-slot="form-shell"', 'name="name"'],
   "/reports/new": ['data-slot="form-shell"'],
   // `/coverage` carried this marker until feature slice 6 moved the table
   // it comes from onto `/performance` and deleted the route `[26 §2]`.
@@ -734,8 +735,10 @@ async function main(): Promise<void> {
             unescapeHtml(input[0].match(/value="([^"]*)"/)?.[1] ?? ""),
           );
         }
-        // `readFields` requires `nameEn` and nothing else here; the rest are
-        // sent empty exactly as an untouched form would send them.
+        // `readFields` requires the project's `nameEn` and nothing else here.
+        // Projects keep a name pair; only companies and contacts lost theirs
+        // `S12` `S19`. The rest are sent empty, exactly as an untouched form
+        // would send them.
         fields.set("nameEn", nameOf(page.body) ?? "Project");
         fields.set("nameAr", "");
         fields.set("sqmExpected", "");

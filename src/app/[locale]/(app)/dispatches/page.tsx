@@ -14,7 +14,6 @@ import {
 import { Link } from "@/i18n/navigation";
 import { can, requireSession } from "@/lib/authz";
 import { listDispatches } from "@/lib/dispatches";
-import { bilingualName } from "@/lib/lookups";
 
 import {
   FilterNav,
@@ -148,10 +147,10 @@ export default async function DispatchesPage({
                         href={`/companies/${row.companyId}`}
                         className="hover:underline"
                       >
-                        {bilingualName({ nameEn: row.companyNameEn, nameAr: row.companyNameAr }, locale)}
+                        {row.companyName}
                       </Link>
                     ) : (
-                      bilingualName({ nameEn: row.companyNameEn, nameAr: row.companyNameAr }, locale)
+                      row.companyName
                     )}
                   </TableCell>
                   <TableCell className="text-start">{row.userName}</TableCell>

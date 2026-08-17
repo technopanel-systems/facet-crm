@@ -33,7 +33,7 @@ import {
 } from "@/lib/authz";
 import { REGIONS, type Region, type SameValues } from "@/lib/enums";
 import { assertLeadSourceSelectable, regionForCity } from "@/lib/lookups";
-import { normalizedNameFor } from "@/lib/normalize";
+import { normalizeName } from "@/lib/normalize";
 // Qualification is a quotation event, so its predicate lives with quotations
 // `[10 §1]`. The dependency runs one way only — that module never imports this
 // one, so there is no cycle to unpick later.
@@ -57,8 +57,8 @@ export type { Region };
  *  `has_credit_terms` `[25 §7]` is deliberately NOT here: it is the manager's
  *  to set, not the rep's, and no screen sets it yet. */
 export type CompanyInput = {
-  nameEn: string;
-  nameAr: string | null;
+  /** One field, English or Arabic `S12`. */
+  name: string;
   phone: string | null;
   categoryId: string | null;
   vatNumber: string | null;
@@ -70,8 +70,7 @@ export type CompanyInput = {
 
 export type CompanyListRow = {
   id: string;
-  nameEn: string;
-  nameAr: string | null;
+  name: string;
   phone: string | null;
   region: Region | null;
   categoryNameEn: string | null;
@@ -95,7 +94,7 @@ function searchFilter(query: string | undefined): SQL | undefined {
   const trimmed = query?.trim();
   if (!trimmed) return undefined;
   return or(
-    ilike(companies.nameNormalized, `%${normalizedNameFor({ nameEn: trimmed })}%`),
+    ilike(companies.nameNormalized, `%${normalizeName(trimmed)}%`),
     ilike(companies.phone, `%${trimmed}%`),
   );
 }
@@ -110,8 +109,7 @@ export async function listCompanies(
   const rows = await db
     .select({
       id: companies.id,
-      nameEn: companies.nameEn,
-      nameAr: companies.nameAr,
+      name: companies.name,
       phone: companies.phone,
       region: companies.region,
       categoryNameEn: companyCategories.nameEn,
@@ -143,16 +141,15 @@ export async function listCompanies(
 /** The company select on the contact and project forms. */
 export async function listCompanyOptions(
   session: AuthSession,
-): Promise<{ id: string; nameEn: string; nameAr: string | null }[]> {
+): Promise<{ id: string; name: string }[]> {
   return db
     .select({
       id: companies.id,
-      nameEn: companies.nameEn,
-      nameAr: companies.nameAr,
+      name: companies.name,
     })
     .from(companies)
     .where(visibleCompaniesFilter(session))
-    .orderBy(companies.nameEn);
+    .orderBy(companies.name);
 }
 
 export type CompanyDetail = Company & {
@@ -287,7 +284,7 @@ export async function createCompany(
         // The city decides the region when there is one `[15 §4]`; whatever
         // the form posted is not consulted.
         region,
-        nameNormalized: normalizedNameFor(input),
+        nameNormalized: normalizeName(input.name),
         createdBy: session.user.id,
       })
       .returning();
@@ -323,8 +320,7 @@ export async function createCompany(
 
 /** The columns a rep may change, for the before/after diff. */
 const EDITABLE = [
-  "nameEn",
-  "nameAr",
+  "name",
   "phone",
   "categoryId",
   "vatNumber",
@@ -376,7 +372,7 @@ export async function updateCompany(
       .update(companies)
       .set({
         ...values,
-        nameNormalized: normalizedNameFor(values),
+        nameNormalized: normalizeName(values.name),
       })
       .where(eq(companies.id, id))
       .returning();

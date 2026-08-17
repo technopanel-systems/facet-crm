@@ -40,7 +40,7 @@ export default async function EditCompanyPage({
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
-      <PageHeader title={t("companies.editTitle")} description={company.nameEn} />
+      <PageHeader title={t("companies.editTitle")} description={company.name} />
       <CompanyForm
         action={updateCompanyAction.bind(null, company.id)}
         defaults={company}

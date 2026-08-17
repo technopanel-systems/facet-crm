@@ -277,7 +277,7 @@ async function main(): Promise<void> {
   const [company] = await db
     .insert(companies)
     .values({
-      nameEn: `${stamp} Co`,
+      name: `${stamp} Co`,
       nameNormalized: stamp,
       createdBy: repA.user.id,
     })
@@ -305,7 +305,7 @@ async function main(): Promise<void> {
     .insert(contacts)
     .values({
       companyId: company.id,
-      nameEn: `${stamp} Contact`,
+      name: `${stamp} Contact`,
       nameNormalized: stamp,
       createdBy: repA.user.id,
     })

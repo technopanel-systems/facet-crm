@@ -12,8 +12,7 @@ function readContactForm(formData: FormData) {
   const fields = readFields(formData);
   const input: ContactInput = {
     companyId: fields.uuid("companyId", { required: true }) ?? "",
-    nameEn: fields.text("nameEn", { required: true, max: 200 }) ?? "",
-    nameAr: fields.text("nameAr", { max: 200 }),
+    name: fields.text("name", { required: true, max: 200 }) ?? "",
     phone: fields.text("phone", { max: 50 }),
     email: fields.text("email", { max: 200 }),
     position: fields.text("position", { max: 120 }),

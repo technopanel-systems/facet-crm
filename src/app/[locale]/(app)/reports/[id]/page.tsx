@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
-import { bilingualName } from "@/lib/lookups";
+import { lookupName } from "@/lib/lookups";
 import { getReport } from "@/lib/reports";
 
 export const dynamic = "force-dynamic";
@@ -44,17 +44,9 @@ export default async function ReportDetailPage({
       timeZone: "UTC",
     });
 
-  const companyName = report.companyNameEn
-    ? bilingualName(
-        { nameEn: report.companyNameEn, nameAr: report.companyNameAr },
-        locale,
-      )
-    : null;
+  const companyName = report.companyName;
   const projectName = report.projectNameEn
-    ? bilingualName(
-        { nameEn: report.projectNameEn, nameAr: report.projectNameAr },
-        locale,
-      )
+    ? lookupName({ nameEn: report.projectNameEn, nameAr: report.projectNameAr }, locale)
     : null;
 
   return (
@@ -106,15 +98,7 @@ export default async function ReportDetailPage({
                   )}
                 </Fact>
                 <Fact label={t("reports.fields.contact")}>
-                  {report.contactNameEn
-                    ? bilingualName(
-                        {
-                          nameEn: report.contactNameEn,
-                          nameAr: report.contactNameAr,
-                        },
-                        locale,
-                      )
-                    : null}
+                  {report.contactName}
                 </Fact>
                 <Fact label={t("reports.fields.project")}>
                   {projectName === null ? null : report.projectViewable ? (
@@ -153,10 +137,7 @@ export default async function ReportDetailPage({
                 </Fact>
                 <Fact label={t("reports.fields.city")}>
                   {report.cityNameEn
-                    ? bilingualName(
-                        { nameEn: report.cityNameEn, nameAr: report.cityNameAr },
-                        locale,
-                      )
+                    ? lookupName({ nameEn: report.cityNameEn, nameAr: report.cityNameAr }, locale)
                     : null}
                 </Fact>
               </>

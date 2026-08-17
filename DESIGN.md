@@ -405,3 +405,10 @@ empty list reads as a broken page rather than an empty one.
 **D61.** Container-drawn line work assumes a full last row, and an `auto-fit`
 grid cannot promise one — the empty track paints as a solid rule. Borders go on
 the cells.
+
+**D62.** A value that may hold either script carries `dir="auto"`, wherever it
+is entered or displayed — direction is a property of the value, not of the
+page. Since S12 and S19 a company or contact name is one field written in
+English or Arabic, so an Arabic name must read correctly on an English page.
+This is the converse of the `dir="ltr"` rule, which only ever covered LTR
+content — references, decimals, dates — inside Arabic.

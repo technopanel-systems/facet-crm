@@ -30,17 +30,12 @@ export function ProjectLinks({
   projectId,
   links,
   companies,
-  locale,
 }: {
   projectId: string;
   links: ProjectCompanyRow[];
   companies: CompanyOption[];
-  locale: string;
 }) {
   const t = useTranslations();
-
-  const optionName = (company: CompanyOption) =>
-    locale === "ar" ? company.nameAr || company.nameEn : company.nameEn;
 
   // Only companies not already linked can be added.
   const linkedIds = new Set(links.map((link) => link.companyId));
@@ -59,7 +54,6 @@ export function ProjectLinks({
               <LinkRow
                 projectId={projectId}
                 link={link}
-                locale={locale}
                 canRemove={links.length > 1}
               />
             </li>
@@ -71,7 +65,6 @@ export function ProjectLinks({
         <AddLinkForm
           projectId={projectId}
           companies={addable}
-          optionName={optionName}
         />
       ) : null}
     </div>
@@ -81,12 +74,10 @@ export function ProjectLinks({
 function LinkRow({
   projectId,
   link,
-  locale,
   canRemove,
 }: {
   projectId: string;
   link: ProjectCompanyRow;
-  locale: string;
   canRemove: boolean;
 }) {
   const t = useTranslations();
@@ -98,11 +89,6 @@ function LinkRow({
     removeProjectCompanyAction.bind(null, projectId, link.id),
     emptyFormState,
   );
-
-  const name =
-    locale === "ar"
-      ? link.companyNameAr || link.companyNameEn
-      : link.companyNameEn;
 
   return (
     <div className="flex flex-col gap-2">
@@ -116,14 +102,14 @@ function LinkRow({
             href={`/companies/${link.companyId}`}
             className="text-start text-sm font-medium hover:underline"
           >
-            {name}
+            {link.companyName}
           </Link>
         ) : (
           <span
             className="text-start text-sm font-medium"
             title={t("projects.detail.hiddenCompany")}
           >
-            {name}
+            {link.companyName}
             <span className="text-muted-foreground ms-2 text-xs font-normal">
               ({t("projects.detail.hiddenCompany")})
             </span>
@@ -181,11 +167,9 @@ function LinkRow({
 function AddLinkForm({
   projectId,
   companies,
-  optionName,
 }: {
   projectId: string;
   companies: CompanyOption[];
-  optionName: (company: CompanyOption) => string;
 }) {
   const t = useTranslations();
   const [state, action, pending] = useActionState(
@@ -208,7 +192,7 @@ function AddLinkForm({
         <option value="">{t("projects.detail.addCompany")}</option>
         {companies.map((company) => (
           <option key={company.id} value={company.id}>
-            {optionName(company)}
+            {company.name}
           </option>
         ))}
       </select>

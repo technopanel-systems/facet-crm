@@ -10,7 +10,7 @@ import {
   listDispatchableThreads,
   searchDispatchCompanies,
 } from "@/lib/dispatches";
-import { bilingualName } from "@/lib/lookups";
+import { lookupName } from "@/lib/lookups";
 
 import { recordDispatchAction } from "../actions";
 import { DispatchForm } from "../dispatch-form";
@@ -121,21 +121,15 @@ export default async function NewDispatchPage({
         mode={mode}
         threads={threads.map((thread) => ({
           id: thread.id,
-          label: `${thread.smacReference ?? t("common.none")} · ${bilingualName(
-            { nameEn: thread.projectNameEn, nameAr: thread.projectNameAr },
-            locale,
-          )} · ${t("dispatches.fields.dispatchedSoFar")} ${thread.dispatchedSqm}`,
-          companyLabel: bilingualName(
-            { nameEn: thread.companyNameEn, nameAr: thread.companyNameAr },
-            locale,
-          ),
+          label: `${thread.smacReference ?? t("common.none")} · ${lookupName({ nameEn: thread.projectNameEn, nameAr: thread.projectNameAr }, locale)} · ${t("dispatches.fields.dispatchedSoFar")} ${thread.dispatchedSqm}`,
+          companyLabel: thread.companyName,
           raisedByName: thread.raisedByName,
           quotedSqm: thread.quotedSqm,
           dispatchedSqm: thread.dispatchedSqm,
         }))}
         companies={companies.map((company) => ({
           id: company.id,
-          label: bilingualName(company, locale),
+          label: company.name,
         }))}
         reps={reps}
         companyQuery={query}

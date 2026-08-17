@@ -243,7 +243,7 @@ async function main(): Promise<void> {
   const [company] = await db
     .insert(companies)
     .values({
-      nameEn: `${stamp} Co`,
+      name: `${stamp} Co`,
       nameNormalized: stamp,
       createdBy: repA.user.id,
     })
@@ -855,7 +855,7 @@ async function main(): Promise<void> {
   );
   check(
     "…but the company NAME is present. Names yes, records no.",
-    (coordinatorRow?.companyNameEn.length ?? 0) > 0,
+    (coordinatorRow?.companyName.length ?? 0) > 0,
   );
 
   check(

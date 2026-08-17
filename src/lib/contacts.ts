@@ -20,15 +20,15 @@ import {
   visibleContactsFilter,
   type AuthSession,
 } from "@/lib/authz";
-import { normalizedNameFor } from "@/lib/normalize";
+import { normalizeName } from "@/lib/normalize";
 import { RuleError } from "@/lib/validation";
 
 export type Contact = typeof contacts.$inferSelect;
 
 export type ContactInput = {
   companyId: string;
-  nameEn: string;
-  nameAr: string | null;
+  /** One field, English or Arabic `S19`. */
+  name: string;
   phone: string | null;
   email: string | null;
   position: string | null;
@@ -37,14 +37,13 @@ export type ContactInput = {
 
 export type ContactListRow = {
   id: string;
-  nameEn: string;
-  nameAr: string | null;
+  /** One field, English or Arabic `S19`. */
+  name: string;
   phone: string | null;
   email: string | null;
   position: string | null;
   companyId: string;
-  companyNameEn: string;
-  companyNameAr: string | null;
+  companyName: string;
   createdAt: Date;
 };
 
@@ -54,7 +53,7 @@ function searchFilter(query: string | undefined): SQL | undefined {
   const trimmed = query?.trim();
   if (!trimmed) return undefined;
   return or(
-    ilike(contacts.nameNormalized, `%${normalizedNameFor({ nameEn: trimmed })}%`),
+    ilike(contacts.nameNormalized, `%${normalizeName(trimmed)}%`),
     ilike(contacts.phone, `%${trimmed}%`),
   );
 }
@@ -80,14 +79,12 @@ export async function listContacts(
   const rows = await db
     .select({
       id: contacts.id,
-      nameEn: contacts.nameEn,
-      nameAr: contacts.nameAr,
+      name: contacts.name,
       phone: contacts.phone,
       email: contacts.email,
       position: contacts.position,
       companyId: contacts.companyId,
-      companyNameEn: companies.nameEn,
-      companyNameAr: companies.nameAr,
+      companyName: companies.name,
       createdAt: contacts.createdAt,
     })
     .from(contacts)
@@ -106,8 +103,7 @@ export async function listContacts(
 }
 
 export type ContactDetail = Contact & {
-  companyNameEn: string;
-  companyNameAr: string | null;
+  companyName: string;
   createdByName: string | null;
 };
 
@@ -118,8 +114,7 @@ export async function getContact(
   const [row] = await db
     .select({
       contact: contacts,
-      companyNameEn: companies.nameEn,
-      companyNameAr: companies.nameAr,
+      companyName: companies.name,
       createdByName: users.name,
     })
     .from(contacts)
@@ -131,8 +126,7 @@ export async function getContact(
   if (!row) return null;
   return {
     ...row.contact,
-    companyNameEn: row.companyNameEn,
-    companyNameAr: row.companyNameAr,
+    companyName: row.companyName,
     createdByName: row.createdByName,
   };
 }
@@ -164,7 +158,7 @@ export async function createContact(
       .insert(contacts)
       .values({
         ...input,
-        nameNormalized: normalizedNameFor(input),
+        nameNormalized: normalizeName(input.name),
         createdBy: session.user.id,
       })
       .returning();
@@ -181,8 +175,7 @@ export async function createContact(
 
 const EDITABLE = [
   "companyId",
-  "nameEn",
-  "nameAr",
+  "name",
   "phone",
   "email",
   "position",
@@ -215,7 +208,7 @@ export async function updateContact(
 
     const [after] = await tx
       .update(contacts)
-      .set({ ...input, nameNormalized: normalizedNameFor(input) })
+      .set({ ...input, nameNormalized: normalizeName(input.name) })
       .where(eq(contacts.id, id))
       .returning();
 

@@ -160,11 +160,13 @@ do not drag** `D29`. Build order `D31`.
   a key; then `revalidatePath()` and `redirect()` from `@/i18n/navigation`. The audit row is
   the data layer's `S112`.
 - Wrap LTR content in Arabic with `dir="ltr"` — references, decimals, dates, percentages, m².
+  And the converse `D62`: a value that may hold **either** script takes `dir="auto"` wherever
+  it is entered or displayed, because direction belongs to the value, not the page.
   Decimals stay **strings** end to end; square metres are computed, never typed `S55`.
 - Dates: `format.dateTime(new Date(value + "T00:00:00Z"), { dateStyle: "medium", timeZone:
   "UTC" })` from `getFormatter()` — a calendar day in Riyadh, not an instant. **One name
-  field** `S12` `S19`; `bilingualName` is still in the code and goes in the model slice — do
-  not use it in a new screen.
+  field** `S12` `S19`: a company or contact renders `row.name`. `lookupName` covers what
+  still carries a pair — the lookup tables and projects; `bilingualName` is gone.
 
 Screen contents when you need them: rep dashboard `D32`–`D37` · manager `D38`–`D41` · rollup
 `D42`–`D44` · stream, Log button, private note `D45`–`D47` · comments on quotation threads

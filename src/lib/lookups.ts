@@ -312,16 +312,12 @@ export async function listServiceTypes(): Promise<LookupRow[]> {
  * appear in `messages/*.json` — so this is where the locale is applied. Falls
  * back to English when the Arabic name is missing, which is better than a
  * blank option.
+ *
+ * It covers any row carrying a bilingual name pair, projects included, so
+ * `name_ar` is nullable here. Companies and contacts no longer have a pair
+ * `S12` `S19` — render their `name` directly.
  */
-export function lookupName(row: LookupRow, locale: string): string {
-  return locale === "ar" ? row.nameAr || row.nameEn : row.nameEn;
-}
-
-/**
- * The same rule for records that carry a bilingual name of their own
- * (companies, contacts, projects), where `name_ar` is genuinely optional.
- */
-export function bilingualName(
+export function lookupName(
   row: { nameEn: string; nameAr: string | null },
   locale: string,
 ): string {

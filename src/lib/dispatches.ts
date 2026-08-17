@@ -103,8 +103,7 @@ export type DispatchListRow = {
   dispatchDate: string;
   sqm: string;
   companyId: string;
-  companyNameEn: string;
-  companyNameAr: string | null;
+  companyName: string;
   /** May the viewer OPEN the company? `can_dispatch` sees the name only
    *  `[18 §2]`, so the screen renders plain text rather than a link. */
   companyViewable: boolean;
@@ -136,8 +135,7 @@ export type DispatchableThread = {
   projectNameEn: string;
   projectNameAr: string | null;
   companyId: string;
-  companyNameEn: string;
-  companyNameAr: string | null;
+  companyName: string;
   raisedByUserId: string;
   raisedByName: string;
   /** The live version's total, for information. Never a cap `[04 quantities]`. */
@@ -272,7 +270,7 @@ function searchFilter(query: string | undefined) {
   if (!trimmed) return undefined;
   const pattern = `%${trimmed}%`;
   return or(
-    sql`${companies.nameEn} ilike ${pattern}`,
+    sql`${companies.name} ilike ${pattern}`,
     sql`${users.name} ilike ${pattern}`,
   );
 }
@@ -317,8 +315,7 @@ export async function listDispatches(
       dispatchDate: dispatches.dispatchDate,
       sqm: dispatches.sqm,
       companyId: dispatches.companyId,
-      companyNameEn: companies.nameEn,
-      companyNameAr: companies.nameAr,
+      companyName: companies.name,
       userId: dispatches.userId,
       userName: users.name,
       recordedByName: recordedBy.name,
@@ -353,8 +350,7 @@ type BareRow = {
   dispatchDate: string;
   sqm: string;
   companyId: string;
-  companyNameEn: string;
-  companyNameAr: string | null;
+  companyName: string;
   userId: string;
   userName: string;
   recordedByName: string;
@@ -445,8 +441,7 @@ export async function getDispatch(
       dispatchDate: dispatches.dispatchDate,
       sqm: dispatches.sqm,
       companyId: dispatches.companyId,
-      companyNameEn: companies.nameEn,
-      companyNameAr: companies.nameAr,
+      companyName: companies.name,
       userId: dispatches.userId,
       userName: users.name,
       recordedByName: recordedBy.name,
@@ -517,8 +512,7 @@ export async function listDispatchableThreads(
       projectNameEn: projects.nameEn,
       projectNameAr: projects.nameAr,
       companyId: quotationThreads.companyId,
-      companyNameEn: companies.nameEn,
-      companyNameAr: companies.nameAr,
+      companyName: companies.name,
       raisedByUserId: quotationThreads.raisedByUserId,
       raisedByName: users.name,
       quotedSqm: quotationVersions.totalSqm,
@@ -578,7 +572,7 @@ export async function searchDispatchCompanies(
   session: AuthSession,
   query: string,
   limit = 20,
-): Promise<{ id: string; nameEn: string; nameAr: string | null }[]> {
+): Promise<{ id: string; name: string }[]> {
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
   const pattern = `%${trimmed}%`;
@@ -586,8 +580,7 @@ export async function searchDispatchCompanies(
   return db
     .select({
       id: companies.id,
-      nameEn: companies.nameEn,
-      nameAr: companies.nameAr,
+      name: companies.name,
     })
     .from(companies)
     .where(
@@ -595,13 +588,12 @@ export async function searchDispatchCompanies(
         dispatchCompanyLookupFilter(session),
         isNull(companies.archivedAt),
         isNull(companies.mergedIntoId),
-        or(
-          sql`${companies.nameEn} ilike ${pattern}`,
-          sql`${companies.nameAr} ilike ${pattern}`,
-        ),
+        // One name field `S12`, so one column to match — this was the only
+        // place the Arabic name was ever searched.
+        sql`${companies.name} ilike ${pattern}`,
       ),
     )
-    .orderBy(companies.nameEn)
+    .orderBy(companies.name)
     .limit(limit);
 }
 

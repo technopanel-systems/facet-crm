@@ -14,7 +14,7 @@ import {
 import { Link } from "@/i18n/navigation";
 import { can, requireSession } from "@/lib/authz";
 import { chainState } from "@/lib/chain";
-import { bilingualName } from "@/lib/lookups";
+import { lookupName } from "@/lib/lookups";
 import { listQuotationThreads } from "@/lib/quotations";
 
 import { ListCard, SearchForm } from "../_components/list-controls";
@@ -126,16 +126,10 @@ export default async function QuotationsPage({
                     </Link>
                   </TableCell>
                   <TableCell className="text-start">
-                    {bilingualName(
-                      { nameEn: row.projectNameEn, nameAr: row.projectNameAr },
-                      locale,
-                    )}
+                    {lookupName({ nameEn: row.projectNameEn, nameAr: row.projectNameAr }, locale)}
                   </TableCell>
                   <TableCell className="text-start">
-                    {bilingualName(
-                      { nameEn: row.companyNameEn, nameAr: row.companyNameAr },
-                      locale,
-                    )}
+                    {row.companyName}
                   </TableCell>
                   <TableCell className="text-start">
                     <Turn

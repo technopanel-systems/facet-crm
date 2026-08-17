@@ -15,7 +15,7 @@ import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
 import { FOLLOW_UP_KINDS } from "@/lib/enums";
 import { followUps } from "@/lib/follow-ups";
-import { bilingualName } from "@/lib/lookups";
+import { lookupName } from "@/lib/lookups";
 import { cn } from "@/lib/utils";
 
 import { anchorHref } from "../_components/anchors";
@@ -158,25 +158,16 @@ export default async function FollowUpsPage({
                   </TableCell>
                   <TableCell className="text-start font-medium">
                     <Link href={anchorHref(row.anchorType, row.anchorId)} className="hover:underline">
-                      {bilingualName(
-                        { nameEn: row.anchorNameEn, nameAr: row.anchorNameAr },
-                        locale,
-                      )}
+                      {lookupName({ nameEn: row.anchorNameEn, nameAr: row.anchorNameAr }, locale)}
                     </Link>
                   </TableCell>
                   <TableCell className="text-start">
-                    {row.companyId && row.companyNameEn ? (
+                    {row.companyId && row.companyName ? (
                       <Link
                         href={`/companies/${row.companyId}`}
                         className="hover:underline"
                       >
-                        {bilingualName(
-                          {
-                            nameEn: row.companyNameEn,
-                            nameAr: row.companyNameAr,
-                          },
-                          locale,
-                        )}
+                        {row.companyName}
                       </Link>
                     ) : (
                       t("common.none")

@@ -299,7 +299,7 @@ async function main(): Promise<void> {
     const [company] = await db
       .insert(companies)
       .values({
-        nameEn: `${stamp} ${slug}`,
+        name: `${stamp} ${slug}`,
         nameNormalized: `${stamp}-${slug}`,
         createdBy: ownerUser.id,
         createdAt: instantDaysAgo(ageDays),
@@ -950,8 +950,8 @@ async function main(): Promise<void> {
   );
   check(
     "*** and the company it names is the one that will do the suppressing [21 §7] ***",
-    deferred.heldCompanyNameEn === `${stamp} defer`,
-    `got ${deferred.heldCompanyNameEn}`,
+    deferred.heldCompanyName === `${stamp} defer`,
+    `got ${deferred.heldCompanyName}`,
   );
 
   // The other half of the claim: the date really is deferred.

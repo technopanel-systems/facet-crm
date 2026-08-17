@@ -49,6 +49,7 @@
     "actions": "Actions",
     "createdAt": "Created",
     "createdBy": "Created by",
+    "name": "Name",
     "nameEn": "Name (English)",
     "nameAr": "Name (Arabic)",
     "phone": "Phone",

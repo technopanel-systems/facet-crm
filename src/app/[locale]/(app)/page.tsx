@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
 import { FOLLOW_UP_KINDS } from "@/lib/enums";
-import { bilingualName } from "@/lib/lookups";
+import { lookupName } from "@/lib/lookups";
 import { listNotifications } from "@/lib/notifications";
 import { achievementForPeriod, currentPeriod } from "@/lib/targets";
 
@@ -171,10 +171,7 @@ export default async function TodayPage({
                   <RecordRow
                     key={`${row.kind}:${row.anchorId}`}
                     href={anchorHref(row.anchorType, row.anchorId)}
-                    title={bilingualName(
-                      { nameEn: row.anchorNameEn, nameAr: row.anchorNameAr },
-                      locale,
-                    )}
+                    title={lookupName({ nameEn: row.anchorNameEn, nameAr: row.anchorNameAr }, locale)}
                     meta={`${t(`enums.followUpKind.${row.kind}`)}${
                       row.ownerNames.length > 0
                         ? ` · ${row.ownerNames.join(", ")}`

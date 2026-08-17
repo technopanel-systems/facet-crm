@@ -53,8 +53,7 @@ const subquery = new QueryBuilder();
 
 export type CoverageRow = {
   companyId: string;
-  companyNameEn: string;
-  companyNameAr: string | null;
+  companyName: string;
   /** Every live rep on the company, so a manager can see whose it is. */
   repNames: string[];
   /** Null = never logged against. */
@@ -88,7 +87,7 @@ export type CoverageResult = {
 function searchFilter(query: string | undefined) {
   const trimmed = query?.trim();
   if (!trimmed) return undefined;
-  return ilike(companies.nameEn, `%${trimmed}%`);
+  return ilike(companies.name, `%${trimmed}%`);
 }
 
 /**
@@ -136,12 +135,11 @@ export async function coverage(
   const rows = await db
     .select({
       companyId: companies.id,
-      companyNameEn: companies.nameEn,
-      companyNameAr: companies.nameAr,
+      companyName: companies.name,
     })
     .from(companies)
     .where(where)
-    .orderBy(asc(companies.nameEn))
+    .orderBy(asc(companies.name))
     .limit(PAGE_SIZE)
     .offset((page - 1) * PAGE_SIZE);
 

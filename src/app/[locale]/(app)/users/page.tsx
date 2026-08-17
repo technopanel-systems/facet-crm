@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
 import { can, listUsers, requireSession } from "@/lib/authz";
-import { bilingualName } from "@/lib/lookups";
+import { lookupName } from "@/lib/lookups";
 
 import {
   FilterNav,
@@ -131,10 +131,7 @@ export default async function UsersPage({
                     {row.email}
                   </TableCell>
                   <TableCell className="text-start">
-                    {bilingualName(
-                      { nameEn: row.roleNameEn, nameAr: row.roleNameAr },
-                      locale,
-                    )}
+                    {lookupName({ nameEn: row.roleNameEn, nameAr: row.roleNameAr }, locale)}
                   </TableCell>
                   <TableCell className="text-start">
                     {row.region

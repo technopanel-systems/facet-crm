@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
 import { getCompany } from "@/lib/companies";
-import { bilingualName } from "@/lib/lookups";
 import { companyTimeline } from "@/lib/timeline";
 
 import { ListPagination } from "../../../_components/list-controls";
@@ -46,7 +45,7 @@ export default async function CompanyTimelinePage({
     <div className="flex max-w-4xl flex-col gap-6">
       <PageHeader
         title={t("timeline.fullTitle")}
-        description={bilingualName(company, locale)}
+        description={company.name}
         action={
           <Button asChild size="sm" variant="outline">
             <Link href={`/companies/${company.id}`}>{t("common.back")}</Link>

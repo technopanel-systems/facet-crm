@@ -302,8 +302,7 @@ export type QuotationThreadListRow = {
   projectNameEn: string;
   projectNameAr: string | null;
   companyId: string;
-  companyNameEn: string;
-  companyNameAr: string | null;
+  companyName: string;
   raisedByName: string;
   endState: QuotationThreadEndState | null;
   paymentConfirmedAt: Date | null;
@@ -337,7 +336,7 @@ function searchFilter(query: string | undefined): SQL | undefined {
   return or(
     sql`${quotationVersions.smacReference} ilike ${pattern}`,
     sql`${projects.nameEn} ilike ${pattern}`,
-    sql`${companies.nameEn} ilike ${pattern}`,
+    sql`${companies.name} ilike ${pattern}`,
   );
 }
 
@@ -378,8 +377,7 @@ export async function listQuotationThreads(
         projectNameEn: projects.nameEn,
         projectNameAr: projects.nameAr,
         companyId: quotationThreads.companyId,
-        companyNameEn: companies.nameEn,
-        companyNameAr: companies.nameAr,
+        companyName: companies.name,
         raisedByName: users.name,
         endState: quotationThreads.endState,
         paymentConfirmedAt: quotationThreads.paymentConfirmedAt,
@@ -424,13 +422,8 @@ export type QuotationProjectOption = {
   id: string;
   nameEn: string;
   nameAr: string | null;
-  companies: { id: string; nameEn: string; nameAr: string | null }[];
-  contacts: {
-    id: string;
-    companyId: string;
-    nameEn: string;
-    nameAr: string | null;
-  }[];
+  companies: { id: string; name: string }[];
+  contacts: { id: string; companyId: string; name: string }[];
 };
 
 /**
@@ -464,8 +457,7 @@ export async function listQuotationProjectOptions(
     .select({
       projectId: projectCompanies.projectId,
       companyId: companies.id,
-      nameEn: companies.nameEn,
-      nameAr: companies.nameAr,
+      name: companies.name,
     })
     .from(projectCompanies)
     .innerJoin(companies, eq(projectCompanies.companyId, companies.id))
@@ -475,7 +467,7 @@ export async function listQuotationProjectOptions(
         isNull(projectCompanies.removedAt),
       ),
     )
-    .orderBy(asc(companies.nameEn));
+    .orderBy(asc(companies.name));
 
   const companyIds = [...new Set(links.map((row) => row.companyId))];
   const contactRows = companyIds.length
@@ -483,12 +475,11 @@ export async function listQuotationProjectOptions(
         .select({
           id: contacts.id,
           companyId: contacts.companyId,
-          nameEn: contacts.nameEn,
-          nameAr: contacts.nameAr,
+          name: contacts.name,
         })
         .from(contacts)
         .where(inArray(contacts.companyId, companyIds))
-        .orderBy(asc(contacts.nameEn))
+        .orderBy(asc(contacts.name))
     : [];
 
   return visibleProjects.map((project) => {
@@ -496,11 +487,7 @@ export async function listQuotationProjectOptions(
     const ownCompanyIds = new Set(own.map((link) => link.companyId));
     return {
       ...project,
-      companies: own.map(({ companyId, nameEn, nameAr }) => ({
-        id: companyId,
-        nameEn,
-        nameAr,
-      })),
+      companies: own.map(({ companyId, name }) => ({ id: companyId, name })),
       contacts: contactRows.filter((row) => ownCompanyIds.has(row.companyId)),
     };
   });
@@ -547,10 +534,8 @@ export type QuotationVersionDetail = QuotationVersion & {
 export type QuotationThreadDetail = QuotationThread & {
   projectNameEn: string;
   projectNameAr: string | null;
-  companyNameEn: string;
-  companyNameAr: string | null;
-  contactNameEn: string | null;
-  contactNameAr: string | null;
+  companyName: string;
+  contactName: string | null;
   raisedByName: string;
   cancelledByName: string | null;
   paymentConfirmedByName: string | null;
@@ -696,10 +681,8 @@ export async function getQuotationThread(
       thread: quotationThreads,
       projectNameEn: projects.nameEn,
       projectNameAr: projects.nameAr,
-      companyNameEn: companies.nameEn,
-      companyNameAr: companies.nameAr,
-      contactNameEn: contacts.nameEn,
-      contactNameAr: contacts.nameAr,
+      companyName: companies.name,
+      contactName: contacts.name,
       raisedByName: users.name,
     })
     .from(quotationThreads)
@@ -739,10 +722,8 @@ export async function getQuotationThread(
     ...row.thread,
     projectNameEn: row.projectNameEn,
     projectNameAr: row.projectNameAr,
-    companyNameEn: row.companyNameEn,
-    companyNameAr: row.companyNameAr,
-    contactNameEn: row.contactNameEn,
-    contactNameAr: row.contactNameAr,
+    companyName: row.companyName,
+    contactName: row.contactName,
     raisedByName: row.raisedByName,
     cancelledByName: names.get(row.thread.cancelledByUserId ?? "") ?? null,
     paymentConfirmedByName:

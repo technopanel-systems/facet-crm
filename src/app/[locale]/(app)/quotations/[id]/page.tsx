@@ -27,7 +27,7 @@ import { Link } from "@/i18n/navigation";
 import { can, requireSession } from "@/lib/authz";
 import { chainState } from "@/lib/chain";
 import { listDispatches } from "@/lib/dispatches";
-import { bilingualName } from "@/lib/lookups";
+import { lookupName } from "@/lib/lookups";
 import {
   listProductClasses,
   listProductFireRatings,
@@ -119,14 +119,8 @@ export default async function QuotationDetailPage({
   return (
     <div className="flex flex-col gap-6">
       <DetailHeader
-        name={bilingualName(
-          { nameEn: thread.projectNameEn, nameAr: thread.projectNameAr },
-          locale,
-        )}
-        state={bilingualName(
-          { nameEn: thread.companyNameEn, nameAr: thread.companyNameAr },
-          locale,
-        )}
+        name={lookupName({ nameEn: thread.projectNameEn, nameAr: thread.projectNameAr }, locale)}
+        state={thread.companyName}
         reference={live.smacReference ?? undefined}
         action={
           thread.endState ? (
@@ -194,19 +188,10 @@ export default async function QuotationDetailPage({
                   href={`/projects/${thread.projectId}`}
                   className="hover:underline"
                 >
-                  {bilingualName(
-                    {
-                      nameEn: thread.projectNameEn,
-                      nameAr: thread.projectNameAr,
-                    },
-                    locale,
-                  )}
+                  {lookupName({ nameEn: thread.projectNameEn, nameAr: thread.projectNameAr }, locale)}
                 </Link>
               ) : (
-                bilingualName(
-                  { nameEn: thread.projectNameEn, nameAr: thread.projectNameAr },
-                  locale,
-                )
+                lookupName({ nameEn: thread.projectNameEn, nameAr: thread.projectNameAr }, locale)
               )}
             </Fact>
             <Fact label={t("quotations.fields.company")}>
@@ -215,31 +200,14 @@ export default async function QuotationDetailPage({
                   href={`/companies/${thread.companyId}`}
                   className="hover:underline"
                 >
-                  {bilingualName(
-                    {
-                      nameEn: thread.companyNameEn,
-                      nameAr: thread.companyNameAr,
-                    },
-                    locale,
-                  )}
+                  {thread.companyName}
                 </Link>
               ) : (
-                bilingualName(
-                  { nameEn: thread.companyNameEn, nameAr: thread.companyNameAr },
-                  locale,
-                )
+                thread.companyName
               )}
             </Fact>
             <Fact label={t("quotations.fields.contact")}>
-              {thread.contactNameEn
-                ? bilingualName(
-                    {
-                      nameEn: thread.contactNameEn,
-                      nameAr: thread.contactNameAr,
-                    },
-                    locale,
-                  )
-                : dash}
+              {thread.contactName ?? dash}
             </Fact>
             <Fact label={t("quotations.fields.raisedBy")}>
               {thread.raisedByName}
@@ -484,7 +452,6 @@ export default async function QuotationDetailPage({
           them. */}
       <NextFollowUpPanel
         session={session}
-        locale={locale}
         recordType="quotation_thread"
         recordId={thread.id}
         value={thread.nextFollowUpAt}

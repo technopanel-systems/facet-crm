@@ -14,7 +14,6 @@ import {
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
 import { REPORT_ENTRY_TYPES, REPORT_OUTCOMES } from "@/lib/enums";
-import { bilingualName } from "@/lib/lookups";
 import { listReports } from "@/lib/reports";
 
 import {
@@ -179,15 +178,7 @@ export default async function ReportsPage({
                   </TableCell>
                   <TableCell className="text-start">
                     {/* A field note belongs to no customer `[20 §2]`. */}
-                    {row.companyNameEn
-                      ? bilingualName(
-                          {
-                            nameEn: row.companyNameEn,
-                            nameAr: row.companyNameAr,
-                          },
-                          locale,
-                        )
-                      : t("common.none")}
+                    {row.companyName ?? t("common.none")}
                   </TableCell>
                   <TableCell className="text-start">
                     {row.outcome

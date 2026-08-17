@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
 import type { CoverageRow } from "@/lib/coverage";
-import { bilingualName } from "@/lib/lookups";
 
 import { Turn, turnTone } from "./turn";
 
@@ -38,10 +37,8 @@ import { Turn, turnTone } from "./turn";
  */
 export async function CoverageTable({
   rows,
-  locale,
 }: {
   rows: CoverageRow[];
-  locale: string;
 }) {
   const t = await getTranslations();
   const format = await getFormatter();
@@ -81,10 +78,7 @@ export async function CoverageTable({
                 href={`/companies/${row.companyId}`}
                 className="hover:underline"
               >
-                {bilingualName(
-                  { nameEn: row.companyNameEn, nameAr: row.companyNameAr },
-                  locale,
-                )}
+                {row.companyName}
               </Link>
             </TableCell>
             <TableCell className="text-start">

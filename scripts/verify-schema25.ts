@@ -411,8 +411,7 @@ async function main(): Promise<void> {
 
   const rep = await sessionFor("rep-a@example.test");
   const company = await createCompany(rep, {
-    nameEn: `${stamp} company`,
-    nameAr: null,
+    name: `${stamp} company`,
     phone: null,
     categoryId: null,
     vatNumber: null,

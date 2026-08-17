@@ -12,7 +12,6 @@ import { Timeline } from "@/components/timeline";
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
 import { getContact } from "@/lib/contacts";
-import { bilingualName } from "@/lib/lookups";
 import { recordTimeline } from "@/lib/timeline";
 
 import { CommentBox } from "../../_components/comment-box";
@@ -49,7 +48,7 @@ export default async function ContactDetailPage({
   return (
     <div className="flex flex-col gap-6">
       <DetailHeader
-        name={bilingualName(contact, locale)}
+        name={contact.name}
         state={contact.position ?? undefined}
         reference={contact.phone ?? undefined}
         action={
@@ -72,18 +71,8 @@ export default async function ContactDetailPage({
                 href={`/companies/${contact.companyId}`}
                 className="hover:underline"
               >
-                {bilingualName(
-                  {
-                    nameEn: contact.companyNameEn,
-                    nameAr: contact.companyNameAr,
-                  },
-                  locale,
-                )}
+                {contact.companyName}
               </Link>
-            </Fact>
-            <Fact label={t("common.nameEn")}>{contact.nameEn}</Fact>
-            <Fact label={t("common.nameAr")}>
-              {contact.nameAr ?? dash}
             </Fact>
             <Fact label={t("contacts.fields.position")}>
               {contact.position ?? dash}

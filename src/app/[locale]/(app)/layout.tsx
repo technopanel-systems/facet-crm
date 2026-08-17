@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { Link } from "@/i18n/navigation";
 import { can } from "@/lib/authz";
-import { bilingualName } from "@/lib/lookups";
+import { lookupName } from "@/lib/lookups";
 
 import { logoutAction } from "./actions";
 import { shellCounts } from "./_components/shell-counts";
@@ -66,7 +66,7 @@ export default async function AppLayout({
         canManageUsers={can(session, "canManageUsers")}
         todayCount={follow.total}
         userName={session.user.name}
-        roleLabel={bilingualName(session.user.role, locale)}
+        roleLabel={lookupName(session.user.role, locale)}
       />
 
       {/* `min-w-0` stops a wide table blowing the column out and squeezing the

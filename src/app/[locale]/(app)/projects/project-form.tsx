@@ -270,7 +270,6 @@ export function ProjectForm({
       {withCompanies ? (
         <ProjectCompaniesField
           companies={companies}
-          locale={locale}
           error={errors.companyId}
         />
       ) : null}

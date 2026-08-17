@@ -40,7 +40,6 @@ export default async function NewContactPage({
         submitLabel={t("common.create")}
         cancelHref={prefill ? `/companies/${prefill}` : "/contacts"}
         companies={companies}
-        locale={locale}
       />
     </div>
   );

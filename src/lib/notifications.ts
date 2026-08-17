@@ -764,7 +764,7 @@ async function anchorName(
 ): Promise<string | null> {
   if (anchorType === "company") {
     const [row] = await db
-      .select({ name: companies.nameEn })
+      .select({ name: companies.name })
       .from(companies)
       .where(eq(companies.id, id))
       .limit(1);
@@ -772,7 +772,7 @@ async function anchorName(
   }
   if (anchorType === "quotation_thread") {
     const [row] = await db
-      .select({ name: companies.nameEn })
+      .select({ name: companies.name })
       .from(quotationThreads)
       .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
       .where(eq(quotationThreads.id, id))

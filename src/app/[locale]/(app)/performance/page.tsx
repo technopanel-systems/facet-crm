@@ -192,7 +192,7 @@ export default async function PerformancePage({
             query={q}
             extra={{ period: asMonth(period), rep, quiet }}
           >
-            <CoverageTable rows={cover.rows} locale={locale} />
+            <CoverageTable rows={cover.rows} />
           </ListCard>
         )}
       </section>

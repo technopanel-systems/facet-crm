@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
-import { bilingualName, pickName } from "@/lib/lookups";
+import { lookupName, pickName } from "@/lib/lookups";
 import { listProjects } from "@/lib/projects";
 
 import { ListCard, SearchForm } from "../_components/list-controls";
@@ -89,7 +89,7 @@ export default async function ProjectsPage({
                       href={`/projects/${row.id}`}
                       className="hover:underline"
                     >
-                      {bilingualName(row, locale)}
+                      {lookupName(row, locale)}
                     </Link>
                   </TableCell>
                   <TableCell className="text-start">{row.ownerName}</TableCell>

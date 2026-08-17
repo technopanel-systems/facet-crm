@@ -26,7 +26,7 @@ import { Timeline } from "@/components/timeline";
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
 import { getDispatch } from "@/lib/dispatches";
-import { bilingualName } from "@/lib/lookups";
+import { lookupName } from "@/lib/lookups";
 import { recordTimeline } from "@/lib/timeline";
 
 import { CommentBox } from "../../_components/comment-box";
@@ -74,10 +74,7 @@ export default async function DispatchPage({
           title told a rep nothing about which dispatch they had opened; the
           square metres are a fact below, where a quantity belongs. */}
       <DetailHeader
-        name={bilingualName(
-          { nameEn: dispatch.companyNameEn, nameAr: dispatch.companyNameAr },
-          locale,
-        )}
+        name={dispatch.companyName}
         state={`${day(dispatch.dispatchDate)} · ${dispatch.sqm} ${t("common.sqm")}`}
         reference={dispatch.smacReference ?? undefined}
       />
@@ -96,10 +93,10 @@ export default async function DispatchPage({
                   href={`/companies/${dispatch.companyId}`}
                   className="hover:underline"
                 >
-                  {bilingualName({ nameEn: dispatch.companyNameEn, nameAr: dispatch.companyNameAr }, locale)}
+                  {dispatch.companyName}
                 </Link>
               ) : (
-                bilingualName({ nameEn: dispatch.companyNameEn, nameAr: dispatch.companyNameAr }, locale)
+                dispatch.companyName
               )}
             </Fact>
             <Fact label={t("dispatches.fields.rep")}>
@@ -124,7 +121,7 @@ export default async function DispatchPage({
                   href={`/projects/${dispatch.projectId}`}
                   className="hover:underline"
                 >
-                  {bilingualName(
+                  {lookupName(
                     {
                       nameEn: dispatch.projectNameEn ?? "",
                       nameAr: dispatch.projectNameAr,
@@ -133,7 +130,7 @@ export default async function DispatchPage({
                   )}
                 </Link>
               ) : (
-                bilingualName(
+                lookupName(
                   {
                     nameEn: dispatch.projectNameEn ?? "",
                     nameAr: dispatch.projectNameAr,

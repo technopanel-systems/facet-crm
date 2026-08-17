@@ -12,9 +12,12 @@
  *  1. Soft state, never deletion of history. Business events are recorded as
  *     `deactivated_at`, `archived_at`, `removed_at`, `revoked_at`,
  *     `merged_into_id` or a superseding row — never by deleting.
- *  2. Bilingual names plus a normalised form. `name_en` / `name_ar` on
- *     everything user-facing; `name_normalized` additionally on companies,
- *     contacts and projects, which are what duplicate matching compares.
+ *  2. Bilingual names plus a normalised form. `name_en` / `name_ar` on the
+ *     lookup tables and on projects; `name_normalized` additionally on
+ *     companies, contacts and projects, which are what duplicate matching
+ *     compares. Companies and contacts carry **one** `name`, written in
+ *     English or Arabic `S12` `S19` — with a mandatory phone as the primary
+ *     matching key `S23`, a second name column stopped earning its cost.
  *  3. ERP references carry a verification state. Every SMAC reference number
  *     is typed by a human, so it sits beside a verification status and can be
  *     corrected `[04 A2]`.
@@ -499,10 +502,10 @@ export const companies = pgTable(
   "companies",
   {
     id: pk(),
-    nameEn: text("name_en").notNull(),
-    nameAr: text("name_ar"),
+    /** One field, English or Arabic `S12`. */
+    name: text("name").notNull(),
     nameNormalized: text("name_normalized").notNull(),
-    /** The strongest duplicate-matching key `[07 B6]`. */
+    /** The strongest duplicate-matching key `[07 B6]`, and the primary one `S23`. */
     phone: text("phone"),
     categoryId: uuid("category_id").references(() => companyCategories.id),
     /** The customer's VAT number `[08 D7]`. */
@@ -644,8 +647,8 @@ export const contacts = pgTable(
     companyId: uuid("company_id")
       .notNull()
       .references(() => companies.id),
-    nameEn: text("name_en").notNull(),
-    nameAr: text("name_ar"),
+    /** One field, English or Arabic `S19`. */
+    name: text("name").notNull(),
     nameNormalized: text("name_normalized").notNull(),
     phone: text("phone"),
     email: text("email"),

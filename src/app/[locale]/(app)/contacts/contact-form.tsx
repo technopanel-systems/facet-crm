@@ -19,8 +19,8 @@ type Action = (state: FormState, formData: FormData) => Promise<FormState>;
 
 export type CompanyOption = {
   id: string;
-  nameEn: string;
-  nameAr: string | null;
+  /** One field, English or Arabic `S12`. */
+  name: string;
 };
 
 export function ContactForm({
@@ -29,14 +29,12 @@ export function ContactForm({
   submitLabel,
   cancelHref,
   companies,
-  locale,
 }: {
   action: Action;
   defaults?: Partial<ContactInput>;
   submitLabel: string;
   cancelHref: string;
   companies: CompanyOption[];
-  locale: string;
 }) {
   const t = useTranslations();
   const [state, formAction, pending] = useActionState(action, emptyFormState);
@@ -44,9 +42,6 @@ export function ContactForm({
   const errors = state.fieldErrors ?? {};
   const value = (name: keyof ContactInput) =>
     state.values?.[name] ?? (defaults?.[name] as string | null | undefined) ?? "";
-
-  const optionName = (company: CompanyOption) =>
-    locale === "ar" ? company.nameAr || company.nameEn : company.nameEn;
 
   return (
     <FormShell
@@ -81,7 +76,7 @@ export function ContactForm({
         >
           {companies.map((company) => (
             <option key={company.id} value={company.id}>
-              {optionName(company)}
+              {company.name}
             </option>
           ))}
         </SelectField>
@@ -101,29 +96,16 @@ export function ContactForm({
         />
       </FormField>
 
-      <FormField
-        name="nameEn"
-        label={t("common.nameEn")}
-        error={errors.nameEn}
-        required
-      >
+      {/* One field, English or Arabic `S19`. `dir="auto"` because the script
+          is a property of what the rep types, not of the interface `D62`. */}
+      <FormField name="name" label={t("common.name")} error={errors.name} required>
         <Input
-          id="nameEn"
-          name="nameEn"
-          defaultValue={value("nameEn")}
+          id="name"
+          name="name"
+          defaultValue={value("name")}
           required
-          aria-invalid={Boolean(errors.nameEn) || undefined}
-          className="text-start"
-        />
-      </FormField>
-
-      <FormField name="nameAr" label={t("common.nameAr")} error={errors.nameAr}>
-        <Input
-          id="nameAr"
-          name="nameAr"
-          dir="rtl"
-          defaultValue={value("nameAr")}
-          aria-invalid={Boolean(errors.nameAr) || undefined}
+          dir="auto"
+          aria-invalid={Boolean(errors.name) || undefined}
           className="text-start"
         />
       </FormField>

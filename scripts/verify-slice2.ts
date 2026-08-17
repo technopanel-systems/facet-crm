@@ -176,7 +176,7 @@ async function main(): Promise<void> {
   const [company] = await db
     .insert(companies)
     .values({
-      nameEn: `${stamp} Co`,
+      name: `${stamp} Co`,
       nameNormalized: stamp,
       createdBy: repA.user.id,
     })
@@ -205,7 +205,7 @@ async function main(): Promise<void> {
   const [unquoted] = await db
     .insert(companies)
     .values({
-      nameEn: `${stamp} Unquoted`,
+      name: `${stamp} Unquoted`,
       nameNormalized: `${stamp}-unquoted`,
       createdBy: repA.user.id,
     })
@@ -525,7 +525,7 @@ async function main(): Promise<void> {
   );
   check(
     "the coordinator gets the company name",
-    Boolean(coordinatorView?.companyNameEn),
+    Boolean(coordinatorView?.companyName),
   );
   check(
     "but may NOT open the project record [16 §8]",
@@ -555,7 +555,7 @@ async function main(): Promise<void> {
   const [other] = await db
     .insert(companies)
     .values({
-      nameEn: `${stamp} Unlinked`,
+      name: `${stamp} Unlinked`,
       nameNormalized: `${stamp}-unlinked`,
       createdBy: repA.user.id,
     })
