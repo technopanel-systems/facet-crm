@@ -17,14 +17,13 @@ export type CompanyOption = {
  * The participants chosen while creating a project.
  *
  * A project keeps at least one participant `S27`, so the field starts with one
- * row and refuses to drop below one. A participant carries no role label `S25`,
- * so a row is a company and nothing else — it stays a repeater because a
- * project involves several companies `S24`, not because a row is complicated.
+ * row and refuses to drop below one. A participant carries no role label `S25`
+ * and no buyer flag `S26`, so a row is a company and nothing else — it stays a
+ * repeater because a project involves several companies `S24`, not because a
+ * row is complicated.
  *
- * The buyer is a **radio group with a "none" option**, not a checkbox per row.
- * `S26` says zero or one buyer, and a radio group is that rule: the invalid
- * two-buyer state is unreachable in the UI, so the server's check and the
- * partial unique index are backstops rather than the thing users hit.
+ * **Nothing here says who bought.** That is derived from dispatches `S26`, and
+ * nothing has been dispatched against a project being created.
  */
 export function ProjectCompaniesField({
   companies,
@@ -58,43 +57,28 @@ export function ProjectCompaniesField({
 
       <div className="flex flex-col gap-3">
         {rows.map((index) => (
-          <div
-            key={index}
-            className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto]"
-          >
-            <div className="flex flex-col gap-1.5">
-              <Label
-                htmlFor={`companyId-${index}`}
-                className="text-muted-foreground text-start text-xs"
-              >
-                {t("projects.detail.company")}
-              </Label>
-              <select
-                id={`companyId-${index}`}
-                name="companyId"
-                required={index === 0}
-                disabled={companies.length === 0}
-                defaultValue=""
-                className={selectClasses}
-              >
-                <option value="">{t("common.none")}</option>
-                {companies.map((company) => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <label className="flex h-9 items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="buyerIndex"
-                value={String(index)}
-                className="size-4"
-              />
-              <span>{t("projects.detail.buyer")}</span>
-            </label>
+          <div key={index} className="flex flex-col gap-1.5">
+            <Label
+              htmlFor={`companyId-${index}`}
+              className="text-muted-foreground text-start text-xs"
+            >
+              {t("projects.detail.company")}
+            </Label>
+            <select
+              id={`companyId-${index}`}
+              name="companyId"
+              required={index === 0}
+              disabled={companies.length === 0}
+              defaultValue=""
+              className={selectClasses}
+            >
+              <option value="">{t("common.none")}</option>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
+                </option>
+              ))}
+            </select>
           </div>
         ))}
       </div>
@@ -125,10 +109,6 @@ export function ProjectCompaniesField({
             {t("common.remove")}
           </Button>
         ) : null}
-        <label className="text-muted-foreground ms-auto flex items-center gap-2 text-xs">
-          <input type="radio" name="buyerIndex" value="" defaultChecked className="size-3.5" />
-          {t("projects.detail.noBuyer")}
-        </label>
       </div>
     </fieldset>
   );

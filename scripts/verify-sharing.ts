@@ -376,7 +376,7 @@ async function main(): Promise<void> {
     .returning();
   await db
     .insert(projectCompanies)
-    .values({ projectId: project.id, companyId: company.id, isBuyer: true });
+    .values({ projectId: project.id, companyId: company.id });
 
   const thread = await createQuotationThread(
     repA,
@@ -800,7 +800,7 @@ async function main(): Promise<void> {
     .returning();
   await db
     .insert(projectCompanies)
-    .values({ projectId: lonelyProject.id, companyId: lonely.id, isBuyer: true });
+    .values({ projectId: lonelyProject.id, companyId: lonely.id });
 
   await grantShare(manager, "company", lonely.id, repC.user.id);
   check(

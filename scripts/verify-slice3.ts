@@ -6,8 +6,9 @@
  * `CLAUDE.md` records: the throwaway script that verified the auth checklist
  * was deleted, so its results cannot be reproduced. This one is **kept**.
  *
- * It drives `src/lib/dispatches.ts`, `src/lib/credit-splits.ts` and
- * `src/lib/targets.ts` in process — no browser, no HTTP — and checks the things
+ * It drives `src/lib/dispatches.ts`, `src/lib/credit-splits.ts`,
+ * `src/lib/targets.ts` and — since `S26` — the buyer derivation in
+ * `src/lib/projects.ts` in process: no browser, no HTTP. It checks the things
  * that are otherwise only claimed:
  *
  *   1. The three flags are reachable, and held by the right roles.
@@ -26,6 +27,11 @@
  *  12. Visibility `[18 §2]` — including the negative half: names yes, records
  *      no.
  *  13. Every write is audited `[07 E1]`.
+ *  14. Who bought is DERIVED from dispatches, never flagged `S26` — two
+ *      participants may both have bought, a direct dispatch reaches no project
+ *      `S75`, and a participant with nothing dispatched is `null` and not
+ *      `"0.0000"`. That last one is asserted by identity: a truthiness test
+ *      passes on the zero it exists to distinguish.
  *
  * Usage: `npm run verify:slice3`
  *
@@ -85,6 +91,7 @@ import {
 } from "@/lib/dispatches";
 import { SAUDI_CODE } from "@/lib/enums";
 import { listCountries } from "@/lib/lookups";
+import { listProjectCompanies } from "@/lib/projects";
 import {
   acceptThread,
   addServiceLine,
@@ -277,7 +284,7 @@ async function main(): Promise<void> {
     .returning();
   await db
     .insert(projectCompanies)
-    .values({ projectId: project.id, companyId: company.id, isBuyer: true });
+    .values({ projectId: project.id, companyId: company.id });
 
   const line = {
     supplierId: supplier.id,
@@ -973,6 +980,175 @@ async function main(): Promise<void> {
     .groupBy(auditLog.action);
   console.log(
     `        actions seen: ${actions.map((row) => row.action).sort().join(", ")}`,
+  );
+
+  /* --- 14. Who bought is derived from dispatches `S26` ------------- */
+
+  console.log(
+    "\n14. Who bought is derived from dispatches, never flagged [S26]",
+  );
+
+  // A SECOND participant that also buys, and a THIRD that never does. The
+  // fixture project already has `company`, which dispatched 100 + 5000 m²
+  // against `paidThread` and — separately — 40 m² with no thread at all.
+  const [buyerTwo] = await db
+    .insert(companies)
+    .values({
+      name: `${stamp} Buyer Two`,
+      nameNormalized: `${stamp}-buyer-two`,
+      phone: `+9665${stamp.slice(-7)}2`,
+      countryId: saudiId,
+      createdBy: repA.user.id,
+    })
+    .returning();
+  await db.insert(companyReps).values({
+    companyId: buyerTwo.id,
+    userId: repA.user.id,
+    isPrimary: true,
+    origin: "self_registered",
+  });
+  const [bystander] = await db
+    .insert(companies)
+    .values({
+      name: `${stamp} Bystander`,
+      nameNormalized: `${stamp}-bystander`,
+      phone: `+9665${stamp.slice(-7)}3`,
+      countryId: saudiId,
+      createdBy: repA.user.id,
+    })
+    .returning();
+  await db.insert(projectCompanies).values([
+    { projectId: project.id, companyId: buyerTwo.id },
+    { projectId: project.id, companyId: bystander.id },
+  ]);
+
+  /** This project's figure for one company, or null. */
+  async function figureFor(companyId: string): Promise<string | null> {
+    const rows = await listProjectCompanies(repA, project.id);
+    return rows.find((row) => row.companyId === companyId)?.dispatchedSqm ?? null;
+  }
+
+  const beforeSecondBuyer = await listProjectCompanies(repA, project.id);
+  const firstBuyerBefore = beforeSecondBuyer.find(
+    (row) => row.companyId === company.id,
+  );
+  check(
+    "a participant that has dispatched carries a figure",
+    firstBuyerBefore?.dispatchedSqm != null,
+    `got ${JSON.stringify(firstBuyerBefore?.dispatchedSqm)}`,
+  );
+
+  // **Deltas, not totals.** Sections 3 and 7 both dispatch against `paidThread`
+  // and either could gain a row; a hardcoded total would then fail for a reason
+  // that has nothing to do with S26. What must hold is how the figure MOVES.
+  const baseline = toScaled(firstBuyerBefore?.dispatchedSqm ?? "0", SQM_SCALE);
+
+  // A direct dispatch has no thread, so it reaches no project `S75` — this is
+  // the assertion that fails the day someone routes a dispatch to a project by
+  // its company instead of by its quotation thread.
+  await recordDispatch(coordinator, {
+    sqm: "40.0000",
+    dispatchDate: "2026-09-13",
+    quotationThreadId: null,
+    companyId: company.id,
+    userId: repB.user.id,
+  });
+  check(
+    "*** a DIRECT dispatch moves the project figure not at all *** [S26], [S75]",
+    toScaled(await figureFor(company.id) ?? "0", SQM_SCALE) === baseline,
+    `${firstBuyerBefore?.dispatchedSqm} → ${await figureFor(company.id)}`,
+  );
+
+  // And a linked one moves it by exactly its own square metres.
+  await recordDispatch(coordinator, {
+    sqm: "7.0000",
+    dispatchDate: "2026-09-13",
+    quotationThreadId: paidThread.id,
+    companyId: null,
+    userId: null,
+  });
+  check(
+    "a LINKED dispatch moves it by exactly its own square metres [S26]",
+    toScaled(await figureFor(company.id) ?? "0", SQM_SCALE) ===
+      baseline + toScaled("7.0000", SQM_SCALE),
+    `expected ${fromScaled(baseline + toScaled("7.0000", SQM_SCALE), SQM_SCALE)}, got ${await figureFor(company.id)}`,
+  );
+
+  // *** `=== null`, never `!x`. *** "Absent" and "zero" is the distinction the
+  // derivation exists to make, and a truthiness test passes on `"0.0000"` and
+  // `""` alike — it would pass against exactly the bug it is here to catch.
+  const bystanderBefore = beforeSecondBuyer.find(
+    (row) => row.companyId === bystander.id,
+  );
+  check(
+    "a participant with no dispatch is present on the project",
+    bystanderBefore !== undefined,
+  );
+  check(
+    "*** and its figure is null, NOT '0.0000' *** [S26]",
+    bystanderBefore?.dispatchedSqm === null,
+    `got ${JSON.stringify(bystanderBefore?.dispatchedSqm)}`,
+  );
+
+  const buyerTwoBefore = beforeSecondBuyer.find(
+    (row) => row.companyId === buyerTwo.id,
+  );
+  check(
+    "a participant that has not dispatched YET is null too",
+    buyerTwoBefore?.dispatchedSqm === null,
+    `got ${JSON.stringify(buyerTwoBefore?.dispatchedSqm)}`,
+  );
+
+  // Now the second participant buys, through its own thread on the same
+  // project. `S26`: two participants may both have bought.
+  const secondThread = await createQuotationThread(
+    repA,
+    { projectId: project.id, companyId: buyerTwo.id, contactId: null },
+    version,
+    [line],
+    [],
+  );
+  await issueVersion(coordinator, secondThread.id, {
+    smacReference: `${stamp}-9593`,
+    verification: "unverified",
+  });
+  await acceptThread(coordinator, secondThread.id);
+  await confirmPayment(repA, secondThread.id, "2026-08-02");
+  await recordDispatch(coordinator, {
+    sqm: "250.0000",
+    dispatchDate: "2026-09-13",
+    quotationThreadId: secondThread.id,
+    companyId: null,
+    userId: null,
+  });
+
+  const afterSecondBuyer = await listProjectCompanies(repA, project.id);
+  const byCompany = new Map(
+    afterSecondBuyer.map((row) => [row.companyId, row.dispatchedSqm]),
+  );
+  // **Both, at once.** Under the old flag this state was unreachable: a partial
+  // unique index refused a second buyer on a project, and naming one cleared
+  // the other. Nothing was ticked here and nothing was cleared.
+  check(
+    "*** two participants may BOTH have bought — no flag moved *** [S26]",
+    byCompany.get(company.id) ===
+      fromScaled(baseline + toScaled("7.0000", SQM_SCALE), SQM_SCALE) &&
+      byCompany.get(buyerTwo.id) === "250.0000",
+    `got ${byCompany.get(company.id)} and ${byCompany.get(buyerTwo.id)}`,
+  );
+  check(
+    "the third participant is STILL null, by identity — not zeroed by the sum",
+    byCompany.get(bystander.id) === null,
+    `got ${JSON.stringify(byCompany.get(bystander.id))}`,
+  );
+  // Ordering was `desc(is_buyer), name` and is now name alone. Nothing floats
+  // to the top: not a flag, which is gone, and not the biggest figure either —
+  // `company` has 5100 m² against Buyer Two's 250 and still sorts third.
+  check(
+    "participants come back in NAME order, with nothing floated to the top [S26]",
+    afterSecondBuyer.map((row) => row.companyName).join(" | ") ===
+      [`${stamp} Buyer Two`, `${stamp} Bystander`, `${stamp} Co`].join(" | "),
+    afterSecondBuyer.map((row) => row.companyName).join(" | "),
   );
 
   // Nothing is cleaned up: FACET does not delete history `[12 §7]`, and this

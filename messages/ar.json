@@ -316,8 +316,7 @@
       "details": "التفاصيل",
       "companies": "الشركات",
       "company": "الشركة",
-      "buyer": "المشتري",
-      "noBuyer": "لا يوجد مشترٍ",
+      "dispatched": "تم التوريد",
       "addCompany": "إضافة شركة",
       "removeCompany": "إزالة",
       "hiddenCompany": "غير مرئية لك",
@@ -334,7 +333,6 @@
     "errors": {
       "atLeastOneCompany": "يجب أن يرتبط المشروع بشركة واحدة على الأقل.",
       "duplicateCompany": "هذه الشركة مرتبطة بالمشروع بالفعل.",
-      "oneBuyerOnly": "لا يمكن أن تكون أكثر من شركة واحدة هي المشتري.",
       "companyNotVisible": "لا يمكنك استخدام هذه الشركة.",
       "lossReasonRequired": "المشروع الخاسر يحتاج إلى سبب.",
       "lossReasonDetailRequired": "أضف تفاصيل حول \"أخرى\" — بها تنمو قائمة الأسباب.",

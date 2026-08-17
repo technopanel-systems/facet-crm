@@ -488,7 +488,7 @@ async function main(): Promise<void> {
       .returning();
     await db
       .insert(projectCompanies)
-      .values({ projectId: project.id, companyId, isBuyer: true });
+      .values({ projectId: project.id, companyId });
     const [thread] = await db
       .insert(quotationThreads)
       .values({

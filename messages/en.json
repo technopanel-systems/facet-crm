@@ -316,8 +316,7 @@
       "details": "Details",
       "companies": "Companies",
       "company": "Company",
-      "buyer": "Buyer",
-      "noBuyer": "No buyer",
+      "dispatched": "Dispatched",
       "addCompany": "Add company",
       "removeCompany": "Remove",
       "hiddenCompany": "Not visible to you",
@@ -334,7 +333,6 @@
     "errors": {
       "atLeastOneCompany": "A project needs at least one company.",
       "duplicateCompany": "That company is already linked to this project.",
-      "oneBuyerOnly": "Only one company can be the buyer.",
       "companyNotVisible": "You cannot use that company.",
       "lossReasonRequired": "A lost project needs a reason.",
       "lossReasonDetailRequired": "Say more about \"Other\" — it is how the reason list grows.",

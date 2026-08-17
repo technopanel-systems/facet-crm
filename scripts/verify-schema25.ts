@@ -27,7 +27,11 @@
  *      is where `25 §20`'s withdrawal (`tasks`) is confirmed — folded into
  *      this section rather than kept as its own, since a separate section
  *      making the same kind of claim ("this thing is gone") would be an
- *      assertion about an assertion.
+ *      assertion about an assertion. Two spec rules land here too:
+ *      `project_companies.role` `S25`, and `project_companies.is_buyer` with
+ *      the `project_companies_one_buyer_key` index `S26` — the index asserted
+ *      in its own right, since "at most one buyer" is what S26 forbids and a
+ *      dropped column takes its index silently.
  *   3. Every CHECK refuses **at the database** `[13 §1]`.
  *   4. The seeds: ten categories and nine loss reasons `[25 §5, §33]`. The
  *      read-only flag `25 §28` seeded is gone with the column `[26 §2]`.
@@ -279,6 +283,23 @@ const SLICE6_DROPPED_COLUMNS = [
  */
 const S25_DROPPED_COLUMNS = ["project_companies.role"];
 
+/**
+ * The column `S26` drops: who bought is derived from dispatches, never
+ * flagged, so there is no flag to hold. Separate from the S25 list beside it
+ * for the reason that one is separate from the two above — one rule, one
+ * migration, one claim, legible without git blame.
+ *
+ * The **index** matters at least as much as the column and is checked below
+ * rather than here: `is_buyer` going takes `project_companies_one_buyer_key`
+ * with it automatically, so a passing column check proves the index is gone
+ * only by implication, and "at most one buyer" is the thing `S26` actually
+ * forbids.
+ */
+const S26_DROPPED_COLUMNS = ["project_companies.is_buyer"];
+
+/** The index `S26` drops with it — see the note above. */
+const S26_DROPPED_INDEXES = ["project_companies_one_buyer_key"];
+
 /** Whole tables feature slice 6 dropped `[26 §2, §6]`. */
 const SLICE6_DROPPED_TABLES = ["product_colours", "activities", "tasks"];
 
@@ -359,10 +380,10 @@ async function main(): Promise<void> {
     }
   }
 
-  /* --- 2. Every withdrawn thing is gone [25 §6, §23, §35], [26 §2], S25 --- */
+  /* --- 2. Every withdrawn thing is gone [25 §6, §23, §35], [26 §2], S25, S26 - */
 
   console.log(
-    "\n2. Warmth, tolerance, the sales desk, slice 6's drops and the participant role are absent",
+    "\n2. Warmth, tolerance, the sales desk, slice 6's drops, the participant role and the buyer flag are absent",
   );
 
   for (const key of WITHDRAWN) {
@@ -384,6 +405,31 @@ async function main(): Promise<void> {
   for (const key of S25_DROPPED_COLUMNS) {
     check(`${key} is gone [S25]`, !columns.has(key));
   }
+
+  for (const key of S26_DROPPED_COLUMNS) {
+    check(`${key} is gone [S26]`, !columns.has(key));
+  }
+
+  // The rule S26 states is "no participant is marked as the buyer by hand" —
+  // which in SQL was the partial unique index, not the column. Asserted in its
+  // own right, because a column check passes on it only by implication.
+  const liveIndexes = new Set(
+    (
+      (await db.execute(
+        sql`select indexname from pg_indexes where schemaname = 'public'`,
+      )) as unknown as { indexname: string }[]
+    ).map((row) => row.indexname),
+  );
+  for (const name of S26_DROPPED_INDEXES) {
+    check(`index ${name} is gone [S26]`, !liveIndexes.has(name));
+  }
+  // Its sibling stays: removal is still soft and re-linkable `S27`, which is
+  // unchanged by this slice and is exactly the thing a regenerated migration
+  // would quietly take out alongside the buyer index.
+  check(
+    "index project_companies_key survives — S27 is unchanged",
+    liveIndexes.has("project_companies_key"),
+  );
 
   for (const table of SLICE6_DROPPED_TABLES) {
     const exists = (await db.execute(
@@ -466,7 +512,7 @@ async function main(): Promise<void> {
       lossReason: null,
       inProduction: false,
     },
-    [{ companyId: company.id, isBuyer: false }],
+    [{ companyId: company.id }],
   );
 
   const otherReason = seededReasons.find(
@@ -785,7 +831,7 @@ async function main(): Promise<void> {
       lossReason: "The customer chose a cheaper supplier.",
       inProduction: false,
     },
-    [{ companyId: company.id, isBuyer: false }],
+    [{ companyId: company.id }],
   );
   check(
     "*** creating a LOST project through src/lib/projects.ts succeeds *** [25 §5]",

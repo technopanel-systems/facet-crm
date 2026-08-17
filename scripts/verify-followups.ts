@@ -19,7 +19,7 @@
  *    met still raises a row. This is the assertion that fails if the override
  *    is ever rebuilt as a suppressor that merely stops suppressing.
  *  - **§14: a deferred date says so, and names the right company.** The panel
- *    resolves a project's company through `buyerOrFirstCompany`, the same way
+ *    resolves a project's company through `firstCompanyByName`, the same way
  *    `gather` does; a second resolution would name one company while another
  *    did the suppressing, which is the trap `21 §7` names.
  *  - **§11: none of it stores anything.** No `notifications` row — `21 §1`,
@@ -341,7 +341,7 @@ async function main(): Promise<void> {
       .returning();
     await db
       .insert(projectCompanies)
-      .values({ projectId: project.id, companyId, isBuyer: true });
+      .values({ projectId: project.id, companyId });
     return project;
   }
 

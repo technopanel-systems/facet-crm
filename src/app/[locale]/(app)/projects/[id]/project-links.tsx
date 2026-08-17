@@ -3,29 +3,23 @@
 import { useActionState } from "react";
 import { useTranslations } from "next-intl";
 
-import { Badge } from "@/components/ui/badge";
+import { RecordRow } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { Link } from "@/i18n/navigation";
 import type { ProjectCompanyRow } from "@/lib/projects";
 import { emptyFormState } from "@/lib/validation";
 
-import {
-  addProjectCompanyAction,
-  removeProjectCompanyAction,
-  updateProjectCompanyAction,
-} from "../actions";
+import { addProjectCompanyAction, removeProjectCompanyAction } from "../actions";
 
 import type { CompanyOption } from "../project-companies-field";
 
 /**
- * The participants on a project detail page: one small form per row, plus one
- * to add.
+ * The participants on a project detail page, plus one form to add another.
  *
- * Separate forms rather than one big one, because each row is an independent
- * act with its own audit entry — naming the buyer `S26` and taking a
- * participant off the project `S27` are different things and should not travel
- * together. A participant carries no role label `S25`, so the row is a name,
- * the buyer flag, and removal.
+ * A participant carries no role label `S25` and no buyer flag `S26`, so a row
+ * is a name, what that company has dispatched, and removal. **The number is
+ * read, never set** — who bought is derived from dispatches, so there is
+ * nothing on a row for a rep to tick and the only act left is taking the
+ * participant off the project `S27`.
  */
 export function ProjectLinks({
   projectId,
@@ -49,15 +43,14 @@ export function ProjectLinks({
           {t("projects.detail.noCompanies")}
         </p>
       ) : (
-        <ul className="flex flex-col divide-y">
+        <ul className="flex flex-col">
           {links.map((link) => (
-            <li key={link.id} className="py-3 first:pt-0 last:pb-0">
-              <LinkRow
-                projectId={projectId}
-                link={link}
-                canRemove={links.length > 1}
-              />
-            </li>
+            <LinkRow
+              key={link.id}
+              projectId={projectId}
+              link={link}
+              canRemove={links.length > 1}
+            />
           ))}
         </ul>
       )}
@@ -72,6 +65,11 @@ export function ProjectLinks({
   );
 }
 
+/**
+ * One participant. A fragment of `<li>`s rather than a single one, because the
+ * removal error needs somewhere to go and `RecordRow` has no error slot — it
+ * follows as a sibling row instead of growing one.
+ */
 function LinkRow({
   projectId,
   link,
@@ -82,83 +80,56 @@ function LinkRow({
   canRemove: boolean;
 }) {
   const t = useTranslations();
-  const [updateState, updateAction, updating] = useActionState(
-    updateProjectCompanyAction.bind(null, projectId, link.id),
-    emptyFormState,
-  );
   const [removeState, removeAction, removing] = useActionState(
     removeProjectCompanyAction.bind(null, projectId, link.id),
     emptyFormState,
   );
 
+  // **`!== null`, never truthiness.** `"0.0000"` is a real figure and `null`
+  // is no dispatch at all `S26`; a falsy test cannot tell them apart and would
+  // hide the very number the row exists to show.
+  const dispatched = link.dispatchedSqm !== null;
+
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Seeing a project shows which companies are on it — a project
-            without them is meaningless `[07 A9]` — but it does not grant
-            access to the company record itself `[04 Q7]`. Not viewable means
-            the name renders as plain text. */}
-        {/* One name field since `S12`, so it may hold either script and takes
-            `dir="auto"` `D62`. */}
-        {link.viewable ? (
-          <Link
-            href={`/companies/${link.companyId}`}
-            dir="auto"
-            className="text-start text-sm font-medium hover:underline"
-          >
-            {link.companyName}
-          </Link>
-        ) : (
-          <span
-            dir="auto"
-            className="text-start text-sm font-medium"
-            title={t("projects.detail.hiddenCompany")}
-          >
-            {link.companyName}
-            <span className="text-muted-foreground ms-2 text-xs font-normal">
-              ({t("projects.detail.hiddenCompany")})
-            </span>
-          </span>
-        )}
-        {link.isBuyer ? <Badge>{t("projects.detail.buyer")}</Badge> : null}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <form action={updateAction} className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-1.5 text-xs">
-            <input
-              type="checkbox"
-              name="isBuyer"
-              defaultChecked={link.isBuyer}
-              className="size-3.5"
-            />
-            {t("projects.detail.buyer")}
-          </label>
-          <Button type="submit" size="xs" variant="secondary" disabled={updating}>
-            {updating ? t("common.saving") : t("common.save")}
-          </Button>
-        </form>
-
-        {canRemove ? (
-          <form action={removeAction}>
-            <Button type="submit" size="xs" variant="ghost" disabled={removing}>
-              {t("projects.detail.removeCompany")}
-            </Button>
-          </form>
-        ) : null}
-      </div>
-
-      {updateState.error ? (
-        <p role="alert" className="text-destructive text-start text-xs">
-          {t(updateState.error)}
-        </p>
-      ) : null}
+    <>
+      <RecordRow
+        // Seeing a project shows which companies are on it — a project without
+        // them is meaningless `[07 A9]` — but it does not grant access to the
+        // company record itself `[04 Q7]`. Not viewable means no link.
+        href={link.viewable ? `/companies/${link.companyId}` : undefined}
+        // One name field since `S12`, so it may hold either script `D62`.
+        title={<span dir="auto">{link.companyName}</span>}
+        meta={
+          [
+            link.viewable ? null : t("projects.detail.hiddenCompany"),
+            dispatched ? t("projects.detail.dispatched") : null,
+          ]
+            .filter(Boolean)
+            .join(" · ") || undefined
+        }
+        // `RecordRow` renders this mono and tabular `D11`. Absent, not zero:
+        // a participant with no dispatch shows nothing `S26`.
+        when={
+          dispatched
+            ? `${link.dispatchedSqm} ${t("common.sqm")}`
+            : undefined
+        }
+        action={
+          canRemove ? (
+            <form action={removeAction}>
+              <Button type="submit" size="xs" variant="ghost" disabled={removing}>
+                {t("projects.detail.removeCompany")}
+              </Button>
+            </form>
+          ) : undefined
+        }
+      />
       {removeState.error ? (
-        <p role="alert" className="text-destructive text-start text-xs">
+        <li role="alert" className="text-destructive pb-2.5 text-start text-xs">
           {t(removeState.error)}
-        </p>
+        </li>
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -194,10 +165,6 @@ function AddLinkForm({
           </option>
         ))}
       </select>
-      <label className="flex h-8 items-center gap-1.5 text-xs">
-        <input type="checkbox" name="isBuyer" className="size-3.5" />
-        {t("projects.detail.buyer")}
-      </label>
       <Button type="submit" size="xs" disabled={pending}>
         {pending ? t("common.saving") : t("common.add")}
       </Button>

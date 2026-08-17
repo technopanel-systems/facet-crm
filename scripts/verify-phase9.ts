@@ -463,7 +463,7 @@ async function main(): Promise<void> {
     .returning();
   await db
     .insert(projectCompanies)
-    .values({ projectId: projectA.id, companyId: companyA.id, isBuyer: true });
+    .values({ projectId: projectA.id, companyId: companyA.id });
 
   // A quotation chain on company A, raised by the AUTHOR and issued by the
   // COORDINATOR — the founder's named attribution case, section 14.

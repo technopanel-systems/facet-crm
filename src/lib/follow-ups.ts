@@ -577,7 +577,7 @@ async function projectStageUnchanged(
   if (rows.length === 0) return [];
 
   const now = today();
-  const companiesByProject = await buyerOrFirstCompany(
+  const companiesByProject = await firstCompanyByName(
     rows.map((row) => row.projectId),
   );
 
@@ -790,9 +790,9 @@ async function manualDateDue(session: AuthSession): Promise<FollowUpRow[]> {
 
   // A thread's own label is its SMAC reference where it has one, so a date_due
   // row names the thread the same way `quotationNoResponse` does. Decorated
-  // afterwards, the shape `buyerOrFirstCompany` already uses here.
+  // afterwards, the shape `firstCompanyByName` already uses here.
   const [companiesByProject, referenceByThread] = await Promise.all([
-    buyerOrFirstCompany(projectRows.map((row) => row.id)),
+    firstCompanyByName(projectRows.map((row) => row.id)),
     liveReferenceByThread(threadRows.map((row) => row.id)),
   ]);
 
@@ -894,8 +894,15 @@ async function suppressedCompanies(
   return held;
 }
 
-/** The buyer if one is flagged `[12 §6]`, else the first live link by name. */
-async function buyerOrFirstCompany(
+/**
+ * The first live participant by name.
+ *
+ * It used to prefer a flagged buyer; `S26` derives who bought from dispatches
+ * and there is no flag left to read. Name order is arbitrary but **stable**,
+ * which is the property that matters here — a follow-up row that renamed
+ * itself the day a dispatch landed would be worse than one that never moves.
+ */
+async function firstCompanyByName(
   projectIds: string[],
 ): Promise<Map<string, { id: string; name: string }>> {
   if (projectIds.length === 0) return new Map();
@@ -903,7 +910,6 @@ async function buyerOrFirstCompany(
   const rows = await db
     .select({
       projectId: projectCompanies.projectId,
-      isBuyer: projectCompanies.isBuyer,
       id: companies.id,
       name: companies.name,
     })
@@ -919,10 +925,8 @@ async function buyerOrFirstCompany(
 
   const byProject = new Map<string, { id: string; name: string }>();
   for (const row of rows) {
-    const existing = byProject.get(row.projectId);
-    if (!existing || row.isBuyer) {
-      byProject.set(row.projectId, { id: row.id, name: row.name });
-    }
+    if (byProject.has(row.projectId)) continue;
+    byProject.set(row.projectId, { id: row.id, name: row.name });
   }
   return byProject;
 }
@@ -1376,7 +1380,7 @@ async function nextFollowUpSetBy(
  * raise anything — **resolved exactly as `gather` resolves it**.
  *
  * That "exactly" is the whole point. `gather` suppresses a project row on
- * `row.companyId`, which comes from `buyerOrFirstCompany`; resolving the
+ * `row.companyId`, which comes from `firstCompanyByName`; resolving the
  * company a second way here would let the panel name one company while a
  * different one did the suppressing, which is the second-derivation trap
  * `21 §7` names.
@@ -1407,7 +1411,7 @@ async function anchorCompany(
         .where(and(eq(projects.id, recordId), visibleProjectsFilter(session)))
         .limit(1);
       if (!row) return null;
-      return (await buyerOrFirstCompany([recordId])).get(recordId) ?? null;
+      return (await firstCompanyByName([recordId])).get(recordId) ?? null;
     }
     case "quotation_thread": {
       const [row] = await db

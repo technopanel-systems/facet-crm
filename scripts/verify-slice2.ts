@@ -213,7 +213,7 @@ async function main(): Promise<void> {
     .returning();
   await db
     .insert(projectCompanies)
-    .values({ projectId: project.id, companyId: company.id, isBuyer: true });
+    .values({ projectId: project.id, companyId: company.id });
 
   // A second company that never gets a quotation, so qualification can be
   // shown to be derived rather than always true.

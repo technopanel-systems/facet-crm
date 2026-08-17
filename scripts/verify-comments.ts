@@ -310,7 +310,7 @@ async function main(): Promise<void> {
     .returning();
   await db
     .insert(projectCompanies)
-    .values({ projectId: project.id, companyId: company.id, isBuyer: true });
+    .values({ projectId: project.id, companyId: company.id });
 
   const [contact] = await db
     .insert(contacts)

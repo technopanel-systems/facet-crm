@@ -1,0 +1,35 @@
+-- 0012 — S26: who bought is derived from dispatches, never flagged.
+--
+-- A dispatch names its company, so a project's buyers are the companies that
+-- have dispatched against it. `is_buyer` was a hand-ticked flag sitting beside
+-- a derivable fact — the same thing S28 already forbids for project state — so
+-- the column goes rather than being left for someone to tick.
+--
+-- The index goes with it, and matters at least as much. The partial unique
+-- index was what "at most one buyer" meant in SQL; S26 says two participants
+-- may both have bought, so the constraint is not merely unused, it is wrong.
+--
+-- **S27 is untouched.** `removed_at` stays, and so does
+-- `project_companies_key`, still partial on `removed_at is null`: removal is
+-- soft and re-linkable, which this slice does not revisit.
+--
+-- **Nothing was lost.** Checked before generating: 49 of 56 `project_companies`
+-- rows carried `is_buyer` true, and every one of the 56 belonged to a verify
+-- script fixture — each row's project and company name carries a run stamp
+-- (`verify-`, `verify3-`, `verify9-`, `verify10a-`, `verifyfu-`, `verifyc-`,
+-- `verifysh-`, `schema25-`). All 17 `project_company` entries in `audit_log`
+-- were written by `rep-a@example.test`, the dev-fixtures account, against
+-- those same fixtures; the one real account wrote none. No value typed by a
+-- person existed anywhere, so there is no backfill and no archive step — the
+-- same finding 0011 recorded for `role`.
+--
+-- The derived figure that replaces the flag is `dispatchedSqmByCompany` in
+-- `src/lib/projects.ts`, and a dispatch still reaches a project only through
+-- `quotation_threads.project_id`. S74 moves the project onto the dispatch
+-- itself; that is the next slice, and no column is added here in advance of it.
+--
+-- Reviewed as generated — two statements, index before column, no reordering
+-- needed. Postgres would have dropped the index with the column anyway; the
+-- explicit order is kept because the index is the rule.
+DROP INDEX "project_companies_one_buyer_key";--> statement-breakpoint
+ALTER TABLE "project_companies" DROP COLUMN "is_buyer";

@@ -12,6 +12,10 @@
  *
  * Achieved SQM is never stored — it is derived from dispatches `[04 C1]`.
  * `sqm_expected` is the human forecast, and the only number a rep types.
+ *
+ * **Who bought is derived the same way** `S26`, since this slice. There is no
+ * buyer flag; `dispatchedSqmByCompany` below is the one place that knows how a
+ * dispatch reaches a project, because `S74` changes that next.
  */
 
 import {
@@ -22,6 +26,7 @@ import {
   ilike,
   inArray,
   isNull,
+  sum,
   type SQL,
 } from "drizzle-orm";
 
@@ -29,9 +34,11 @@ import { db } from "@/db";
 import {
   cities,
   companies,
+  dispatches,
   lossReasons,
   projectCompanies,
   projects,
+  quotationThreads,
   users,
 } from "@/db/schema";
 import { withAudit } from "@/lib/audit";
@@ -83,11 +90,16 @@ export type ProjectInput = {
   inProduction: boolean;
 };
 
-/** One row of the project–company join: a participant `S25`, and whether it
- *  is the buyer `S26`. */
+/**
+ * One row of the project–company join: a participant `S25`, and nothing else.
+ *
+ * It carries a single field because a participant *is* a single field since
+ * `S25` dropped the role and `S26` dropped the buyer flag. It stays a named
+ * type rather than collapsing to a bare `string` so that `createProject` and
+ * `addProjectCompany` still say what they take.
+ */
 export type ProjectCompanyLink = {
   companyId: string;
-  isBuyer: boolean;
 };
 
 export type ProjectListRow = {
@@ -183,7 +195,15 @@ export type ProjectCompanyRow = {
   id: string;
   companyId: string;
   companyName: string;
-  isBuyer: boolean;
+  /**
+   * What this participant has dispatched against this project `S26`, summed —
+   * a `numeric(14,4)` string, never a number.
+   *
+   * **`null` means no dispatch, and is not the same as `"0.0000"`.** A
+   * participant with nothing dispatched shows nothing on the screen rather
+   * than a zero, so the two must stay distinguishable all the way out.
+   */
+  dispatchedSqm: string | null;
   /**
    * Whether the viewer may open this company's own record.
    *
@@ -251,11 +271,60 @@ export async function getProject(
 }
 
 /**
- * The live company links on a project, each flagged with whether the viewer
- * may open that company.
+ * Dispatched square metres per company on one project `S26`.
+ *
+ * **A dispatch reaches a project through its quotation thread and nothing
+ * else.** `dispatches` carries no project column, and `quotation_threads.
+ * project_id` is `not null`, so a thread-less dispatch is a company simply
+ * buying `S75` and belongs to no project at all. `S74` puts the project on the
+ * dispatch itself; this function is then the one place that changes, which is
+ * why `listProjectCompanies` calls it rather than joining `dispatches` itself.
+ *
+ * Grouped by **the dispatch's own company**, not the thread's: `S26` says a
+ * dispatch names its company, and the two can differ.
+ *
+ * A company with no dispatch is **absent from the map, never zero**. "Nothing
+ * has gone out" and "0.0000 m² went out" are the same fact said two ways, and
+ * only one of them is worth a number on a screen.
+ *
+ * `sum()` rather than a `sql` template: a Drizzle column interpolated into a
+ * `sql` template in the SELECT list **loses its table qualifier**, which would
+ * render `sum("sqm")` against a two-table join — correct today only because
+ * `quotation_threads` happens to have no `sqm` column of its own. It returns
+ * `string | null`, so the decimal stays a string end to end `[22 §2]`.
+ *
+ * No visibility term of its own: the caller has already proved the project
+ * visible, and a project's figures follow it `[20 §13]` — the same terms
+ * `listDispatchableThreads` totals on.
+ */
+async function dispatchedSqmByCompany(
+  projectId: string,
+): Promise<Map<string, string>> {
+  const rows = await db
+    .select({ companyId: dispatches.companyId, total: sum(dispatches.sqm) })
+    .from(dispatches)
+    .innerJoin(
+      quotationThreads,
+      eq(quotationThreads.id, dispatches.quotationThreadId),
+    )
+    .where(eq(quotationThreads.projectId, projectId))
+    .groupBy(dispatches.companyId);
+
+  return new Map(
+    rows.flatMap((row) =>
+      row.total === null ? [] : [[row.companyId, row.total] as const],
+    ),
+  );
+}
+
+/**
+ * The live company links on a project: who is a participant `S25`, what each
+ * has dispatched `S26`, and whether the viewer may open that company.
  *
  * Removed links are hidden `[14 §4]` — kept in the table, absent from the
- * screen.
+ * screen. Ordered by name alone: there is no buyer to float to the top since
+ * `S26`, and dispatched square metres are a fact about a participant rather
+ * than a ranking of them.
  */
 export async function listProjectCompanies(
   session: AuthSession,
@@ -266,7 +335,6 @@ export async function listProjectCompanies(
       id: projectCompanies.id,
       companyId: projectCompanies.companyId,
       companyName: companies.name,
-      isBuyer: projectCompanies.isBuyer,
     })
     .from(projectCompanies)
     .innerJoin(companies, eq(projectCompanies.companyId, companies.id))
@@ -276,30 +344,34 @@ export async function listProjectCompanies(
         isNull(projectCompanies.removedAt),
       ),
     )
-    .orderBy(desc(projectCompanies.isBuyer), companies.name);
+    .orderBy(companies.name);
 
   if (rows.length === 0) return [];
 
   // One extra query rather than one per row: which of these companies is this
   // identity allowed to open on its own?
-  const viewableIds = new Set(
-    (
-      await db
-        .select({ id: companies.id })
-        .from(companies)
-        .where(
-          and(
-            inArray(
-              companies.id,
-              rows.map((row) => row.companyId),
-            ),
-            visibleCompaniesFilter(session),
+  const [viewableIds, dispatched] = await Promise.all([
+    db
+      .select({ id: companies.id })
+      .from(companies)
+      .where(
+        and(
+          inArray(
+            companies.id,
+            rows.map((row) => row.companyId),
           ),
-        )
-    ).map((row) => row.id),
-  );
+          visibleCompaniesFilter(session),
+        ),
+      )
+      .then((found) => new Set(found.map((row) => row.id))),
+    dispatchedSqmByCompany(projectId),
+  ]);
 
-  return rows.map((row) => ({ ...row, viewable: viewableIds.has(row.companyId) }));
+  return rows.map((row) => ({
+    ...row,
+    dispatchedSqm: dispatched.get(row.companyId) ?? null,
+    viewable: viewableIds.has(row.companyId),
+  }));
 }
 
 /* ------------------------------------------------------------------ *
@@ -418,9 +490,6 @@ function assertLinksValid(links: ProjectCompanyLink[]): void {
   const ids = links.map((link) => link.companyId);
   if (new Set(ids).size !== ids.length) {
     throw new RuleError("projects.errors.duplicateCompany");
-  }
-  if (links.filter((link) => link.isBuyer).length > 1) {
-    throw new RuleError("projects.errors.oneBuyerOnly");
   }
 }
 
@@ -550,60 +619,13 @@ export async function updateProject(
   });
 }
 
-/** Shared gate for the three link operations. */
+/** Shared gate for the two link operations: adding one and removing one. */
 async function assertProjectEditable(
   session: AuthSession,
   projectId: string,
 ): Promise<void> {
   if (!(await canViewRecord(session, "project", projectId))) {
     throw new RuleError("projects.errors.notFound");
-  }
-}
-
-/**
- * Clear the current buyer, if any, inside an open transaction.
- *
- * "At most one buyer" `[12 §6]` is enforced by a partial unique index, so
- * naming a new buyer without clearing the old one would raise a constraint
- * violation. Doing it here means the user sees a moved flag rather than a
- * Postgres error, and both changes land in the same audited transaction.
- */
-async function clearBuyer(
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
-  projectId: string,
-  log: (entry: {
-    action: string;
-    entityType: string;
-    entityId?: string;
-    before?: unknown;
-    after?: unknown;
-  }) => void,
-  exceptCompanyId?: string,
-): Promise<void> {
-  const current = await tx
-    .select()
-    .from(projectCompanies)
-    .where(
-      and(
-        eq(projectCompanies.projectId, projectId),
-        eq(projectCompanies.isBuyer, true),
-        isNull(projectCompanies.removedAt),
-      ),
-    );
-
-  for (const row of current) {
-    if (row.companyId === exceptCompanyId) continue;
-    await tx
-      .update(projectCompanies)
-      .set({ isBuyer: false })
-      .where(eq(projectCompanies.id, row.id));
-    log({
-      action: "project_company.updated",
-      entityType: "project_company",
-      entityId: row.id,
-      before: { isBuyer: true },
-      after: { isBuyer: false },
-    });
   }
 }
 
@@ -629,8 +651,6 @@ export async function addProjectCompany(
       .limit(1);
     if (existing) throw new RuleError("projects.errors.duplicateCompany");
 
-    if (link.isBuyer) await clearBuyer(tx, projectId, log);
-
     const [row] = await tx
       .insert(projectCompanies)
       .values({ ...link, projectId })
@@ -640,49 +660,6 @@ export async function addProjectCompany(
       entityType: "project_company",
       entityId: row.id,
       after: row,
-    });
-  });
-}
-
-export async function updateProjectCompany(
-  session: AuthSession,
-  projectId: string,
-  linkId: string,
-  patch: { isBuyer: boolean },
-): Promise<void> {
-  await assertProjectEditable(session, projectId);
-
-  await withAudit(session.actor, async (tx, log) => {
-    const [before] = await tx
-      .select()
-      .from(projectCompanies)
-      .where(
-        and(
-          eq(projectCompanies.id, linkId),
-          eq(projectCompanies.projectId, projectId),
-          isNull(projectCompanies.removedAt),
-        ),
-      )
-      .limit(1);
-    if (!before) throw new RuleError("projects.errors.notFound");
-
-    if (before.isBuyer === patch.isBuyer) return;
-
-    // Clear any other buyer first, or the partial unique index raises.
-    if (patch.isBuyer) await clearBuyer(tx, projectId, log, before.companyId);
-
-    const [after] = await tx
-      .update(projectCompanies)
-      .set({ isBuyer: patch.isBuyer })
-      .where(eq(projectCompanies.id, linkId))
-      .returning();
-
-    log({
-      action: "project_company.updated",
-      entityType: "project_company",
-      entityId: linkId,
-      before: { isBuyer: before.isBuyer },
-      after: { isBuyer: after.isBuyer },
     });
   });
 }

@@ -12,7 +12,6 @@ import {
   createProject,
   removeProjectCompany,
   updateProject,
-  updateProjectCompany,
   type ProjectCompanyLink,
   type ProjectInput,
 } from "@/lib/projects";
@@ -39,22 +38,16 @@ function readProjectForm(formData: FormData) {
 }
 
 /**
- * The participant rows arrive as repeated `companyId` inputs plus a single
- * `buyerIndex`, because "at most one buyer" `S26` is a radio group: the invalid
- * two-buyer state cannot be expressed in the form at all. A participant carries
- * nothing else `S25`, so one repeated input is the whole repeater.
+ * The participant rows arrive as repeated `companyId` inputs and nothing else.
+ *
+ * A participant carries no role label `S25` and no buyer flag `S26`, so one
+ * repeated input is the whole repeater.
  */
 function readLinks(formData: FormData): ProjectCompanyLink[] {
-  const fields = readFields(formData);
-  const companyIds = fields.list("companyId");
-  const buyerIndex = formData.get("buyerIndex");
-
-  return companyIds
-    .map((companyId, index) => ({
-      companyId,
-      isBuyer: buyerIndex === String(index),
-    }))
-    .filter((link) => link.companyId !== "");
+  return readFields(formData)
+    .list("companyId")
+    .filter((companyId) => companyId !== "")
+    .map((companyId) => ({ companyId }));
 }
 
 export async function createProjectAction(
@@ -101,7 +94,7 @@ export async function updateProjectAction(
 }
 
 /* ------------------------------------------------------------------ *
- * Company links, edited from the project detail page
+ * Company links, added and removed on the project detail page
  * ------------------------------------------------------------------ */
 
 export async function addProjectCompanyAction(
@@ -115,34 +108,7 @@ export async function addProjectCompanyAction(
   if (!fields.ok || !companyId) return fields.state;
 
   try {
-    await addProjectCompany(session, projectId, {
-      companyId,
-      isBuyer: fields.checkbox("isBuyer"),
-    });
-  } catch (error) {
-    return ruleErrorState(error, fields.values);
-  }
-
-  revalidatePath(`/projects/${projectId}`);
-  return {};
-}
-
-export async function updateProjectCompanyAction(
-  projectId: string,
-  linkId: string,
-  _previous: FormState,
-  formData: FormData,
-): Promise<FormState> {
-  const session = await requireSession();
-  // Only the buyer flag is settable on a participant `S25`, `S26`, and a
-  // checkbox cannot fail to parse — so there is nothing to check before the
-  // call. `fields` is still read for `values`, which re-fills a rejected form.
-  const fields = readFields(formData);
-
-  try {
-    await updateProjectCompany(session, projectId, linkId, {
-      isBuyer: fields.checkbox("isBuyer"),
-    });
+    await addProjectCompany(session, projectId, { companyId });
   } catch (error) {
     return ruleErrorState(error, fields.values);
   }
