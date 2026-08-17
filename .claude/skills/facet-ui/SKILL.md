@@ -63,7 +63,7 @@ else is a **defect**, not a flourish `D8`.
 | `--surface` + `--blur` + `--line-hi` + `--shadow`/`--shadow-lift` | the card texture, identical on every card; resting and hovered depth `D14` `D8` |
 | `--surface-solid` | the fallback below 980px and under `prefers-reduced-transparency` `D18` `D19` |
 | `--brand-grad` | **five uses**: primary button · active rail marker · target bar fill · rail count badge · dispatched segment of a rollup bar `D15` |
-| `--brand-glow` | **four uses**: primary button and app mark · the pace badge's ring · today's cell in the week strip · the target fill's bloom `D16` |
+| `--brand-glow` | **five uses**: primary button and app mark · the pace badge's ring · today's cell in the week strip · the target fill's bloom `D16` |
 
 Motion is the closed list in `D17`, `prefers-reduced-motion` is the tested path, radius is
 `D9`, and `D21` names the forbidden tells. **JavaScript stays near zero** `D20`: depth is
@@ -98,7 +98,7 @@ is** `D25`, each header naming the group and its count.
 - *List* — `SearchForm` · `FilterNav` · `ListCard` (`_components/list-controls`), the
   bordered card with table and pagination footer; `PAGE_SIZE` tracks the data modules.
   **`FilterNav` chips must carry the current search**: a chip linking to a bare `?type=…`
-  throws the query away, which broke three lists.
+  throws the query away, which broke three lists `D59`.
 - *Detail* — `DetailHeader` · `Facts`/`Fact` · `RecordRow` (`page-header`) and
   `Turn`/`TurnPanel` (`_components/turn`); **the turn panel is the screen's most important
   element** `D24`; `DetailRow` survives only for a totals block.
@@ -118,9 +118,9 @@ contact and a filed report owe nobody `D26`.
 
 **An empty list** says what would make it non-empty and offers the action `D52`, takes a
 different key when a search filtered it away, and sits **outside** `ListCard`, where a
-pagination footer would make it read as broken; no skeleton state `D54`. **Container-drawn
+pagination footer would make it read as broken `D60`; no skeleton state `D54`. **Container-drawn
 line work assumes a full last row** — an `auto-fit` grid cannot promise one, so put the
-borders on the cells.
+borders on the cells `D61`.
 
 ## Rows and views
 
