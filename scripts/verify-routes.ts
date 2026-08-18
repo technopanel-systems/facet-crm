@@ -31,16 +31,26 @@
  *      is refused as a message rather than a 500, and the same payload sent
  *      twice — differing only in country — stores a region for Saudi Arabia
  *      and none for anywhere else.
+ *  14. `S50` and `S74`, end to end: a quotation is raised with **no project**,
+ *      paid, and dispatched — the coordinator choosing a project, which is
+ *      written back onto the quotation and puts the quotation's company on
+ *      that project as a participant carrying a dispatched figure `S26`. Then
+ *      the other branch on the same thread: dispatching again takes the
+ *      project it gained, and naming a different one is refused as a message.
  *
  * This was 11 sections until feature slice 6: the old item 11 (the
  * message-key scan) is now section 12, and section 11 above — the
  * follow-up-date replay — existed in the code for a phase but was never
  * added to this list. Not a renumbering; a correction `[26 §4]`.
  *
- * **Section 13 sits after the key scan**, alone among the replays. Section 12
- * is written to cover everything fetched before it, and every string 13
- * renders is already on a page sections 2 and 3 fetched — so nothing is lost,
- * and section 12 keeps the number `CLAUDE.md` gives it.
+ * **Sections 13 and 14 sit after the key scan.** Section 12 is written to
+ * cover everything fetched before it, and section 12 keeps the number
+ * `CLAUDE.md` gives it. Every string 13 renders is already on a page sections
+ * 2 and 3 fetched, so nothing is lost there. Section 14 is not in that
+ * position — the project picker and its two hints render only for a
+ * project-less quotation, which no earlier section can reach — so it scans
+ * for itself, asserting that the leak map it inherited has not grown by the
+ * time it finishes.
  *
  * Section 0 runs before all of them, and refuses a server that booted before
  * the build — the hole every one of the above passed straight through `[23]`.
@@ -1540,6 +1550,425 @@ async function main(): Promise<void> {
       );
     }
   }
+
+  console.log(
+    "\n14. A quotation with no project, dispatched into one [S50], [S74]",
+  );
+  {
+    // **The one chain no in-process script can drive.** `verify:slice3` §15
+    // proves S74's rules against the data layer; this proves the SCREENS —
+    // that a rep can raise a quotation with the project field left alone, that
+    // the coordinator is offered a picker for exactly that quotation and not
+    // for the others, and that what comes back names the project on three
+    // screens: the dispatch, the quotation, and the project's participants.
+    //
+    // That last one is why this section exists at all. `S26`'s derived figure
+    // has never been asserted over HTTP, because no route-suite identity owned
+    // a project with a participant that had dispatched. This gives rep-a one.
+    //
+    // **The thread is never issued.** Nothing in `S73` or `S74` depends on a
+    // SMAC reference — the gate is payment — and section 8 already drives the
+    // issue form. Fewer POSTs, and the null-reference label gets driven too.
+    const leakedBefore = leaked.size;
+    const stamp = `${Date.now()}`.slice(-7);
+    let phoneSeq = 0;
+
+    for (const locale of ["en", "ar"] as const) {
+      const repJar = jars["rep-a@example.test"];
+      const coordJar = jars["coordinator@example.test"];
+
+      /** Every `$ACTION…` input of one form, unescaped, as a browser sends it. */
+      const envelope = (form: string): FormData => {
+        const fields = new FormData();
+        for (const input of form.matchAll(/<input[^>]*>/g)) {
+          const name = input[0].match(/name="([^"]+)"/)?.[1];
+          if (!name?.startsWith("$ACTION")) continue;
+          fields.append(
+            name,
+            unescapeHtml(input[0].match(/value="([^"]*)"/)?.[1] ?? ""),
+          );
+        }
+        return fields;
+      };
+
+      const post = async (jar: Jar, path: string, body: FormData) => {
+        const response = await fetch(`${BASE}${path}`, {
+          method: "POST",
+          headers: { cookie: header(jar), origin: BASE },
+          body,
+          redirect: "manual",
+        });
+        store(jar, response);
+        return {
+          status: response.status,
+          location: response.headers.get("location") ?? "",
+        };
+      };
+
+      /**
+       * POST a form whose response this script deliberately does not wait for.
+       *
+       * **`confirmPaymentAction` never answers a raw form POST**, and that is
+       * neither this slice's doing nor a rule this section is about: the same
+       * request stalls identically on a quotation that has a project, on a
+       * build with none of S50 or S74 in it, and on the comment composer's
+       * neighbour it does not stall at all. The write lands — the row is
+       * updated, and the page renders in 150ms afterwards — so what is broken
+       * is the response to the no-JavaScript path of that one action.
+       *
+       * So the POST is really sent, and what follows asserts the STATE it
+       * produced rather than the answer it did not give. Left as a plain
+       * check below, not swallowed: if the payment ever fails to land, the
+       * next assertion says so.
+       */
+      const fireAndForget = async (jar: Jar, path: string, body: FormData) => {
+        const abort = new AbortController();
+        const timer = setTimeout(() => abort.abort(), 5000);
+        try {
+          const response = await fetch(`${BASE}${path}`, {
+            method: "POST",
+            headers: { cookie: header(jar), origin: BASE },
+            body,
+            redirect: "manual",
+            signal: abort.signal,
+          });
+          store(jar, response);
+        } catch {
+          // The stall described above. The GET that follows is the assertion.
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+
+      /* --- a company of its own, so the participant is genuinely new ---- */
+
+      // Not one of rep-a's existing companies: those are already participants
+      // of the fixture project, and "the company joined the project" would
+      // then be true before the dispatch ran. Registered through the form
+      // section 13 just proved, so this costs no new assertion.
+      const newCompany = await get(repJar, `/${locale}/companies/new`);
+      const companyForm = newCompany.body.match(
+        /<form[^>]*data-slot="form-shell"[\s\S]*?<\/form>/,
+      )?.[0];
+      const saudiId = newCompany.body
+        .match(/<select[^>]*name="countryId"[\s\S]*?<\/select>/)?.[0]
+        ?.match(/<option value="([0-9a-f-]{36})"[^>]*data-code="SA"/)?.[1];
+      if (!companyForm || !saudiId) {
+        check(`${locale}: the company form is reachable`, false);
+        continue;
+      }
+      const companyFields = envelope(companyForm);
+      companyFields.set("name", `s74-${stamp}-${locale}`);
+      companyFields.set("phone", `+9665${stamp}${phoneSeq++}`);
+      companyFields.set("countryId", saudiId);
+      for (const empty of [
+        "cityId",
+        "region",
+        "vatNumber",
+        "categoryId",
+        "leadSourceId",
+        "notes",
+      ]) {
+        companyFields.set(empty, "");
+      }
+      const registered = await post(
+        repJar,
+        `/${locale}/companies/new`,
+        companyFields,
+      );
+      if (registered.status !== 303) {
+        check(
+          `${locale}: the fixture company registered`,
+          false,
+          `got ${registered.status}`,
+        );
+        continue;
+      }
+      const companyId = registered.location.match(/[0-9a-f-]{36}/)?.[0];
+
+      /* --- 1. raised with NO project [S50] ------------------------------ */
+
+      const newQuotation = await get(repJar, `/${locale}/quotations/new`);
+      const quotationForm = newQuotation.body.match(
+        /<form[^>]*data-slot="form-shell"[\s\S]*?<\/form>/,
+      )?.[0];
+      check(
+        `${locale}: the quotation form renders`,
+        Boolean(quotationForm) && newQuotation.status === 200,
+      );
+      if (!quotationForm || !companyId) continue;
+
+      // `S50` — the company list is no longer the chosen project's links, so
+      // the company registered a moment ago is selectable with no project at
+      // all. That it is IN the markup is the form half of the rule.
+      check(
+        `${locale}: the new company is offered with no project chosen [S50]`,
+        quotationForm.includes(`value="${companyId}"`),
+      );
+
+      /** The first real option of a named `<select>` — never the placeholder. */
+      const optionOf = (name: string) =>
+        quotationForm
+          .match(new RegExp(`<select[^>]*name="${name}"[\\s\\S]*?</select>`))?.[0]
+          ?.match(/<option value="([0-9a-f-]{36})"/)?.[1];
+
+      const line = {
+        supplierId: optionOf("supplierId"),
+        classId: optionOf("classId"),
+        fireRatingId: optionOf("fireRatingId"),
+        thicknessId: optionOf("thicknessId"),
+      };
+      if (Object.values(line).some((id) => !id)) {
+        // `npm run db:seed` has not run. A missing precondition, not a defect.
+        console.log(`  skip  ${locale}: the product lookups are not seeded`);
+        continue;
+      }
+
+      const quotationFields = envelope(quotationForm);
+      // **The project is sent EMPTY**, exactly as an untouched form sends it:
+      // the combobox posts a hidden input whose value is "" until somebody
+      // picks something. This is the POST S50 exists for.
+      quotationFields.set("projectId", "");
+      quotationFields.set("companyId", companyId);
+      quotationFields.set("contactId", "");
+      for (const empty of [
+        "validUntil",
+        "deliveryPeriod",
+        "paymentMethod",
+        "shipmentTerms",
+      ]) {
+        quotationFields.set(empty, "");
+      }
+      for (const [name, value] of Object.entries(line)) {
+        quotationFields.set(name, value as string);
+      }
+      quotationFields.set("customColour", "168");
+      quotationFields.set("widthM", "1.2");
+      quotationFields.set("lengthM", "2.4");
+      quotationFields.set("quantityPcs", "10");
+      quotationFields.set("unitPrice", "95");
+      // Whatever the form itself defaults to — `S57` fixes it, and that is a
+      // different rule's slice.
+      quotationFields.set(
+        "vatRate",
+        quotationForm
+          .match(/<input[^>]*name="vatRate"[^>]*>/)?.[0]
+          ?.match(/value="([^"]*)"/)?.[1] ?? "15",
+      );
+
+      const raised = await post(
+        repJar,
+        `/${locale}/quotations/new`,
+        quotationFields,
+      );
+      check(
+        `${locale}: *** raising a quotation with NO project answers 303 *** [S50]`,
+        raised.status === 303,
+        `got ${raised.status} ${raised.location}`,
+      );
+      if (raised.status !== 303) continue;
+
+      const threadPath = raised.location.replace(BASE, "");
+      const threadId = threadPath.match(/[0-9a-f-]{36}/)?.[0] as string;
+
+      /* --- 2. and it READS as absent, not as a blank -------------------- */
+
+      const thread = await get(repJar, threadPath);
+      check(
+        `${locale}: *** the missing project reads as deliberately absent *** [S50]`,
+        factHtmlOf(thread.body, "project").includes('data-slot="fact-absent"'),
+        factOf(thread.body, "project"),
+      );
+      // Not the em-dash every other empty value uses, which is the whole
+      // distinction: "nothing here" against "nobody has answered this yet".
+      check(
+        `${locale}: …and not as the em-dash an empty value takes`,
+        factOf(thread.body, "project") !== DASH,
+      );
+
+      /* --- 3. paid, so it can be dispatched [S73] ----------------------- */
+
+      const paymentForm = thread.body.match(
+        /<form[^>]*>(?:(?!<\/form>)[\s\S])*?name="confirmedOn"[\s\S]*?<\/form>/,
+      )?.[0];
+      check(`${locale}: the payment form is on the rep's screen`, Boolean(paymentForm));
+      if (!paymentForm) continue;
+      const paymentFields = envelope(paymentForm);
+      paymentFields.set("confirmedOn", "2026-08-18");
+      await fireAndForget(repJar, threadPath, paymentFields);
+
+      // What the POST actually did, read back off the screen: the form is
+      // offered only while the payment is unconfirmed, so its absence is the
+      // confirmation — and the chain strip agrees, at `paid` `[22 §6.6]`.
+      const paid = await get(repJar, threadPath);
+      check(
+        `${locale}: the rep's payment POST confirmed it [S73]`,
+        !paid.body.includes('name="confirmedOn"') &&
+          stripOf(paid.body)?.position === "paid",
+        `chain reads ${stripOf(paid.body)?.position ?? "nothing"}`,
+      );
+
+      /* --- 4. the coordinator's form marks it as having no project ------ */
+
+      const dispatchNew = await get(coordJar, `/${locale}/dispatches/new`);
+      const option = dispatchNew.body.match(
+        new RegExp(`<option[^>]*value="${threadId}"[^>]*>`),
+      )?.[0];
+      check(
+        `${locale}: the paid, project-less quotation is offered for dispatch [S74]`,
+        Boolean(option),
+        "not in the list — did the payment POST fail?",
+      );
+      check(
+        `${locale}: …and is marked as carrying no project of its own [S50]`,
+        option?.includes('data-project=""') ?? false,
+        option ?? "",
+      );
+
+      /* --- 5. dispatched, choosing one of rep-a's projects [S74] -------- */
+
+      const projectsList = await get(repJar, `/${locale}/projects`);
+      const projectIds = [
+        ...new Set(
+          [
+            ...projectsList.body.matchAll(
+              /href="\/(?:en|ar)\/projects\/([0-9a-f-]{36})"/gi,
+            ),
+          ].map((match) => match[1]),
+        ),
+      ];
+      if (projectIds.length === 0) {
+        // A rep with no project is a legitimate empty state; without one there
+        // is nothing for the write-back to write.
+        console.log(`  --    ${locale}: rep-a owns no project to dispatch into`);
+        continue;
+      }
+      const projectId = projectIds[0];
+
+      const dispatchForm = dispatchNew.body.match(
+        /<form[^>]*data-slot="form-shell"[\s\S]*?<\/form>/,
+      )?.[0];
+      if (!dispatchForm) {
+        check(`${locale}: the dispatch form renders`, false);
+        continue;
+      }
+      const dispatchFields = (project: string): FormData => {
+        const fields = envelope(dispatchForm);
+        fields.set("quotationThreadId", threadId);
+        fields.set("projectId", project);
+        fields.set("sqm", "40");
+        fields.set("dispatchDate", "2026-08-18");
+        return fields;
+      };
+
+      const dispatched = await post(
+        coordJar,
+        `/${locale}/dispatches/new`,
+        dispatchFields(projectId),
+      );
+      check(
+        `${locale}: *** dispatching it answers 303 *** [S74]`,
+        dispatched.status === 303,
+        `got ${dispatched.status} ${dispatched.location}`,
+      );
+      if (dispatched.status !== 303) continue;
+
+      const dispatchPath = dispatched.location.replace(BASE, "");
+      const dispatchPage = await get(coordJar, dispatchPath);
+      check(
+        `${locale}: the dispatch names a project of its own [S74]`,
+        factOf(dispatchPage.body, "project") !== DASH &&
+          !factHtmlOf(dispatchPage.body, "project").includes("fact-absent"),
+        factOf(dispatchPage.body, "project"),
+      );
+
+      /* --- 6. written back onto the quotation [S74] --------------------- */
+
+      const rewritten = await get(repJar, threadPath);
+      check(
+        `${locale}: *** the quotation now names that project *** [S74]`,
+        !factHtmlOf(rewritten.body, "project").includes('data-slot="fact-absent"'),
+        factOf(rewritten.body, "project"),
+      );
+      check(
+        `${locale}: …and it links the project the dispatch took`,
+        rewritten.body.includes(`/projects/${projectId}"`),
+      );
+
+      /* --- 7. the company is a participant, with the derived figure ----- */
+
+      const project = await get(repJar, `/${locale}/projects/${projectId}`);
+      check(
+        `${locale}: *** the quotation's company joined the project *** [S74], [S27]`,
+        project.body.includes(`data-participant="${companyId}"`),
+      );
+      // **The point of the whole section.** `S26`'s figure is derived in SQL
+      // from `dispatches.project_id`, and until now no identity in this suite
+      // owned a project with a participant that had dispatched — so it had
+      // never once been rendered on a real screen.
+      check(
+        `${locale}: *** and carries its dispatched square metres *** [S26]`,
+        project.body.includes(`data-dispatched="${companyId}"`),
+      );
+
+      /* --- 8. the other branch, on the same thread [S74] ---------------- */
+
+      // It has a project now, so a second dispatch takes it with nothing
+      // chosen — the "shown, not chosen" half of the rule.
+      const again = await post(
+        coordJar,
+        `/${locale}/dispatches/new`,
+        dispatchFields(""),
+      );
+      check(
+        `${locale}: dispatching it again takes the project it gained [S74]`,
+        again.status === 303,
+        `got ${again.status}`,
+      );
+      if (again.status === 303) {
+        const second = await get(coordJar, again.location.replace(BASE, ""));
+        check(
+          `${locale}: …the same project, not another`,
+          second.body.includes(`/projects/${projectId}"`) ||
+            factOf(second.body, "project") ===
+              factOf(dispatchPage.body, "project"),
+          factOf(second.body, "project"),
+        );
+      }
+
+      // And a project that disagrees with the quotation's is refused. **As a
+      // message**: `useActionState` re-renders the form, so 200 — never a 303
+      // that wrote it anyway, and never a 500 from the rule throwing. WHICH
+      // rule refused is `verify:slice3` §15's assertion; this is the boundary
+      // that no in-process script crosses.
+      const otherId =
+        projectIds[1] ?? "00000000-0000-0000-0000-000000000000";
+      console.log(
+        projectIds[1]
+          ? `  --    ${locale}: refusal driven with a second real project`
+          : `  --    ${locale}: rep-a owns one project, so the refusal uses an unknown id`,
+      );
+      const refused = await post(
+        coordJar,
+        `/${locale}/dispatches/new`,
+        dispatchFields(otherId),
+      );
+      check(
+        `${locale}: *** a project that is not the quotation's is refused *** [S74]`,
+        refused.status === 200,
+        `got ${refused.status} ${refused.location}`,
+      );
+    }
+
+    // Section 12 has already run, and every screen above is one it could not
+    // reach: the picker and its hints exist only for a project-less quotation.
+    // So this section carries its own half of that assertion.
+    check(
+      "no screen in this section rendered an unresolved message key [S113]",
+      leaked.size === leakedBefore,
+      [...leaked.keys()].slice(leakedBefore).join(", "),
+    );
+  }
 }
 
 /** `common.none` — the same glyph in both locales, so it is a value, not a
@@ -1559,6 +1988,21 @@ function factOf(body: string, name: string): string {
   )?.[0];
   const value = cell?.match(/<dd[^>]*>([\s\S]*?)<\/dd>/)?.[1] ?? "";
   return value.replace(/<[^>]*>/g, "").trim();
+}
+
+/**
+ * The raw markup of one `Fact`, by its `data-fact` handle.
+ *
+ * `factOf` strips the tags, which is right when the assertion is about the
+ * VALUE. `S50`'s absent project is asserted on a marker inside the cell
+ * instead — the difference between "deliberately not there yet" and an
+ * em-dash is a `data-slot`, not a string this script may read.
+ */
+function factHtmlOf(body: string, name: string): string {
+  return (
+    body.match(new RegExp(`<div[^>]*data-fact="${name}"[\\s\\S]*?</div>`))?.[0] ??
+    ""
+  );
 }
 
 /** The strip's position and the state of each of its six nodes, or null. */

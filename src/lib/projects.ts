@@ -13,9 +13,15 @@
  * Achieved SQM is never stored — it is derived from dispatches `[04 C1]`.
  * `sqm_expected` is the human forecast, and the only number a rep types.
  *
- * **Who bought is derived the same way** `S26`, since this slice. There is no
- * buyer flag; `dispatchedSqmByCompany` below is the one place that knows how a
- * dispatch reaches a project, because `S74` changes that next.
+ * **Who bought is derived the same way** `S26`. There is no buyer flag;
+ * `dispatchedSqmByCompany` below is the one place that knows how a dispatch
+ * reaches a project, and since `S74` that is `dispatches.project_id`.
+ *
+ * **`ensureProjectParticipant` is the only writer of a participant row.** Both
+ * ways in use it: a rep adding one by hand, and `S74`'s write-back when a
+ * project-less quotation is dispatched. One path, so `S27`'s rules — soft
+ * removal, re-linkable, the partial unique index — cannot hold for one caller
+ * and not the other.
  */
 
 import {
@@ -38,10 +44,9 @@ import {
   lossReasons,
   projectCompanies,
   projects,
-  quotationThreads,
   users,
 } from "@/db/schema";
-import { withAudit } from "@/lib/audit";
+import { withAudit, type AuditEntry } from "@/lib/audit";
 import {
   canViewRecord,
   visibleCompaniesFilter,
@@ -61,6 +66,10 @@ import { normalizeName } from "@/lib/normalize";
 import { RuleError } from "@/lib/validation";
 
 export type Project = typeof projects.$inferSelect;
+
+/** The caller's transaction and pen, for the one exported writer below. */
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type Log = (entry: AuditEntry) => void;
 
 /** Compile-time proof that `enums.ts` still matches the database. */
 export type EndStateMatchesSchema = SameValues<
@@ -273,12 +282,17 @@ export async function getProject(
 /**
  * Dispatched square metres per company on one project `S26`.
  *
- * **A dispatch reaches a project through its quotation thread and nothing
- * else.** `dispatches` carries no project column, and `quotation_threads.
- * project_id` is `not null`, so a thread-less dispatch is a company simply
- * buying `S75` and belongs to no project at all. `S74` puts the project on the
- * dispatch itself; this function is then the one place that changes, which is
- * why `listProjectCompanies` calls it rather than joining `dispatches` itself.
+ * **A dispatch reaches a project by its own `project_id`** `S74`, and by
+ * nothing else since this slice — the join through `quotation_threads` is
+ * gone, which is what `S74` moving the project onto the dispatch is FOR. A
+ * dispatch with no project reaches none, which today is exactly the direct
+ * route `S75`.
+ *
+ * Migration 0013 backfilled the column from each dispatch's thread, so the
+ * figures this returns are unchanged for every row that existed before it.
+ * `verify:schema25` §11 asserts the two agree for every dispatch ever written
+ * — that is the invariant `recordDispatch` enforces, and the backfill landing
+ * correctly is a consequence of it rather than a separate claim.
  *
  * Grouped by **the dispatch's own company**, not the thread's: `S26` says a
  * dispatch names its company, and the two can differ.
@@ -288,9 +302,9 @@ export async function getProject(
  * only one of them is worth a number on a screen.
  *
  * `sum()` rather than a `sql` template: a Drizzle column interpolated into a
- * `sql` template in the SELECT list **loses its table qualifier**, which would
- * render `sum("sqm")` against a two-table join — correct today only because
- * `quotation_threads` happens to have no `sqm` column of its own. It returns
+ * `sql` template in the SELECT list **loses its table qualifier**. That is no
+ * longer load-bearing here now the join is gone, and it stays because the next
+ * join added to this query would make it load-bearing again. It returns
  * `string | null`, so the decimal stays a string end to end `[22 §2]`.
  *
  * No visibility term of its own: the caller has already proved the project
@@ -303,11 +317,7 @@ async function dispatchedSqmByCompany(
   const rows = await db
     .select({ companyId: dispatches.companyId, total: sum(dispatches.sqm) })
     .from(dispatches)
-    .innerJoin(
-      quotationThreads,
-      eq(quotationThreads.id, dispatches.quotationThreadId),
-    )
-    .where(eq(quotationThreads.projectId, projectId))
+    .where(eq(dispatches.projectId, projectId))
     .groupBy(dispatches.companyId);
 
   return new Map(
@@ -537,17 +547,11 @@ export async function createProject(
       after: project,
     });
 
+    // Through the one writer, like every other participant row `S27`.
+    // `assertLinksValid` already refused a duplicate, so each of these
+    // inserts.
     for (const link of links) {
-      const [row] = await tx
-        .insert(projectCompanies)
-        .values({ ...link, projectId: project.id })
-        .returning();
-      log({
-        action: "project_company.linked",
-        entityType: "project_company",
-        entityId: row.id,
-        after: row,
-      });
+      await ensureProjectParticipant(tx, log, project.id, link.companyId);
     }
 
     return project;
@@ -629,6 +633,56 @@ async function assertProjectEditable(
   }
 }
 
+/**
+ * Link a company to a project unless it already is one `S27`, in the caller's
+ * transaction. Returns false when a live link was already there.
+ *
+ * **This is the only place a participant row is written**, and it is exported
+ * because `S74` has a second way in: dispatching a project-less quotation adds
+ * the quotation's company to the project it gains. That write must obey the
+ * same rules as a rep adding one by hand, and the only way to guarantee that
+ * is for it to be the same statement.
+ *
+ * "Already one" means a LIVE link. A removed link is re-linked with a new row
+ * rather than resurrected, which is what `project_companies_key` — partial on
+ * `removed_at is null` — exists to allow `[14 §4]`.
+ *
+ * No visibility check of its own: each caller has its own, and they differ.
+ * A rep must be able to use the company `[12 §6]`; the coordinator dispatching
+ * has `can_dispatch`'s reach and no company visibility at all `[18 §2]`.
+ */
+export async function ensureProjectParticipant(
+  tx: Tx,
+  log: Log,
+  projectId: string,
+  companyId: string,
+): Promise<boolean> {
+  const [existing] = await tx
+    .select({ id: projectCompanies.id })
+    .from(projectCompanies)
+    .where(
+      and(
+        eq(projectCompanies.projectId, projectId),
+        eq(projectCompanies.companyId, companyId),
+        isNull(projectCompanies.removedAt),
+      ),
+    )
+    .limit(1);
+  if (existing) return false;
+
+  const [row] = await tx
+    .insert(projectCompanies)
+    .values({ projectId, companyId })
+    .returning();
+  log({
+    action: "project_company.linked",
+    entityType: "project_company",
+    entityId: row.id,
+    after: row,
+  });
+  return true;
+}
+
 export async function addProjectCompany(
   session: AuthSession,
   projectId: string,
@@ -638,29 +692,15 @@ export async function addProjectCompany(
   await assertCompaniesUsable(session, [link.companyId]);
 
   await withAudit(session.actor, async (tx, log) => {
-    const [existing] = await tx
-      .select()
-      .from(projectCompanies)
-      .where(
-        and(
-          eq(projectCompanies.projectId, projectId),
-          eq(projectCompanies.companyId, link.companyId),
-          isNull(projectCompanies.removedAt),
-        ),
-      )
-      .limit(1);
-    if (existing) throw new RuleError("projects.errors.duplicateCompany");
-
-    const [row] = await tx
-      .insert(projectCompanies)
-      .values({ ...link, projectId })
-      .returning();
-    log({
-      action: "project_company.linked",
-      entityType: "project_company",
-      entityId: row.id,
-      after: row,
-    });
+    // A rep who picks a company that is already on the project is told so;
+    // `S74`'s write-back, which cannot know either way, is not.
+    const linked = await ensureProjectParticipant(
+      tx,
+      log,
+      projectId,
+      link.companyId,
+    );
+    if (!linked) throw new RuleError("projects.errors.duplicateCompany");
   });
 }
 

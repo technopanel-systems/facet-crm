@@ -142,7 +142,9 @@ export async function createQuotationAction(
   const session = await requireSession();
   const fields = readFields(formData);
 
-  const projectId = fields.uuid("projectId", { required: true });
+  // Optional `S50`. Null means the project is chosen at dispatch `S74`, and
+  // the data layer applies the company rule that goes with each case.
+  const projectId = fields.uuid("projectId");
   const companyId = fields.uuid("companyId", { required: true });
   const contactId = fields.uuid("contactId");
   const version = {
@@ -166,7 +168,7 @@ export async function createQuotationAction(
     if (service) serviceLines.push(service);
   }
 
-  if (!fields.ok || !projectId || !companyId) return fields.state;
+  if (!fields.ok || !companyId) return fields.state;
 
   let threadId: string;
   try {

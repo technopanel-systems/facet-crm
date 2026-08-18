@@ -46,6 +46,10 @@
  *      two new NOT NULLs, and the rule no CHECK can hold beside them: a
  *      company outside Saudi Arabia keeps no city and no region `S15`, which
  *      would need a subquery into `countries` to state in SQL.
+ *  11. *** A dispatch's project IS its quotation's *** `S74` — the third rule
+ *      of that kind, and the first to span two rows, so not even a CHECK could
+ *      hold it. Asserted over every row in the table rather than over rows
+ *      this script wrote.
  *
  * Usage: `npm run verify:schema25`
  *
@@ -1182,6 +1186,74 @@ async function main(): Promise<void> {
         }),
     );
   }
+
+  /* --- 11. A dispatch's project is its quotation's [S74] ---------------- */
+
+  await projectMatchesThread();
+}
+
+/**
+ * `S74` — **a dispatch's project is never different from its quotation's.**
+ *
+ * This is not a claim about today's data. It is the invariant `recordDispatch`
+ * enforces, it must hold for every dispatch ever written, and it is stated
+ * here because no CHECK can state it: the pair spans two rows, and Postgres
+ * cannot express "equal to a column on another table" without a trigger or a
+ * composite key nobody asked for.
+ *
+ * It is also the only thing that proves migration 0013's backfill. That
+ * `UPDATE` is the one statement in the migration that can be **wrong without
+ * failing**: `dispatchedSqmByCompany` reads `dispatches.project_id` since this
+ * slice, so a backfill that missed rows would show up as figures that look
+ * plausible and are quietly short — never as an error. Two counts, both zero.
+ *
+ * **Counted in SQL, and asserted `=== 0`.** Not `!count`: the query returns a
+ * string from `count(*)`, and a truthiness test on `"0"` passes for the wrong
+ * reason and would keep passing on `"1"`.
+ */
+async function projectMatchesThread(): Promise<void> {
+  console.log("\n11. *** A dispatch's project IS its quotation's *** [S74]");
+
+  const [row] = (await db.execute(sql`
+    select
+      count(*) filter (
+        where d.project_id is distinct from t.project_id
+      )::int as disagreeing,
+      count(*) filter (
+        where t.project_id is not null and d.project_id is null
+      )::int as unfilled,
+      count(*)::int as linked,
+      (select count(*)::int from dispatches
+        where quotation_thread_id is null and project_id is not null) as direct_with_project
+    from dispatches d
+    join quotation_threads t on t.id = d.quotation_thread_id
+  `)) as unknown as {
+    disagreeing: number;
+    unfilled: number;
+    linked: number;
+    direct_with_project: number;
+  }[];
+
+  console.log(`  --    ${row.linked} dispatch(es) against a quotation`);
+  check(
+    "*** no dispatch carries a project different from its quotation's *** [S74]",
+    row.disagreeing === 0,
+    `${row.disagreeing} disagree`,
+  );
+  check(
+    "*** none is null where its quotation has one — the 0013 backfill *** [S74]",
+    row.unfilled === 0,
+    `${row.unfilled} unfilled`,
+  );
+  // `S75`'s stated-purpose half is session 6b. Until it lands, a dispatch with
+  // no quotation reaches no project, and this is what says so — the assertion
+  // that fails the day someone routes a direct dispatch to a project without
+  // the rule that decides which one.
+  check(
+    "a dispatch with no quotation still names no project [S75]",
+    row.direct_with_project === 0,
+    `${row.direct_with_project} do`,
+  );
 }
 
 main()

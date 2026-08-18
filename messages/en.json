@@ -366,7 +366,8 @@
       "origin": "Origin",
       "verification": "Reference checked",
       "grandTotal": "Total",
-      "payment": "Payment"
+      "payment": "Payment",
+      "projectNone": "No project"
     },
     "detail": {
       "details": "Details",
@@ -413,7 +414,11 @@
       "paymentConfirmedAt": "Payment confirmed",
       "acceptedForProcessing": "Accepted for processing",
       "notConfirmed": "Not confirmed",
-      "turnSince": "Sitting here since {date}."
+      "turnSince": "Sitting here since {date}.",
+      "noProject": "No project yet",
+      "noProjectState": "No project yet — one is recorded when this is dispatched.",
+      "projectOptional": "Optional. A quotation raised without one gains a project when it is dispatched.",
+      "noProjectsYet": "You have no projects yet. This quotation can still be raised without one."
     },
     "actions": {
       "coordinator": "Coordinator",
@@ -452,7 +457,8 @@
       "cancellationReasonRequired": "Cancelling needs a written reason.",
       "returnReasonRequired": "Say what needs changing. The reason goes to the rep as a comment.",
       "paymentFirst": "Confirm the payment first.",
-      "noSuppliers": "No product suppliers have been set up yet, so a line cannot be saved."
+      "noSuppliers": "No product suppliers have been set up yet, so a line cannot be saved.",
+      "companyNotVisible": "That company cannot be found, or it is not one of yours."
     }
   },
   "auth": {
@@ -498,7 +504,8 @@
       "filterAll": "All",
       "filterLinked": "Against a quotation",
       "filterDirect": "Direct sales",
-      "dispatchedSoFar": "dispatched so far:"
+      "dispatchedSoFar": "dispatched so far:",
+      "projectPlaceholder": "Select a project"
     },
     "detail": {
       "title": "Dispatch",
@@ -512,7 +519,9 @@
       "partialHint": "One quotation can produce several partial dispatches. Quoted, paid and dispatched quantities are three different numbers.",
       "paymentConfirmed": "Confirmed",
       "creditBySplit": "Divided equally by the credit split in force since {date}.",
-      "creditByRep": "No credit split is in force, so the whole amount credits the rep on this dispatch."
+      "creditByRep": "No credit split is in force, so the whole amount credits the rep on this dispatch.",
+      "projectFromQuotation": "The project comes from the quotation. It is not chosen here.",
+      "projectWriteBack": "This quotation has no project. The one you choose is recorded on the quotation too, and its company joins that project."
     },
     "actions": {
       "record": "Record dispatch"
@@ -525,7 +534,11 @@
       "companyNotVisible": "That company cannot be found.",
       "companyRequired": "A direct sale needs a company.",
       "repRequired": "A direct sale needs a rep.",
-      "sqmPositive": "Enter the square metres that actually went out."
+      "sqmPositive": "Enter the square metres that actually went out.",
+      "projectRequired": "This quotation has no project. Choose the project this dispatch belongs to.",
+      "projectNotOnThread": "The project does not match the quotation.",
+      "projectNotVisible": "That project cannot be found.",
+      "projectAlreadySet": "This quotation gained a project a moment ago. Open the form again."
     }
   },
   "credit": {

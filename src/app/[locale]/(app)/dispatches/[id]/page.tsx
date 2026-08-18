@@ -110,10 +110,12 @@ export default async function DispatchPage({
             <Fact label={t("dispatches.fields.dispatchDate")}>
               <span dir="ltr">{day(dispatch.dispatchDate)}</span>
             </Fact>
-            {/* A direct sale has no project at all `[07 C6]`, which is also
-                why no credit split can apply to it. Otherwise: the name
-                always, the link only for someone who may open it `[16 §8]`. */}
-            <Fact label={t("dispatches.fields.project")}>
+            {/* `S74` — the dispatch's own project, taken from the quotation
+                or chosen when it had none. A direct sale still has none at all
+                `[07 C6]`, `S75`, which is also why no credit split can apply
+                to it. Otherwise: the name always, the link only for someone who
+                may open it `[16 §8]`. */}
+            <Fact label={t("dispatches.fields.project")} name="project">
               {dispatch.projectId === null ? (
                 dash
               ) : dispatch.projectViewable ? (

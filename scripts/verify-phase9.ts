@@ -506,6 +506,10 @@ async function main(): Promise<void> {
       userId: authorUser.id,
       sqm: "12.5000",
       quotationThreadId: threadA.id,
+      // `S74` — a dispatch carries its quotation's project, and this row is
+      // written by hand rather than through `recordDispatch`, so it has to
+      // say so itself. `verify:schema25` §11 holds every row to it.
+      projectId: projectA.id,
       dispatchDate: today(),
       recordedByUserId: coordinator.user.id,
       approvedByUserId: coordinator.user.id,

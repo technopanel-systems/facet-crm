@@ -33,6 +33,13 @@
  *      `"0.0000"`. That last one is asserted by identity: a truthiness test
  *      passes on the zero it exists to distinguish.
  *
+ *  15. **The project is recorded on the dispatch** `S74`. Both branches: a
+ *      quotation that has one hands it over, and a quotation that has none
+ *      `S50` gains the coordinator's choice — written back onto the quotation,
+ *      with its company added to that project as a participant `S27`. Plus
+ *      the two refusals, and the derived figure `S26` reaching a project it
+ *      could not have reached before this slice.
+ *
  * Usage: `npm run verify:slice3`
  *
  * That needs `NODE_ENV=development` in `.env`. `--env-file` is not optional and
@@ -70,6 +77,7 @@ import {
   projectCompanies,
   projectCreditSplits,
   projects,
+  quotationThreads,
   recordShares,
   roles,
   serviceTypes,
@@ -85,13 +93,18 @@ import {
 import { PERCENT_SCALE, SQM_SCALE, divideEqually, fromScaled, toScaled } from "@/lib/decimal";
 import {
   getDispatch,
+  listDispatchProjectOptions,
   listDispatchableThreads,
   listDispatches,
   recordDispatch,
 } from "@/lib/dispatches";
 import { SAUDI_CODE } from "@/lib/enums";
-import { listCountries } from "@/lib/lookups";
-import { listProjectCompanies } from "@/lib/projects";
+import { listCountries, listLossReasons } from "@/lib/lookups";
+import {
+  createProject,
+  listProjectCompanies,
+  updateProject,
+} from "@/lib/projects";
 import {
   acceptThread,
   addServiceLine,
@@ -371,6 +384,7 @@ async function main(): Promise<void> {
     quotationThreadId: null,
     companyId: company.id,
     userId: repB.user.id,
+    projectId: null,
   };
   await refuses(
     "a rep may not dispatch",
@@ -415,6 +429,7 @@ async function main(): Promise<void> {
         quotationThreadId: unpaidThread.id,
         companyId: null,
         userId: null,
+        projectId: null,
       }),
   );
   check(
@@ -444,6 +459,7 @@ async function main(): Promise<void> {
     quotationThreadId: paidThread.id,
     companyId: null,
     userId: null,
+    projectId: null,
   });
   check("the dispatch was recorded once payment was confirmed", !!linked.id);
   check(
@@ -468,6 +484,7 @@ async function main(): Promise<void> {
         quotationThreadId: paidThread.id,
         companyId: project.id, // any id that is not the thread's company
         userId: null,
+        projectId: null,
       }),
   );
 
@@ -477,6 +494,7 @@ async function main(): Promise<void> {
     quotationThreadId: paidThread.id,
     companyId: null,
     userId: null,
+    projectId: null,
   });
   check(
     "one quotation takes several partial dispatches, uncapped [04 quantities]",
@@ -492,6 +510,7 @@ async function main(): Promise<void> {
     quotationThreadId: null,
     companyId: company.id,
     userId: repB.user.id,
+    projectId: null,
   });
   check("no quotation, and it was allowed", direct.quotationThreadId === null);
   check(
@@ -516,6 +535,7 @@ async function main(): Promise<void> {
         quotationThreadId: null,
         companyId: null,
         userId: repB.user.id,
+        projectId: null,
       }),
   );
   await refuses(
@@ -528,6 +548,7 @@ async function main(): Promise<void> {
         quotationThreadId: null,
         companyId: company.id,
         userId: null,
+        projectId: null,
       }),
   );
   await refuses(
@@ -540,6 +561,7 @@ async function main(): Promise<void> {
         quotationThreadId: null,
         companyId: company.id,
         userId: repB.user.id,
+        projectId: null,
       }),
   );
 
@@ -653,6 +675,7 @@ async function main(): Promise<void> {
     quotationThreadId: paidThread.id,
     companyId: null,
     userId: null,
+    projectId: null,
   });
   const d2Credit = await creditOf({
     id: d2Row.id,
@@ -1052,6 +1075,7 @@ async function main(): Promise<void> {
     quotationThreadId: null,
     companyId: company.id,
     userId: repB.user.id,
+    projectId: null,
   });
   check(
     "*** a DIRECT dispatch moves the project figure not at all *** [S26], [S75]",
@@ -1066,6 +1090,7 @@ async function main(): Promise<void> {
     quotationThreadId: paidThread.id,
     companyId: null,
     userId: null,
+    projectId: null,
   });
   check(
     "a LINKED dispatch moves it by exactly its own square metres [S26]",
@@ -1120,6 +1145,7 @@ async function main(): Promise<void> {
     quotationThreadId: secondThread.id,
     companyId: null,
     userId: null,
+    projectId: null,
   });
 
   const afterSecondBuyer = await listProjectCompanies(repA, project.id);
@@ -1149,6 +1175,229 @@ async function main(): Promise<void> {
     afterSecondBuyer.map((row) => row.companyName).join(" | ") ===
       [`${stamp} Buyer Two`, `${stamp} Bystander`, `${stamp} Co`].join(" | "),
     afterSecondBuyer.map((row) => row.companyName).join(" | "),
+  );
+
+  /* --- 15. The project is recorded on the dispatch [S74] ---------------- */
+
+  console.log("\n15. *** The project is on the dispatch *** [S74], [S50]");
+
+  // Branch one: the quotation HAS a project, so the dispatch takes it. Every
+  // dispatch above already exercised this; what none of them proved is that
+  // the column was written, rather than the figure still arriving through the
+  // thread. `paidThread` belongs to `project`.
+  const takenFrom = await recordDispatch(coordinator, {
+    sqm: "3.0000",
+    dispatchDate: "2026-09-14",
+    quotationThreadId: paidThread.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  check(
+    "*** a dispatch takes its quotation's project — shown, not chosen *** [S74]",
+    takenFrom.projectId === project.id,
+    `got ${takenFrom.projectId}, expected ${project.id}`,
+  );
+
+  // …and a project that disagrees is refused, not silently corrected — the
+  // twin of `companyNotOnThread`, which section 3 proves for the company.
+  const otherProject = await createProject(
+    repA,
+    {
+      nameEn: `${stamp} Other Project`,
+      nameAr: null,
+      sqmExpected: null,
+      region: null,
+      cityId: null,
+      endState: null,
+      lostReasonId: null,
+      lossReason: null,
+      inProduction: false,
+    },
+    [{ companyId: company.id }],
+  );
+  await refuses(
+    "a dispatch whose project differs from its quotation's is refused [S74]",
+    "dispatches.errors.projectNotOnThread",
+    () =>
+      recordDispatch(coordinator, {
+        sqm: "1.0000",
+        dispatchDate: "2026-09-14",
+        quotationThreadId: paidThread.id,
+        companyId: null,
+        userId: null,
+        projectId: otherProject.id,
+      }),
+  );
+
+  // Branch two: a quotation with NO project `S50`, taken to paid. Its company
+  // is deliberately one that is NOT a participant of `otherProject`, so the
+  // participant this dispatch adds is one that was not there before.
+  const [outsider] = await db
+    .insert(companies)
+    .values({
+      name: `${stamp} Outsider`,
+      nameNormalized: `${stamp}-outsider`,
+      phone: `+9665${stamp.slice(-7)}4`,
+      countryId: saudiId,
+      createdBy: repA.user.id,
+    })
+    .returning();
+  await db.insert(companyReps).values({
+    companyId: outsider.id,
+    userId: repA.user.id,
+    isPrimary: true,
+    origin: "self_registered",
+  });
+
+  const looseThread = await createQuotationThread(
+    repA,
+    { projectId: null, companyId: outsider.id, contactId: null },
+    version,
+    [line],
+    [],
+  );
+  check(
+    "*** a quotation can be raised with NO project *** [S50]",
+    looseThread.projectId === null,
+    `got ${looseThread.projectId}`,
+  );
+
+  await issueVersion(coordinator, looseThread.id, {
+    smacReference: `${stamp}-9594`,
+    verification: "unverified",
+  });
+  await acceptThread(coordinator, looseThread.id);
+  await confirmPayment(repA, looseThread.id, "2026-08-03");
+
+  await refuses(
+    "dispatching it with no project chosen is refused [S74]",
+    "dispatches.errors.projectRequired",
+    () =>
+      recordDispatch(coordinator, {
+        sqm: "12.0000",
+        dispatchDate: "2026-09-14",
+        quotationThreadId: looseThread.id,
+        companyId: null,
+        userId: null,
+        projectId: null,
+      }),
+  );
+
+  const written = await recordDispatch(coordinator, {
+    sqm: "12.0000",
+    dispatchDate: "2026-09-14",
+    quotationThreadId: looseThread.id,
+    companyId: null,
+    userId: null,
+    projectId: otherProject.id,
+  });
+  check(
+    "the dispatch carries the chosen project [S74]",
+    written.projectId === otherProject.id,
+    `got ${written.projectId}`,
+  );
+
+  const [rewritten] = await db
+    .select({ projectId: quotationThreads.projectId })
+    .from(quotationThreads)
+    .where(eq(quotationThreads.id, looseThread.id))
+    .limit(1);
+  check(
+    "*** and it is written back onto the QUOTATION *** [S74]",
+    rewritten?.projectId === otherProject.id,
+    `got ${rewritten?.projectId}`,
+  );
+
+  const participants = await listProjectCompanies(repA, otherProject.id);
+  const added = participants.find((row) => row.companyId === outsider.id);
+  check(
+    "*** the quotation's company joined that project as a participant *** [S74], [S27]",
+    added !== undefined,
+    participants.map((row) => row.companyName).join(" | "),
+  );
+  check(
+    "…and the derived figure reaches it, through the dispatch's own project [S26]",
+    added?.dispatchedSqm === "12.0000",
+    `got ${JSON.stringify(added?.dispatchedSqm)}`,
+  );
+
+  // **The participant is added ONCE.** A second dispatch on the same
+  // quotation finds the company already there and must not write a second
+  // link — `S27` keeps one live row per company, and the partial unique index
+  // would refuse it anyway. Nothing to write back either: the quotation now
+  // has a project, so this is branch one from here on.
+  const again = await recordDispatch(coordinator, {
+    sqm: "8.0000",
+    dispatchDate: "2026-09-15",
+    quotationThreadId: looseThread.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  check(
+    "a second dispatch on the same quotation now takes the project it gained [S74]",
+    again.projectId === otherProject.id,
+    `got ${again.projectId}`,
+  );
+  const afterSecond = await listProjectCompanies(repA, otherProject.id);
+  check(
+    "…and the company is still ONE participant, not two [S27]",
+    afterSecond.filter((row) => row.companyId === outsider.id).length === 1,
+    `got ${afterSecond.filter((row) => row.companyId === outsider.id).length}`,
+  );
+  check(
+    "…with both dispatches summed into its figure [S26]",
+    afterSecond.find((row) => row.companyId === outsider.id)?.dispatchedSqm ===
+      "20.0000",
+    `got ${JSON.stringify(afterSecond.find((row) => row.companyId === outsider.id)?.dispatchedSqm)}`,
+  );
+
+  // **What the coordinator may pick from** `S74`. Two ways to get this wrong,
+  // and both were nearly shipped: filtering on `end_state is null` hides every
+  // WON project — and `S31` makes a project won when the payment arrives,
+  // which is the moment before the dispatch — while `<> 'lost'` on a nullable
+  // column is null for every ordinary project and hides all of them.
+  const wonProject = await updateProject(repA, otherProject.id, {
+    nameEn: otherProject.nameEn,
+    nameAr: null,
+    sqmExpected: null,
+    region: null,
+    cityId: null,
+    endState: "won",
+    lostReasonId: null,
+    lossReason: null,
+    inProduction: false,
+  });
+  const lostProject = await createProject(
+    repA,
+    {
+      nameEn: `${stamp} Lost Project`,
+      nameAr: null,
+      sqmExpected: null,
+      region: null,
+      cityId: null,
+      endState: "lost",
+      lostReasonId: (await listLossReasons())[0].id,
+      lossReason: null,
+      inProduction: false,
+    },
+    [{ companyId: company.id }],
+  );
+  const pickable = await listDispatchProjectOptions(coordinator);
+  const offered = new Set(pickable.map((row) => row.id));
+  check(
+    "*** the picker offers a WON project — that is when dispatch happens *** [S31], [S74]",
+    offered.has(wonProject.id),
+    `${pickable.length} offered`,
+  );
+  check(
+    "…and an ordinary open project, which a plain <> comparison would drop",
+    offered.has(project.id),
+  );
+  check(
+    "…and never a lost one [07 C5]",
+    !offered.has(lostProject.id),
   );
 
   // Nothing is cleaned up: FACET does not delete history `[12 §7]`, and this

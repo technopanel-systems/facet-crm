@@ -9,7 +9,7 @@ import {
   listProductThicknesses,
   listServiceTypes,
 } from "@/lib/lookups";
-import { listQuotationProjectOptions } from "@/lib/quotations";
+import { listQuotationFormOptions } from "@/lib/quotations";
 
 import { createQuotationAction } from "../actions";
 import { QuotationForm } from "../quotation-form";
@@ -31,9 +31,9 @@ export default async function NewQuotationPage({
   const t = await getTranslations();
 
   // No colour list `[17 §2]` — the colour is typed on the line.
-  const [projects, suppliers, classes, fireRatings, thicknesses, services] =
+  const [options, suppliers, classes, fireRatings, thicknesses, services] =
     await Promise.all([
-      listQuotationProjectOptions(session),
+      listQuotationFormOptions(session),
       listProductSuppliers(),
       listProductClasses(),
       listProductFireRatings(),
@@ -49,7 +49,9 @@ export default async function NewQuotationPage({
       <PageHeader title={t("quotations.newTitle")} />
       <QuotationForm
         action={createQuotationAction}
-        projects={projects}
+        projects={options.projects}
+        companies={options.companies}
+        contacts={options.contacts}
         products={{ suppliers, classes, fireRatings, thicknesses }}
         services={services}
         locale={locale}

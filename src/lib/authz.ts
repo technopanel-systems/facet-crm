@@ -328,7 +328,8 @@ async function canViewProject(
  *   deliberately never consulted — a shared company does not expose its
  *   projects `[04 Q7]`.
  * - quotation_thread: raising rep OR an explicit thread share OR visibility
- *   of the parent project (owner/share — founder decision, phase 6).
+ *   of the parent project (owner/share — founder decision, phase 6). A thread
+ *   with NO project `S50` simply stops after the first two terms.
  * - dispatch `[18 §2]`: `can_dispatch` sees every one, else the credited rep,
  *   else the thread it was dispatched against. Term for term the SQL twin
  *   below, and a direct dispatch `[07 C6]` carries no thread, so it stops
@@ -391,6 +392,9 @@ export async function canViewRecord(
       if (await hasActiveShare(userId, "quotation_thread", recordId)) {
         return true;
       }
+      // No project, no third term `S50`. The SQL twin below reaches the same
+      // answer without a branch: its `exists` matches nothing on a null.
+      if (!thread.projectId) return false;
       return canViewProject(userId, thread.projectId);
     }
     case "dispatch": {
@@ -552,7 +556,9 @@ export function visibleProjectsFilter(session: AuthSession): SQL | undefined {
  *
  * The project term is the founder decision in `11 §2`: project visibility
  * cascades to the threads raised on it, or a rep would lose sight of their own
- * deal for want of a share click. Note what none of this does: company
+ * deal for want of a share click. **A thread with no project `S50` falls
+ * through it**: the correlated `exists` matches no row on a null `project_id`,
+ * which is the same answer `canViewRecord` reaches with an explicit branch. Note what none of this does: company
  * membership is still never consulted, here or in `visibleProjectsFilter`.
  * Company → projects does not cascade `[04 Q7]`.
  */
@@ -851,6 +857,34 @@ export function dispatchCompanyLookupFilter(
 ): SQL | undefined {
   if (session.user.role.canDispatch) return undefined;
   return visibleCompaniesFilter(session);
+}
+
+/**
+ * Projects a `can_dispatch` holder may NAME on the dispatch form `S74`.
+ *
+ * Term for term the company filter above, and it exists for the same reason.
+ * `S74` obliges the coordinator to choose a project when the quotation has
+ * none `S50`, and `visibleProjectsFilter` returns nothing for that role —
+ * owner or explicit share, and they are neither. Without this the rule cannot
+ * be performed by the only person the rule names.
+ *
+ * **The grant stops at the name**, exactly as `18 §2` limits the company one:
+ * no project record, no participants, no quotations, no link to open it.
+ * `canViewRecord` and `visibleProjectsFilter` are untouched, so `/projects`
+ * behaves as before and a dispatch screen renders a project as plain text
+ * unless the viewer may open it on their own.
+ *
+ * **S76 is not built by this.** That rule gives the coordinator projects and
+ * contacts properly; this is the narrower reach `can_dispatch` carries in the
+ * meantime — the same argument `setCreditSplit` makes for its own flag
+ * `[16 §8]`, where a strict project check would make a founder-granted flag
+ * unusable by one of the two roles holding it.
+ */
+export function dispatchProjectLookupFilter(
+  session: AuthSession,
+): SQL | undefined {
+  if (session.user.role.canDispatch) return undefined;
+  return visibleProjectsFilter(session);
 }
 
 /* ------------------------------------------------------------------ *

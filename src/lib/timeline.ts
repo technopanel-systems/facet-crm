@@ -468,23 +468,21 @@ async function dispatchedEvents(
       actorUserId: dispatches.recordedByUserId,
       actorName: recorder.name,
       companyId: dispatches.companyId,
-      projectId: quotationThreads.projectId,
+      // `S74` — the dispatch's own project. The join through the thread that
+      // used to reach it is gone: it was this query's only use for it.
+      projectId: dispatches.projectId,
       sqm: dispatches.sqm,
     })
     .from(dispatches)
     .innerJoin(recorder, eq(recorder.id, dispatches.recordedByUserId))
-    .leftJoin(
-      quotationThreads,
-      eq(quotationThreads.id, dispatches.quotationThreadId),
-    )
     .where(
       and(
         visibleDispatchesFilter(session),
         scope.companyId ? eq(dispatches.companyId, scope.companyId) : undefined,
-        // A direct dispatch has no thread and so no project: it belongs to the
-        // company's timeline and to no project's `[07 C6]`.
+        // A direct dispatch names no project today, so it belongs to the
+        // company's timeline and to no project's `[07 C6]`, `S75`.
         scope.projectId
-          ? eq(quotationThreads.projectId, scope.projectId)
+          ? eq(dispatches.projectId, scope.projectId)
           : undefined,
         range ? gte(dispatches.dispatchDate, range.from) : undefined,
         range ? lte(dispatches.dispatchDate, range.to) : undefined,

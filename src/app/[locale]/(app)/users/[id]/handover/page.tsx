@@ -62,7 +62,14 @@ export default async function HandoverPage({
       empty: t("team.handover.noQuotations"),
       rows: book.quotationThreads.map((row) => ({
         id: row.id,
-        label: lookupName({ nameEn: row.projectNameEn, nameAr: row.projectNameAr }, locale),
+        // `S50` — a project-less thread is named by its company instead, so
+        // it can still be selected and handed over `[19 §3]`.
+        label: row.projectNameEn
+          ? lookupName(
+              { nameEn: row.projectNameEn, nameAr: row.projectNameAr },
+              locale,
+            )
+          : row.companyName,
         note: row.companyName,
       })),
     },

@@ -13,6 +13,12 @@
  * rep, an explicit thread share, or visibility of the parent project
  * `[11 §2]`. No query in this file writes its own predicate.
  *
+ * **A thread may have no project** `S50`. Every join onto `projects` here is
+ * therefore a LEFT join: an inner one silently drops the project-less thread
+ * from the list, the count and the detail screen alike, with no error anywhere.
+ * A thread with none gains one at dispatch `S74` — `src/lib/dispatches.ts` is
+ * the only writer, and nothing in this file may fill it in instead.
+ *
  * Money is computed, never typed `[16 §1]`. SMAC still owns it: `08 D5`
  * governs disagreement, and computing the mirror removes the commonest way the
  * two diverge. Every figure stays a string end to end — a square-metre number
@@ -70,6 +76,7 @@ import {
 import {
   can,
   canViewRecord,
+  visibleCompaniesFilter,
   visibleProjectsFilter,
   visibleQuotationThreadsFilter,
   type AuthSession,
@@ -298,8 +305,9 @@ export async function expireOverdueThreads(): Promise<number> {
 
 export type QuotationThreadListRow = {
   id: string;
-  projectId: string;
-  projectNameEn: string;
+  /** Null when the quotation has no project yet `S50`. */
+  projectId: string | null;
+  projectNameEn: string | null;
   projectNameAr: string | null;
   companyId: string;
   companyName: string;
@@ -394,7 +402,7 @@ export async function listQuotationThreads(
         quotationVersions,
         eq(quotationVersions.threadId, quotationThreads.id),
       )
-      .innerJoin(projects, eq(quotationThreads.projectId, projects.id))
+      .leftJoin(projects, eq(quotationThreads.projectId, projects.id))
       .innerJoin(companies, eq(quotationThreads.companyId, companies.id))
       .innerJoin(users, eq(quotationThreads.raisedByUserId, users.id));
 
@@ -411,7 +419,7 @@ export async function listQuotationThreads(
       quotationVersions,
       eq(quotationVersions.threadId, quotationThreads.id),
     )
-    .innerJoin(projects, eq(quotationThreads.projectId, projects.id))
+    .leftJoin(projects, eq(quotationThreads.projectId, projects.id))
     .innerJoin(companies, eq(quotationThreads.companyId, companies.id))
     .where(where);
 
@@ -423,54 +431,87 @@ export type QuotationProjectOption = {
   nameEn: string;
   nameAr: string | null;
   companies: { id: string; name: string }[];
+};
+
+export type QuotationFormOptions = {
+  projects: QuotationProjectOption[];
+  /**
+   * Every company this identity may name, for a quotation with no project
+   * `S50`. With a project chosen the form uses that project's links instead
+   * `[16 §6]`; this list is the wider one, and it is what the server falls
+   * back to when there is no project to narrow by.
+   */
+  companies: { id: string; name: string }[];
+  /** Their contacts, flat. A contact belongs to a company, never to a
+   *  project, so one list serves both halves of the form `[07 A2]`. */
   contacts: { id: string; companyId: string; name: string }[];
 };
 
 /**
  * What the new-quotation form may choose from: the projects this identity can
- * see, each with its **live** company links and those companies' contacts.
+ * see, each with its **live** company links — and, for the project-less case
+ * `S50`, every visible company with its contacts.
  *
- * The company list is the project's links and nothing wider `[16 §6]`, and it
- * is built from the same rule the server then enforces — a dropdown that
- * offers what the action refuses is how a rule becomes a bug report.
+ * With a project, the company list is that project's links and nothing wider
+ * `[16 §6]`, built from the same rule the server then enforces — a dropdown
+ * that offers what the action refuses is how a rule becomes a bug report.
+ * Without one there is no project to narrow by, so ordinary company visibility
+ * is the rule, and `createQuotationThread` enforces exactly that.
  *
- * Three queries rather than one join, so a project with twenty contacts does
+ * Separate queries rather than one join, so a project with twenty contacts does
  * not arrive twenty times.
  */
-export async function listQuotationProjectOptions(
+export async function listQuotationFormOptions(
   session: AuthSession,
-): Promise<QuotationProjectOption[]> {
-  const visibleProjects = await db
-    .select({
-      id: projects.id,
-      nameEn: projects.nameEn,
-      nameAr: projects.nameAr,
-    })
-    .from(projects)
-    .where(visibleProjectsFilter(session))
-    .orderBy(asc(projects.nameEn));
+): Promise<QuotationFormOptions> {
+  const [visibleProjects, visibleCompanies] = await Promise.all([
+    db
+      .select({
+        id: projects.id,
+        nameEn: projects.nameEn,
+        nameAr: projects.nameAr,
+      })
+      .from(projects)
+      .where(visibleProjectsFilter(session))
+      .orderBy(asc(projects.nameEn)),
+    // The project-less half `S50`. Ordinary company visibility, the same rule
+    // `listCompanyOptions` composes for the contact and project forms.
+    db
+      .select({ id: companies.id, name: companies.name })
+      .from(companies)
+      .where(visibleCompaniesFilter(session))
+      .orderBy(asc(companies.name)),
+  ]);
 
-  if (visibleProjects.length === 0) return [];
   const projectIds = visibleProjects.map((row) => row.id);
+  const links = projectIds.length
+    ? await db
+        .select({
+          projectId: projectCompanies.projectId,
+          companyId: companies.id,
+          name: companies.name,
+        })
+        .from(projectCompanies)
+        .innerJoin(companies, eq(projectCompanies.companyId, companies.id))
+        .where(
+          and(
+            inArray(projectCompanies.projectId, projectIds),
+            isNull(projectCompanies.removedAt),
+          ),
+        )
+        .orderBy(asc(companies.name))
+    : [];
 
-  const links = await db
-    .select({
-      projectId: projectCompanies.projectId,
-      companyId: companies.id,
-      name: companies.name,
-    })
-    .from(projectCompanies)
-    .innerJoin(companies, eq(projectCompanies.companyId, companies.id))
-    .where(
-      and(
-        inArray(projectCompanies.projectId, projectIds),
-        isNull(projectCompanies.removedAt),
-      ),
-    )
-    .orderBy(asc(companies.name));
-
-  const companyIds = [...new Set(links.map((row) => row.companyId))];
-  const contactRows = companyIds.length
+  // Every company either half of the form can offer, so one contact list
+  // serves both. A project's participant the viewer cannot otherwise see is
+  // still on this list, exactly as `16 §6` already allowed.
+  const companyIds = [
+    ...new Set([
+      ...links.map((row) => row.companyId),
+      ...visibleCompanies.map((row) => row.id),
+    ]),
+  ];
+  const contacts_ = companyIds.length
     ? await db
         .select({
           id: contacts.id,
@@ -482,15 +523,16 @@ export async function listQuotationProjectOptions(
         .orderBy(asc(contacts.name))
     : [];
 
-  return visibleProjects.map((project) => {
-    const own = links.filter((link) => link.projectId === project.id);
-    const ownCompanyIds = new Set(own.map((link) => link.companyId));
-    return {
+  return {
+    projects: visibleProjects.map((project) => ({
       ...project,
-      companies: own.map(({ companyId, name }) => ({ id: companyId, name })),
-      contacts: contactRows.filter((row) => ownCompanyIds.has(row.companyId)),
-    };
-  });
+      companies: links
+        .filter((link) => link.projectId === project.id)
+        .map(({ companyId, name }) => ({ id: companyId, name })),
+    })),
+    companies: visibleCompanies,
+    contacts: contacts_,
+  };
 }
 
 export type QuotationLineRow = {
@@ -532,7 +574,8 @@ export type QuotationVersionDetail = QuotationVersion & {
 };
 
 export type QuotationThreadDetail = QuotationThread & {
-  projectNameEn: string;
+  /** Null when the quotation has no project yet `S50`. */
+  projectNameEn: string | null;
   projectNameAr: string | null;
   companyName: string;
   contactName: string | null;
@@ -686,7 +729,7 @@ export async function getQuotationThread(
       raisedByName: users.name,
     })
     .from(quotationThreads)
-    .innerJoin(projects, eq(quotationThreads.projectId, projects.id))
+    .leftJoin(projects, eq(quotationThreads.projectId, projects.id))
     .innerJoin(companies, eq(quotationThreads.companyId, companies.id))
     .innerJoin(users, eq(quotationThreads.raisedByUserId, users.id))
     .leftJoin(contacts, eq(quotationThreads.contactId, contacts.id))
@@ -714,7 +757,11 @@ export async function getQuotationThread(
   ]);
 
   const [projectViewable, companyViewable] = await Promise.all([
-    canViewRecord(session, "project", row.thread.projectId),
+    // No project, nothing to open `S50` — and `false` is what the screen
+    // already means by "render the name as plain text".
+    row.thread.projectId
+      ? canViewRecord(session, "project", row.thread.projectId)
+      : false,
     canViewRecord(session, "company", row.thread.companyId),
   ]);
 
@@ -803,6 +850,29 @@ async function assertCompanyOnProject(
     .limit(1);
   if (!link) {
     throw new RuleError("quotations.errors.companyNotOnProject", "companyId");
+  }
+}
+
+/**
+ * The company on a project-less quotation `S50`.
+ *
+ * `assertCompanyOnProject` is the rule when there IS a project `[16 §6]`, and
+ * it is stricter: the company must be a participant. With no project that
+ * question has no object, so what is left is the ordinary one — may this
+ * identity use this company at all. Same filter the company list composes,
+ * never a hand-written predicate `[authz.ts]`.
+ */
+async function assertCompanyVisible(
+  session: AuthSession,
+  companyId: string,
+): Promise<void> {
+  const [row] = await db
+    .select({ id: companies.id })
+    .from(companies)
+    .where(and(eq(companies.id, companyId), visibleCompaniesFilter(session)))
+    .limit(1);
+  if (!row) {
+    throw new RuleError("quotations.errors.companyNotVisible", "companyId");
   }
 }
 
@@ -1020,7 +1090,8 @@ function lineMoney(input: QuotationLineInput): {
  * ------------------------------------------------------------------ */
 
 export type QuotationThreadInput = {
-  projectId: string;
+  /** Optional `S50`. Null means the project is chosen at dispatch `S74`. */
+  projectId: string | null;
   companyId: string;
   contactId: string | null;
 };
@@ -1138,12 +1209,19 @@ export async function createQuotationThread(
   lines: QuotationLineInput[],
   serviceLines: ServiceLineInput[],
 ): Promise<QuotationThread> {
-  // FACET requires a project even though SMAC does not `[08 C3]`, and the
-  // project is what visibility hangs off `[11 §2]`.
-  if (!(await canViewRecord(session, "project", thread.projectId))) {
-    throw new RuleError("quotations.errors.projectNotVisible", "projectId");
+  // **The project is optional** `S50`, and the two rules that hang off it go
+  // with it: visibility of the parent project `[11 §2]`, and the company being
+  // one of that project's participants `[16 §6]`. With no project there is
+  // nothing to be a participant OF, so the company is checked against ordinary
+  // company visibility instead — the rule the form's own list is built from.
+  if (thread.projectId) {
+    if (!(await canViewRecord(session, "project", thread.projectId))) {
+      throw new RuleError("quotations.errors.projectNotVisible", "projectId");
+    }
+    await assertCompanyOnProject(thread.projectId, thread.companyId);
+  } else {
+    await assertCompanyVisible(session, thread.companyId);
   }
-  await assertCompanyOnProject(thread.projectId, thread.companyId);
   await assertContactOnCompany(thread.companyId, thread.contactId);
 
   if (lines.length === 0) {

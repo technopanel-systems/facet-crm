@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import {
@@ -28,10 +28,14 @@ export type ThreadOption = {
   raisedByName: string;
   quotedSqm: string | null;
   dispatchedSqm: string;
+  /** `S74` — the quotation's own project, already translated. Null when it
+   *  has none `S50`, which is what puts the picker on this form. */
+  projectLabel: string | null;
 };
 
 export type CompanyOption = { id: string; label: string };
 export type RepOption = { id: string; name: string };
+export type ProjectOption = { id: string; label: string };
 
 /**
  * Recording a dispatch. Two modes, and the difference between them is the
@@ -41,6 +45,13 @@ export type RepOption = { id: string; name: string };
  * search for a company, and a search that lives in the URL is shareable,
  * survives a reload and needs no JavaScript — the same reasoning `SearchForm`
  * already follows. Only the submit path is a client action.
+ *
+ * **The project follows the chosen quotation** `S74`, which is the one thing
+ * here that IS client state: the quotation carrying a project shows it and
+ * offers nothing to change, and the quotation with none `S50` shows a picker.
+ * The server decides either way — it derives the project from the thread and
+ * refuses a disagreeing one — so this only spares the coordinator a field
+ * they may not answer.
  */
 export function DispatchForm({
   action,
@@ -48,6 +59,7 @@ export function DispatchForm({
   threads,
   companies,
   reps,
+  projects,
   companyQuery,
   today,
 }: {
@@ -56,12 +68,17 @@ export function DispatchForm({
   threads: ThreadOption[];
   companies: CompanyOption[];
   reps: RepOption[];
+  projects: ProjectOption[];
   companyQuery: string;
   today: string;
 }) {
   const t = useTranslations();
   const [state, formAction, pending] = useActionState(action, emptyFormState);
   const errors = state.fieldErrors ?? {};
+  const [threadId, setThreadId] = useState(
+    state.values?.quotationThreadId ?? "",
+  );
+  const thread = threads.find((row) => row.id === threadId);
 
   return (
     <FormShell
@@ -79,25 +96,81 @@ export function DispatchForm({
       }
     >
       {mode === "linked" ? (
-        <FormField
-          name="quotationThreadId"
-          label={t("dispatches.fields.quotation")}
-          error={errors.quotationThreadId}
-          hint={t("dispatches.detail.derivedHint")}
-          required
-        >
-          <SelectField
+        <>
+          <FormField
             name="quotationThreadId"
-            placeholder={t("dispatches.fields.quotationPlaceholder")}
-            invalid={!!errors.quotationThreadId}
+            label={t("dispatches.fields.quotation")}
+            error={errors.quotationThreadId}
+            hint={t("dispatches.detail.derivedHint")}
+            required
           >
-            {threads.map((thread) => (
-              <option key={thread.id} value={thread.id}>
-                {thread.label}
-              </option>
-            ))}
-          </SelectField>
-        </FormField>
+            {/* Uncontrolled, like every other `SelectField`: the state only
+                decides which project field appears, so `defaultValue` still
+                wins after a rejected submit. */}
+            <SelectField
+              name="quotationThreadId"
+              defaultValue={threadId}
+              onChange={setThreadId}
+              placeholder={t("dispatches.fields.quotationPlaceholder")}
+              invalid={!!errors.quotationThreadId}
+            >
+              {threads.map((row) => (
+                <option
+                  key={row.id}
+                  value={row.id}
+                  // A DOM handle for `verify:routes`, which may not read a
+                  // translated label to tell the two branches apart.
+                  data-project={row.projectLabel === null ? "" : "set"}
+                >
+                  {row.label}
+                </option>
+              ))}
+            </SelectField>
+          </FormField>
+
+          {/* `S74` — the project is shown, not chosen, when the quotation has
+              one. No input: the server takes it from the quotation, so a field
+              here would be a value the coordinator could only get wrong. */}
+          {thread && thread.projectLabel !== null ? (
+            <FormField
+              name="project"
+              label={t("dispatches.fields.project")}
+              hint={t("dispatches.detail.projectFromQuotation")}
+            >
+              {/* The label above points at this, and a project name may
+                  hold either script `D62`. */}
+              <p id="project" dir="auto" className="text-sm font-medium">
+                {thread.projectLabel}
+              </p>
+            </FormField>
+          ) : null}
+
+          {/* `S74` — and chosen when it has none `S50`. The hint says the
+              second half of the rule out loud, because writing the project
+              back onto the quotation is a consequence a coordinator should
+              not discover afterwards. */}
+          {thread && thread.projectLabel === null ? (
+            <FormField
+              name="projectId"
+              label={t("dispatches.fields.project")}
+              error={errors.projectId}
+              hint={t("dispatches.detail.projectWriteBack")}
+              required
+            >
+              <SelectField
+                name="projectId"
+                placeholder={t("dispatches.fields.projectPlaceholder")}
+                invalid={!!errors.projectId}
+              >
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.label}
+                  </option>
+                ))}
+              </SelectField>
+            </FormField>
+          ) : null}
+        </>
       ) : (
         <>
           <FormField

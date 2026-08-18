@@ -98,7 +98,14 @@ function LinkRow({
         // company record itself `[04 Q7]`. Not viewable means no link.
         href={link.viewable ? `/companies/${link.companyId}` : undefined}
         // One name field since `S12`, so it may hold either script `D62`.
-        title={<span dir="auto">{link.companyName}</span>}
+        // `data-participant` is a DOM handle, like `Fact`'s `name`: the derived
+        // figure `S26` is what `S74`'s write-back must produce, and
+        // `verify:routes` cannot assert it by reading a translated name.
+        title={
+          <span dir="auto" data-participant={link.companyId}>
+            {link.companyName}
+          </span>
+        }
         meta={
           [
             link.viewable ? null : t("projects.detail.hiddenCompany"),
@@ -110,9 +117,11 @@ function LinkRow({
         // `RecordRow` renders this mono and tabular `D11`. Absent, not zero:
         // a participant with no dispatch shows nothing `S26`.
         when={
-          dispatched
-            ? `${link.dispatchedSqm} ${t("common.sqm")}`
-            : undefined
+          dispatched ? (
+            <span data-dispatched={link.companyId}>
+              {link.dispatchedSqm} {t("common.sqm")}
+            </span>
+          ) : undefined
         }
         action={
           canRemove ? (

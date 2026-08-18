@@ -32,6 +32,9 @@ export async function recordDispatchAction(
     ? fields.uuid("companyId", { required: true })
     : null;
   const userId = isDirect ? fields.uuid("userId", { required: true }) : null;
+  // `S74` — shape only. Whether it is required, ignored or refused depends on
+  // the quotation's own project, which only the data layer can read.
+  const projectId = isDirect ? null : fields.uuid("projectId");
   // `min: 0` rejects a negative here; the data layer rejects zero with its own
   // rule `[dispatches.errors.sqmPositive]`, because "nothing went out" is a
   // business statement rather than a malformed field.
@@ -48,6 +51,7 @@ export async function recordDispatchAction(
       quotationThreadId,
       companyId,
       userId,
+      projectId,
     });
     dispatchId = dispatch.id;
   } catch (error) {
@@ -57,6 +61,10 @@ export async function recordDispatchAction(
   const locale = await getLocale();
   revalidatePath("/dispatches");
   revalidatePath("/targets");
+  // `S74` — dispatching can write a project onto a quotation and add a
+  // participant to that project, so both of those screens are now stale.
+  revalidatePath("/quotations");
+  revalidatePath("/projects");
   redirect({ href: `/dispatches/${dispatchId}`, locale });
   throw new Error("unreachable"); // redirect() never returns
 }

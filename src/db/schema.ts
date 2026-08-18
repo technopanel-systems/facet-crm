@@ -855,7 +855,8 @@ export const projects = pgTable(
  * have bought. The `is_buyer` column and the partial unique index that made it
  * "at most one" are both gone — a hand-ticked flag beside a derivable fact is
  * what `S28` already forbids for project state. The derivation lives in
- * `dispatchedSqmByCompany` in `src/lib/projects.ts` and nowhere else.
+ * `dispatchedSqmByCompany` in `src/lib/projects.ts` and nowhere else, which
+ * reads `dispatches.project_id` since `S74`.
  *
  * So the one thing this row still says about a company is whether it is still
  * involved. Removal is soft and re-linkable `S27` — the row is kept and
@@ -990,9 +991,13 @@ export const deleteRequests = pgTable(
  * ------------------------------------------------------------------ */
 
 /**
- * `09 §5.2` — one thread, many versions. The project link is required even
- * though SMAC does not require one, so it cannot be validated against SMAC
- * `[08 C3]`.
+ * `09 §5.2` — one thread, many versions.
+ *
+ * **The project is optional** `S50`: reps sometimes need to quote before a
+ * project exists, so `08 C3`'s "required even though SMAC does not require
+ * one" is exactly what S50 reverses. A thread with none gains one at dispatch
+ * `S74`, and that is the ONLY place FACET fills it in — SPEC §16 leaves open
+ * whether anything else ever should, so nothing else may.
  *
  * Payment confirmation is one tick by the rep with a date, because the rep
  * receives the payment — not an amounts ledger `[07 C3]`. Two application
@@ -1005,9 +1010,8 @@ export const quotationThreads = pgTable(
   "quotation_threads",
   {
     id: pk(),
-    projectId: uuid("project_id")
-      .notNull()
-      .references(() => projects.id),
+    /** Optional `S50`; written back at dispatch when it is null `S74`. */
+    projectId: uuid("project_id").references(() => projects.id),
     companyId: uuid("company_id")
       .notNull()
       .references(() => companies.id),
@@ -1314,6 +1318,16 @@ export const quotationServiceLines = pgTable(
  * `[07 C6]` — a null thread is exactly what makes a direct dispatch visible as
  * such in reporting, so the route cannot quietly bypass the chain.
  *
+ * **The project is recorded here, on the dispatch itself** `S74`. Square metres
+ * per project are analysed from dispatch data and this row is the record of
+ * what actually shipped, so it carries its own project rather than borrowing
+ * its thread's. Where there IS a thread the two are never different — a rule
+ * `recordDispatch` enforces the way it already enforces the company, because
+ * this pair spans two rows and no CHECK can reach across one.
+ *
+ * It stays nullable for the direct route: a dispatch with no quotation may
+ * still name no project `S75`.
+ *
  * Achieved SQM and pipeline metrics derive from these rows and nowhere else.
  */
 export const dispatches = pgTable(
@@ -1330,6 +1344,8 @@ export const dispatches = pgTable(
     quotationThreadId: uuid("quotation_thread_id").references(
       () => quotationThreads.id,
     ),
+    /** `S74` — the thread's project whenever there is a thread, never another. */
+    projectId: uuid("project_id").references(() => projects.id),
     dispatchDate: date("dispatch_date").notNull(),
     recordedByUserId: uuid("recorded_by_user_id")
       .notNull()
@@ -1343,6 +1359,8 @@ export const dispatches = pgTable(
     index("dispatches_user_date_idx").on(t.userId, t.dispatchDate),
     index("dispatches_company_idx").on(t.companyId),
     index("dispatches_thread_idx").on(t.quotationThreadId),
+    /** `S26` groups by it, per project, on every project detail screen. */
+    index("dispatches_project_idx").on(t.projectId),
   ],
 );
 

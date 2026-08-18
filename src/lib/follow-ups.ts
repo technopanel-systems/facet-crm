@@ -29,6 +29,12 @@
  * `visibleQuotationThreadsFilter` — and nothing else. `setNextFollowUp` gates
  * on `canViewRecord`, which `authz.ts` documents as the write-path check.
  *
+ * **Every join onto `projects` from a thread is a LEFT join** `S50`. A
+ * quotation may have no project, and an inner join would drop it from the
+ * waiting list without an error — the one failure mode a work queue cannot
+ * survive, because nobody notices work that is not shown. Its label then falls
+ * back to the company, which `S51` guarantees is there.
+ *
  * ## Two suppressions, with deliberately different reach
  *
  * `gather` drops rows twice, and the two do not cover the same ground. A
@@ -153,6 +159,32 @@ export type FollowUpRow = {
   thresholdDays: number;
 };
 
+/**
+ * What names a quotation on the list: its SMAC reference, else its project,
+ * else its company `S51`.
+ *
+ * The third term is `S50`'s: a quotation raised before its project exists has
+ * neither of the first two while it is still `requested`, and a row with no
+ * name is a row nobody can act on. The company is the fact that is always
+ * there, and it is already on every one of these queries.
+ */
+type ThreadLabelParts = {
+  smacReference: string | null;
+  projectNameEn: string | null;
+  projectNameAr: string | null;
+  companyName: string;
+};
+
+function threadLabel(parts: ThreadLabelParts): string {
+  return parts.smacReference ?? parts.projectNameEn ?? parts.companyName;
+}
+
+/** The Arabic half, which only a project ever fills `S12`. */
+function threadLabelAr(parts: ThreadLabelParts): string | null {
+  if (parts.smacReference || !parts.projectNameEn) return null;
+  return parts.projectNameAr;
+}
+
 export type FollowUpOptions = {
   kind?: FollowUpKind;
   q?: string;
@@ -229,7 +261,7 @@ async function quotationNoResponse(
     )
     .innerJoin(auditLog, eq(auditLog.entityId, quotationVersions.id))
     .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
-    .innerJoin(projects, eq(projects.id, quotationThreads.projectId))
+    .leftJoin(projects, eq(projects.id, quotationThreads.projectId))
     .where(
       and(
         visibleQuotationThreadsFilter(session),
@@ -274,8 +306,8 @@ async function quotationNoResponse(
       kind: "quotation_no_response" as const,
       anchorType: "quotation_thread" as const,
       anchorId: row.threadId,
-      anchorNameEn: row.smacReference ?? row.projectNameEn,
-      anchorNameAr: row.smacReference ? null : row.projectNameAr,
+      anchorNameEn: threadLabel(row),
+      anchorNameAr: threadLabelAr(row),
       companyId: row.companyId,
       companyName: row.companyName,
       ownerNames: [],
@@ -368,7 +400,7 @@ async function quotationReturned(
     )
     .innerJoin(auditLog, eq(auditLog.entityId, quotationVersions.id))
     .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
-    .innerJoin(projects, eq(projects.id, quotationThreads.projectId))
+    .leftJoin(projects, eq(projects.id, quotationThreads.projectId))
     .where(
       and(
         visibleQuotationThreadsFilter(session),
@@ -418,8 +450,8 @@ async function quotationReturned(
       kind: "quotation_returned" as const,
       anchorType: "quotation_thread" as const,
       anchorId: row.threadId,
-      anchorNameEn: row.smacReference ?? row.projectNameEn,
-      anchorNameAr: row.smacReference ? null : row.projectNameAr,
+      anchorNameEn: threadLabel(row),
+      anchorNameAr: threadLabelAr(row),
       companyId: row.companyId,
       companyName: row.companyName,
       ownerNames: [],
@@ -775,7 +807,7 @@ async function manualDateDue(session: AuthSession): Promise<FollowUpRow[]> {
       })
       .from(quotationThreads)
       .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
-      .innerJoin(projects, eq(projects.id, quotationThreads.projectId))
+      .leftJoin(projects, eq(projects.id, quotationThreads.projectId))
       .where(
         and(
           visibleQuotationThreadsFilter(session),
@@ -838,8 +870,8 @@ async function manualDateDue(session: AuthSession): Promise<FollowUpRow[]> {
       return row({
         anchorType: "quotation_thread",
         anchorId: thread.id,
-        anchorNameEn: reference ?? thread.projectNameEn,
-        anchorNameAr: reference ? null : thread.projectNameAr,
+        anchorNameEn: threadLabel({ ...thread, smacReference: reference }),
+        anchorNameAr: threadLabelAr({ ...thread, smacReference: reference }),
         companyId: thread.companyId,
         companyName: thread.companyName,
         since: thread.due as string,

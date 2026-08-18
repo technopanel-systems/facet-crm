@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Link } from "@/i18n/navigation";
 import { can, listActiveUsers, requireSession } from "@/lib/authz";
 import {
+  listDispatchProjectOptions,
   listDispatchableThreads,
   searchDispatchCompanies,
 } from "@/lib/dispatches";
@@ -46,10 +47,13 @@ export default async function NewDispatchPage({
   const mode = rawMode === "direct" ? "direct" : "linked";
   const query = companyQ?.trim() ?? "";
 
-  const [threads, companies, reps] = await Promise.all([
+  const [threads, companies, reps, projects] = await Promise.all([
     mode === "linked" ? listDispatchableThreads(session) : [],
     mode === "direct" ? searchDispatchCompanies(session, query) : [],
     mode === "direct" ? listActiveUsers() : [],
+    // `S74` — only the linked form ever picks one: a direct dispatch names no
+    // project this slice `S75`.
+    mode === "linked" ? listDispatchProjectOptions(session) : [],
   ]);
 
   return (
@@ -119,19 +123,35 @@ export default async function NewDispatchPage({
       <DispatchForm
         action={recordDispatchAction}
         mode={mode}
-        threads={threads.map((thread) => ({
-          id: thread.id,
-          label: `${thread.smacReference ?? t("common.none")} · ${lookupName({ nameEn: thread.projectNameEn, nameAr: thread.projectNameAr }, locale)} · ${t("dispatches.fields.dispatchedSoFar")} ${thread.dispatchedSqm}`,
-          companyLabel: thread.companyName,
-          raisedByName: thread.raisedByName,
-          quotedSqm: thread.quotedSqm,
-          dispatchedSqm: thread.dispatchedSqm,
-        }))}
+        threads={threads.map((thread) => {
+          // `S50` — the quotation may have no project, in which case the
+          // option names its company instead of leaving a gap between two
+          // separators, and the form offers the picker `S74`.
+          const projectLabel = thread.projectNameEn
+            ? lookupName(
+                { nameEn: thread.projectNameEn, nameAr: thread.projectNameAr },
+                locale,
+              )
+            : null;
+          return {
+            id: thread.id,
+            label: `${thread.smacReference ?? t("common.none")} · ${projectLabel ?? thread.companyName} · ${t("dispatches.fields.dispatchedSoFar")} ${thread.dispatchedSqm}`,
+            companyLabel: thread.companyName,
+            raisedByName: thread.raisedByName,
+            quotedSqm: thread.quotedSqm,
+            dispatchedSqm: thread.dispatchedSqm,
+            projectLabel,
+          };
+        })}
         companies={companies.map((company) => ({
           id: company.id,
           label: company.name,
         }))}
         reps={reps}
+        projects={projects.map((project) => ({
+          id: project.id,
+          label: lookupName(project, locale),
+        }))}
         companyQuery={query}
         today={today()}
       />

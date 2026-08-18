@@ -414,6 +414,9 @@ async function main(): Promise<void> {
       userId: repA.user.id,
       sqm: "86.3040",
       quotationThreadId: thread.id,
+      // `S74` — see the same note in `verify-phase9`: a hand-written dispatch
+      // still carries its quotation's project.
+      projectId: project.id,
       dispatchDate: today(),
       recordedByUserId: coordinator.user.id,
     })

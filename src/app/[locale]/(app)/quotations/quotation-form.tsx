@@ -31,17 +31,26 @@ export type ProjectOption = {
   /** The project's live company links — the only companies a quotation on it
    *  may name `[16 §6]`. */
   companies: { id: string; name: string }[];
-  contacts: { id: string; companyId: string; name: string }[];
 };
+
+export type CompanyOption = { id: string; name: string };
+export type ContactOption = { id: string; companyId: string; name: string };
 
 /**
  * The rep's quotation request `[04 flow 6]`. **This form creates version 1**
  * `[10 §4]` — status `requested`, no SMAC reference, which the coordinator
  * fills in later.
+ *
+ * **The project is optional** `S50`. Which companies may be named follows from
+ * that: with a project, its live links and nothing wider `[16 §6]`; without
+ * one, every company this rep may use. The server applies the same pair, so
+ * neither list offers what the action would refuse.
  */
 export function QuotationForm({
   action,
   projects,
+  companies,
+  contacts,
   products,
   services,
   locale,
@@ -49,6 +58,8 @@ export function QuotationForm({
 }: {
   action: Action;
   projects: ProjectOption[];
+  companies: CompanyOption[];
+  contacts: ContactOption[];
   products: ProductOptions;
   services: NamedOption[];
   locale: string;
@@ -66,8 +77,10 @@ export function QuotationForm({
   const [serviceCount, setServiceCount] = useState(0);
 
   const project = projects.find((row) => row.id === projectId);
-  const companies = project?.companies ?? [];
-  const contacts = (project?.contacts ?? []).filter(
+  // `16 §6` narrows to the project's participants; with no project `S50`
+  // there is nothing to narrow by, so it is ordinary company visibility.
+  const companyOptions = project ? project.companies : companies;
+  const contactOptions = contacts.filter(
     (contact) => contact.companyId === companyId,
   );
 
@@ -93,12 +106,18 @@ export function QuotationForm({
       <div className="grid gap-4 sm:grid-cols-2">
         {/* A rep can hold many projects, so this is the second field to earn a
             combobox after the city `[15 §5]` — same reasoning, list length. */}
+        {/* Not required `S50` — a rep sometimes quotes before the project
+            exists. The hint says what happens to the gap rather than leaving
+            it looking like a field somebody forgot. */}
         <FormField
           name="projectId"
           label={t("quotations.fields.project")}
           error={errors.projectId}
-          required
-          hint={projects.length === 0 ? t("common.noOptions") : undefined}
+          hint={
+            projects.length === 0
+              ? t("quotations.detail.noProjectsYet")
+              : t("quotations.detail.projectOptional")
+          }
         >
           <Combobox
             name="projectId"
@@ -111,7 +130,7 @@ export function QuotationForm({
             placeholder={t("common.none")}
             searchPlaceholder={t("common.search")}
             emptyLabel={t("common.noMatches")}
-            clearLabel={t("common.none")}
+            clearLabel={t("quotations.fields.projectNone")}
             disabled={projects.length === 0}
             invalid={Boolean(errors.projectId)}
             onChange={(value) => {
@@ -135,13 +154,13 @@ export function QuotationForm({
             name="companyId"
             value={companyId}
             onChange={(event) => setCompanyId(event.target.value)}
-            disabled={!project}
+            disabled={companyOptions.length === 0}
             aria-invalid={Boolean(errors.companyId) || undefined}
             aria-describedby={errors.companyId ? "companyId-error" : undefined}
             className={selectClasses}
           >
             <option value="">{t("common.none")}</option>
-            {companies.map((row) => (
+            {companyOptions.map((row) => (
               <option key={row.id} value={row.id}>
                 {row.name}
               </option>
@@ -174,7 +193,7 @@ export function QuotationForm({
             className={selectClasses}
           >
             <option value="">{t("common.none")}</option>
-            {contacts.map((row) => (
+            {contactOptions.map((row) => (
               <option key={row.id} value={row.id}>
                 {row.name}
               </option>

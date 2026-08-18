@@ -23,7 +23,19 @@
  *     `[18 §7]`. CLAUDE.md's first design principle, and it closes `07 D3`'s
  *     stated worry: if the coordinator picks the rep, the credited person
  *     becomes a dropdown choice rather than a fact of the quotation chain.
- *  6. **Recording a dispatch NEVER sets a credit split** `[07 D3]`, `[12 §1]`.
+ *  6. **The project is recorded on the dispatch** `S74`, and derived the same
+ *     way whenever the thread has one: shown, never chosen. When the thread
+ *     has none `S50`, the coordinator chooses, and that choice is written back
+ *     onto the quotation and adds its company to the project as a participant
+ *     `S27`. All three writes are one transaction with the dispatch — a
+ *     project written back onto a quotation whose dispatch then failed would
+ *     be a decision nobody made.
+ *
+ *     **A dispatch's project is never different from its thread's** `S74`.
+ *     The pair spans two rows, so no CHECK can hold it; it is enforced here,
+ *     exactly as the company is, and asserted for every row ever written by
+ *     `verify:schema25` §11.
+ *  7. **Recording a dispatch NEVER sets a credit split** `[07 D3]`, `[12 §1]`.
  *     This module does not import `setCreditSplit`, and `verify-slice3`
  *     counts rows to prove it.
  *
@@ -68,6 +80,7 @@ import {
   can,
   canViewRecord,
   dispatchCompanyLookupFilter,
+  dispatchProjectLookupFilter,
   visibleDispatchesFilter,
   visibleQuotationThreadsFilter,
   type AuthSession,
@@ -78,6 +91,7 @@ import {
   type DispatchCredit,
 } from "@/lib/credit-splits";
 import { SQM_SCALE, ZERO, toScaled } from "@/lib/decimal";
+import { ensureProjectParticipant } from "@/lib/projects";
 import { RuleError } from "@/lib/validation";
 
 export type Dispatch = typeof dispatches.$inferSelect;
@@ -96,6 +110,12 @@ export type DispatchInput = {
   companyId: string | null;
   /** Direct dispatches only. */
   userId: string | null;
+  /**
+   * `S74`. Required when the thread has no project of its own `S50`; ignored,
+   * and refused if it disagrees, when the thread has one. Null on the direct
+   * route, which names no project this slice `S75`.
+   */
+  projectId: string | null;
 };
 
 export type DispatchListRow = {
@@ -132,7 +152,10 @@ export type DispatchDetail = DispatchListRow & {
 export type DispatchableThread = {
   id: string;
   smacReference: string | null;
-  projectNameEn: string;
+  /** Null when the quotation has no project `S50` — the coordinator picks one
+   *  as part of dispatching it `S74`. */
+  projectId: string | null;
+  projectNameEn: string | null;
   projectNameAr: string | null;
   companyId: string;
   companyName: string;
@@ -157,6 +180,9 @@ export type DispatchableThread = {
  * |---|---|---|
  * | against a quotation | payment confirmed `[07 C3]` | stay null — the chain is the approval |
  * | direct | `can_dispatch` | stamped with the coordinator `[07 C6]` |
+ *
+ * And two ways the project arrives `S74`, which is the whole of that rule:
+ * taken from the thread, or chosen and written back onto it.
  */
 export async function recordDispatch(
   session: AuthSession,
@@ -173,6 +199,9 @@ export async function recordDispatch(
 
   let companyId = input.companyId;
   let userId = input.userId;
+  let projectId = input.projectId;
+  /** `S74`'s second branch: the project is new to the quotation. */
+  let writeBackProject = false;
 
   if (input.quotationThreadId) {
     // Visibility first — a thread the actor cannot see does not exist to them.
@@ -191,6 +220,7 @@ export async function recordDispatch(
         companyId: quotationThreads.companyId,
         raisedByUserId: quotationThreads.raisedByUserId,
         paymentConfirmedAt: quotationThreads.paymentConfirmedAt,
+        projectId: quotationThreads.projectId,
       })
       .from(quotationThreads)
       .where(eq(quotationThreads.id, input.quotationThreadId))
@@ -212,6 +242,34 @@ export async function recordDispatch(
     }
     companyId = thread.companyId;
     userId = thread.raisedByUserId;
+
+    if (thread.projectId) {
+      // `S74` — the dispatch takes the thread's project, shown and not chosen.
+      // A disagreeing input is refused rather than silently corrected: the
+      // same trade the company check above makes, for the same reason.
+      if (projectId && projectId !== thread.projectId) {
+        throw new RuleError("dispatches.errors.projectNotOnThread", "projectId");
+      }
+      projectId = thread.projectId;
+    } else {
+      // `S74` — the quotation has none `S50`, so the coordinator chooses, and
+      // the choice is written back below. Checked against the same lookup the
+      // picker is built from, so the form never offers what this refuses.
+      if (!projectId) {
+        throw new RuleError("dispatches.errors.projectRequired", "projectId");
+      }
+      const [pickable] = await db
+        .select({ id: projects.id })
+        .from(projects)
+        .where(
+          and(eq(projects.id, projectId), dispatchProjectLookupFilter(session)),
+        )
+        .limit(1);
+      if (!pickable) {
+        throw new RuleError("dispatches.errors.projectNotVisible", "projectId");
+      }
+      writeBackProject = true;
+    }
   } else {
     if (!companyId) {
       throw new RuleError("dispatches.errors.companyRequired", "companyId");
@@ -233,8 +291,49 @@ export async function recordDispatch(
   }
 
   const isDirect = input.quotationThreadId === null;
+  // The direct route names no project this slice `S75`: its stated-purpose
+  // half is not built, and nothing may reach a project without a thread to
+  // have derived it from.
+  if (isDirect) projectId = null;
 
   return withAudit(session.actor, async (tx, log) => {
+    // `S74` — the write-back comes FIRST, so the dispatch is inserted against
+    // a quotation that already carries the project. Guarded on the column
+    // still being null: two coordinators dispatching the same project-less
+    // quotation must not both write, and the row count is what says so.
+    if (writeBackProject) {
+      const written = await tx
+        .update(quotationThreads)
+        .set({ projectId })
+        .where(
+          and(
+            eq(quotationThreads.id, input.quotationThreadId as string),
+            isNull(quotationThreads.projectId),
+          ),
+        )
+        .returning({ id: quotationThreads.id });
+      if (written.length !== 1) {
+        throw new RuleError("dispatches.errors.projectAlreadySet", "projectId");
+      }
+      log({
+        action: "quotation_thread.project_set",
+        entityType: "quotation_thread",
+        entityId: input.quotationThreadId as string,
+        before: { projectId: null },
+        after: { projectId },
+      });
+
+      // `S74` — and the quotation's company joins that project if it is not
+      // already a participant. Through `projects.ts`'s one writer, so `S27`
+      // holds for this route exactly as for a rep adding one by hand.
+      await ensureProjectParticipant(
+        tx,
+        log,
+        projectId as string,
+        companyId as string,
+      );
+    }
+
     const [created] = await tx
       .insert(dispatches)
       .values({
@@ -242,6 +341,7 @@ export async function recordDispatch(
         userId: userId as string,
         sqm: input.sqm,
         quotationThreadId: input.quotationThreadId,
+        projectId,
         dispatchDate: input.dispatchDate,
         recordedByUserId: session.user.id,
         // `07 C6` — the coordinator's approval IS the direct route's control,
@@ -449,7 +549,7 @@ export async function getDispatch(
       approvedByName: approvedBy.name,
       approvedAt: dispatches.approvedAt,
       createdAt: dispatches.createdAt,
-      projectId: projects.id,
+      projectId: dispatches.projectId,
       projectNameEn: projects.nameEn,
       projectNameAr: projects.nameAr,
     })
@@ -458,11 +558,9 @@ export async function getDispatch(
     .innerJoin(users, eq(users.id, dispatches.userId))
     .innerJoin(recordedBy, eq(recordedBy.id, dispatches.recordedByUserId))
     .leftJoin(approvedBy, eq(approvedBy.id, dispatches.approvedByUserId))
-    .leftJoin(
-      quotationThreads,
-      eq(quotationThreads.id, dispatches.quotationThreadId),
-    )
-    .leftJoin(projects, eq(projects.id, quotationThreads.projectId))
+    // `S74` — the dispatch's OWN project, not its thread's. The two agree
+    // whenever there is a thread, and this is the column that says so.
+    .leftJoin(projects, eq(projects.id, dispatches.projectId))
     // The same rule the list asks of every row, asked of this one.
     .where(and(eq(dispatches.id, id), visibleDispatchesFilter(session)))
     .limit(1);
@@ -498,9 +596,13 @@ export async function getDispatch(
  * **payment confirmed** `[07 C3]`.
  *
  * The dropdown never offers what the action refuses — the same principle
- * `listQuotationProjectOptions` follows. An unpaid quotation is simply not in
+ * `listQuotationFormOptions` follows. An unpaid quotation is simply not in
  * the list, and the screen says why rather than letting someone pick it and be
  * told no.
+ *
+ * **The project join is LEFT** `S50`: a quotation with no project is precisely
+ * the one `S74`'s second branch exists for, and an inner join would hide it
+ * from the only screen that can resolve it.
  */
 export async function listDispatchableThreads(
   session: AuthSession,
@@ -509,6 +611,7 @@ export async function listDispatchableThreads(
     .select({
       id: quotationThreads.id,
       smacReference: quotationVersions.smacReference,
+      projectId: quotationThreads.projectId,
       projectNameEn: projects.nameEn,
       projectNameAr: projects.nameAr,
       companyId: quotationThreads.companyId,
@@ -526,7 +629,7 @@ export async function listDispatchableThreads(
         ne(quotationVersions.status, "superseded"),
       ),
     )
-    .innerJoin(projects, eq(projects.id, quotationThreads.projectId))
+    .leftJoin(projects, eq(projects.id, quotationThreads.projectId))
     .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
     .innerJoin(users, eq(users.id, quotationThreads.raisedByUserId))
     .where(
@@ -598,6 +701,46 @@ export async function searchDispatchCompanies(
 }
 
 /**
+ * Projects a `can_dispatch` holder may name on a dispatch `S74`.
+ *
+ * Ordered by name. **Only a LOST project is left out** `[07 C5]`: it is
+ * finished, and offering one is offering a mistake. Everything else stays —
+ * and `won` in particular, because `S31` makes a project won when the payment
+ * arrives, which is the moment before the dispatch this picker exists for.
+ * Filtering to `end_state is null` would have hidden exactly the projects most
+ * likely to be dispatched against. `is distinct from` rather than `<>`, or
+ * the null end state — the ordinary case — fails the comparison and every
+ * live project disappears. Names, and nothing else:
+ * the coordinator gets no link and no project record from this, the same
+ * shape `searchDispatchCompanies` already has for companies `[18 §2]`.
+ *
+ * **It cannot be narrowed to the company's own projects.** S74's second half
+ * is that the company is ADDED to the project it did not belong to, so a
+ * picker that only offered projects it already belonged to would make the rule
+ * unusable. S76 gives the coordinator real project visibility in its own
+ * slice; this is the reach `can_dispatch` carries in the meantime, exactly as
+ * `setCreditSplit` reasons for `can_set_credit_split` `[16 §8]`.
+ */
+export async function listDispatchProjectOptions(
+  session: AuthSession,
+): Promise<{ id: string; nameEn: string; nameAr: string | null }[]> {
+  return db
+    .select({
+      id: projects.id,
+      nameEn: projects.nameEn,
+      nameAr: projects.nameAr,
+    })
+    .from(projects)
+    .where(
+      and(
+        dispatchProjectLookupFilter(session),
+        sql`${projects.endState} is distinct from 'lost'`,
+      ),
+    )
+    .orderBy(projects.nameEn);
+}
+
+/**
  * Every dispatch in a period, for achievement `[04 C1]`.
  *
  * **Deliberately unfiltered by `visibleDispatchesFilter`.** The visibility
@@ -619,14 +762,13 @@ export async function dispatchesInPeriod(
       sqm: dispatches.sqm,
       dispatchDate: dispatches.dispatchDate,
       quotationThreadId: dispatches.quotationThreadId,
-      projectId: quotationThreads.projectId,
+      // `S74` — the dispatch's own project. A credit split is a fact about a
+      // project on a date, so it reads what the dispatch records, not what
+      // its thread happens to say today.
+      projectId: dispatches.projectId,
     })
     .from(dispatches)
     .innerJoin(users, eq(users.id, dispatches.userId))
-    .leftJoin(
-      quotationThreads,
-      eq(quotationThreads.id, dispatches.quotationThreadId),
-    )
     .where(
       and(
         gte(dispatches.dispatchDate, periodStart),

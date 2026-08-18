@@ -169,6 +169,32 @@ export function Fact({
 }
 
 /**
+ * A value that is deliberately not there **yet**, as against one that is
+ * simply empty.
+ *
+ * `S50`'s project-less quotation is what this exists for. An em-dash is what
+ * every other absent value renders as, and it says "nothing here" — which for
+ * a quotation raised before its project exists is the wrong sentence. This one
+ * says what is missing and what fills it, in normal weight rather than the
+ * semibold a real value carries, so the row reads as answered-later rather
+ * than as a field somebody skipped.
+ *
+ * `data-slot="fact-absent"` is a DOM handle, for the same reason `Fact` takes
+ * a `name`: `verify:routes` may not read a translated string, and the
+ * difference between "absent" and "an em-dash" is exactly what it must assert.
+ */
+export function Absent({ children }: { children: ReactNode }) {
+  return (
+    <span
+      data-slot="fact-absent"
+      className="text-muted-foreground font-normal"
+    >
+      {children}
+    </span>
+  );
+}
+
+/**
  * A related record inside a card `[22 §3]` — the concept's `.row`.
  *
  * This replaces the class string that was copy-pasted into five files. Wrap a

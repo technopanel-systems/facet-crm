@@ -236,7 +236,7 @@ counts once, not once per quotation beneath it.
 
 ## 8. Quotations
 
-**S50. [CHANGE]** A quotation may exist **with or without a project**. Reps
+**S50.** A quotation may exist **with or without a project**. Reps
 sometimes need to quote before a project exists.
 
 **S51.** A quotation always names a **company**.
@@ -320,14 +320,18 @@ only event that credits a target.
 confirmed — unless the company is an approved credit customer**, in which case it
 proceeds and is flagged as a credit dispatch.
 
-**S74. [BUILD]** **The project is chosen at dispatch.** If the linked quotation
-has no project, the project selected here is **written back onto the quotation**,
-and the quotation's company is added to that project as a participant if it is
-not already one.
+**S74.** **The project is recorded on the dispatch itself.** When the
+quotation has a project, the dispatch takes that project — it is shown, not
+chosen. When the quotation has none, the coordinator chooses one, it is written
+back onto the quotation, and the quotation's company is added to that project as
+a participant if it is not already one. A dispatch's project is never different
+from its quotation's.
 
-**S75.** A dispatch with **no quotation and no project** is a company simply
-buying — from stock or similar. It names its own company and rep and is marked as
-a direct dispatch.
+**S75. [CHANGE]** **Every dispatch has a project or a stated purpose, never
+neither.** A dispatch with no quotation may still name a project. When it names
+none, the coordinator states what the stock is for — the customer's own
+inventory, a sample, or other with a text field. It stays marked as a direct
+dispatch.
 
 **S76. [CHANGE]** The coordinator **sees projects and contacts**, because both
 are part of the dispatch. The name-only restriction is removed.
