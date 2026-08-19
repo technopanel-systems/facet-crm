@@ -172,6 +172,9 @@ a session report does not exist.
 | `listQuotationFormOptions` returns every visible company into one `<select>`. Fine at ~90 | `src/lib/quotations.ts` | Revisit after bulk import |
 | Comments render on companies, contacts and dispatches. `S114` and `D48` allow quotation threads and projects only; the `comments_record_type` CHECK admits five kinds, the company screen imports `CommentBox`, and `verify:routes` §9 asserts the wider behaviour | `src/db/schema.ts`, `companies/[id]/page.tsx`, `scripts/verify-routes.ts` §9 | Session 14, which narrows comments — it deletes that walk |
 | `quotation_threads.closed_at` and `closed_by_user_id` have no writer and no reader outside the schema. `src/lib/projects.ts` never touches `quotationThreads`, so `S47`'s cascade — which is what would write them — is not built | `src/db/schema.ts` | The loss-cascade slice `S47`, which builds their writer or drops them |
+| `companies.merged_into_id` has readers (isNull filters in five modules) but no writer | `src/db/schema.ts` | Session 16, which builds duplicate merge |
+| `quotation_lines.form_factor` is always written `'sheet'`; the enum's `coil` value is set nowhere and nothing branches on it | `src/db/schema.ts` | Undecided — needs a rule or a drop |
+| `report_signal` has nine values; S43 lists ten — stock shortage is missing | `src/lib/enums.ts` | Session 15, which unifies the vocabulary |
 
 ---
 
