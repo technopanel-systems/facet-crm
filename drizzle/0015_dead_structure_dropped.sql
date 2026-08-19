@@ -46,10 +46,28 @@
 -- filled.
 --
 -- Its CHECK goes with it. `rep_reports_reference` (`reference is null or
--- entry_type = 'interaction'`) exists in the database but was never declared
--- in `schema.ts`, so drizzle-kit does not emit a statement for it; Postgres
--- drops a constraint with the only column it names. Verified against
--- `pg_constraint` after replay.
+-- entry_type = 'interaction'`) is dropped by Postgres along with the only
+-- column it names, so this file emits no statement for it. Verified against
+-- `pg_constraint` after replay: `rep_reports` carries `rep_reports_shape` and
+-- `rep_reports_on_hold` and nothing else.
+--
+-- CORRECTION, AUDIT 1 (§6). The sentence that stood here claimed the
+-- constraint "was never declared in `schema.ts`, so drizzle-kit does not emit
+-- a statement for it". Both halves are false, and it was stated as verified.
+-- It IS declared in `schema.ts` — `0007` added it and the `check()` is still in
+-- the `rep_reports` table definition — and it is still in
+-- `meta/0015_snapshot.json`, which lists nine CHECK constraints where the
+-- database has eight. Drizzle-kit emitted nothing because it compares
+-- `schema.ts` against the snapshot and the two agree, not because the
+-- declaration was absent.
+--
+-- What that leaves behind, which is the reason this correction is worth
+-- writing: `schema.ts` declares a CHECK on a column that no longer exists in
+-- either the file or the database. `drizzle-kit generate` compares the two
+-- things that agree, so it can never surface the drift; `db:push`, which
+-- compares `schema.ts` to the live database, would try to re-add the
+-- constraint and fail on the missing column. The fix is one deletion in
+-- `schema.ts`, and it is not this file's to make.
 --
 -- No rule marker moves. `SPEC §15` entries are not numbered rules, so the
 -- count stays 16 CHANGE / 22 BUILD.
