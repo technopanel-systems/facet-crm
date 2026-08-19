@@ -41,6 +41,14 @@
  *  15. `S67` and `S57` over HTTP: reading a quotation whose validity has
  *      passed does **not** write to it, and the line form offers no VAT rate.
  *
+ *  16. `S76` on the screens: the coordinator's `/projects` and `/contacts` are
+ *      no longer empty, and neither carries a control they may not use — no
+ *      New button, no edit link, no composer, no follow-up panel. Every one of
+ *      those is asserted against the manager on the same path, so a screen
+ *      that failed to render its own controls cannot pass as a permission
+ *      working. Sections 2 and 3 carry the route half: the two `new` forms and
+ *      the two edit routes answer 404 for that identity and 200 for the others.
+ *
  * This was 11 sections until feature slice 6: the old item 11 (the
  * message-key scan) is now section 12, and section 11 above — the
  * follow-up-date replay — existed in the code for a phase but was never
@@ -282,7 +290,28 @@ const STATIC_ROUTES = [
 const FORBIDDEN: Record<string, readonly string[]> = {
   "rep-a@example.test": ["/dispatches/new", "/users", "/users/new"],
   "manager@example.test": ["/dispatches/new"],
-  "coordinator@example.test": ["/users", "/users/new"],
+  // A project needs a company `S27` and a contact belongs to one `[07 A2]`,
+  // and the coordinator holds none — so both forms are `D53` 404s for them,
+  // and `S76` made the lists behind them worth reading anyway.
+  "coordinator@example.test": [
+    "/users",
+    "/users/new",
+    "/projects/new",
+    "/contacts/new",
+  ],
+};
+
+/**
+ * Records an identity may READ but not act on `S76`.
+ *
+ * The coordinator sees every project and contact and writes to neither, so on
+ * those two sections the edit route answers 404 and no composer is offered.
+ * Keyed by email like `FORBIDDEN` above, and for the same reason: the other
+ * two identities assert the 200 and the composer on the very same paths, so
+ * neither half of the claim can pass on its own.
+ */
+const READ_ONLY: Record<string, readonly string[]> = {
+  "coordinator@example.test": ["projects", "contacts"],
 };
 
 /** The first id a list page links to, or null when the list is empty. */
@@ -300,10 +329,13 @@ function firstId(body: string, section: string): string | null {
  * **Asserted for the manager only.** `sees_all_reps` is the one identity with
  * rows on every list; a coordinator's `/companies` and `/performance` are
  * legitimately empty — they see quotation threads and company NAMES, not
- * company records. `S76 [CHANGE]` removes that name-only restriction and is
- * not built, so this describes today — so a list card that is absent there is
- * the empty state working, not a missing frame. Asserting it for everyone
- * turns a correct screen into a red line.
+ * company records `[18 §2]`. So a list card that is absent there is the empty
+ * state working, not a missing frame, and asserting it for everyone turns a
+ * correct screen into a red line.
+ *
+ * `S76` moved the line without erasing it: the coordinator now reads projects
+ * and contacts in full, so `/projects` and `/contacts` are no longer empty for
+ * them — section 14 asserts that directly — while `/companies` still is.
  */
 const MARKERS: Record<string, readonly string[]> = {
   "/": ['data-slot="today-queue"', 'data-slot="today-waiting"'],
@@ -395,10 +427,18 @@ async function walkRecords(jar: Jar, email: string): Promise<void> {
       console.log(`  skip  ${email} /${section} is empty for this identity`);
       continue;
     }
+    const readOnly = (READ_ONLY[email] ?? []).includes(section);
     for (const suffix of suffixes) {
       const path = `/en/${section}/${id}${suffix}`;
       const { status, body } = await get(jar, path);
-      check(`${email} ${path} → 200`, status === 200, `got ${status}`);
+      // Reading is not editing `S76`: the edit route is a 404 for an identity
+      // that may only read, which is `D53`'s answer everywhere else too.
+      const expected = readOnly && suffix === "/edit" ? 404 : 200;
+      check(
+        `${email} ${path} → ${expected}`,
+        status === expected,
+        `got ${status}`,
+      );
       if (status === 200 && suffix === "") {
         check(`  ${path} renders a fact grid`, body.includes('data-slot="facts"'));
         // Every thread has a chain position — a closed one included, which
@@ -414,10 +454,14 @@ async function walkRecords(jar: Jar, email: string): Promise<void> {
         // timeline to hang it on — and, since `S114` and `D48` allow only two
         // of the five, the assertion session 14 has to invert.
         if (COMMENTABLE.has(section)) {
-          check(
-            `  ${path} offers the comment box [S114] [D48]`,
+          const offered =
             body.includes('data-slot="comment-composer"') &&
-              body.includes('name="body"'),
+            body.includes('name="body"');
+          check(
+            readOnly
+              ? `  ${path} offers NO comment box — read, not write [S76] [D51]`
+              : `  ${path} offers the comment box [S114] [D48]`,
+            readOnly ? !offered : offered,
           );
         }
       }
@@ -932,8 +976,9 @@ async function main(): Promise<void> {
             continue;
           }
           if (!projectId) {
-            // A coordinator gets no project link — `S76 [CHANGE]`, not built;
-            // a manager should.
+            // Every identity that reaches a thread with a project may now open
+            // it — the coordinator too, since `S76`. No project on the thread
+            // is the only reason left to skip `S50`.
             console.log(`  skip  ${label}: links no project`);
             continue;
           }
@@ -1934,6 +1979,13 @@ async function main(): Promise<void> {
           !factHtmlOf(dispatchPage.body, "project").includes("fact-absent"),
         factOf(dispatchPage.body, "project"),
       );
+      // `S76` on the screen it was written for: the project a dispatch carries
+      // is a LINK for the coordinator who recorded it, not plain text. This
+      // page is fetched as the coordinator, so the href IS the assertion.
+      check(
+        `${locale}: *** and the coordinator may open it — the name is a link *** [S76]`,
+        dispatchPage.body.includes(`/projects/${projectId}"`),
+      );
 
       /* --- 6. written back onto the quotation [S74] --------------------- */
 
@@ -2179,6 +2231,88 @@ async function main(): Promise<void> {
           );
         }
       }
+    }
+  }
+
+  console.log(
+    "\n16. The coordinator's projects and contacts, read and no further [S76]",
+  );
+  {
+    // **Both halves on every check.** The coordinator reaching a screen proves
+    // `S76`; the manager reaching the control the coordinator does not proves
+    // the screen was not simply broken for everybody. A one-sided assertion
+    // here would pass on an empty database and on a page that failed to render
+    // its own edit button.
+    const coordJar = jars["coordinator@example.test"];
+    const managerJar = jars["manager@example.test"];
+
+    for (const section of ["projects", "contacts"] as const) {
+      const list = await get(coordJar, `/en/${section}`);
+      check(
+        `the coordinator's /${section} is no longer empty [S76]`,
+        list.body.includes('data-slot="list-card"'),
+        `status ${list.status}`,
+      );
+      // `D51` — a New button that always fails is not rendered. The
+      // coordinator holds no company, and both records need one. Section 2
+      // already asserts the 404 behind it, from `FORBIDDEN`; this is the
+      // control, which is the half a route check cannot see.
+      check(
+        `…and offers them no New button, which would refuse [D51]`,
+        !list.body.includes(`/en/${section}/new"`),
+      );
+      const managerList = await get(managerJar, `/en/${section}`);
+      check(
+        `…while the manager, who holds companies, is offered one [D51]`,
+        managerList.body.includes(`/en/${section}/new"`),
+      );
+
+      // The edit CONTROL, for the same reason: section 3 walks the route and
+      // finds the 404, and neither of them proves the button is gone.
+      const id = firstId(list.body, section);
+      if (!id) {
+        console.log(`  --    no ${section} row to open`);
+        continue;
+      }
+      const detail = await get(coordJar, `/en/${section}/${id}`);
+      check(
+        `…and its detail carries no edit control [S76], [D51]`,
+        detail.status === 200 &&
+          !detail.body.includes(`/en/${section}/${id}/edit"`),
+        `status ${detail.status}`,
+      );
+      const managerDetail = await get(managerJar, `/en/${section}/${id}`);
+      check(
+        `…while the manager's does — the control is not simply gone`,
+        managerDetail.body.includes(`/en/${section}/${id}/edit"`),
+      );
+    }
+
+    // The project screen carries two more controls a reader may not use, and
+    // one it may: the participants are exactly what `S76` gave them.
+    const projectId = firstId(
+      (await get(coordJar, "/en/projects")).body,
+      "projects",
+    );
+    if (projectId) {
+      const asCoordinator = await get(coordJar, `/en/projects/${projectId}`);
+      const asManager = await get(managerJar, `/en/projects/${projectId}`);
+      check(
+        "no follow-up panel for a reader who may not set one [S76], [D51]",
+        !asCoordinator.body.includes('data-slot="next-follow-up"'),
+      );
+      check(
+        "…while the manager has it — the panel is not simply gone",
+        asManager.body.includes('data-slot="next-follow-up"'),
+      );
+      check(
+        "…and the manager keeps the edit control the coordinator lacks",
+        asManager.body.includes(`/en/projects/${projectId}/edit"`),
+      );
+      check(
+        "the participants render for the coordinator — what S76 is for [S26]",
+        asCoordinator.body.includes("data-participant="),
+      );
     }
   }
 }

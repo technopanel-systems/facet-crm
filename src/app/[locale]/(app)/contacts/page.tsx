@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
+import { hasUsableCompany } from "@/lib/companies";
 import { listContacts } from "@/lib/contacts";
 
 import { ListCard, SearchForm } from "../_components/list-controls";
@@ -33,16 +34,24 @@ export default async function ContactsPage({
   const t = await getTranslations();
 
   const currentPage = Number(page) || 1;
-  const { rows, total } = await listContacts(session, { q, page: currentPage });
+  // A contact belongs to a company `[07 A2]`, so an identity with none may read
+  // this list and start nothing from it — the projects list's note, for the
+  // other half of `S76` `D51`.
+  const [{ rows, total }, mayCreate] = await Promise.all([
+    listContacts(session, { q, page: currentPage }),
+    hasUsableCompany(session),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title={t("contacts.title")}
         action={
-          <Button asChild size="sm">
-            <Link href="/contacts/new">{t("contacts.new")}</Link>
-          </Button>
+          mayCreate ? (
+            <Button asChild size="sm">
+              <Link href="/contacts/new">{t("contacts.new")}</Link>
+            </Button>
+          ) : undefined
         }
       />
 
@@ -90,13 +99,20 @@ export default async function ContactsPage({
                       {row.name}
                     </Link>
                   </TableCell>
+                  {/* Not viewable means no link `S76`: a reader who holds
+                      contacts and no company sees the name and cannot open the
+                      record behind it — `listProjectCompanies`' shape. */}
                   <TableCell className="text-start">
-                    <Link
-                      href={`/companies/${row.companyId}`}
-                      className="hover:underline"
-                    >
-                      {row.companyName}
-                    </Link>
+                    {row.companyViewable ? (
+                      <Link
+                        href={`/companies/${row.companyId}`}
+                        className="hover:underline"
+                      >
+                        {row.companyName}
+                      </Link>
+                    ) : (
+                      row.companyName
+                    )}
                   </TableCell>
                   <TableCell className="text-start">
                     {row.position ?? t("common.none")}

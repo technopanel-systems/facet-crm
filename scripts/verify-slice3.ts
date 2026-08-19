@@ -40,6 +40,15 @@
  *      the two refusals, and the derived figure `S26` reaching a project it
  *      could not have reached before this slice.
  *
+ *  16. **The coordinator sees projects and contacts** `S76`, in three
+ *      directions rather than one. They reach both records and the dispatch
+ *      screen may link the project; every write on either is still refused,
+ *      each with its own key, because `S76` grants sight and `S62` names what
+ *      a coordinator may do; and a rep who could not see the project still
+ *      cannot `S30`. Two of its checks are a **pair**: the owner's waiting
+ *      list holds a stale project and the coordinator's does not, which is what
+ *      proves the read filter did not leak into the queue.
+ *
  * Usage: `npm run verify:slice3`
  *
  * That needs `NODE_ENV=development` in `.env`. `--env-file` is not optional and
@@ -84,7 +93,13 @@ import {
   targets as targetsTable,
   users,
 } from "@/db/schema";
-import { canViewRecord, type AuthSession } from "@/lib/authz";
+import {
+  canOpenRecord,
+  canViewRecord,
+  type AuthSession,
+} from "@/lib/authz";
+import { addComment } from "@/lib/comments";
+import { createContact, getContact, listContacts, updateContact } from "@/lib/contacts";
 import {
   creditForDispatches,
   getCreditSplitInForce,
@@ -99,10 +114,14 @@ import {
   recordDispatch,
 } from "@/lib/dispatches";
 import { SAUDI_CODE } from "@/lib/enums";
+import { followUpsForRecipient, setNextFollowUp } from "@/lib/follow-ups";
 import { listCountries, listLossReasons } from "@/lib/lookups";
 import {
+  addProjectCompany,
   createProject,
+  getProject,
   listProjectCompanies,
+  listProjects,
   updateProject,
 } from "@/lib/projects";
 import {
@@ -111,8 +130,10 @@ import {
   confirmPayment,
   createQuotationThread,
   issueVersion,
+  listQuotationFormOptions,
 } from "@/lib/quotations";
 import { achievementForPeriod, listTargetHistory, setTarget } from "@/lib/targets";
+import { projectTimeline } from "@/lib/timeline";
 
 let failures = 0;
 
@@ -1398,6 +1419,248 @@ async function main(): Promise<void> {
     "…and never a lost one [07 C5]",
     !offered.has(lostProject.id),
   );
+
+  /* --- 16. S76 — the coordinator sees projects and contacts ------ */
+
+  console.log(
+    "\n16. *** The coordinator sees projects and contacts *** [S76], [S30]",
+  );
+
+  const contact = await createContact(repA, {
+    companyId: company.id,
+    name: `${stamp} Contact`,
+    phone: "0500000000",
+    email: null,
+    position: null,
+    notes: null,
+  });
+
+  // repA's own project, through the real path — so its normalised name matches
+  // a search for the stamp, which the hand-inserted `project` above does not:
+  // that one stores the stamp raw and `normalizeName` folds the hyphen to a
+  // space. It carries the list assertions here and the queue pair below, and
+  // has no thread and no dispatch, which is what the queue half needs.
+  const stale = await createProject(
+    repA,
+    {
+      nameEn: `${stamp} Stale Project`,
+      nameAr: null,
+      sqmExpected: null,
+      region: null,
+      cityId: null,
+      endState: null,
+      lostReasonId: null,
+      lossReason: null,
+      inProduction: false,
+    },
+    [{ companyId: company.id }],
+  );
+
+  // The reaching half. The list matters as much as the detail: the filter is
+  // resolved in SQL before pagination, so a screen that pages correctly and a
+  // detail that opens are two different claims.
+  check(
+    "*** the coordinator opens a project they neither own nor were shared *** [S76]",
+    (await getProject(coordinator, project.id)) !== null,
+  );
+  const coordinatorProjects = await listProjects(coordinator, { q: stamp });
+  check(
+    "…and one is IN their list, not merely reachable by id [S76]",
+    coordinatorProjects.rows.some((row) => row.id === stale.id),
+    `saw ${coordinatorProjects.rows.length} of ${coordinatorProjects.total}`,
+  );
+  check(
+    "the coordinator opens a contact [S76]",
+    (await getContact(coordinator, contact.id)) !== null,
+  );
+  const coordinatorContacts = await listContacts(coordinator, { q: stamp });
+  check(
+    "…and it is in their list too [S76]",
+    coordinatorContacts.rows.some((row) => row.id === contact.id),
+    `saw ${coordinatorContacts.rows.length} of ${coordinatorContacts.total}`,
+  );
+  check(
+    "…while sees_all_reps is STILL false — a role exception, not a tier",
+    coordinator.user.role.seesAllReps === false,
+  );
+
+  // `S76`'s own reason: both are part of the dispatch. The screen half of it —
+  // the dispatch detail draws its project as a link rather than as plain text.
+  const linkedForCoordinator = await getDispatch(coordinator, linked.id);
+  check(
+    "*** the dispatch screen may now LINK its project, not print it *** [S76], [S74]",
+    linkedForCoordinator?.projectViewable === true,
+  );
+  check(
+    "the picker is ordinary project visibility now — the stopgap is gone [S76]",
+    (await listDispatchProjectOptions(coordinator)).some(
+      (row) => row.id === project.id,
+    ),
+  );
+
+  // The negative half, and the point of the slice: sight, not a hand.
+  check(
+    "the ACT gate still refuses the coordinator on a project [S76], [S62]",
+    (await canViewRecord(coordinator, "project", project.id)) === false,
+  );
+  check(
+    "…and on a contact [S76], [S62]",
+    (await canViewRecord(coordinator, "contact", contact.id)) === false,
+  );
+  check(
+    "…while the READ gate passes for both — the two questions have parted [S76]",
+    (await canOpenRecord(coordinator, "project", project.id)) &&
+      (await canOpenRecord(coordinator, "contact", contact.id)),
+  );
+  check(
+    "the company behind that contact stays shut — S76 names two records [18 §2]",
+    (await canOpenRecord(coordinator, "company", company.id)) === false,
+  );
+  const coordinatorContact = coordinatorContacts.rows.find(
+    (row) => row.id === contact.id,
+  );
+  check(
+    "…so the contact row tells its screen not to link it",
+    coordinatorContact?.companyViewable === false,
+  );
+  check(
+    "…and the company NAME is still there. Names yes, records no.",
+    (coordinatorContact?.companyName.length ?? 0) > 0,
+  );
+
+  await refuses(
+    "the coordinator may not edit a project [S76], [S62]",
+    "projects.errors.notFound",
+    () =>
+      updateProject(coordinator, project.id, {
+        nameEn: `${stamp} Renamed By Coordinator`,
+        nameAr: null,
+        sqmExpected: null,
+        region: null,
+        cityId: null,
+        endState: null,
+        lostReasonId: null,
+        lossReason: null,
+        inProduction: false,
+      }),
+  );
+  await refuses(
+    "…nor add a participant to one",
+    "projects.errors.notFound",
+    () => addProjectCompany(coordinator, project.id, { companyId: company.id }),
+  );
+  await refuses(
+    "…nor edit a contact",
+    "contacts.errors.notFound",
+    () =>
+      updateContact(coordinator, contact.id, {
+        companyId: company.id,
+        name: `${stamp} Renamed By Coordinator`,
+        phone: "0500000000",
+        email: null,
+        position: null,
+        notes: null,
+      }),
+  );
+  await refuses(
+    "…nor comment on a project they may read",
+    "comments.errors.recordNotFound",
+    () =>
+      addComment(coordinator, {
+        recordType: "project",
+        recordId: project.id,
+        body: `${stamp} coordinator comment`,
+        mentions: [],
+      }),
+  );
+  await refuses(
+    "…nor set a follow-up date on one",
+    "followUps.errors.notYours",
+    () => setNextFollowUp(coordinator, "project", project.id, "2026-12-01"),
+  );
+
+  // `S38` is not revisited here: the coordinator holds no `sees_all_reps` and
+  // no company, so they fail `visibleRepReportsFilter`'s company term and read
+  // no report at all — neither half. A timeline that showed one would mean this
+  // slice had widened `S38` sideways.
+  const coordinatorTimeline = await projectTimeline(coordinator, project.id, {
+    limit: 50,
+  });
+  check(
+    "a project timeline carries no rep report for the coordinator [S38]",
+    coordinatorTimeline.events.every((event) => event.kind !== "report"),
+    `${coordinatorTimeline.events.length} events`,
+  );
+
+  /*
+   * **The queue, asserted as a PAIR.** `S76` widened what may be read; it must
+   * not widen what is waiting on anybody, which is why
+   * `projectStageUnchanged` and `manualDateDue` compose `ownProjectsFilter`
+   * and not the read filter.
+   *
+   * One direction proves nothing: "the coordinator's queue holds no row for
+   * this project" passes just as well on a queue that is empty for an
+   * unrelated reason. The pair is the assertion — repA has exactly the row the
+   * coordinator does not — and it is the check that fails when someone later
+   * folds `ownProjectsFilter` back into `visibleProjectsFilter`, which will
+   * look like removing duplication.
+   *
+   * A project of its own, with no thread and no dispatch, so the fallback
+   * branch is what fires; `created_at` is backdated by hand, the shape §12
+   * already uses for its share row. `followUpsForRecipient` rather than
+   * `followUps`: the latter pages, and a page-one question is not the question
+   * being asked — §12's own trap.
+   */
+  await db
+    .update(projects)
+    .set({ createdAt: sql`now() - interval '400 days'` })
+    .where(eq(projects.id, stale.id));
+
+  const staleRows = (rows: { anchorType: string; anchorId: string }[]) =>
+    rows.filter(
+      (row) => row.anchorType === "project" && row.anchorId === stale.id,
+    ).length;
+  const repAQueue = staleRows(await followUpsForRecipient(repA));
+  const coordinatorQueue = staleRows(await followUpsForRecipient(coordinator));
+  check(
+    "*** the owner's queue holds the stale project *** [07 D5]",
+    repAQueue === 1,
+    `got ${repAQueue} rows`,
+  );
+  check(
+    "*** and the coordinator's does not — S76 widened sight, not work *** [S76]",
+    coordinatorQueue === 0,
+    `got ${coordinatorQueue} rows`,
+  );
+
+  // The same reasoning, for the other predicate narrowed with it: the
+  // new-quotation form offers exactly what `createQuotationThread` accepts.
+  const repAOptions = await listQuotationFormOptions(repA);
+  const coordinatorOptions = await listQuotationFormOptions(coordinator);
+  check(
+    "the quotation form offers the owner their project",
+    repAOptions.projects.some((row) => row.id === project.id),
+  );
+  check(
+    "…and offers the coordinator none of it — the write path would refuse [S76]",
+    !coordinatorOptions.projects.some((row) => row.id === project.id),
+    `${coordinatorOptions.projects.length} offered`,
+  );
+
+  // The mirror. repB owns nothing here and was shared nothing — §12 gave the
+  // project share to repC — so `S30` still reads exactly as it did.
+  check(
+    "*** a rep who could not see this project still cannot *** [S30]",
+    (await getProject(repB, project.id)) === null,
+  );
+  const repBProjects = await listProjects(repB, { q: stamp });
+  check(
+    "…nor find this run's projects in their list, where the coordinator does",
+    repBProjects.rows.length === 0 &&
+      coordinatorProjects.rows.some((row) => row.id === stale.id),
+    `saw ${repBProjects.rows.length}`,
+  );
+  check("…nor open the contact", (await getContact(repB, contact.id)) === null);
 
   // Nothing is cleaned up: FACET does not delete history `[12 §7]`, and this
   // script does not get an exception. Every row it writes is prefixed with the

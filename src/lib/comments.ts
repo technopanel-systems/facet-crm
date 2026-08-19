@@ -65,6 +65,7 @@ import {
 } from "@/db/schema";
 import { withAudit, type AuditEntry } from "@/lib/audit";
 import {
+  canOpenRecord,
   canViewRecord,
   visibleCommentsFilter,
   type AuthSession,
@@ -170,7 +171,11 @@ export async function getComment(
   if (!row) return null;
 
   const recordType = row.recordType as CommentRecordType;
-  if (!(await canViewRecord(session, recordType, row.recordId))) return null;
+  // A read, so `canOpenRecord` `S76`: a comment follows its record `[25 §10]`,
+  // and the coordinator now reads the projects and contacts they may not write
+  // to. Editing is author-only, checked in `updateComment` and again on the
+  // edit screen, so a wider read grants no wider write.
+  if (!(await canOpenRecord(session, recordType, row.recordId))) return null;
 
   const [decorated] = await withMentions([row]);
   return decorated ?? null;
@@ -284,7 +289,7 @@ export async function insertComment(
  * attaches no condition to it — *"Tagging a person raises a notification"* — and
  * a gate here would be business logic no document states. Nothing leaks: a
  * notification has no body column, and `mentionPayload` withholds the body, the
- * name and the link unless `canViewRecord` passes at the moment it is read.
+ * name and the link unless `canOpenRecord` passes at the moment it is read.
  *
  * The notification is raised **anchorless**, which is not cosmetic — see the
  * seed row. Tagging yourself raises nothing: you know.
@@ -333,10 +338,17 @@ async function addMentions(
 /**
  * Post a comment on a record.
  *
- * The record has to be one this identity may see — `25 §10` makes a comment
+ * The record has to be one this identity may ACT on — `25 §10` makes a comment
  * follow its record, so writing one where you cannot read is not a thing that
- * can happen. `canViewRecord` is the write-path form of the same rule the
- * filters state for lists, which is exactly what it exists for.
+ * can happen. `canViewRecord` is the write-path form of the rule the filters
+ * state for lists, which is exactly what it exists for.
+ *
+ * **Read and act parted company at `S76`**, and this stayed on act. A
+ * coordinator reads every project and contact and posts on neither: `S62` lists
+ * what they may do and commenting on a customer's project is not on it, so
+ * opening this would be inventing a rule inside a visibility slice. The
+ * composer is not rendered for them either `[projects/[id]/page.tsx]`, so the
+ * refusal is never reached from a screen.
  */
 export async function addComment(
   session: AuthSession,

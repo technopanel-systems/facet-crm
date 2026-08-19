@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { PageHeader } from "@/components/page-header";
-import { requireSession } from "@/lib/authz";
+import { canViewRecord, requireSession } from "@/lib/authz";
 import { listCompanyOptions } from "@/lib/companies";
 import { getContact } from "@/lib/contacts";
 
@@ -22,6 +22,9 @@ export default async function EditContactPage({
   const session = await requireSession();
   const contact = await getContact(session, id);
   if (!contact) notFound();
+  // Reading a contact is not editing one `S76` — the project edit screen's
+  // note, for the other half of the same rule `D53`.
+  if (!(await canViewRecord(session, "contact", id))) notFound();
 
   const t = await getTranslations();
   const companies = await listCompanyOptions(session);

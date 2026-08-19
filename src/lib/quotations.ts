@@ -75,9 +75,10 @@ import {
 } from "@/lib/decimal";
 import {
   can,
+  canOpenRecord,
   canViewRecord,
+  ownProjectsFilter,
   visibleCompaniesFilter,
-  visibleProjectsFilter,
   visibleQuotationThreadsFilter,
   type AuthSession,
 } from "@/lib/authz";
@@ -376,6 +377,12 @@ export type QuotationFormOptions = {
  * Without one there is no project to narrow by, so ordinary company visibility
  * is the rule, and `createQuotationThread` enforces exactly that.
  *
+ * **The projects are `ownProjectsFilter`, not `visibleProjectsFilter`** — the
+ * same sentence, applied to `S76`. `createQuotationThread` gates the project on
+ * `canViewRecord`, which `S76` deliberately leaves narrow, so the read filter
+ * here would offer a coordinator every project in the company and have each one
+ * refused on submit.
+ *
  * Separate queries rather than one join, so a project with twenty contacts does
  * not arrive twenty times.
  */
@@ -390,7 +397,7 @@ export async function listQuotationFormOptions(
         nameAr: projects.nameAr,
       })
       .from(projects)
-      .where(visibleProjectsFilter(session))
+      .where(ownProjectsFilter(session))
       .orderBy(asc(projects.nameEn)),
     // The project-less half `S50`. Ordinary company visibility, the same rule
     // `listCompanyOptions` composes for the contact and project forms.
@@ -529,10 +536,14 @@ export type QuotationThreadDetail = QuotationThread & {
    *
    * Seeing a quotation shows you the project title, the company name and the
    * contact name — a quotation without them is unreadable — but it does not
-   * grant access to those records `[16 §10]`. This is the coordinator's case
-   * exactly: they process every quotation in the company and see none of the
-   * customer detail behind it. False renders the name as plain text rather
-   * than a link, the same way `listProjectCompanies` already does.
+   * grant access to those records `[16 §10]`. False renders the name as plain
+   * text rather than a link, the same way `listProjectCompanies` already does.
+   *
+   * **`S76` moved the coordinator's half of that.** They still see none of the
+   * company detail behind a quotation, so `companyViewable` is false for them
+   * as before; the project is now theirs to open, because a dispatch carries
+   * one `S74`. Reading it is all they gain — every write on that project is
+   * still refused.
    */
   projectViewable: boolean;
   companyViewable: boolean;
@@ -704,10 +715,15 @@ export async function getQuotationThread(
   const [projectViewable, companyViewable] = await Promise.all([
     // No project, nothing to open `S50` — and `false` is what the screen
     // already means by "render the name as plain text".
+    //
+    // `canOpenRecord`, not `canViewRecord`: the question is whether to draw a
+    // link, and `S76` gives the coordinator the project behind a quotation
+    // while leaving every write on it refused. The company answer is unchanged
+    // — `S76` names projects and contacts, not companies `[18 §2]`.
     row.thread.projectId
-      ? canViewRecord(session, "project", row.thread.projectId)
+      ? canOpenRecord(session, "project", row.thread.projectId)
       : false,
-    canViewRecord(session, "company", row.thread.companyId),
+    canOpenRecord(session, "company", row.thread.companyId),
   ]);
 
   return {

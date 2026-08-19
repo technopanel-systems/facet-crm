@@ -510,8 +510,12 @@ async function main(): Promise<void> {
     "but can_approve_quotation sees every thread [16 §8]",
     coordinatorView !== null,
   );
-  // The second half of `16 §8`, which is as load-bearing as the first: names
-  // yes, records no.
+  // The second half of `16 §8` — names yes, records no — **as `S76` left it**.
+  // That rule said the coordinator got the project title and no more; `S76`
+  // gives them the project itself, because a dispatch carries one `S74`. It
+  // names projects and contacts and no company, so the company half of
+  // `16 §8` is untouched and asserted here unchanged. Reading is all that
+  // moved: `verify:slice3` §16 holds the refusals that prove it.
   check(
     "the coordinator gets the project title",
     Boolean(coordinatorView?.projectNameEn),
@@ -521,11 +525,11 @@ async function main(): Promise<void> {
     Boolean(coordinatorView?.companyName),
   );
   check(
-    "but may NOT open the project record [16 §8]",
-    coordinatorView?.projectViewable === false,
+    "*** and may now OPEN the project record — S76 supersedes 16 §8 here ***",
+    coordinatorView?.projectViewable === true,
   );
   check(
-    "and may NOT open the company record [16 §8]",
+    "but may NOT open the company record — S76 names no company [16 §8]",
     coordinatorView?.companyViewable === false,
   );
   check(

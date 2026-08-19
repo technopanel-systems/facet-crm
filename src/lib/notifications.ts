@@ -29,7 +29,7 @@
  * addressed to one person, which is an equality, not a visibility question.
  *
  * **A notification row is not access-controlled proof of anything.** The anchor
- * is rendered as a link only when `canViewRecord` still passes — `20 §8.2`'s
+ * is rendered as a link only when `canOpenRecord` still passes — `20 §8.2`'s
  * rule about the audit log, which holds for the same reason wherever a row
  * names a record it does not gate.
  *
@@ -52,7 +52,7 @@ import {
 } from "@/db/schema";
 import { withAudit, type AuditActor, type AuditEntry } from "@/lib/audit";
 import {
-  canViewRecord,
+  canOpenRecord,
   scopeForUser,
   type AuthSession,
   type ViewableRecordType,
@@ -85,7 +85,7 @@ const PAGE_SIZE = 25;
  * `asAnchorType("dispatch")` returned null and a dispatch-anchored notification
  * rendered with no link and no error anywhere.
  *
- * `satisfies` still proves every member is a record `canViewRecord` can answer
+ * `satisfies` still proves every member is a record `canOpenRecord` can answer
  * for, which is what `decorate` needs.
  */
 const ANCHOR_TYPES = [
@@ -129,7 +129,7 @@ export type HandoverPayload = {
  *
  * Ids are stored; names, the body and the link are resolved on read, for the
  * reason above `HandoverPayload`. `recordViewable` is re-derived with
- * `canViewRecord` every time: a notification row is not access-controlled proof
+ * `canOpenRecord` every time: a notification row is not access-controlled proof
  * of anything, and a share can be revoked between the tag and the reading of
  * it.
  */
@@ -632,9 +632,11 @@ async function decorate(
   row: RawNotification,
 ): Promise<NotificationRow> {
   const anchorType = asAnchorType(row.recordType);
+  // Whether to draw the link, so `canOpenRecord` `S76` — not whether the
+  // reader may act on what is behind it.
   const anchorViewable =
     anchorType && row.recordId
-      ? await canViewRecord(session, anchorType, row.recordId)
+      ? await canOpenRecord(session, anchorType, row.recordId)
       : false;
 
   return {
@@ -770,7 +772,7 @@ async function mentionPayload(
     return null;
   }
 
-  const viewable = await canViewRecord(session, recordType, recordId);
+  const viewable = await canOpenRecord(session, recordType, recordId);
 
   const [author] = await db
     .select({ name: users.name })

@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { PageHeader } from "@/components/page-header";
@@ -23,6 +24,11 @@ export default async function NewContactPage({
   const session = await requireSession();
   const t = await getTranslations();
   const companies = await listCompanyOptions(session);
+  // A contact belongs to exactly one company `[07 A2]` and `createContact`
+  // checks it, so with no company to name there is no form to fill — `D51`, and
+  // `D53` for the shape of the refusal. The `S76` reader is the identity this
+  // catches: they read every contact and may use no company.
+  if (companies.length === 0) notFound();
 
   // `?companyId=` prefills the select when arriving from a company page. It is
   // a convenience only — the option list is already scoped, and the action

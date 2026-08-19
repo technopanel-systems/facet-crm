@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
+import { hasUsableCompany } from "@/lib/companies";
 import { lookupName, pickName } from "@/lib/lookups";
 import { listProjects } from "@/lib/projects";
 
@@ -35,16 +36,25 @@ export default async function ProjectsPage({
   const t = await getTranslations();
 
   const currentPage = Number(page) || 1;
-  const { rows, total } = await listProjects(session, { q, page: currentPage });
+  // A project needs a company `S27`, so an identity with none may read this
+  // list and start nothing from it — the `S76` reader exactly. `D51`: the
+  // button is not rendered rather than rendered and refused, and
+  // `/projects/new` answers `notFound()` for the same identity.
+  const [{ rows, total }, mayCreate] = await Promise.all([
+    listProjects(session, { q, page: currentPage }),
+    hasUsableCompany(session),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title={t("projects.title")}
         action={
-          <Button asChild size="sm">
-            <Link href="/projects/new">{t("projects.new")}</Link>
-          </Button>
+          mayCreate ? (
+            <Button asChild size="sm">
+              <Link href="/projects/new">{t("projects.new")}</Link>
+            </Button>
+          ) : undefined
         }
       />
 

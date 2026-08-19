@@ -63,6 +63,7 @@ import {
 } from "@/db/schema";
 import { withAudit } from "@/lib/audit";
 import {
+  canOpenRecord,
   canViewRecord,
   readableNoteFilter,
   visibleRepReportsFilter,
@@ -755,12 +756,13 @@ export async function getReport(
     contactId: row.contactId,
     cityId: row.cityId,
     // Seeing the report does not imply being allowed to open its anchor —
-    // the shape `16 §10` established for the coordinator.
+    // the shape `16 §10` established for the coordinator. `canOpenRecord`
+    // because this decides a link, not an act `S76`.
     companyViewable: row.companyId
-      ? await canViewRecord(session, "company", row.companyId)
+      ? await canOpenRecord(session, "company", row.companyId)
       : false,
     projectViewable: row.projectId
-      ? await canViewRecord(session, "project", row.projectId)
+      ? await canOpenRecord(session, "project", row.projectId)
       : false,
     isAuthor: row.userId === session.user.id,
     editable:

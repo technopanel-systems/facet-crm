@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { PageHeader } from "@/components/page-header";
@@ -25,6 +26,10 @@ export default async function NewProjectPage({
     listCompanyOptions(session),
     listLossReasons(),
   ]);
+  // A project requires a company `S27`, `[07 A9]`, and `createProject` checks
+  // each one against what this identity may use. None means no form — the
+  // contact form's note, for the same reason `D51`, `D53`.
+  if (companies.length === 0) notFound();
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">

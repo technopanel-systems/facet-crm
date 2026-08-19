@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Timeline } from "@/components/timeline";
 import { Link } from "@/i18n/navigation";
-import { requireSession } from "@/lib/authz";
+import { canViewRecord, requireSession } from "@/lib/authz";
 import { getContact } from "@/lib/contacts";
 import { recordTimeline } from "@/lib/timeline";
 
@@ -38,6 +38,11 @@ export default async function ContactDetailPage({
   const format = await getFormatter();
   const dash = t("common.none");
 
+  // Read or act — the project detail page's note `S76`. False only for the
+  // reader `S76` admits, and presentation only: `updateContact` and
+  // `addComment` refuse on their own `S109`.
+  const mayEdit = await canViewRecord(session, "contact", contact.id);
+
   // `25 §9` — one thread per record. A contact has no derived events of its
   // own, so its thread is the conversation and nothing else; it pages rather
   // than capping, because there is no full-history route to send anyone to.
@@ -52,9 +57,13 @@ export default async function ContactDetailPage({
         state={contact.position ?? undefined}
         reference={contact.phone ?? undefined}
         action={
-          <Button asChild size="sm" variant="outline">
-            <Link href={`/contacts/${contact.id}/edit`}>{t("common.edit")}</Link>
-          </Button>
+          mayEdit ? (
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/contacts/${contact.id}/edit`}>
+                {t("common.edit")}
+              </Link>
+            </Button>
+          ) : undefined
         }
       />
 
@@ -66,13 +75,18 @@ export default async function ContactDetailPage({
         </CardHeader>
         <CardContent className="px-0">
           <Facts>
+            {/* Not viewable means no link `S76` — the contact list's note. */}
             <Fact label={t("contacts.fields.company")}>
-              <Link
-                href={`/companies/${contact.companyId}`}
-                className="hover:underline"
-              >
-                {contact.companyName}
-              </Link>
+              {contact.companyViewable ? (
+                <Link
+                  href={`/companies/${contact.companyId}`}
+                  className="hover:underline"
+                >
+                  {contact.companyName}
+                </Link>
+              ) : (
+                contact.companyName
+              )}
             </Fact>
             <Fact label={t("contacts.fields.position")}>
               {contact.position ?? dash}
@@ -100,11 +114,13 @@ export default async function ContactDetailPage({
         events={timeline.events}
         total={timeline.total}
         composer={
-          <CommentBox
-            session={session}
-            recordType="contact"
-            recordId={contact.id}
-          />
+          mayEdit ? (
+            <CommentBox
+              session={session}
+              recordType="contact"
+              recordId={contact.id}
+            />
+          ) : undefined
         }
       />
       <ListPagination

@@ -78,10 +78,11 @@ import {
 import { withAudit } from "@/lib/audit";
 import {
   can,
+  canOpenRecord,
   canViewRecord,
   dispatchCompanyLookupFilter,
-  dispatchProjectLookupFilter,
   visibleDispatchesFilter,
+  visibleProjectsFilter,
   visibleQuotationThreadsFilter,
   type AuthSession,
 } from "@/lib/authz";
@@ -125,7 +126,8 @@ export type DispatchListRow = {
   companyId: string;
   companyName: string;
   /** May the viewer OPEN the company? `can_dispatch` sees the name only
-   *  `[18 §2]`, so the screen renders plain text rather than a link. */
+   *  `[18 §2]` — which `S76` did not change for companies — so the screen
+   *  renders plain text rather than a link. */
   companyViewable: boolean;
   userId: string;
   userName: string;
@@ -253,17 +255,19 @@ export async function recordDispatch(
       projectId = thread.projectId;
     } else {
       // `S74` — the quotation has none `S50`, so the coordinator chooses, and
-      // the choice is written back below. Checked against the same lookup the
+      // the choice is written back below. Checked against the same filter the
       // picker is built from, so the form never offers what this refuses.
+      //
+      // Ordinary project visibility since `S76`: the name-only lookup this
+      // used to compose was the stopgap that made `S74` performable before the
+      // coordinator could see a project, and it came out with the rule.
       if (!projectId) {
         throw new RuleError("dispatches.errors.projectRequired", "projectId");
       }
       const [pickable] = await db
         .select({ id: projects.id })
         .from(projects)
-        .where(
-          and(eq(projects.id, projectId), dispatchProjectLookupFilter(session)),
-        )
+        .where(and(eq(projects.id, projectId), visibleProjectsFilter(session)))
         .limit(1);
       if (!pickable) {
         throw new RuleError("dispatches.errors.projectNotVisible", "projectId");
@@ -497,12 +501,14 @@ async function decorate(
     }
   }
 
+  // `canOpenRecord`, not `canViewRecord`: both of these decide whether the
+  // screen draws a link, which since `S76` is a different question from
+  // whether the viewer may act `[authz:370]`.
   const companyIds = [...new Set(rows.map((row) => row.companyId))];
   const companyViewable = new Map<string, boolean>(
     await Promise.all(
       companyIds.map(
-        async (id) =>
-          [id, await canViewRecord(session, "company", id)] as const,
+        async (id) => [id, await canOpenRecord(session, "company", id)] as const,
       ),
     ),
   );
@@ -510,7 +516,7 @@ async function decorate(
     await Promise.all(
       threadIds.map(
         async (id) =>
-          [id, await canViewRecord(session, "quotation_thread", id)] as const,
+          [id, await canOpenRecord(session, "quotation_thread", id)] as const,
       ),
     ),
   );
@@ -584,8 +590,10 @@ export async function getDispatch(
     projectId: row.projectId,
     projectNameEn: row.projectNameEn,
     projectNameAr: row.projectNameAr,
+    // `S76`'s own reason, on the screen it was written for: the coordinator
+    // records this dispatch, so the project it carries is theirs to open.
     projectViewable: row.projectId
-      ? await canViewRecord(session, "project", row.projectId)
+      ? await canOpenRecord(session, "project", row.projectId)
       : false,
     credit: credits.get(row.id) as DispatchCredit,
   };
@@ -710,16 +718,19 @@ export async function searchDispatchCompanies(
  * Filtering to `end_state is null` would have hidden exactly the projects most
  * likely to be dispatched against. `is distinct from` rather than `<>`, or
  * the null end state — the ordinary case — fails the comparison and every
- * live project disappears. Names, and nothing else:
- * the coordinator gets no link and no project record from this, the same
- * shape `searchDispatchCompanies` already has for companies `[18 §2]`.
+ * live project disappears.
  *
- * **It cannot be narrowed to the company's own projects.** S74's second half
+ * **Ordinary project visibility since `S76`.** It used to compose a name-only
+ * lookup filter of its own, because the only role holding `can_dispatch` could
+ * not see a project at all while `S74` obliges that role to choose one; `S76`
+ * made the coordinator's sight real and the stopgap came out with it. What is
+ * left in the `where` is the picker's own rule, above, and no visibility rule
+ * of its own.
+ *
+ * **It cannot be narrowed to the company's own projects.** `S74`'s second half
  * is that the company is ADDED to the project it did not belong to, so a
  * picker that only offered projects it already belonged to would make the rule
- * unusable. S76 gives the coordinator real project visibility in its own
- * slice; this is the reach `can_dispatch` carries in the meantime, exactly as
- * `setCreditSplit` reasons for `can_set_credit_split` `[16 §8]`.
+ * unusable.
  */
 export async function listDispatchProjectOptions(
   session: AuthSession,
@@ -733,7 +744,7 @@ export async function listDispatchProjectOptions(
     .from(projects)
     .where(
       and(
-        dispatchProjectLookupFilter(session),
+        visibleProjectsFilter(session),
         sql`${projects.endState} is distinct from 'lost'`,
       ),
     )

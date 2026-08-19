@@ -333,8 +333,12 @@ none, the coordinator states what the stock is for — the customer's own
 inventory, a sample, or other with a text field. It stays marked as a direct
 dispatch.
 
-**S76. [CHANGE]** The coordinator **sees projects and contacts**, because both
-are part of the dispatch. The name-only restriction is removed.
+**S76.** The coordinator **sees projects and contacts**, because both
+are part of the dispatch. The name-only restriction is removed. This is a
+role-level exception to **S30**, which is unchanged: a project is still visible
+only to its owner or someone explicitly shared on it, and seeing a company still
+reveals none of its projects. The coordinator sees them; **S62** is the whole of
+what they may do, and neither a project nor a contact is on it.
 
 **S77.** One quotation produces **any number of dispatches** — one, two, more.
 The quotation and the project are linked; quantities are never reconciled against

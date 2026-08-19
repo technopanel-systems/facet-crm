@@ -18,16 +18,27 @@
  * Visibility `[04 Q7]`, `[07 B2]`: sharing is per record. Company visibility
  * comes from membership (`company_reps`) or an explicit company share — and a
  * shared company does NOT expose its projects or quotations. Projects and
- * quotation threads need ownership or their own share. One founder-decided
- * extension (phase 6): owning — or being explicitly shared — a project grants
- * visibility of the quotation threads raised on it. Contacts follow their
- * company `[14 §1]`: they have no owner of their own, and per-rep contact
- * privacy is not expressible without a column no document requires.
+ * quotation threads need ownership or their own share `S30`. One
+ * founder-decided extension (phase 6): owning — or being explicitly shared — a
+ * project grants visibility of the quotation threads raised on it. Contacts
+ * follow their company `[14 §1]`: they have no owner of their own, and per-rep
+ * contact privacy is not expressible without a column no document requires.
  *
- * Visibility grants EDIT, not merely read `[14 §2, §3]`. A share is working
- * access — the point of sharing is that both people work the record — and the
- * executive may edit records too. There is deliberately no `can_edit` flag:
- * the answer is that the question needs no flag.
+ * **Two role-level exceptions, and they are exceptions rather than tiers.**
+ * `can_approve_quotation` reads every quotation thread `[16 §10]` and
+ * `can_dispatch` every dispatch `[18 §2]`, because both acts pass through the
+ * coordinator; `S76` adds projects and contacts to that reach, for the same
+ * reason — a dispatch carries both. `S30` is unchanged for everybody else.
+ *
+ * Visibility grants EDIT, not merely read `[14 §2, §3]`, **with one exception
+ * that `S76` introduced.** A share is working access — the point of sharing is
+ * that both people work the record — and the executive may edit records too,
+ * so there is still no `can_edit` flag. But `S76` grants the coordinator sight
+ * of projects and contacts and no more: `S62` is the whole of what that role
+ * may do, and neither is on it. So the module answers two questions where it
+ * used to answer one — `canViewRecord` for whether an identity may ACT on a
+ * record, the filters and `canOpenRecord` for whether they may READ it. They
+ * differ for project and contact under `can_dispatch`, and nowhere else.
  */
 
 import {
@@ -339,6 +350,22 @@ async function canViewProject(
  * the filters below. Detail screens use the filters too; this function is for
  * write paths, where an id arrives from a form and must be checked before it
  * is written into another record.
+ *
+ * **Since `S76` that sentence is load-bearing.** This is the ACT gate, and it
+ * is deliberately NARROWER than `visibleProjectsFilter` and
+ * `visibleContactsFilter`: the coordinator READS every project and contact and
+ * may write to none of them, which is the whole of `S76` — it grants sight,
+ * and `S62`'s list of what a coordinator may do names neither. Because every
+ * write that takes a project or contact id already routes through here —
+ * `updateProject`, `addProjectCompany`, `removeProjectCompany`,
+ * `updateContact`, `addComment`, `setNextFollowUp`, `createQuotationThread` —
+ * leaving this function alone is what keeps them all closed, with no new gate
+ * to forget. Widening a case here to "fix" a screen re-opens all seven at once.
+ *
+ * **A screen asking whether to render a LINK is asking the other question**
+ * and wants `canOpenRecord` `[:972]`, which is the filters asked of one row.
+ * The two agree on every record type except project and contact, and there
+ * only for `can_dispatch`.
  */
 export async function canViewRecord(
   session: AuthSession,
@@ -507,9 +534,19 @@ export function visibleCompaniesFilter(session: AuthSession): SQL | undefined {
  * nothing writes such a row and no document asks for per-contact sharing, so
  * it is not consulted here. Wiring it up on speculation is what produced v1's
  * dead approval gate.
+ *
+ * **`S76`'s exception is here too**, on the same terms as
+ * `visibleProjectsFilter`: the coordinator sees contacts because a dispatch is
+ * made against one. Note what it does NOT grant — `S76` names projects and
+ * contacts, not companies, so a coordinator reads a contact while its company
+ * stays closed to them `[18 §2]`, and the contact screens render that company
+ * as plain text. Sight only, again: `canViewRecord` is not widened, so
+ * `updateContact` still refuses.
  */
 export function visibleContactsFilter(session: AuthSession): SQL | undefined {
   if (session.user.role.seesAllReps) return undefined;
+  // `S76`, term for term the project exception above.
+  if (session.user.role.canDispatch) return undefined;
   const userId = session.user.id;
   return or(
     activeMembershipExists(contacts.companyId, userId),
@@ -518,21 +555,53 @@ export function visibleContactsFilter(session: AuthSession): SQL | undefined {
 }
 
 /**
- * Projects: owner OR an explicit project share.
+ * Projects a viewer HOLDS `S30` — owner, or an explicit project share. The two
+ * ways a project sits on somebody's desk, and nothing else.
  *
  * Company membership is NEVER a term here. A shared company does not expose
  * its projects `[04 Q7]` — that is the single rule this whole slice exists to
  * get right. If you are about to join `project_companies` into this function
  * to "fix" a project that will not appear, read `04 Q7` first: the project is
  * not appearing because it is not meant to.
+ *
+ * **This is not the read filter.** `visibleProjectsFilter` below is these terms
+ * plus `S76`'s exception, and the two answer different questions: whose work is
+ * this, versus who may read it. Use this one wherever the answer decides WORK —
+ * the waiting list, and a picker whose write path is `canViewRecord`. Folding
+ * the two back together reads as removing duplication and silently puts every
+ * rep's project on the coordinator's queue.
  */
-export function visibleProjectsFilter(session: AuthSession): SQL | undefined {
+export function ownProjectsFilter(session: AuthSession): SQL | undefined {
   if (session.user.role.seesAllReps) return undefined;
   const userId = session.user.id;
   return or(
     eq(projects.ownerUserId, userId),
     activeShareExists("project", projects.id, userId),
   );
+}
+
+/**
+ * Projects a viewer may READ — `ownProjectsFilter`'s terms, plus `S76`.
+ *
+ * **`S76` is a role-level exception to `S30`, not a repeal of it.** `S30` still
+ * governs every rep, exactly as written above: a project is visible only to its
+ * owner or someone explicitly shared on it, and seeing a company reveals none
+ * of its projects. The coordinator is exempt because every dispatch passes
+ * through them and a dispatch carries a project `S72`, `S74` — the same shape
+ * `16 §10` gives `can_approve_quotation` over quotation threads. Nothing here
+ * weakens `S30` for anybody else: a rep who could not see a project still
+ * cannot.
+ *
+ * **Sight, not a hand.** `S62` lists what the coordinator may do and projects
+ * are not on it, so `canViewRecord` — the write-path check `[:370]` — is
+ * deliberately NOT widened to match. That divergence is what makes this
+ * read-only without a single new gate, and project and contact are the only
+ * records where the two disagree.
+ */
+export function visibleProjectsFilter(session: AuthSession): SQL | undefined {
+  // `S76`, checked before falling through to `S30`'s terms.
+  if (session.user.role.canDispatch) return undefined;
+  return ownProjectsFilter(session);
 }
 
 /**
@@ -648,11 +717,17 @@ export function visibleDispatchesFilter(
 /**
  * `exists (select 1 from projects ...)`, correlated on a project column.
  *
- * The SQL twin of `visibleProjectsFilter`, for the tables that reference a
- * project rather than being one. The two are ONE rule — a change to either is a
- * change to both — and the terms are deliberately identical: owner, or an
- * explicit project share. Company membership is not a term here either
- * `[04 Q7]`.
+ * The SQL twin of `ownProjectsFilter`, for the tables that reference a project
+ * rather than being one. The two are ONE rule — a change to either is a change
+ * to both — and the terms are deliberately identical: owner, or an explicit
+ * project share. Company membership is not a term here either `[04 Q7]`.
+ *
+ * **The twin of `ownProjectsFilter`, not of `visibleProjectsFilter`** — those
+ * two parted company at `S76`. The one caller is `visibleRepReportsFilter`,
+ * whose question is whether the reader may see the project a report NAMES, and
+ * `S76` grants the coordinator no report either way: they fail that filter's
+ * company term first. Widening this would be a change to `S38`, which `S76`
+ * does not make.
  */
 function projectVisibleExists(
   projectIdColumn: AnyPgColumn,
@@ -870,6 +945,93 @@ export function visibleMeasuredUsersFilter(
   return eq(users.id, session.user.id);
 }
 
+/* ------------------------------------------------------------------ *
+ * One record, asked as a READ `S76`
+ * ------------------------------------------------------------------ */
+
+/**
+ * May the identity OPEN this record — the filters above, asked of one row.
+ *
+ * This is the question a screen asks before rendering a name as a link rather
+ * than as plain text. It is **not** `canViewRecord` `[:370]`: that one answers
+ * whether the identity may ACT on the record, and since `S76` the two differ —
+ * the coordinator reads every project and contact and may write to none. Every
+ * other record type gives both functions the same answer, so a site that swaps
+ * one for the other changes nothing unless it can be asked about a project or a
+ * contact, which is exactly where it must.
+ *
+ * Each branch runs that record type's own filter against a single id, so this
+ * states no rule of its own and cannot drift from the lists. An `undefined`
+ * filter degrades under `and()` to *"a row with that id exists"*, which is the
+ * correct reading for an identity that sees every record of the kind.
+ *
+ * One row, by primary key. A screen deciding several links at once does what
+ * `listProjectCompanies` does instead — one `inArray` query carrying the same
+ * filter — rather than calling this in a loop.
+ */
+export async function canOpenRecord(
+  session: AuthSession,
+  recordType: ViewableRecordType,
+  recordId: string,
+): Promise<boolean> {
+  const one = { one: sql<number>`1` };
+  switch (recordType) {
+    case "company":
+      return rowExists(
+        db
+          .select(one)
+          .from(companies)
+          .where(
+            and(eq(companies.id, recordId), visibleCompaniesFilter(session)),
+          )
+          .limit(1),
+      );
+    case "contact":
+      return rowExists(
+        db
+          .select(one)
+          .from(contacts)
+          .where(and(eq(contacts.id, recordId), visibleContactsFilter(session)))
+          .limit(1),
+      );
+    case "project":
+      return rowExists(
+        db
+          .select(one)
+          .from(projects)
+          .where(and(eq(projects.id, recordId), visibleProjectsFilter(session)))
+          .limit(1),
+      );
+    case "quotation_thread":
+      return rowExists(
+        db
+          .select(one)
+          .from(quotationThreads)
+          .where(
+            and(
+              eq(quotationThreads.id, recordId),
+              visibleQuotationThreadsFilter(session),
+            ),
+          )
+          .limit(1),
+      );
+    case "dispatch":
+      return rowExists(
+        db
+          .select(one)
+          .from(dispatches)
+          .where(
+            and(eq(dispatches.id, recordId), visibleDispatchesFilter(session)),
+          )
+          .limit(1),
+      );
+  }
+}
+
+async function rowExists(query: PromiseLike<unknown[]>): Promise<boolean> {
+  return (await query).length > 0;
+}
+
 /**
  * Companies a `can_dispatch` holder may NAME on the dispatch form `[18 §2]`.
  *
@@ -879,12 +1041,18 @@ export function visibleMeasuredUsersFilter(
  * them. Without this the flag is dead on arrival, which is precisely the
  * situation `16 §10` was asked about and fixed for quotations.
  *
- * **The grant stops at the name.** `18 §2` is explicit: no company record, no
- * address, no contacts, no projects, no link to open it. `canViewRecord` and
- * `visibleCompaniesFilter` are untouched, so `/companies` and every other
- * screen behave exactly as before; the dispatch screens render a company as
- * plain text unless the viewer may open it on their own. Callers pair this
- * with a typed query and a small limit — a lookup, not a directory dump.
+ * **The grant stops at the name**, and `S76` did not change that. `18 §2` is
+ * explicit: no company record, no address, no link to open it. `S76` removed
+ * the name-only restriction for **projects and contacts**, which the
+ * coordinator now reads in full; it names no company, so `canViewRecord` and
+ * `visibleCompaniesFilter` are untouched, `/companies` behaves exactly as
+ * before, and the dispatch screens still render a company as plain text unless
+ * the viewer may open it on their own. Callers pair this with a typed query and
+ * a small limit — a lookup, not a directory dump.
+ *
+ * The project half of this pair is gone: `S76` made
+ * `dispatchProjectLookupFilter` a synonym for `visibleProjectsFilter`, and its
+ * callers now compose that directly.
  */
 export function dispatchCompanyLookupFilter(
   session: AuthSession,
@@ -893,33 +1061,6 @@ export function dispatchCompanyLookupFilter(
   return visibleCompaniesFilter(session);
 }
 
-/**
- * Projects a `can_dispatch` holder may NAME on the dispatch form `S74`.
- *
- * Term for term the company filter above, and it exists for the same reason.
- * `S74` obliges the coordinator to choose a project when the quotation has
- * none `S50`, and `visibleProjectsFilter` returns nothing for that role —
- * owner or explicit share, and they are neither. Without this the rule cannot
- * be performed by the only person the rule names.
- *
- * **The grant stops at the name**, exactly as `18 §2` limits the company one:
- * no project record, no participants, no quotations, no link to open it.
- * `canViewRecord` and `visibleProjectsFilter` are untouched, so `/projects`
- * behaves as before and a dispatch screen renders a project as plain text
- * unless the viewer may open it on their own.
- *
- * **S76 is not built by this.** That rule gives the coordinator projects and
- * contacts properly; this is the narrower reach `can_dispatch` carries in the
- * meantime — the same argument `setCreditSplit` makes for its own flag
- * `[16 §8]`, where a strict project check would make a founder-granted flag
- * unusable by one of the two roles holding it.
- */
-export function dispatchProjectLookupFilter(
-  session: AuthSession,
-): SQL | undefined {
-  if (session.user.role.canDispatch) return undefined;
-  return visibleProjectsFilter(session);
-}
 
 /* ------------------------------------------------------------------ *
  * User management — gated on `can_manage_users`, audited by the data layer

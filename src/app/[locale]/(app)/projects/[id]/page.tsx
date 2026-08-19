@@ -11,7 +11,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
-import { can, listActiveUsers, requireSession } from "@/lib/authz";
+import {
+  can,
+  canViewRecord,
+  listActiveUsers,
+  requireSession,
+} from "@/lib/authz";
 import { chainState } from "@/lib/chain";
 import { listCompanyOptions } from "@/lib/companies";
 import { getCreditSplitInForce } from "@/lib/credit-splits";
@@ -54,6 +59,15 @@ export default async function ProjectDetailPage({
   // The add-a-company select is scoped to what this identity may use; the
   // action re-checks it, so a tampered option cannot link an unseen company.
   const companies = await listCompanyOptions(session);
+
+  // **May this viewer ACT on the project, or only read it?** `S76` separated
+  // the two: the coordinator reads every project and writes to none, and
+  // `canViewRecord` is the gate every one of those writes already goes through
+  // `[authz:370]`. False for exactly that reader — anybody else who reaches
+  // this page owns the project, was shared it, or sees every rep. What it
+  // decides here is presentation only `D51`; the data layer refuses regardless
+  // `S109`.
+  const mayEdit = await canViewRecord(session, "project", project.id);
 
   // `18 §3` — the split names people, so the picker is the user directory.
   const [split, people, timeline, threads] = await Promise.all([
@@ -141,9 +155,13 @@ export default async function ProjectDetailPage({
           .filter(Boolean)
           .join(" · ")}
         action={
-          <Button asChild size="sm" variant="outline">
-            <Link href={`/projects/${project.id}/edit`}>{t("common.edit")}</Link>
-          </Button>
+          mayEdit ? (
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/projects/${project.id}/edit`}>
+                {t("common.edit")}
+              </Link>
+            </Button>
+          ) : undefined
         }
       />
 
@@ -310,6 +328,7 @@ export default async function ProjectDetailPage({
             projectId={project.id}
             links={project.links}
             companies={companies}
+            mayEdit={mayEdit}
           />
         </CardContent>
       </Card>
@@ -349,13 +368,21 @@ export default async function ProjectDetailPage({
       {/* `25 §18` — the rep's own date. On a project it suppresses the
           stage-unchanged chase until it arrives, and then becomes the
           follow-up itself. The founder's own case: a project going overdue in
-          two days, with the follow-up already set for next week. */}
-      <NextFollowUpPanel
-        session={session}
-        recordType="project"
-        recordId={project.id}
-        value={project.nextFollowUpAt}
-      />
+          two days, with the follow-up already set for next week.
+
+          Not rendered for a reader who may not set one `S76`: the date is a
+          rep's note to themself about work they hold, `setNextFollowUp` refuses
+          anyone else, and a panel whose only control is refused is `D51`'s
+          control that does nothing. The project is not on that reader's queue
+          either — `projectStageUnchanged` takes `ownProjectsFilter`. */}
+      {mayEdit ? (
+        <NextFollowUpPanel
+          session={session}
+          recordType="project"
+          recordId={project.id}
+          value={project.nextFollowUpAt}
+        />
+      ) : null}
 
       {/* `20 §6` — the project's own history. A report naming this project
           appears here AND on its company's timeline; a direct dispatch has no
@@ -368,12 +395,16 @@ export default async function ProjectDetailPage({
         fullHistoryHref={`/projects/${project.id}/timeline`}
         // A comment is not an interaction, so it IS offered here `[25 §9]`:
         // what it needs is a record to hang on, not a company to have visited.
+        // Offered to whoever may act on the project — `addComment` gates on
+        // the same check, and `S76` gives its reader sight and no voice.
         composer={
-          <CommentBox
-            session={session}
-            recordType="project"
-            recordId={project.id}
-          />
+          mayEdit ? (
+            <CommentBox
+              session={session}
+              recordType="project"
+              recordId={project.id}
+            />
+          ) : undefined
         }
       />
     </div>

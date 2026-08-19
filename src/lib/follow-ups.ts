@@ -26,9 +26,15 @@
  * one delivery: `21 §2`'s "five types and no sixth" is about deliveries.
  *
  * **No predicate is written here.** Each source composes an existing filter
- * from `authz` — `visibleCompaniesFilter`, `visibleProjectsFilter`,
+ * from `authz` — `visibleCompaniesFilter`, `ownProjectsFilter`,
  * `visibleQuotationThreadsFilter` — and nothing else. `setNextFollowUp` gates
  * on `canViewRecord`, which `authz.ts` documents as the write-path check.
+ *
+ * **The project sources take `ownProjectsFilter`, not `visibleProjectsFilter`**
+ * `S76`. A queue answers *whose desk is this on*, and since `S76` that is not
+ * the same question as *who may read it* — the coordinator reads every project
+ * and holds none. The panel reads at the bottom of this file are the other
+ * question and keep the read filter.
  *
  * **Every join onto `projects` from a thread is a LEFT join** `S50`. A
  * quotation may have no project, and an inner join would drop it from the
@@ -96,6 +102,7 @@ import {
 import { withAudit } from "@/lib/audit";
 import {
   canViewRecord,
+  ownProjectsFilter,
   visibleCompaniesFilter,
   visibleProjectsFilter,
   visibleQuotationThreadsFilter,
@@ -598,7 +605,13 @@ async function projectStageUnchanged(
     .leftJoin(dispatchEvents, eq(dispatchEvents.projectId, projects.id))
     .where(
       and(
-        visibleProjectsFilter(session),
+        // **`ownProjectsFilter`, never `visibleProjectsFilter`** `S76`. A queue
+        // asks whose desk a record sits on, which since `S76` is a different
+        // question from who may read it: the coordinator reads every project
+        // and owns none, and the read filter here would put every rep's stale
+        // project on their waiting list and in their digest. No rule asks for
+        // that. The two are asserted as a pair in `verify:slice3` §16.
+        ownProjectsFilter(session),
         isNull(projects.endState),
         sql`coalesce(
           greatest(${threadEvents.at}, ${dispatchEvents.at}),
@@ -791,7 +804,9 @@ async function manualDateDue(session: AuthSession): Promise<FollowUpRow[]> {
       .from(projects)
       .where(
         and(
-          visibleProjectsFilter(session),
+          // Whose desk, not who may read — `projectStageUnchanged`'s note
+          // `S76`.
+          ownProjectsFilter(session),
           isNull(projects.endState),
           isNotNull(projects.nextFollowUpAt),
           lte(projects.nextFollowUpAt, now),

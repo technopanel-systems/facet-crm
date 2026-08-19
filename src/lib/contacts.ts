@@ -7,16 +7,30 @@
  * history the rule exists to keep.
  *
  * A contact has no owner of its own. It follows its company `[14 §1]`, which
- * is what `visibleContactsFilter` expresses.
+ * is what `visibleContactsFilter` expresses — with one exception since `S76`:
+ * the coordinator reads every contact and no company at all, so a contact's own
+ * company may be one the reader cannot open. That is what `companyViewable`
+ * carries, and why it is not simply true.
  */
 
-import { and, count, desc, eq, ilike, or, type SQL } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  or,
+  type SQL,
+} from "drizzle-orm";
 
 import { db } from "@/db";
 import { companies, contacts, users } from "@/db/schema";
 import { withAudit } from "@/lib/audit";
 import {
+  canOpenRecord,
   canViewRecord,
+  visibleCompaniesFilter,
   visibleContactsFilter,
   type AuthSession,
 } from "@/lib/authz";
@@ -44,6 +58,14 @@ export type ContactListRow = {
   position: string | null;
   companyId: string;
   companyName: string;
+  /**
+   * Whether the viewer may open the company this contact belongs to.
+   *
+   * False renders the name as plain text rather than a link — the shape
+   * `listProjectCompanies` already uses. It is only ever false for a `S76`
+   * reader: everybody else reaches a contact THROUGH its company `[14 §1]`.
+   */
+  companyViewable: boolean;
   createdAt: Date;
 };
 
@@ -99,11 +121,48 @@ export async function listContacts(
     .from(contacts)
     .where(where);
 
-  return { rows, total: totals?.total ?? 0, page };
+  return {
+    rows: await withCompanyViewable(session, rows),
+    total: totals?.total ?? 0,
+    page,
+  };
+}
+
+/**
+ * Which of these contacts' companies the viewer may open on their own.
+ *
+ * One extra query rather than one per row, the shape `listProjectCompanies`
+ * uses for the same question on a project — and the same filter, so the answer
+ * cannot drift from `/companies`.
+ */
+async function withCompanyViewable(
+  session: AuthSession,
+  rows: Omit<ContactListRow, "companyViewable">[],
+): Promise<ContactListRow[]> {
+  if (rows.length === 0) return [];
+  const found = await db
+    .select({ id: companies.id })
+    .from(companies)
+    .where(
+      and(
+        inArray(
+          companies.id,
+          rows.map((row) => row.companyId),
+        ),
+        visibleCompaniesFilter(session),
+      ),
+    );
+  const viewable = new Set(found.map((row) => row.id));
+  return rows.map((row) => ({
+    ...row,
+    companyViewable: viewable.has(row.companyId),
+  }));
 }
 
 export type ContactDetail = Contact & {
   companyName: string;
+  /** As `ContactListRow.companyViewable` — false only for a `S76` reader. */
+  companyViewable: boolean;
   createdByName: string | null;
 };
 
@@ -127,6 +186,11 @@ export async function getContact(
   return {
     ...row.contact,
     companyName: row.companyName,
+    companyViewable: await canOpenRecord(
+      session,
+      "company",
+      row.contact.companyId,
+    ),
     createdByName: row.createdByName,
   };
 }

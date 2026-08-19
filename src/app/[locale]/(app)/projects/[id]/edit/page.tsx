@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { PageHeader } from "@/components/page-header";
-import { requireSession } from "@/lib/authz";
+import { canViewRecord, requireSession } from "@/lib/authz";
 import { listCities, listLossReasons } from "@/lib/lookups";
 import { getProject } from "@/lib/projects";
 
@@ -22,6 +22,10 @@ export default async function EditProjectPage({
   const session = await requireSession();
   const project = await getProject(session, id);
   if (!project) notFound();
+  // Reading a project is not editing one `S76`. `getProject` admits the
+  // coordinator; `updateProject` refuses them, so the screen refuses first and
+  // with the same answer `D53` gives every route a role may not use.
+  if (!(await canViewRecord(session, "project", id))) notFound();
 
   const t = await getTranslations();
   const [cities, lossReasons] = await Promise.all([

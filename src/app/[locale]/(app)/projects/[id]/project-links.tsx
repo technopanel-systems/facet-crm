@@ -20,15 +20,22 @@ import type { CompanyOption } from "../project-companies-field";
  * read, never set** — who bought is derived from dispatches, so there is
  * nothing on a row for a rep to tick and the only act left is taking the
  * participant off the project `S27`.
+ *
+ * `mayEdit` false is the `S76` reader: the participants and their dispatched
+ * square metres are exactly what that reader came for, and neither the add form
+ * nor a remove button is rendered for them `D51`. Both actions refuse in the
+ * data layer regardless `S109`.
  */
 export function ProjectLinks({
   projectId,
   links,
   companies,
+  mayEdit,
 }: {
   projectId: string;
   links: ProjectCompanyRow[];
   companies: CompanyOption[];
+  mayEdit: boolean;
 }) {
   const t = useTranslations();
 
@@ -49,13 +56,13 @@ export function ProjectLinks({
               key={link.id}
               projectId={projectId}
               link={link}
-              canRemove={links.length > 1}
+              canRemove={mayEdit && links.length > 1}
             />
           ))}
         </ul>
       )}
 
-      {addable.length > 0 ? (
+      {mayEdit && addable.length > 0 ? (
         <AddLinkForm
           projectId={projectId}
           companies={addable}

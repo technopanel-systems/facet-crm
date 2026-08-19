@@ -164,6 +164,26 @@ export async function listCompanyOptions(
     .orderBy(companies.name);
 }
 
+/**
+ * Is there a company this identity may use — `listCompanyOptions` reduced to
+ * whether it would be empty.
+ *
+ * A contact needs one `[07 A2]` and a project needs one `S27`, both checked in
+ * the data layer, so an identity with none can open neither form and submit it.
+ * That was true before `S76` and only reachable by URL; a coordinator now lands
+ * on a full `/projects` list, where a New button that always fails is the
+ * control `D51` says not to render. The two `new` pages gate on the options
+ * they already load; this exists for the two list pages, which do not load them.
+ */
+export async function hasUsableCompany(session: AuthSession): Promise<boolean> {
+  const [row] = await db
+    .select({ id: companies.id })
+    .from(companies)
+    .where(visibleCompaniesFilter(session))
+    .limit(1);
+  return row !== undefined;
+}
+
 export type CompanyDetail = Company & {
   categoryNameEn: string | null;
   categoryNameAr: string | null;
