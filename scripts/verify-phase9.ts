@@ -26,7 +26,8 @@
  *  12. Coverage is scoped, not gated, in both directions `[20 §7]`.
  *  13. *** The daily view shows real activity beside logged *** `[20 §8]`.
  *  14. Attribution — every event on the row of whoever performed it `[20 §8]`.
- *  15. Visibility in both directions, including the audit-sourced half
+ *  15. Visibility in both directions, including the audit-sourced half, the
+ *      note half `[S38]` and the search path that discloses it by inference
  *      `[20 §8.2]`, `[20 §10]`, `[04 Q7]`.
  *  16. A handover needs no report bucket `[20 §10]`, `[19 §1]`.
  *  17. Every write is audited `[07 E1]`.
@@ -826,6 +827,57 @@ async function main(): Promise<void> {
     (await auditCount(reportA.id)) === auditBeforeNoop,
   );
 
+  // *** The same-day window `[S39]`. *** Every edit above backdates the day
+  // the report COVERS and still lands, because the clock is `created_at` in
+  // Riyadh, not `report_date` — otherwise a three-week-old report could be
+  // reopened by editing the date it claims to cover.
+  const stale = await createReport(
+    author,
+    interaction({
+      companyId: companyA.id,
+      channel: "call",
+      outcome: "no_answer",
+      reportDate: daysAgo(1),
+      narrative: `${stamp} written today, about yesterday`,
+    }),
+  );
+  check(
+    "a report written today is editable by its author [S39]",
+    (await getReport(author, stale.id))?.editable === true,
+  );
+
+  // Only a fixture may do this: `created_at` defaults to `now()` and no code
+  // path writes it, which is what makes the window unforgeable in the app.
+  await db
+    .update(repReports)
+    .set({ createdAt: new Date(Date.now() - 36 * 60 * 60 * 1000) })
+    .where(eq(repReports.id, stale.id));
+
+  check(
+    "*** and NOT once the day it was written has passed [S39] ***",
+    (await getReport(author, stale.id))?.editable === false,
+  );
+  await refuses(
+    "*** the DATA LAYER refuses it, not merely the screen [S39] ***",
+    "reports.errors.editWindowClosed",
+    () =>
+      updateReport(
+        author,
+        stale.id,
+        interaction({
+          companyId: companyA.id,
+          channel: "call",
+          outcome: "not_interested",
+          reportDate: daysAgo(1),
+          narrative: `${stamp} written today, about yesterday`,
+        }),
+      ),
+  );
+  check(
+    "and the outcome really did stand",
+    (await getReport(author, stale.id))?.outcome === "no_answer",
+  );
+
   /* --- 6. Re-anchoring [20 §9] ------------------------------------- */
 
   console.log("\n6. A report filed against the wrong company is corrected, not abandoned");
@@ -1281,6 +1333,83 @@ async function main(): Promise<void> {
     await canViewRecord(author, "company", companyA.id),
   );
 
+  /* The note half `[S38]` — the same rows, minus the words.
+     `sharer` reaches company A's reports through a membership rather than a
+     `record_shares` row; the filter reads the two identically, and
+     `verify:sharing` §5 follows a real share to the same place. */
+
+  const noteToken = `${stamp}-noteonly`;
+  const noted = await createReport(
+    author,
+    interaction({
+      companyId: companyA.id,
+      channel: "call",
+      outcome: "introduced",
+      reportDate: daysAgo(1),
+      narrative: `${noteToken} what the customer actually said`,
+    }),
+  );
+
+  check(
+    "the author reads their own note [S38]",
+    (await getReport(author, noted.id))?.narrative?.includes(noteToken) === true,
+  );
+  check(
+    "anyone who sees all reps reads it too [S38]",
+    (await getReport(manager, noted.id))?.narrative?.includes(noteToken) ===
+      true,
+  );
+
+  const sharerNoted = await getReport(sharer, noted.id);
+  check(
+    "*** a rep who reaches the report through the company reads WHAT HAPPENED [S38] ***",
+    sharerNoted !== null && sharerNoted.outcome === "introduced",
+  );
+  check(
+    "*** and NOT the note — withheld, not blank, not a missing row [S38] ***",
+    sharerNoted?.narrative === null,
+    `got ${JSON.stringify(sharerNoted?.narrative)}`,
+  );
+  check(
+    "the list says the same as the detail, for both viewers [S38]",
+    (await listReports(sharer, { companyId: companyA.id })).rows.find(
+      (row) => row.id === noted.id,
+    )?.narrative === null &&
+      (await listReports(author, { companyId: companyA.id })).rows.find(
+        (row) => row.id === noted.id,
+      )?.narrative !== null,
+  );
+
+  /* The SEARCH path `[S38]`, which is the subtler of the two and the one a
+     later "simplification" would silently reopen once the column is already
+     withheld: `/reports` `ilike`s the narrative, so an open search hands over
+     the note's contents by inference without ever rendering a word of it. */
+
+  const authorSearch = await listReports(author, { q: noteToken });
+  const managerSearch = await listReports(manager, { q: noteToken });
+  const sharerSearch = await listReports(sharer, { q: noteToken });
+
+  check(
+    "the author searching a word of their own note finds it [S38]",
+    authorSearch.rows.length === 1 && authorSearch.rows[0].id === noted.id,
+    `got ${authorSearch.rows.length}`,
+  );
+  check(
+    "anyone who sees all reps searching the same word finds it [S38]",
+    managerSearch.rows.some((row) => row.id === noted.id),
+  );
+  check(
+    "*** and the shared rep searching it gets NOTHING [S38] ***",
+    sharerSearch.rows.length === 0,
+    `got ${sharerSearch.rows.length}`,
+  );
+  check(
+    "*** and that zero is the SEARCH being gated, not the row being hidden — the same rep sees it by company ***",
+    (await listReports(sharer, { companyId: companyA.id })).rows.some(
+      (row) => row.id === noted.id,
+    ),
+  );
+
   // The audit-sourced half, asserted on its own `[20 §8.2]`.
   const auditRowExists = await db
     .select({ n: sql<number>`count(*)::int` })
@@ -1340,6 +1469,41 @@ async function main(): Promise<void> {
   check(
     "and the author column was never rewritten [19 §1]",
     stillAuthored[0].userId === authorUser.id,
+  );
+
+  // *** `S40` — but never the AUTHOR's own. *** The write side was always
+  // right: `S103` rewrites who OWNS a thread and never who PERFORMED an act,
+  // and `team.ts` does not touch `rep_reports` at all. The loss was entirely
+  // in the read predicate, which used to hang a rep's own interactions off
+  // LIVE membership — so a handover took their own words away the moment it
+  // stamped `company_reps.removed_at`.
+  const authorHeld = await listReports(author, { companyId: companyA.id });
+  check(
+    "before: the author sees their own reports on company A",
+    authorHeld.rows.length > 0,
+  );
+  await db
+    .update(companyReps)
+    .set({ removedAt: new Date() })
+    .where(
+      and(
+        eq(companyReps.companyId, companyA.id),
+        eq(companyReps.userId, authorUser.id),
+      ),
+    );
+  const authorKept = await listReports(author, { companyId: companyA.id });
+  check(
+    "*** a rep who leaves the company KEEPS their own reports [S40] ***",
+    authorKept.rows.length === authorHeld.rows.length,
+    `held ${authorHeld.rows.length}, kept ${authorKept.rows.length}`,
+  );
+  check(
+    "including the note, which was always theirs [S38]",
+    authorKept.rows.some((row) => row.narrative !== null),
+  );
+  check(
+    "and a field note, which never had an anchor to lose [S40]",
+    (await getReport(author, fieldNote.id)) !== null,
   );
 
   /* --- 17. Every write is audited [07 E1] -------------------------- */

@@ -171,6 +171,8 @@ a session report does not exist.
 | `verify-routes.ts` assertion labels cite archived document numbers | `scripts/verify-routes.ts` | Fold into session 9 |
 | `follow-ups.ts:166` filters in memory after the fetch | `src/lib/follow-ups.ts` | None — file is deleted in session 11 |
 | `listQuotationFormOptions` returns every visible company into one `<select>`. Fine at ~90 | `src/lib/quotations.ts` | Revisit after bulk import |
+| `rep_reports.reference` is a column with no writer and no reader — schema, CHECK and migration exist; data layer, form, screen and message catalogue all omit it | `src/db/schema.ts` | Session 9, which drops dead structure |
+| The share walk revokes the FIRST share row then asserts none remains, so it fails whenever the company it picks already carries a live share — `verify:sharing` leaves those deliberately `[12 §7]`. Green or red by run order, not by correctness | `scripts/verify-routes.ts:1175` | Own session; assert on the row it revoked, not on the list being empty |
 
 ---
 

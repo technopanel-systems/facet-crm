@@ -23,13 +23,21 @@
  *     `[20 §5]`.** Nothing is written to the company: the suppression is
  *     derived on read, so correcting the report corrects the suppression.
  *  5. **A report is ONE row `[20 §9]`.** Editing is an UPDATE and must never
- *     double-count. Only the author edits, forever, and the anchor is editable
- *     too — a report filed against the wrong company is corrected, not
- *     abandoned, because FACET does not delete.
- *  6. **No permission flag `[20 §13]`.** Every rep logs; the only identity
+ *     double-count. The anchor is editable too — a report filed against the
+ *     wrong company is corrected, not abandoned, because FACET does not delete.
+ *  6. **Only the author, and only on the day they wrote it `[S39]`.** After
+ *     that it stands. The clock is `created_at` in Riyadh, never `report_date`:
+ *     a rep may backdate the day a visit happened, and a window keyed on that
+ *     could be reopened by editing the date the report claims to cover.
+ *  7. **Two halves, with different visibility `[S38]`.** *What happened* —
+ *     channel, outcome, project, signals — goes to whoever can see the record,
+ *     including through a share. *The note* goes to its author and to anyone
+ *     who sees all reps. `listColumns` therefore does not name `narrative`;
+ *     `withNotes` fetches it separately for the rows that may carry it.
+ *  8. **No permission flag `[20 §13]`.** Every rep logs; the only identity
  *     question is authorship on edit. Reads compose
- *     `visibleRepReportsFilter` — a report follows its anchor `[20 §10]`, which
- *     supersedes `04 Q6`'s "private to the rep".
+ *     `visibleRepReportsFilter` — a report follows its anchor `[20 §10]`,
+ *     except its author, who keeps their own `[S40]`.
  *
  * Every read composes a filter from `authz`; every write goes through
  * `withAudit`, which owns the transaction.
@@ -56,6 +64,7 @@ import {
 import { withAudit } from "@/lib/audit";
 import {
   canViewRecord,
+  readableNoteFilter,
   visibleRepReportsFilter,
   type AuthSession,
 } from "@/lib/authz";
@@ -148,7 +157,9 @@ export type ReportListRow = {
   id: string;
   entryType: ReportEntryType;
   reportDate: string;
-  narrative: string;
+  /** The note half `[S38]`. `null` means **withheld from this viewer**, never
+   *  empty: `normalise` refuses a blank narrative and the column is NOT NULL. */
+  narrative: string | null;
   userId: string;
   userName: string;
   channel: ReportChannel | null;
@@ -173,8 +184,12 @@ export type ReportDetail = ReportListRow & {
   /** Whether the viewer may open the anchor's own record `[16 §10]` shape. */
   companyViewable: boolean;
   projectViewable: boolean;
-  /** `20 §9` — the Edit control renders only for the author. */
+  /** Whose words these are. Decides what the page says, not what it offers. */
   isAuthor: boolean;
+  /** `S39` — the author, on the day they wrote it. The Edit control renders
+   *  only for this; `updateReport` refuses in step, so the UI is never the
+   *  gate `[19 §3]`. */
+  editable: boolean;
 };
 
 /* ------------------------------------------------------------------ *
@@ -373,9 +388,17 @@ export async function createReport(
  * row, because counts read the current outcome and a correction must not
  * double-count.
  *
- * **Author only, forever, with no time window.** A manager reads a report but
- * never rewrites someone else's words. This is an identity question rather than
- * a visibility one, which is why `ViewableRecordType` gains no value `[20 §13]`.
+ * **The author only, and only on the day they wrote it** `[S39]`. After that
+ * it stands. A manager reads a report but never rewrites someone else's words:
+ * an identity question rather than a visibility one, which is why
+ * `ViewableRecordType` gains no value `[20 §13]`.
+ *
+ * The window is measured on `created_at` in Riyadh, never on `report_date`. A
+ * rep may log Thursday's visit on Sunday, and keying the window on the day the
+ * report *covers* would both close it before they could fix a typo and let a
+ * three-week-old report be reopened by editing the date it claims to cover.
+ * The check lives here rather than only on the form: a hidden Edit button is a
+ * hint, and this is where the rule holds `[19 §3]`.
  *
  * The signal set is **replaced**, not appended to. A no-op save writes no audit
  * row, the way `updateUser` behaves — `withAudit` inserts nothing when `log` is
@@ -396,6 +419,9 @@ export async function updateReport(
   }
   if (existing.userId !== session.user.id) {
     throw new RuleError("reports.errors.authorOnly");
+  }
+  if (riyadhDay(existing.createdAt) !== today()) {
+    throw new RuleError("reports.errors.editWindowClosed");
   }
 
   const { values, signals } = normalise(input);
@@ -488,12 +514,21 @@ export async function updateReport(
  * Reading
  * ------------------------------------------------------------------ */
 
-function searchFilter(query: string | undefined) {
+/**
+ * Search reaches the note only where the viewer may read it `[S38]`.
+ *
+ * Without `readableNoteFilter` here, a rep who holds the company through a
+ * share could binary-search another rep's private note by content without ever
+ * seeing it rendered. Withholding the column from the select and leaving this
+ * `ilike` open looks correct and leaks anyway. The company-name half is
+ * unrestricted — the row itself was never the secret.
+ */
+function searchFilter(session: AuthSession, query: string | undefined) {
   const trimmed = query?.trim();
   if (!trimmed) return undefined;
   const pattern = `%${trimmed}%`;
   return or(
-    ilike(repReports.narrative, pattern),
+    and(readableNoteFilter(session), ilike(repReports.narrative, pattern)),
     ilike(companies.name, pattern),
   );
 }
@@ -520,7 +555,7 @@ export async function listReports(
   // count, so the total can never disagree with the page.
   const where = and(
     visibleRepReportsFilter(session),
-    searchFilter(options.q),
+    searchFilter(session, options.q),
     options.entryType ? eq(repReports.entryType, options.entryType) : undefined,
     options.outcome ? eq(repReports.outcome, options.outcome) : undefined,
     options.companyId ? eq(repReports.companyId, options.companyId) : undefined,
@@ -551,17 +586,24 @@ export async function listReports(
     .where(where);
 
   return {
-    rows: await withSignals(rows),
+    rows: await withNotes(session, await withSignals(rows)),
     total: totals?.total ?? 0,
     page,
   };
 }
 
+/**
+ * The *what happened* half `[S38]`, and only that.
+ *
+ * `narrative` is deliberately absent: every reader of this object composes
+ * `withNotes`, which fetches the note in a second query narrowed to the rows
+ * whose note the viewer may read. A withheld note is never named in the select
+ * that builds someone's page, so it does not leave Postgres.
+ */
 const listColumns = {
   id: repReports.id,
   entryType: repReports.entryType,
   reportDate: repReports.reportDate,
-  narrative: repReports.narrative,
   userId: repReports.userId,
   userName: users.name,
   channel: repReports.channel,
@@ -579,10 +621,11 @@ const listColumns = {
   createdAt: repReports.createdAt,
 } as const;
 
-type BareRow = Omit<ReportListRow, "signals">;
+type BareRow = Omit<ReportListRow, "signals" | "narrative">;
+type SignalledRow = BareRow & { signals: ReportSignalRow[] };
 
 /** One extra query for the whole page, rather than one per row. */
-async function withSignals(rows: BareRow[]): Promise<ReportListRow[]> {
+async function withSignals(rows: BareRow[]): Promise<SignalledRow[]> {
   if (rows.length === 0) return [];
 
   const found = await db
@@ -608,6 +651,44 @@ async function withSignals(rows: BareRow[]): Promise<ReportListRow[]> {
   }
 
   return rows.map((row) => ({ ...row, signals: byReport.get(row.id) ?? [] }));
+}
+
+/**
+ * The note half `[S38]`, attached only where this viewer may read it.
+ *
+ * One extra query for the whole page, the same shape as `withSignals` — and
+ * the reason the split is not a `case … end` in the SELECT list: a Drizzle
+ * `sql` template drops the table qualifier there, silently, and `listColumns`
+ * is used under five joins. Selecting the column in a separate single-table
+ * statement narrowed by `readableNoteFilter` is both safe and literal: the
+ * note a viewer may not read is never named in a select they run.
+ *
+ * A row with no match gets `null` — withheld, not empty.
+ */
+async function withNotes(
+  session: AuthSession,
+  rows: SignalledRow[],
+): Promise<ReportListRow[]> {
+  if (rows.length === 0) return [];
+
+  const readable = await db
+    .select({ id: repReports.id, narrative: repReports.narrative })
+    .from(repReports)
+    .where(
+      and(
+        inArray(
+          repReports.id,
+          rows.map((row) => row.id),
+        ),
+        readableNoteFilter(session),
+      ),
+    );
+
+  const byReport = new Map(readable.map((row) => [row.id, row.narrative]));
+  return rows.map((row) => ({
+    ...row,
+    narrative: byReport.get(row.id) ?? null,
+  }));
 }
 
 /**
@@ -643,7 +724,7 @@ export async function reportsInRange(
     )
     .orderBy(desc(repReports.reportDate), desc(repReports.createdAt));
 
-  return withSignals(rows);
+  return withNotes(session, await withSignals(rows));
 }
 
 export async function getReport(
@@ -668,9 +749,9 @@ export async function getReport(
 
   if (!row) return null;
 
-  const [withSignal] = await withSignals([row]);
+  const [full] = await withNotes(session, await withSignals([row]));
   return {
-    ...withSignal,
+    ...full,
     contactId: row.contactId,
     cityId: row.cityId,
     // Seeing the report does not imply being allowed to open its anchor —
@@ -682,6 +763,8 @@ export async function getReport(
       ? await canViewRecord(session, "project", row.projectId)
       : false,
     isAuthor: row.userId === session.user.id,
+    editable:
+      row.userId === session.user.id && riyadhDay(row.createdAt) === today(),
   };
 }
 
@@ -689,13 +772,26 @@ export async function getReport(
  * `on hold` — derived on read, never stored `[20 §5]`
  * ------------------------------------------------------------------ */
 
+const RIYADH_DAY = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Riyadh",
+  dateStyle: "short",
+});
+
+/**
+ * Which calendar day in Riyadh an instant fell on, as `YYYY-MM-DD`.
+ *
+ * The app's timezone is fixed, and **UTC is the wrong answer here** `[S39]`: a
+ * report typed at 02:00 Riyadh is 23:00 UTC the day before, so a UTC window
+ * would close it before the rep had had breakfast.
+ */
+export function riyadhDay(at: Date): string {
+  return RIYADH_DAY.format(at);
+}
+
 /** Today in Riyadh, as `YYYY-MM-DD`. The app's timezone is fixed and a report
  *  date is a calendar day there, not an instant. */
 export function today(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Riyadh",
-    dateStyle: "short",
-  }).format(new Date());
+  return riyadhDay(new Date());
 }
 
 /**

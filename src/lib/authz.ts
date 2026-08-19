@@ -676,30 +676,36 @@ function projectVisibleExists(
 }
 
 /**
- * Rep reports: a report follows its anchor `[20 §10]`.
+ * Rep reports — **which rows** a viewer may see. What half of a row they may
+ * read is `readableNoteFilter` below `[S38]`.
  *
  * **This supersedes `04 Q6`'s "activities are private to the rep, without
  * exception"**, restated in `01 §4.1` and `09 §8.1`. `20 §1` makes the point of
  * the whole phase that this knowledge stops being personal property, and a
  * report only the writer can read hands nothing over when they leave.
  *
- * Three terms, and the second is the one that is easy to get wrong:
+ * Three terms, and the third is the one that is easy to get wrong:
  *
- *  1. **A field note has no anchor, so it follows its author.** It names no
- *     company and touches no customer timeline `[20 §2]`; there is nothing else
- *     for its visibility to hang on.
+ *  1. **An author always sees their own report** `[S40]`. A rep who leaves a
+ *     company keeps what they did there as a record of it — so this is a plain
+ *     author term, not the field-note special case it used to be. A field note
+ *     has no anchor `[20 §2]` and is covered by the same term, which is why
+ *     there is no longer a separate one for it.
  *  2. **A company-level report follows the company** — the same two terms as
  *     `visibleCompaniesFilter`, substituting `rep_reports.company_id`.
  *  3. **A report naming a project must clear the project TOO** — `and`, not
  *     `or`. Without this a rep who has been shared a company would read the
  *     name of a project they are not allowed to see, which is exactly what
- *     `04 Q7` forbids and the one rule Slice 1 exists to get right.
+ *     `04 Q7` forbids and the one rule Slice 1 exists to get right. It guards
+ *     term 2 only: an author already typed the project's name.
  *
- * **Consequence, and it is intended:** a rep removed from a company loses sight
- * of reports they wrote themselves. That is `20 §1` working — the history
- * belonged to the company. It is also why handover needs no report bucket
- * `[20 §10]`: visibility moves the moment the membership does, and `19 §1`
- * leaves the author column alone.
+ * **`S40` reverses what this used to do on purpose.** Hanging a rep's own
+ * interactions off *live* membership meant a handover took them away the moment
+ * it stamped `company_reps.removed_at` — the write side was always correct
+ * (`19 §1`, `S103`: a handover never rewrites who performed an act, and
+ * `team.ts` does not touch `rep_reports`), and the loss was entirely in this
+ * predicate. Handover still needs no report bucket; an author simply keeps
+ * their own.
  *
  * **No share term of its own.** `record_shares` could carry a report and
  * nothing writes such a row — the same reasoning as `visibleContactsFilter` and
@@ -711,7 +717,7 @@ export function visibleRepReportsFilter(
   if (session.user.role.seesAllReps) return undefined;
   const userId = session.user.id;
   return or(
-    and(isNull(repReports.companyId), eq(repReports.userId, userId)),
+    eq(repReports.userId, userId),
     and(
       or(
         activeMembershipExists(repReports.companyId, userId),
@@ -723,6 +729,34 @@ export function visibleRepReportsFilter(
       ),
     ),
   );
+}
+
+/**
+ * Rep reports — **which half of a row** a viewer may read `[S38]`.
+ *
+ * A report has two halves with different visibility. *What happened* — channel,
+ * outcome, project, signals — goes to whoever can see the record, including
+ * through a share. *The note* — the free text — goes to its author and to
+ * anyone who sees all reps. **A share never exposes another rep's notes.**
+ *
+ * This is a predicate rather than a projection on purpose. `reports.ts` uses it
+ * twice, and both uses need it as a `where` term:
+ *
+ *  - `withNotes` fetches the note column in a **separate query** narrowed by
+ *    this, so a note the viewer may not read is never named in the select that
+ *    builds their page and does not leave Postgres. A `case … end` in the
+ *    SELECT list would read more directly and is wrong here: a Drizzle `sql`
+ *    template drops the table qualifier there, silently, under a join.
+ *  - the `/reports` search `ilike`s the note, which discloses it by inference —
+ *    so the same predicate gates that term. Withholding the column and leaving
+ *    the search open looks correct and leaks anyway.
+ *
+ * `undefined` means every note, and composes with `and()` like the filters
+ * above. Never feed it to `or()`.
+ */
+export function readableNoteFilter(session: AuthSession): SQL | undefined {
+  if (session.user.role.seesAllReps) return undefined;
+  return eq(repReports.userId, session.user.id);
 }
 
 /**

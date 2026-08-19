@@ -29,9 +29,11 @@ export const dynamic = "force-dynamic";
  * abandoned, and FACET does not delete. The company control is therefore the
  * full picker here even when the report already names one.
  *
- * Only the author reaches this screen: `notFound()` rather than a message, so a
- * 404 does not confirm the report exists. `updateReport` refuses in step with
- * `reports.errors.authorOnly` — the UI is never the gate `[19 §3]`.
+ * Only the author reaches this screen, **and only on the day they wrote the
+ * report** `[S39]`: `notFound()` rather than a message, so a 404 does not
+ * confirm the report exists. `updateReport` refuses in step with
+ * `reports.errors.authorOnly` or `reports.errors.editWindowClosed` — the UI is
+ * never the gate `[19 §3]`.
  */
 export default async function EditReportPage({
   params,
@@ -43,7 +45,7 @@ export default async function EditReportPage({
 
   const session = await requireSession();
   const report = await getReport(session, id);
-  if (!report || !report.isAuthor) notFound();
+  if (!report || !report.editable) notFound();
 
   const t = await getTranslations();
   const isFieldNote = report.entryType === "field_note";
@@ -82,7 +84,9 @@ export default async function EditReportPage({
           onHoldUntil: report.onHoldUntil,
           category: report.category,
           cityId: report.cityId,
-          narrative: report.narrative,
+          // The author always reads their own note `[S38]`, and only the
+          // author reaches this screen — the fallback is unreachable.
+          narrative: report.narrative ?? "",
           reportDate: report.reportDate,
           signals: report.signals,
         }}

@@ -720,9 +720,10 @@
       "noSignals": "No signals.",
       "raiseQuotation": "Ask for a quotation",
       "raiseQuotationHint": "“Asked for a quotation” is not an outcome. Raise the real request, and qualification follows from it.",
-      "narrativeAlways": "Always fill this in, whatever the choices above say.",
-      "authorOnlyHint": "Only the person who wrote a report may correct it.",
-      "correctionHint": "This corrects the report in place. There is still one entry, and the change is recorded."
+      "narrativeAlways": "Always fill this in, whatever the choices above say. Colleagues who can see this record see what happened; your note is yours.",
+      "authorOnlyHint": "The note is the author's own. Only the person who wrote a report may correct it, on the day they wrote it.",
+      "correctionHint": "This corrects the report in place, today only. There is still one entry, and the change is recorded.",
+      "standsHint": "This report now stands. A report can be corrected only on the day it was written."
     },
     "actions": {
       "log": "Log it",
@@ -744,7 +745,8 @@
       "projectNotVisible": "That project cannot be found.",
       "projectNotOnCompany": "That project is not linked to that company.",
       "notFound": "That report no longer exists.",
-      "authorOnly": "Only the person who wrote this report may correct it."
+      "authorOnly": "Only the person who wrote this report may correct it.",
+      "editWindowClosed": "A report can be corrected only on the day it was written. This one now stands."
     }
   },
   "comments": {

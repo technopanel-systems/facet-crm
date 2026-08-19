@@ -176,7 +176,7 @@ quotation exists, never because someone ticked a box.
 **S37.** Outcome **on hold requires a date**. Until it passes, that company
 raises nothing.
 
-**S38. [CHANGE]** A report has **two halves, with different visibility**:
+**S38.** A report has **two halves, with different visibility**:
 
 | Half | Contents | Who sees it |
 |---|---|---|
@@ -185,11 +185,11 @@ raises nothing.
 
 A share never exposes another rep's notes.
 
-**S39. [CHANGE]** A report can be **edited only on the day it was written**, and
+**S39.** A report can be **edited only on the day it was written**, and
 only by its author. After that it stands. Editing corrects one row and never
 double-counts.
 
-**S40. [CHANGE]** A rep who leaves a company **keeps their own reports** as a
+**S40.** A rep who leaves a company **keeps their own reports** as a
 record of what they did.
 
 **S41.** Every company and every project has a **timeline**, computed on read,

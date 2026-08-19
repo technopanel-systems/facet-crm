@@ -97,7 +97,7 @@ import {
   getQuotationThread,
   listQuotationThreads,
 } from "@/lib/quotations";
-import { createReport, listReports, today } from "@/lib/reports";
+import { createReport, getReport, listReports, today } from "@/lib/reports";
 import { addComment } from "@/lib/comments";
 import { grantShare, listShares, revokeShare, shareableUsers } from "@/lib/sharing";
 
@@ -621,6 +621,15 @@ async function main(): Promise<void> {
     (await listReports(repB, { q: stamp })).rows.some(
       (row) => row.id === companyReport.id,
     ),
+  );
+  check(
+    "*** …and the share stops at WHAT HAPPENED: no note [S38] ***",
+    (await getReport(repB, companyReport.id))?.narrative === null,
+    `got ${JSON.stringify((await getReport(repB, companyReport.id))?.narrative)}`,
+  );
+  check(
+    "…while its author still reads their own words [S38]",
+    typeof (await getReport(repA, companyReport.id))?.narrative === "string",
   );
   check(
     "visibleCommentsFilter, through the company branch [25 §10]",

@@ -58,9 +58,9 @@ export default async function ReportDetailPage({
         name={companyName ?? t(`enums.reportEntryType.${report.entryType}`)}
         state={`${day(report.reportDate)} · ${report.userName}`}
         action={
-          // `20 §9` — only the author corrects a report. The data layer
+          // `S39` — the author, on the day they wrote it. The data layer
           // refuses either way; this simply does not offer it.
-          report.isAuthor ? (
+          report.editable ? (
             <Button asChild size="sm" variant="outline">
               <Link href={`/reports/${report.id}/edit`}>{t("common.edit")}</Link>
             </Button>
@@ -152,19 +152,29 @@ export default async function ReportDetailPage({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-start text-sm">
-            {t("reports.fields.narrative")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {/* The rep's own words, kept as typed. */}
-          <p className="text-start text-sm whitespace-pre-wrap">
-            {report.narrative}
-          </p>
-        </CardContent>
-      </Card>
+      {/* The note half `[S38]`. A viewer who may not read it never receives
+          it — the data layer withholds the column — and the card is absent
+          entirely rather than greyed out or locked `[D47]`. */}
+      {report.narrative === null ? null : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-start text-sm">
+              {t("reports.fields.narrative")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* The rep's own words, kept as typed, as a quote block `[D47]`. */}
+            <blockquote className="border-s-2 ps-4">
+              <p
+                dir="auto"
+                className="text-start text-sm whitespace-pre-wrap"
+              >
+                {report.narrative}
+              </p>
+            </blockquote>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -198,11 +208,19 @@ export default async function ReportDetailPage({
         </CardContent>
       </Card>
 
+      {/* D47 makes the note absent; absence is not secret. A reader who
+          cannot tell a withheld note from a rep who wrote nothing has been
+          misinformed rather than protected — so the page foot says whose the
+          note is, away from where the note itself would have been. */}
       {!report.isAuthor ? (
         <p className="text-muted-foreground text-start text-xs">
           {t("reports.detail.authorOnlyHint")}
         </p>
-      ) : null}
+      ) : report.editable ? null : (
+        <p className="text-muted-foreground text-start text-xs">
+          {t("reports.detail.standsHint")}
+        </p>
+      )}
     </div>
   );
 }
