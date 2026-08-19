@@ -168,11 +168,10 @@ a session report does not exist.
 | Eight `SelectField`s should carry `required`; each validates server-side, so the placeholder costs a round trip, not correctness | user, contact, report and quotation-line forms | Same sweep session |
 | Participant add/remove forms never answer a no-JS POST — `Failed to parse body as FormData`; the write lands, the response does not. Bisected to pre-existing | `projects/[id]/project-links.tsx` | Own session |
 | `confirmPaymentAction` never answers a raw form POST. Same shape, different action | `quotations/[id]` | Same session as the above — likely one cause |
-| `verify-routes.ts` assertion labels cite archived document numbers | `scripts/verify-routes.ts` | Fold into session 9 |
 | `follow-ups.ts:166` filters in memory after the fetch | `src/lib/follow-ups.ts` | None — file is deleted in session 11 |
 | `listQuotationFormOptions` returns every visible company into one `<select>`. Fine at ~90 | `src/lib/quotations.ts` | Revisit after bulk import |
-| `rep_reports.reference` is a column with no writer and no reader — schema, CHECK and migration exist; data layer, form, screen and message catalogue all omit it | `src/db/schema.ts` | Session 9, which drops dead structure |
-| The share walk revokes the FIRST share row then asserts none remains, so it fails whenever the company it picks already carries a live share — `verify:sharing` leaves those deliberately `[12 §7]`. Green or red by run order, not by correctness | `scripts/verify-routes.ts:1175` | Own session; assert on the row it revoked, not on the list being empty |
+| Comments render on companies, contacts and dispatches. `S114` and `D48` allow quotation threads and projects only; the `comments_record_type` CHECK admits five kinds, the company screen imports `CommentBox`, and `verify:routes` §9 asserts the wider behaviour | `src/db/schema.ts`, `companies/[id]/page.tsx`, `scripts/verify-routes.ts` §9 | Session 14, which narrows comments — it deletes that walk |
+| `quotation_threads.closed_at` and `closed_by_user_id` have no writer and no reader outside the schema. `src/lib/projects.ts` never touches `quotationThreads`, so `S47`'s cascade — which is what would write them — is not built | `src/db/schema.ts` | The loss-cascade slice `S47`, which builds their writer or drops them |
 
 ---
 

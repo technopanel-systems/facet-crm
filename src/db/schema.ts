@@ -30,10 +30,12 @@
  *     document requires knowing the creator. There is deliberately no
  *     `updated_at` anywhere.
  *
- * Auth.js session/account tables (`sessions`, `accounts`,
- * `verification_tokens`, plus `users.email_verified` / `users.image`) carry
- * the shape the library dictates `[09 §2.2]`, `[03]` — added in phase 6 with
- * the Drizzle adapter, not designed here.
+ * Auth.js session/account tables (`sessions`, `accounts`, plus
+ * `users.email_verified` / `users.image`) carry the shape the library dictates
+ * `[09 §2.2]`, `[03]` — added in phase 6 with the Drizzle adapter, not
+ * designed here. `verification_tokens` was in that set until `SPEC §15`
+ * dropped it; the note above `accounts` says which of them the adapter
+ * actually requires, and why.
  */
 
 import { sql } from "drizzle-orm";
@@ -405,9 +407,21 @@ export const users = pgTable(
 
 /* ------------------------------------------------------------------ *
  * Auth.js library tables — shape dictated by @auth/drizzle-adapter
- * `[09 §2.2]`, `[03]`. Only `sessions` is used under credentials-only
- * auth; `accounts` and `verification_tokens` exist because the adapter
- * requires them and stay empty.
+ * `[09 §2.2]`, `[03]`. Only `sessions` is used under credentials-only auth.
+ *
+ * **`accounts` stays because the library's TYPE requires it, not its
+ * behaviour.** `accountsTable` is a non-optional member of the adapter's
+ * `DefaultPostgresSchema`, so omitting it fails `npm run typecheck`. At
+ * runtime nothing reaches it: the four methods that read it — `linkAccount`,
+ * `getUserByAccount`, `unlinkAccount`, `getAccount` — are called only on an
+ * OAuth or WebAuthn sign-in, and the only provider is `Credentials`. The
+ * table stays empty forever and that is correct.
+ *
+ * `verification_tokens` sat here for the same stated reason and did not earn
+ * it: its member is optional (`verificationTokensTable?`) and its two methods
+ * belong to the Email provider. `SPEC §15` drops it — migration `0015`.
+ * `users.email_verified` and `users.image` stay on the same test as
+ * `accounts`: `DefaultPostgresUsersTable` names both columns.
  * ------------------------------------------------------------------ */
 
 export const sessions = pgTable(
@@ -447,16 +461,6 @@ export const accounts = pgTable(
     session_state: text("session_state"),
   },
   (t) => [primaryKey({ columns: [t.provider, t.providerAccountId] })],
-);
-
-export const verificationTokens = pgTable(
-  "verification_tokens",
-  {
-    identifier: text("identifier").notNull(),
-    token: text("token").notNull(),
-    expires: timestamp("expires", { withTimezone: true }).notNull(),
-  },
-  (t) => [primaryKey({ columns: [t.identifier, t.token] })],
 );
 
 /**
@@ -1501,14 +1505,6 @@ export const repReports = pgTable(
     /** Field note only, optional. */
     cityId: uuid("city_id").references(() => cities.id),
     narrative: text("narrative").notNull(),
-    /**
-     * `[25 §34]` — a small reference beside the outcome: a sample number, a
-     * colour code, a document name, so *"Sample #2 → 168"* is a value rather
-     * than a sentence and "how many samples of 168 went out this quarter" is a
-     * query. Same reasoning as `20 §4`'s signal references, and free text for
-     * the same reason.
-     */
-    reference: text("reference"),
     /** Set exactly when the outcome is `on_hold` `[20 §5]`. */
     onHoldUntil: date("on_hold_until"),
     reportDate: date("report_date").notNull(),
@@ -1666,11 +1662,11 @@ export const comments = pgTable(
      * `13 §1`, `25 §9` — the five kinds §9 names, stated **positively**.
      *
      * `record_type` is shared with `record_shares`, `delete_requests`,
-     * `duplicate_flags`, `attachments` and `pipeline_snapshots` (`tasks` and
-     * `activities` shared it too, until feature slice 6 dropped both
-     * `[26 §2, §6]`), so it will grow for reasons that have nothing to do
-     * with comments. A negative CHECK would silently admit every value added
-     * later; this one refuses until somebody decides. Today that excludes
+     * `duplicate_flags` and `attachments` (`tasks` and `activities` shared it
+     * too, until feature slice 6 dropped both `[26 §2, §6]`; so did
+     * `pipeline_snapshots`, until `SPEC §15` did), so it will grow for reasons
+     * that have nothing to do with comments. A negative CHECK would silently
+     * admit every value added later; this one refuses until somebody decides. Today that excludes
      * `quotation_version` — a comment belongs to the thread, which is the
      * conversation, not to one superseded version of it.
      */
@@ -1857,70 +1853,6 @@ export const auditLog = pgTable(
     index("audit_log_entity_idx").on(t.entityType, t.entityId),
     index("audit_log_actor_idx").on(t.actorUserId, t.createdAt),
   ],
-);
-
-/* ------------------------------------------------------------------ *
- * 12. Snapshots — `09 §12`, columns per `10 §11`
- * ------------------------------------------------------------------ */
-
-/**
- * `10 §11` — period, company or project, derived stage, owning rep, expected
- * sqm, value. Written by a scheduled job, never edited afterwards `[07 E2]`.
- * `derived_stage` is text because the funnel is computed, not stored
- * `[10 §1]`, and a snapshot captures whatever the computation said at the
- * time.
- *
- * `10 §11` also listed warmth. `25 §6` cut it, and this table has never been
- * written, so the column went with the rest.
- */
-export const pipelineSnapshots = pgTable(
-  "pipeline_snapshots",
-  {
-    id: pk(),
-    period: date("period").notNull(),
-    recordType: recordTypeEnum("record_type").notNull(),
-    recordId: uuid("record_id").notNull(),
-    derivedStage: text("derived_stage"),
-    ownerUserId: uuid("owner_user_id").references(() => users.id),
-    sqmExpected: numeric("sqm_expected", SQM),
-    value: numeric("value", MONEY),
-    createdAt: createdAt(),
-  },
-  (t) => [
-    uniqueIndex("pipeline_snapshots_key").on(
-      t.period,
-      t.recordType,
-      t.recordId,
-    ),
-  ],
-);
-
-/**
- * `10 §11` — period, person, target sqm, achieved sqm, quotations raised,
- * quotations accepted, dispatches, activity count, reports submitted.
- *
- * Target progress and activity level sit side by side and are never combined
- * into one score `[07 D2]` — which is why there is no combined-score column
- * here or anywhere else.
- */
-export const personSnapshots = pgTable(
-  "person_snapshots",
-  {
-    id: pk(),
-    period: date("period").notNull(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id),
-    targetSqm: numeric("target_sqm", SQM),
-    achievedSqm: numeric("achieved_sqm", SQM),
-    quotationsRaised: integer("quotations_raised").notNull().default(0),
-    quotationsAccepted: integer("quotations_accepted").notNull().default(0),
-    dispatchCount: integer("dispatch_count").notNull().default(0),
-    activityCount: integer("activity_count").notNull().default(0),
-    reportsSubmitted: integer("reports_submitted").notNull().default(0),
-    createdAt: createdAt(),
-  },
-  (t) => [uniqueIndex("person_snapshots_key").on(t.period, t.userId)],
 );
 
 /* ------------------------------------------------------------------ *

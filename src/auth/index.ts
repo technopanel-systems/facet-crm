@@ -30,17 +30,23 @@ import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { cookies } from "next/headers";
 
 import { db } from "@/db";
-import { accounts, sessions, users, verificationTokens } from "@/db/schema";
+import { accounts, sessions, users } from "@/db/schema";
 import { env } from "@/env";
 import { verifyPassword } from "@/lib/passwords";
 
 const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 
+// `accountsTable` is passed because the adapter's TYPE requires it —
+// it is the one non-optional member of `DefaultPostgresSchema` besides
+// `usersTable`, so dropping it fails typecheck. Nothing ever reads the table:
+// its four methods run only on an OAuth or WebAuthn sign-in. `SPEC §15`
+// dropped `verificationTokensTable` on the opposite finding — optional member,
+// Email-provider-only methods — and `authenticatorsTable` was never passed at
+// all, which is the standing proof that an omitted table costs nothing here.
 const adapter = DrizzleAdapter(db, {
   usersTable: users,
   accountsTable: accounts,
   sessionsTable: sessions,
-  verificationTokensTable: verificationTokens,
 });
 
 // NextAuth accepts a config OR a function returning one. It MUST stay a

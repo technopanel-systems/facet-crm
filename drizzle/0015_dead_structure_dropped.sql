@@ -1,0 +1,60 @@
+-- 0015 — `SPEC §15` "Dropped outright": structure no rule asks for.
+--
+-- Four entries, three tables and one column. Every count below was measured
+-- against `facet` before this file was written, and every one is zero.
+--
+-- **`verification_tokens` — 0 rows.** An Auth.js leftover. The claim it sat
+-- under, in `schema.ts` and in `src/auth/index.ts`, was that the adapter
+-- requires it. Read against `@auth/drizzle-adapter@1.11.3` that is false in
+-- both halves: `verificationTokensTable` is an **optional** member of
+-- `DefaultPostgresSchema` (`lib/pg.d.ts`), and the only two methods that touch
+-- it — `createVerificationToken`, `useVerificationToken` — are reached solely
+-- through `@auth/core`'s `signin/send-token.js`, which belongs to the Email
+-- provider. The only provider configured is `Credentials`.
+--
+-- **`accounts` is NOT in this file, and that is the finding, not an
+-- oversight.** Same table shape, same empty 0 rows, opposite answer:
+-- `accountsTable` is a **non-optional** member of that type, so removing it
+-- fails `npm run typecheck` with `TS2345: Property 'accountsTable' is missing
+-- ... but required in type 'DefaultPostgresSchema'`. That was run, not
+-- reasoned. A library that will not compile without a table is a writer, even
+-- though no row is ever inserted. `users.email_verified` and `users.image`
+-- stay on the identical test — `DefaultPostgresUsersTable` names both columns
+-- — and both are null on all 350 users. `verify:schema25` now asserts the
+-- table survives, because a regenerated migration would take it out silently:
+-- login would still work, and the failure would surface as a typecheck.
+--
+-- **`pipeline_snapshots` — 0 rows. `person_snapshots` — 0 rows.** Written by
+-- a scheduled job that was never built. `SPEC §15` hands the question to the
+-- dashboard rebuild, which decides what history it needs rather than
+-- inheriting a guess made before anyone had used the system. Dropping them
+-- now is what stops the rebuild from being handed two tables and a shape to
+-- honour. `0007` already cut `pipeline_snapshots.warmth` on the same footing —
+-- "this table has never been written".
+--
+-- Nothing depends on any of the three: no foreign key in the database points
+-- at them, checked against `pg_constraint` before generating. `DROP TABLE`
+-- therefore carries no `CASCADE` — if that ever stops being true, this fails
+-- loudly instead of quietly taking a dependent with it.
+--
+-- **`rep_reports.reference` — 0 non-null of 555 rows.** A column with no
+-- writer and no reader: schema, CHECK and migration `0007` exist; the data
+-- layer, the form, the screen and the message catalogue all omit it. The
+-- signal reference it was modelled on is real and unaffected — that is
+-- `rep_report_signals.reference`, which `S45` requires and which is written
+-- and read. This was a second one, on the report itself, that nothing ever
+-- filled.
+--
+-- Its CHECK goes with it. `rep_reports_reference` (`reference is null or
+-- entry_type = 'interaction'`) exists in the database but was never declared
+-- in `schema.ts`, so drizzle-kit does not emit a statement for it; Postgres
+-- drops a constraint with the only column it names. Verified against
+-- `pg_constraint` after replay.
+--
+-- No rule marker moves. `SPEC §15` entries are not numbered rules, so the
+-- count stays 16 CHANGE / 22 BUILD.
+
+DROP TABLE "person_snapshots";--> statement-breakpoint
+DROP TABLE "pipeline_snapshots";--> statement-breakpoint
+DROP TABLE "verification_tokens";--> statement-breakpoint
+ALTER TABLE "rep_reports" DROP COLUMN "reference";

@@ -254,12 +254,18 @@ const LANDED: ColumnSpec[] = [
   { key: "comments.edited_at", type: "timestamp with time zone", nullable: true, cite: "25 §12" },
   { key: "comment_mentions.comment_id", type: "uuid", nullable: false, cite: "25 §11" },
   { key: "comment_mentions.mentioned_user_id", type: "uuid", nullable: false, cite: "25 §11" },
-  { key: "rep_reports.reference", type: "text", nullable: true, cite: "25 §34" },
   { key: "quotation_threads.closed_at", type: "timestamp with time zone", nullable: true, cite: "25 §24" },
   { key: "quotation_threads.closed_by_user_id", type: "uuid", nullable: true, cite: "25 §24" },
 ];
 
-/** The columns `25` withdraws. Present means the migration did not land. */
+/**
+ * The columns `25` withdraws. Present means the migration did not land.
+ *
+ * `pipeline_snapshots.warmth` now passes because the whole table is gone
+ * (`SPEC §15`, migration `0015`). Kept rather than moved: what it asserts —
+ * no column of that name exists — is still exactly true, and a reader looking
+ * for where warmth went should find all four of them in one list.
+ */
 const WITHDRAWN = [
   "companies.warmth",
   "companies.warmth_set_by",
@@ -316,6 +322,41 @@ const S26_DROPPED_INDEXES = ["project_companies_one_buyer_key"];
  */
 const S57_DROPPED_COLUMNS = ["quotation_lines.vat_rate"];
 
+/**
+ * What `SPEC §15` "Dropped outright" removes: structure no rule asks for.
+ * Same shape as the four lists above, separate for the same reason — one
+ * decision, one migration, one claim, legible without git blame. These answer
+ * to a section of the spec rather than to a numbered rule, which is why they
+ * are cited `SPEC §15` and not `S`-anything.
+ *
+ * All four were measured empty before `0015` was written: 0 rows in each
+ * table, and `rep_reports.reference` null on all 555 reports.
+ */
+const SPEC15_DROPPED_TABLES = [
+  "verification_tokens",
+  "pipeline_snapshots",
+  "person_snapshots",
+];
+
+/** The column `SPEC §15` drops — no writer, no reader. Its CHECK goes with it. */
+const SPEC15_DROPPED_COLUMNS = ["rep_reports.reference"];
+
+/**
+ * **The counterpart claim, and it is the one that needs asserting.**
+ * `accounts` is the Auth.js table that STAYS: `accountsTable` is a
+ * non-optional member of `@auth/drizzle-adapter`'s `DefaultPostgresSchema`,
+ * so the table exists because the library will not compile without it, not
+ * because anything writes a row. `verification_tokens` sat under the same
+ * stated reason and did not earn it — its member is optional — which is why
+ * one is above and the other is here.
+ *
+ * Worth a check of its own because the failure is quiet in the wrong
+ * direction: a migration regenerated from an older schema would drop
+ * `accounts`, login would carry on working, and the only complaint would be a
+ * typecheck nobody connects to a database.
+ */
+const ADAPTER_REQUIRED_TABLES = ["accounts"];
+
 /** Whole tables feature slice 6 dropped `[26 §2, §6]`. */
 const SLICE6_DROPPED_TABLES = ["product_colours", "activities", "tasks"];
 
@@ -348,7 +389,6 @@ const NEW_COLUMNS: { table: string; column: string; boolean?: true }[] = [
   { table: "companies", column: "has_credit_terms", boolean: true },
   { table: "quotation_threads", column: "closed_at" },
   { table: "quotation_threads", column: "closed_by_user_id" },
-  { table: "rep_reports", column: "reference" },
 ];
 
 async function main(): Promise<void> {
@@ -399,7 +439,7 @@ async function main(): Promise<void> {
   /* --- 2. Every withdrawn thing is gone [25 §6, §23, §35], [26 §2], S25, S26 - */
 
   console.log(
-    "\n2. Warmth, tolerance, the sales desk, slice 6's drops, the participant role and the buyer flag are absent",
+    "\n2. Warmth, tolerance, the sales desk, slice 6's drops, the participant\n   role, the buyer flag and SPEC §15's dead structure are absent — and the\n   one Auth.js table the adapter requires is not",
   );
 
   for (const key of WITHDRAWN) {
@@ -479,6 +519,38 @@ async function main(): Promise<void> {
       sql.raw(`select to_regclass('public.${table}') is not null as exists`),
     )) as unknown as { exists: boolean }[];
     check(`table ${table} is gone [26 §2, §6]`, exists[0]?.exists === false);
+  }
+
+  for (const table of SPEC15_DROPPED_TABLES) {
+    const exists = (await db.execute(
+      sql.raw(`select to_regclass('public.${table}') is not null as exists`),
+    )) as unknown as { exists: boolean }[];
+    check(`table ${table} is gone [SPEC §15]`, exists[0]?.exists === false);
+  }
+
+  for (const key of SPEC15_DROPPED_COLUMNS) {
+    check(`${key} is gone [SPEC §15]`, !columns.has(key));
+  }
+
+  // Dropping a column takes its CHECK with it. `rep_reports_reference` was
+  // never declared in `schema.ts`, so drizzle-kit emits no statement for it
+  // and only the database can answer whether it went.
+  const orphanChecks = (await db.execute(
+    sql`select conname from pg_constraint where conname = 'rep_reports_reference'`,
+  )) as unknown as { conname: string }[];
+  check(
+    "the CHECK rep_reports_reference went with its column [SPEC §15]",
+    orphanChecks.length === 0,
+  );
+
+  for (const table of ADAPTER_REQUIRED_TABLES) {
+    const exists = (await db.execute(
+      sql.raw(`select to_regclass('public.${table}') is not null as exists`),
+    )) as unknown as { exists: boolean }[];
+    check(
+      `table ${table} SURVIVES — @auth/drizzle-adapter's type requires it`,
+      exists[0]?.exists === true,
+    );
   }
 
   for (const typeName of SLICE6_DROPPED_TYPES) {
@@ -623,13 +695,11 @@ async function main(): Promise<void> {
     `insert into comments (record_type, record_id, author_user_id, body)
      values ('quotation_version', '${openProject.id}', '${rep.user.id}', 'no')`,
   );
-  await databaseRefuses(
-    "a reference on a field note is refused [25 §34]",
-    "rep_reports_reference",
-    `insert into rep_reports
-       (user_id, entry_type, category, narrative, report_date, reference)
-     values ('${rep.user.id}', 'field_note', 'scouting', 'n', current_date, '168')`,
-  );
+  // The invariant that stood here — a `reference` only on an interaction —
+  // went with the column it guarded. `SPEC §15` dropped
+  // `rep_reports.reference`; section 2 asserts the column and its CHECK are
+  // both gone. Signal references are untouched and live on
+  // `rep_report_signals.reference`, which `S45` requires.
 
   /* --- 4. The seeds [25 §5, §33] --------------------------------------- */
 

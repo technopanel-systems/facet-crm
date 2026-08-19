@@ -13,17 +13,17 @@
  *   4. Both locales render, and Arabic is `dir="rtl"`.
  *   5. The theme cookie flips the `dark` class, and an unknown value is dark.
  *   6. The 404 screen, and the handover gate behind one.
- *   7. Marking a project lost replays, in both locales `[25 §5]` — the form
+ *   7. Marking a project lost replays, in both locales `S29` `S43` — the form
  *      POST whose writer and whose database CHECK shipped in one pass, and
  *      which nothing else drives.
- *   8. The chain strip `[22 §6.6]` renders on a quotation thread AND on the
+ *   8. The chain strip `D27` `D29` renders on a quotation thread AND on the
  *      project behind it, in both locales.
- *   9. The comment box `[25 §9]` posts for real, and its cap refuses rather
+ *   9. The comment box `S114` `D48` posts for real, and its cap refuses rather
  *      than 500s — the one assertion of `readFields`' shape validation
  *      anywhere, because no in-process script crosses the action boundary.
- *  10. The sharing panel `[07 B1]`, `[25 §30]` grants and revokes for real, and
+ *  10. The sharing panel `S96` `S99` `S100` grants and revokes for real, and
  *      the rep who may not share is not offered the form.
- *  11. The next follow-up date `[25 §18]` is set and cleared for real, over
+ *  11. The next follow-up date `OPEN — no rule` is set and cleared for real, over
  *      HTTP, in both locales — the manual date that outranks the automatic
  *      clock, replayed the same way section 7 replays a lost project.
  *  12. No screen renders anything shaped like an unresolved message key.
@@ -78,7 +78,7 @@
  * 1's "failures" were wrong expectations rather than bugs: `/dispatches/new`
  * 404s for a rep AND a manager, because `can_dispatch` belongs to the
  * coordinator and the super admin; a manager 404s on a report's edit screen,
- * because only the author may edit `[20 §9]`; and a rep's empty lists yield no
+ * because only the author may edit `S39`; and a rep's empty lists yield no
  * id to follow, which is a legitimate empty state rather than a broken link.
  */
 
@@ -108,7 +108,7 @@ function check(label: string, condition: boolean, detail = ""): void {
  * **This is not asserting on translated strings.** The rule stands: next-intl
  * ships the whole catalogue to every page, so grepping for *"Quotation
  * requested"* proves the message bundle exists and nothing about whether the
- * screen rendered it `[23]`, `[20 §8]`. Nothing here looks for a translation.
+ * screen rendered it `[23]`, `S113`. Nothing here looks for a translation.
  *
  * It looks for the **shape of an unresolved key** — `chain.step.new`,
  * `projects.chain.title`, `common.none` as *visible text* — which is what
@@ -299,8 +299,9 @@ function firstId(body: string, section: string): string | null {
  *
  * **Asserted for the manager only.** `sees_all_reps` is the one identity with
  * rows on every list; a coordinator's `/companies` and `/performance` are
- * legitimately empty `[16 §8]`, `[18 §2]` — they see quotation threads and
- * company NAMES, not company records — so a list card that is absent there is
+ * legitimately empty — they see quotation threads and company NAMES, not
+ * company records. `S76 [CHANGE]` removes that name-only restriction and is
+ * not built, so this describes today — so a list card that is absent there is
  * the empty state working, not a missing frame. Asserting it for everyone
  * turns a correct screen into a red line.
  */
@@ -351,7 +352,13 @@ async function walk(jar: Jar, email: string, locale: string): Promise<void> {
 
 /** The id-bearing routes, discovered from the lists rather than hard-coded. */
 /**
- * The five kinds `comments_record_type` admits `[25 §9]`, by list section.
+ * The five kinds `comments_record_type` admits, by list section.
+ *
+ * **This is five and `S114` says two.** `S114` and `D48` put comments on
+ * quotation threads and projects ONLY — never a company, contact or dispatch.
+ * The CHECK, the screens and this walk all predate them and none has caught
+ * up. Recorded in `WORKFLOW.md` §5; session 14 narrows it and deletes what is
+ * below. Cited here so the gap is legible rather than silent.
  *
  * `reports` and `users` are absent because they are not commentable — a report
  * is already somebody's words, and a colleague is not a record.
@@ -395,19 +402,20 @@ async function walkRecords(jar: Jar, email: string): Promise<void> {
       if (status === 200 && suffix === "") {
         check(`  ${path} renders a fact grid`, body.includes('data-slot="facts"'));
         // Every thread has a chain position — a closed one included, which
-        // draws the strip stopped where it got to `[22 §6.6]`.
+        // draws the strip stopped where it got to `D27`.
         if (section === "quotations") {
           check(
             `  ${path} renders the chain strip`,
             body.includes('data-slot="chain-strip"'),
           );
         }
-        // `25 §9` — comments belong on every record, so every one of the five
-        // detail screens offers the box. This is the assertion that would have
-        // caught the three screens that had no timeline to hang it on.
+        // Every one of the five detail screens offers the box. This is the
+        // assertion that would have caught the three screens that had no
+        // timeline to hang it on — and, since `S114` and `D48` allow only two
+        // of the five, the assertion session 14 has to invert.
         if (COMMENTABLE.has(section)) {
           check(
-            `  ${path} offers the comment box [25 §9]`,
+            `  ${path} offers the comment box [S114] [D48]`,
             body.includes('data-slot="comment-composer"') &&
               body.includes('name="body"'),
           );
@@ -671,7 +679,7 @@ async function main(): Promise<void> {
     if (id) {
       const { status: handover } = await get(jar, `/en/users/${id}/handover`);
       check(
-        "an ACTIVE user's handover 404s [19 §3]",
+        "an ACTIVE user's handover 404s [S103]",
         handover === 404,
         `got ${handover}`,
       );
@@ -711,7 +719,7 @@ async function main(): Promise<void> {
       // marker rather than a translated label `[23]`. The free-text detail
       // field is NOT asserted here the same way: it is genuinely conditional
       // on the current pick being `other`, unmounted otherwise on purpose
-      // `[25 §5]`, so its presence depends on the fixture project's current
+      // `S29`, so its presence depends on the fixture project's current
       // state rather than being a fixed structural fact about this screen.
       check(
         `${locale}: it carries the loss-reason picker`,
@@ -792,7 +800,7 @@ async function main(): Promise<void> {
         fieldsFor("lost", otherReasonId, `lost via ${locale}`),
       );
       check(
-        `${locale}: *** POSTing endState=lost answers 303, not 500 *** [25 §5]`,
+        `${locale}: *** POSTing endState=lost answers 303, not 500 *** [S29]`,
         lost === 303,
         `got ${lost}`,
       );
@@ -801,12 +809,12 @@ async function main(): Promise<void> {
       // decide it is actually a real reason. The client unmounts the stale
       // detail field on that switch, but only a real browser POST through
       // `readFields` proves the SERVER accepts the correction on its own
-      // terms — no in-process script crosses that boundary `[25 §5]`.
+      // terms — no in-process script crosses that boundary `S43`.
       const corrected = await post(
         fieldsFor("lost", nonOtherReasonId, ""),
       );
       check(
-        `${locale}: switching from 'other' to a real reason still answers 303 [25 §5]`,
+        `${locale}: switching from 'other' to a real reason still answers 303 [S43]`,
         corrected === 303,
         `got ${corrected}`,
       );
@@ -917,13 +925,15 @@ async function main(): Promise<void> {
           );
 
           if (strip.position === "closed") {
-            // `16 §5` ends a thread at rejected, cancelled or expired; the
+            // `S62` ends a thread at accepted, rejected or cancelled — `S67`
+            // took expiry out of that set, so a closed strip is one of three; the
             // project behind it has no live thread on this account, so the
             // project half is not this thread's to prove.
             continue;
           }
           if (!projectId) {
-            // A coordinator gets no project link `[16 §10]`; a manager should.
+            // A coordinator gets no project link — `S76 [CHANGE]`, not built;
+            // a manager should.
             console.log(`  skip  ${label}: links no project`);
             continue;
           }
@@ -974,7 +984,9 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log("\n9. The comment box, posted for real [25 §9], [25 §11]");
+  // `S114` and `D48` govern; the screens this drives are wider than either
+  // allows — see the note above COMMENTABLE.
+  console.log("\n9. The comment box, posted for real [S114] [D48]");
   {
     // **`verify:comments` drives `addComment`; this drives the FORM.** The two
     // do not overlap: the in-process script never touches `readFields`, the
@@ -993,7 +1005,7 @@ async function main(): Promise<void> {
 
       const page = await get(jar, `/${locale}/companies/${id}`);
       check(
-        `${locale}: the company screen carries the composer [25 §9]`,
+        `${locale}: the company screen carries the composer [S114] [D48]`,
         page.body.includes('data-slot="comment-composer"'),
       );
 
@@ -1003,10 +1015,11 @@ async function main(): Promise<void> {
       check(`${locale}: the composer is a real form`, Boolean(form));
       if (!form) continue;
 
-      // The chip picker posts repeated `mentions` values `[25 §11]`. Asserting
+      // The chip picker posts repeated `mentions` values. `OPEN — no rule`:
+      // no S or D number covers @mentions; archived as `[25 §11]`. Asserting
       // the marker rather than a name: the list is whoever is active.
       check(
-        `${locale}: it offers people to tag [25 §11]`,
+        `${locale}: it offers people to tag [OPEN — no rule]`,
         form.includes('name="mentions"'),
       );
 
@@ -1041,32 +1054,32 @@ async function main(): Promise<void> {
       good.set("body", `verify-routes ${locale} comment`);
       const posted = await post(good);
       check(
-        `${locale}: *** posting a comment answers 200, not 500 *** [25 §9]`,
+        `${locale}: *** posting a comment answers 200, not 500 *** [S114]`,
         posted === 200,
         `got ${posted}`,
       );
 
       const after = await get(jar, `/${locale}/companies/${id}`);
       check(
-        `${locale}: the comment is on the record's thread [25 §9]`,
+        `${locale}: the comment is on the record's thread [S114]`,
         after.body.includes('data-slot="comment"'),
       );
 
-      // **The cap** `[25 §9]`. It is `readFields` shape validation, so nothing
+      // **The cap** `S114`. It is `readFields` shape validation, so nothing
       // in process crosses it — this is the only assertion of it anywhere. A
       // 200 carrying the error is the correct answer; a 500 is the defect.
       const tooLong = envelope();
       tooLong.set("body", "x".repeat(5001));
       const capped = await post(tooLong);
       check(
-        `${locale}: an over-long comment is refused, not a 500 [25 §9]`,
+        `${locale}: an over-long comment is refused, not a 500 [S114]`,
         capped === 200,
         `got ${capped}`,
       );
     }
   }
 
-  console.log("\n10. The sharing panel, granted and revoked for real [07 B1], [25 §30]");
+  console.log("\n10. The sharing panel, granted and revoked for real [S96] [S99] [S100]");
   {
     // **`verify:sharing` drives `grantShare`; this drives the FORM.** The two
     // do not overlap: the in-process script never touches `readFields`, the
@@ -1084,7 +1097,7 @@ async function main(): Promise<void> {
 
       const page = await get(jar, `/${locale}/companies/${id}`);
       check(
-        `${locale}: the company screen carries the sharing panel [25 §30]`,
+        `${locale}: the company screen carries the sharing panel [S96]`,
         page.body.includes('data-slot="sharing-panel"'),
       );
 
@@ -1092,7 +1105,7 @@ async function main(): Promise<void> {
         /<form[^>]*data-slot="sharing-grant"[\s\S]*?<\/form>/,
       )?.[0];
       check(
-        `${locale}: can_share is offered the grant form [07 B1]`,
+        `${locale}: can_share is offered the grant form [S96]`,
         Boolean(grantForm),
       );
       if (!grantForm) continue;
@@ -1128,52 +1141,90 @@ async function main(): Promise<void> {
         return response.status;
       };
 
-      // Whoever the picker offers first. Asserting the marker rather than a
-      // name: the list is whoever is active and not already holding it.
-      const recipient = grantForm.match(
-        /<option value="([0-9a-f-]{36})"/i,
-      )?.[1];
+      // **The row this walk grants must be the row it revokes.** `ShareEntry`
+      // carries no id — it renders `sharedWithName` and a bound revoke action
+      // — so the recipient's NAME is the only handle on a single row, and the
+      // picker supplies it: `<option value="{id}">{name}</option>`. Safe as a
+      // key because `GrantForm` only lists people who do not already hold the
+      // record, so the name cannot collide with a row that was already live.
+      //
+      // Taking whoever sorts first instead, and then asserting the list is
+      // empty, is what made this section pass or fail by run order:
+      // `verify:sharing` deliberately leaves live shares behind, and against
+      // those the old walk revoked somebody else's row and then failed on its
+      // own grant still being there.
+      const offered = grantForm.match(
+        /<option value="([0-9a-f-]{36})"[^>]*>([^<]*)</i,
+      );
+      const recipient = offered?.[1];
+      const recipientName = unescapeHtml(offered?.[2] ?? "").trim();
       check(
         `${locale}: the picker offers somebody to share with`,
-        Boolean(recipient),
+        Boolean(recipient) && recipientName.length > 0,
       );
-      if (!recipient) continue;
+      if (!recipient || !recipientName) continue;
+
+      // Every `share-row` on the page, as its own block. No `<li>` nests
+      // inside another, so the non-greedy close is the right one.
+      const shareRows = (body: string): string[] =>
+        [...body.matchAll(/<li[^>]*data-slot="share-row"[\s\S]*?<\/li>/g)].map(
+          (match) => match[0],
+        );
+
+      // `page` is this record as it stood before the grant — the baseline the
+      // revoke has to return to, whatever `verify:sharing` left live on it.
+      // Reported, because a baseline of zero would make the two assertions
+      // below agree with the broken ones they replaced, and a reader should
+      // be able to see which case this run actually exercised.
+      const before = shareRows(page.body);
+      console.log(`  --    ${locale}: ${before.length} live share(s) before the grant`);
 
       const grant = envelopeOf(grantForm);
       grant.set("sharedWithUserId", recipient);
       const granted = await post(grant);
       check(
-        `${locale}: *** granting a share answers 200, not 500 *** [07 B1]`,
+        `${locale}: *** granting a share answers 200, not 500 *** [S99]`,
         granted === 200,
         `got ${granted}`,
       );
 
       const afterGrant = await get(jar, `/${locale}/companies/${id}`);
-      check(
-        `${locale}: the record now lists who holds it [25 §30]`,
-        afterGrant.body.includes('data-slot="share-row"'),
+      const grantedRow = shareRows(afterGrant.body).find((row) =>
+        row.includes(recipientName),
       );
-
-      const revokeForm = afterGrant.body.match(
-        /<li[^>]*data-slot="share-row"[\s\S]*?<form[\s\S]*?<\/form>/,
-      )?.[0];
       check(
-        `${locale}: each row carries a revoke control [07 B1]`,
+        `${locale}: the record now lists WHO holds it, by name [S96]`,
+        Boolean(grantedRow),
+        `no share row names ${recipientName}`,
+      );
+      if (!grantedRow) continue;
+
+      const revokeForm = grantedRow.match(/<form[\s\S]*?<\/form>/)?.[0];
+      check(
+        `${locale}: that row carries a revoke control [S100]`,
         Boolean(revokeForm),
       );
       if (!revokeForm) continue;
 
       const revoked = await post(envelopeOf(revokeForm));
       check(
-        `${locale}: *** revoking answers 200, not 500 *** [12 §7]`,
+        `${locale}: *** revoking answers 200, not 500 *** [S100]`,
         revoked === 200,
         `got ${revoked}`,
       );
 
-      const afterRevoke = await get(jar, `/${locale}/companies/${id}`);
+      // Both halves, and neither is the list being empty: the row it revoked
+      // is gone, and every row it did NOT revoke survives. The second is what
+      // proves it revoked the right one `S100`.
+      const after = shareRows((await get(jar, `/${locale}/companies/${id}`)).body);
       check(
-        `${locale}: the revoked row leaves the live list [12 §7]`,
-        !afterRevoke.body.includes('data-slot="share-row"'),
+        `${locale}: the row it revoked leaves the live list [S100]`,
+        !after.some((row) => row.includes(recipientName)),
+      );
+      check(
+        `${locale}: shares it did not revoke are untouched [S100]`,
+        after.length === before.length,
+        `${before.length} live before the grant, ${after.length} after the revoke`,
       );
     }
 
@@ -1186,7 +1237,7 @@ async function main(): Promise<void> {
     if (repCompany) {
       const repPage = await get(repJar, `/en/companies/${repCompany}`);
       check(
-        "a rep is NOT offered the grant form — no can_share [07 B1]",
+        "a rep is NOT offered the grant form — no can_share [S96]",
         !repPage.body.includes('data-slot="sharing-grant"'),
       );
     } else {
@@ -1194,7 +1245,10 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log("\n11. The next follow-up date, set and cleared for real [25 §18]");
+  // `OPEN — no rule`: nothing in SPEC or DESIGN covers a manually set next
+  // follow-up date; archived as `[25 §18]`. `S91` may delete the machinery
+  // outright in the waiting-list rebuild.
+  console.log("\n11. The next follow-up date, set and cleared for real [OPEN — no rule]");
   {
     // **`verify:followups` drives `setNextFollowUp`; this drives the FORM.**
     // The two do not overlap: the in-process script never touches
@@ -1236,7 +1290,7 @@ async function main(): Promise<void> {
         const path = `/${locale}/${anchor.section}/${id}`;
         const page = await get(jar, path);
         check(
-          `${locale}: the ${anchor.label} screen carries the panel [25 §18]`,
+          `${locale}: the ${anchor.label} screen carries the panel [OPEN — no rule]`,
           page.body.includes('data-slot="next-follow-up"'),
         );
 
@@ -1269,14 +1323,14 @@ async function main(): Promise<void> {
         set.set("nextFollowUpAt", future);
         const stored = await post(set);
         check(
-          `${locale}: *** dating a ${anchor.label} answers 200, not 500 *** [25 §18]`,
+          `${locale}: *** dating a ${anchor.label} answers 200, not 500 *** [OPEN — no rule]`,
           stored === 200,
           `got ${stored}`,
         );
 
         const afterSet = await get(jar, path);
         check(
-          `${locale}: the ${anchor.label} panel now names who set it [20 §8.1]`,
+          `${locale}: the ${anchor.label} panel now names who set it [OPEN — no rule]`,
           afterSet.body.includes('data-slot="next-follow-up-set-by"'),
         );
 
@@ -1302,7 +1356,7 @@ async function main(): Promise<void> {
 
         const cleared = await post(envelopeOf(clearForm));
         check(
-          `${locale}: *** clearing answers 200, not 500 *** [25 §18]`,
+          `${locale}: *** clearing answers 200, not 500 *** [OPEN — no rule]`,
           cleared === 200,
           `got ${cleared}`,
         );
@@ -1490,7 +1544,7 @@ async function main(): Promise<void> {
 
       const saudiDetail = await get(jar, created.location.replace(BASE, ""));
       check(
-        `${locale}: *** a Saudi company KEPT the posted region *** [15 §4]`,
+        `${locale}: *** a Saudi company KEPT the posted region *** [S15]`,
         factOf(saudiDetail.body, "region") !== DASH,
         `region reads "${factOf(saudiDetail.body, "region")}"`,
       );
@@ -1798,7 +1852,7 @@ async function main(): Promise<void> {
 
       // What the POST actually did, read back off the screen: the form is
       // offered only while the payment is unconfirmed, so its absence is the
-      // confirmation — and the chain strip agrees, at `paid` `[22 §6.6]`.
+      // confirmation — and the chain strip agrees, at `paid` `D27` `D29`.
       const paid = await get(repJar, threadPath);
       check(
         `${locale}: the rep's payment POST confirmed it [S73]`,
