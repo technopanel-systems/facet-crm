@@ -244,7 +244,7 @@ sometimes need to quote before a project exists.
 **S52.** Raising creates a **thread** with **version 1**, status `requested`, no
 SMAC number.
 
-**S53. [CHANGE]** A product line carries supplier, class, fire rating, colour,
+**S53.** A product line carries supplier, class, fire rating, colour,
 thickness, width, length and number of pieces, **displayed as ordinary readable
 fields**. FACET does not reproduce SMAC's code format — optimise for fast, clear
 entry.
@@ -258,7 +258,7 @@ typed.
 **S56.** **Unit price is per square metre.** Line total = unit price × square
 metres.
 
-**S57. [CHANGE]** **VAT is fixed at 15% and is never editable.**
+**S57.** **VAT is fixed at 15% and is never editable.**
 
 **S58.** A line with no price contributes nothing and the screen says so, rather
 than showing a total quietly missing a line.
@@ -289,7 +289,7 @@ conversion figure may treat it as won.
 **S66.** A **revision** creates the next version carrying an RE number, and
 supersedes the previous one.
 
-**S67. [CHANGE]** **Validity is a note, not a gate.** An expired quotation is
+**S67.** **Validity is a note, not a gate.** An expired quotation is
 shown as expired and **stops nothing**. Availability depends on the rep, the
 company and the situation, so no rule is built on it.
 

@@ -47,7 +47,8 @@ import { readFields, ruleErrorState, type FormState } from "@/lib/validation";
  * `colour_id` with it are gone since feature slice 6 `[26 §2]`.
  *
  * `sqm`, `line_total` and `vat_amount` are not read from the form at all —
- * FACET computes them `[16 §1]`.
+ * FACET computes them `[16 §1]`. **Nor is the VAT rate**, which the form no
+ * longer offers and no column holds: it is fixed at 15% `S57`.
  */
 function readLine(
   fields: ReturnType<typeof readFields>,
@@ -72,7 +73,6 @@ function readLine(
     lengthM: at("lengthM"),
     quantityPcs: at("quantityPcs"),
     unitPrice: at("unitPrice") || null,
-    vatRate: at("vatRate") || null,
   };
 
   // Shape only. Whether the ids exist, and whether this identity may use them,
@@ -92,13 +92,8 @@ function readLine(
     if (!value) fields.fail(name, "validation.required");
     else if (!/^\d+(\.\d+)?$/.test(value)) fields.fail(name, "validation.notANumber");
   }
-  for (const [name, value] of [
-    ["unitPrice", line.unitPrice],
-    ["vatRate", line.vatRate],
-  ] as const) {
-    if (value && !/^\d+(\.\d+)?$/.test(value)) {
-      fields.fail(name, "validation.notANumber");
-    }
+  if (line.unitPrice && !/^\d+(\.\d+)?$/.test(line.unitPrice)) {
+    fields.fail("unitPrice", "validation.notANumber");
   }
 
   return line;

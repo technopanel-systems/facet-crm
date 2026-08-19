@@ -309,7 +309,6 @@ async function main(): Promise<void> {
     lengthM: "5.8000",
     quantityPcs: "12.0000", // 86.3040 m²
     unitPrice: "120.00",
-    vatRate: "15.00",
   };
   const version = {
     validUntil: "2031-01-01",

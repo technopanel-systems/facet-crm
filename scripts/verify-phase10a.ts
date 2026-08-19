@@ -105,7 +105,6 @@ import {
   unresolvedCount,
   type NotificationAnchorType,
 } from "@/lib/notifications";
-import { extendValidity } from "@/lib/quotations";
 import { createReport, today } from "@/lib/reports";
 import {
   CATALOGUE_NO_RESPONSE_KEY,
@@ -296,7 +295,6 @@ async function main(): Promise<void> {
     tier: "act_now" | "digest";
     persistent: boolean;
   }[] = [
-    { key: NOTIFICATION_TYPES.quotationExpired, tier: "act_now", persistent: true },
     { key: NOTIFICATION_TYPES.recordAssigned, tier: "act_now", persistent: true },
     // NOT persistent: no anchor, no completion condition `[21 §4, §5]`.
     { key: NOTIFICATION_TYPES.recordHandedOver, tier: "act_now", persistent: false },
@@ -955,16 +953,25 @@ async function main(): Promise<void> {
     `got ${strangerDigests.length}`,
   );
 
-  /* --- 10. Persistence [07 G1], [21 §4] ----------------------------- */
+  /* --- 10. Persistence [07 G1], [21 §4] ------------------------- */
 
   console.log("\n10. Persistence: raised once, and reading is not resolving");
 
-  // The expiry sweep is what raises this one; the thread's validity is already
-  // in the past, so the sweep expires it and notifies the raiser `[07 C7]`.
-  await sweepNotifications();
-  await sweepNotifications();
+  // **This used to ride on `quotation.expired`.** `S67` deleted that type with
+  // the state behind it, so the same four claims are made on `record.assigned`
+  // instead: act-now, persistent, anchored to one record. They were never
+  // claims about expiry — they are claims about the notification table, and
+  // the type was only ever the vehicle.
+  //
+  // `reassignCompany` raises unconditionally, so calling it twice attempts two
+  // raises for the same recipient and record. `notifications_live_key` — the
+  // partial unique index over unresolved rows with a `record_id` — is what
+  // must keep exactly one.
+  const persistCompany = await makeCompany("persist", 1);
+  await reassignCompany(manager, persistCompany.id, ownerUser.id);
+  await reassignCompany(manager, persistCompany.id, ownerUser.id);
 
-  const expiredRows = await db
+  const assignedRows = await db
     .select()
     .from(notifications)
     .innerJoin(
@@ -974,24 +981,24 @@ async function main(): Promise<void> {
     .where(
       and(
         eq(notifications.recipientUserId, ownerUser.id),
-        eq(notificationTypes.key, NOTIFICATION_TYPES.quotationExpired),
-        eq(notifications.recordId, quotedOver.thread.id),
+        eq(notificationTypes.key, NOTIFICATION_TYPES.recordAssigned),
+        eq(notifications.recordId, persistCompany.id),
       ),
     );
   check(
-    "two sweeps raise ONE expiry notification — notifications_live_key [21 §10]",
-    expiredRows.length === 1,
-    `got ${expiredRows.length}`,
+    "two assignments raise ONE notification - notifications_live_key [21 §10]",
+    assignedRows.length === 1,
+    `got ${assignedRows.length}`,
   );
 
-  const expiredId = expiredRows[0]?.notifications.id;
-  if (expiredId) {
+  const persistedId = assignedRows[0]?.notifications.id;
+  if (persistedId) {
     const before = await unresolvedCount(owner);
-    await markRead(owner, expiredId);
+    await markRead(owner, persistedId);
     const [afterRead] = await db
       .select()
       .from(notifications)
-      .where(eq(notifications.id, expiredId));
+      .where(eq(notifications.id, persistedId));
     check(
       "marking read sets read_at [07 G1]",
       afterRead?.readAt !== null,
@@ -1018,7 +1025,6 @@ async function main(): Promise<void> {
    * anchor added with no way to clear it fails here.
    */
   const anchorsByType: Record<string, NotificationAnchorType[]> = {
-    [NOTIFICATION_TYPES.quotationExpired]: ["quotation_thread"],
     [NOTIFICATION_TYPES.recordAssigned]: ["company"],
     // `record_shares` permits three more record types, but no visibility filter
     // reads a share on them, so none is ever raised `[21 §3]`.
@@ -1057,17 +1063,11 @@ async function main(): Promise<void> {
 
   console.log("\n    …and each condition is reachable, not merely stated");
 
-  // Expiry: `07 C7`'s own remedy clears it.
-  await extendValidity(manager, quotedOver.thread.id, shiftDays(today(), 30));
-  await sweepNotifications();
-  const [expiryAfterExtend] = expiredId
-    ? await db.select().from(notifications).where(eq(notifications.id, expiredId))
-    : [];
-  check(
-    "extending the quotation resolves its expiry notification [07 C7], [21 §3]",
-    expiryAfterExtend?.resolvedAt !== null,
-    `got ${expiryAfterExtend?.resolvedAt}`,
-  );
+  // **The expiry case is gone.** It read: extend the quotation, sweep, and the
+  // `quotation.expired` notification resolves. `S67` removed the type, the
+  // sweep step that raised it and the state it watched, so there is no
+  // condition left to reach. `extendValidity` still exists and still moves the
+  // date — it just no longer clears anything, because nothing was set.
 
   // Assignment and share: an interaction against the anchor's company clears
   // them, on all three anchors. `share.granted` has no producer yet `[21 §11]`,

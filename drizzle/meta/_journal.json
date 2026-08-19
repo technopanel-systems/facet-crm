@@ -99,6 +99,13 @@
       "when": 1787076864736,
       "tag": "0013_project_at_dispatch",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1787127535282,
+      "tag": "0014_vat_fixed_validity_note",
+      "breakpoints": true
     }
   ]
 }

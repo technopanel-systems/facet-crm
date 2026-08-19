@@ -38,16 +38,6 @@ export type NotificationTypeSeed = {
 
 export const NOTIFICATION_TYPE_SEED: NotificationTypeSeed[] = [
   {
-    // `07 C7` — "on expiry, notify the rep". Raised by the expiry sweep.
-    // Clears when the thread is extended or revised, or reaches another end
-    // state — the two follow-on actions `07 C7` itself offers `[21 §3]`.
-    key: NOTIFICATION_TYPES.quotationExpired,
-    nameEn: "Quotation expired",
-    nameAr: "انتهت صلاحية عرض السعر",
-    tier: "act_now",
-    isPersistent: true,
-  },
-  {
     // `07 E5`, `07 G1` — "a lead assigned to you", "a manager assignment".
     // Clears when the recipient logs an interaction against the company
     // `[21 §3]`: a first view is a click by another name, which `07 G1`

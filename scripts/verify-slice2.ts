@@ -46,7 +46,7 @@
 
 process.loadEnvFile(".env");
 
-import { and, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { closeDatabase, db } from "@/db";
 import {
@@ -59,12 +59,13 @@ import {
   productThicknesses,
   projectCompanies,
   projects,
-  quotationVersions,
+  quotationThreads,
   roles,
   serviceTypes,
   users,
 } from "@/db/schema";
 import type { AuthSession } from "@/lib/authz";
+import { chainState } from "@/lib/chain";
 import { getCompany } from "@/lib/companies";
 import { SAUDI_CODE } from "@/lib/enums";
 import { listCountries } from "@/lib/lookups";
@@ -76,12 +77,10 @@ import {
   confirmPayment,
   createQuotationThread,
   createRevision,
-  expireOverdueThreads,
   getQuotationThread,
   issueVersion,
   listQuotationThreads,
   markAcceptedForProcessing,
-  productDisplayName,
   updateQuotationLine,
 } from "@/lib/quotations";
 
@@ -234,42 +233,14 @@ async function main(): Promise<void> {
     origin: "self_registered",
   });
 
-  /* --- 1. The generated product name ----------------------------- */
+  /* --- 1. A line reads as ordinary fields ----------------------- */
 
-  console.log("\n1. Generated product name [08 B1, D1]");
-  check(
-    "4 mm is omitted",
-    productDisplayName({
-      supplierCode: "N",
-      classCode: "CA",
-      fireRatingCode: "FR",
-      customColour: "168",
-      thicknessMm: "4.00",
-      thicknessIsStandard: true,
-    }) === "N- CA FR 168",
-  );
-  check(
-    "5 mm is written",
-    productDisplayName({
-      supplierCode: "N",
-      classCode: "CA",
-      fireRatingCode: "FR",
-      customColour: "168",
-      thicknessMm: "5.00",
-      thicknessIsStandard: false,
-    }) === "N- CA FR 168 5mm",
-  );
-  check(
-    "a RAL or Pantone special reads the same way [12 §12], [26 §2]",
-    productDisplayName({
-      supplierCode: "N",
-      classCode: "CA",
-      fireRatingCode: "FR",
-      customColour: "RAL 9016",
-      thicknessMm: "4.00",
-      thicknessIsStandard: true,
-    }) === "N- CA FR RAL 9016",
-  );
+  // `S53` — FACET does not reproduce SMAC's code format. There used to be a
+  // `productDisplayName` here, asserted against three golden strings:
+  // `"N- CA FR 168"`, `"N- CA FR 168 5mm"` and `"N- CA FR RAL 9016"`. That
+  // function reassembled a real SMAC code, and the form was laid out to match
+  // it. Both are gone; what a line carries is asserted in section 2 below,
+  // where the parts arrive from the data layer as parts.
 
   /* --- 2. The request IS version 1 ------------------------------- */
 
@@ -296,7 +267,6 @@ async function main(): Promise<void> {
         lengthM: "5.8000",
         quantityPcs: "12.0000",
         unitPrice: "120.00",
-        vatRate: "15.00",
       },
     ],
     [],
@@ -308,9 +278,18 @@ async function main(): Promise<void> {
   check("no SMAC reference yet", detail?.live.smacReference === null);
   check("origin is initial_request", detail?.live.origin === "initial_request");
   check("no end state", detail?.endState === null);
+  // `S53` — the readable parts, straight from the data layer. Every one is
+  // present and none is a code token: the supplier reads as its own name, the
+  // thickness carries its unit, the colour is whatever was typed.
+  const first = detail!.live.lines[0];
   check(
-    "the app wrote form_factor = sheet [13 §2]",
-    detail?.live.lines.every((line) => line.displayName.length > 0) === true,
+    "a line carries its parts as parts [S53]",
+    first.supplierNameEn.length > 0 &&
+      first.classNameEn.length > 0 &&
+      first.fireRatingNameEn.length > 0 &&
+      first.thicknessMm === "4" &&
+      first.customColour === "168",
+    `${first.supplierNameEn} / ${first.classNameEn} / ${first.fireRatingNameEn} / ${first.thicknessMm} / ${first.customColour}`,
   );
 
   /* --- 3. The arithmetic, against quotation 9592 ----------------- */
@@ -405,7 +384,6 @@ async function main(): Promise<void> {
         lengthM: "5.8000",
         quantityPcs: "13.0000",
         unitPrice: "120.00",
-        vatRate: "15.00",
       }),
   );
 
@@ -443,7 +421,6 @@ async function main(): Promise<void> {
     lengthM: "5.8000",
     quantityPcs: "12.0000",
     unitPrice: "120.00",
-    vatRate: "15.00",
   });
   detail = await getQuotationThread(repA, thread.id);
   check("two lines now", detail?.live.lines.length === 2);
@@ -453,9 +430,9 @@ async function main(): Promise<void> {
     `got ${detail?.live.totalExclVat}`,
   );
   check(
-    "the 5 mm line writes its thickness into the name",
-    detail?.live.lines.some((l) => l.displayName.endsWith("mm")) === true,
-    detail?.live.lines.map((l) => l.displayName).join(" | "),
+    "the 5 mm line reports its own thickness [S53]",
+    detail?.live.lines.some((l) => l.thicknessMm === "5") === true,
+    detail?.live.lines.map((l) => l.thicknessMm).join(" | "),
   );
   await refuses(
     "a line with no colour is refused [12 §12], [26 §2]",
@@ -471,7 +448,6 @@ async function main(): Promise<void> {
         lengthM: "5.8000",
         quantityPcs: "1.0000",
         unitPrice: null,
-        vatRate: null,
       }),
   );
 
@@ -598,50 +574,34 @@ async function main(): Promise<void> {
             lengthM: "5.8000",
             quantityPcs: "1.0000",
             unitPrice: null,
-            vatRate: null,
           },
         ],
         [],
       ),
   );
 
-  /* --- 12. Expiry ------------------------------------------------- */
+  /* --- 12. *** Validity stops nothing *** ------------------------ */
 
-  console.log("\n12. Expiry [07 C7], [16 §3], [16 §7]");
-  await db
-    .update(quotationVersions)
-    .set({ validUntil: "2020-01-01" })
-    .where(
-      and(
-        eq(quotationVersions.threadId, thread.id),
-        eq(quotationVersions.status, "requested"),
-      ),
-    );
-  await expireOverdueThreads();
-  detail = await getQuotationThread(repA, thread.id);
-  check("an overdue thread is marked expired", detail?.endState === "expired");
+  console.log("\n12. *** An expired quotation stops nothing *** [S67]");
 
-  const [expiryEntry] = await db
-    .select()
-    .from(auditLog)
-    .where(
-      and(
-        eq(auditLog.action, "quotation_thread.expired"),
-        eq(auditLog.entityId, thread.id),
-      ),
-    )
-    .limit(1);
-  check("the expiry audit row exists", Boolean(expiryEntry));
-  check(
-    "and its actor is the system, not the reader [16 §3]",
-    expiryEntry?.actorUserId === null,
-  );
-
-  // A paid thread must not expire `[16 §7]`.
-  const paid = await createQuotationThread(
+  // Put the live version's validity a long way in the past. Until `S67` this
+  // was enough, on the very next read, to write `end_state = 'expired'` and
+  // with it freeze the lines, close the chain, drop the thread out of the
+  // follow-up queues and raise a persistent notification. The whole point of
+  // this section is that a date now changes nothing but what a screen says.
+  // **Its own thread, deliberately.** Section 14 asserts that `thread` has
+  // been accepted and still carries no payment, so this section may not issue,
+  // accept or pay that one. It raises an expired thread of its own and drives
+  // the whole chain on it.
+  const stale = await createQuotationThread(
     repA,
     { projectId: project.id, companyId: company.id, contactId: null },
-    { validUntil: "2020-01-01", deliveryPeriod: null, paymentMethod: null, shipmentTerms: null },
+    {
+      validUntil: "2020-01-01",
+      deliveryPeriod: null,
+      paymentMethod: null,
+      shipmentTerms: null,
+    },
     [
       {
         supplierId: supplier.id,
@@ -651,39 +611,118 @@ async function main(): Promise<void> {
         thicknessId: thickness.id,
         widthM: "1.2400",
         lengthM: "5.8000",
-        quantityPcs: "1.0000",
+        quantityPcs: "2.0000",
         unitPrice: "100.00",
-        vatRate: "15.00",
       },
     ],
     [],
   );
-  await confirmPayment(repA, paid.id, "2026-08-09");
-  await expireOverdueThreads();
-  const paidDetail = await getQuotationThread(repA, paid.id);
+
+  let stale_ = await getQuotationThread(repA, stale.id);
   check(
-    "a payment-confirmed thread does NOT expire [16 §7]",
-    paidDetail?.endState === null,
-    `got ${paidDetail?.endState}`,
+    "reading it does NOT close the thread [S67]",
+    stale_?.endState === null,
   );
   check(
-    "payment recorded the person who confirmed it",
-    paidDetail?.paymentConfirmedByUserId === repA.user.id,
-  );
-  await markAcceptedForProcessing(repA, paid.id);
-  check(
-    "accepted-for-processing is allowed after payment",
-    (await getQuotationThread(repA, paid.id))?.acceptedForProcessingAt !== null,
+    "and it IS reported as expired [S67]",
+    stale_?.live.expired === true,
+    `got ${stale_?.live.expired}`,
   );
 
-  /* --- 13. Revising an expired thread revives it ------------------ */
+  // A read that writes is the specific defect `S67` removes. `expired` is
+  // derived, so two reads in a row must leave the row exactly as it was.
+  const beforeRead = await db
+    .select({ endState: quotationThreads.endState })
+    .from(quotationThreads)
+    .where(eq(quotationThreads.id, stale.id));
+  await listQuotationThreads(repA);
+  await getQuotationThread(repA, stale.id);
+  const afterRead = await db
+    .select({ endState: quotationThreads.endState })
+    .from(quotationThreads)
+    .where(eq(quotationThreads.id, stale.id));
+  check(
+    "*** reading a quotation writes nothing to it *** [S67]",
+    beforeRead[0].endState === null && afterRead[0].endState === null,
+    `${beforeRead[0].endState} -> ${afterRead[0].endState}`,
+  );
 
-  console.log("\n13. Revise revives an expired thread [07 C7]");
-  await createRevision(repA, thread.id, "expiry_revision");
-  detail = await getQuotationThread(repA, thread.id);
-  check("the end state cleared", detail?.endState === null);
-  check("live version is 3", detail?.live.versionNumber === 3);
-  check("origin is expiry_revision", detail?.live.origin === "expiry_revision");
+  const listed = await listQuotationThreads(repA);
+  check(
+    "the list reports expiry too, resolved in SQL [S67]",
+    listed.rows.find((row) => row.id === stale.id)?.expired === true,
+  );
+
+  // `S61` — lines are editable while the live version is `requested` and the
+  // thread is open. An expired thread IS open, so this must be allowed. It was
+  // refused with `quotations.errors.threadClosed` before this slice.
+  await addQuotationLine(repA, stale.id, {
+    supplierId: supplier.id,
+    classId: productClass.id,
+    fireRatingId: fireRating.id,
+    customColour: "expired-line",
+    thicknessId: thickness.id,
+    widthM: "1.2400",
+    lengthM: "5.8000",
+    quantityPcs: "1.0000",
+    unitPrice: "100.00",
+  });
+  stale_ = await getQuotationThread(repA, stale.id);
+  check(
+    "an expired quotation still takes a new line [S61], [S67]",
+    stale_?.live.lines.some((l) => l.customColour === "expired-line") === true,
+  );
+
+  // The rest of the chain, on the same expired thread: issued, accepted, paid.
+  // Dispatch is `verify:slice3`'s subject and is not re-driven here.
+  await issueVersion(coordinator, stale.id, {
+    smacReference: `${stamp}-EXP`.slice(-24),
+    verification: "verified",
+  });
+  stale_ = await getQuotationThread(repA, stale.id);
+  check(
+    "an expired quotation can still be issued [S67]",
+    stale_?.live.status === "issued",
+  );
+
+  await acceptThread(coordinator, stale.id);
+  await confirmPayment(repA, stale.id, "2026-08-19");
+  stale_ = await getQuotationThread(repA, stale.id);
+  check(
+    "accepted, on an expired quotation [S67]",
+    stale_?.endState === "accepted",
+  );
+  check("and paid [S67]", stale_?.paymentConfirmedAt !== null);
+  check(
+    "which leaves it still expired — a note, not a state [S67]",
+    stale_?.live.expired === true,
+  );
+
+  /* --- 13. Whose move it is, on an expired quotation -------------- */
+
+  console.log(
+    "\n13. An expired quotation still names whose move it is [S67], [D2]",
+  );
+
+  // `chain.ts` sent every ended thread to `closed`, where `owedBy` is null:
+  // nobody owes the next action on a finished quotation. Expiry used to reach
+  // that branch, so a date could silently take a live deal off everybody's
+  // list. Accepted and paid, this thread is the coordinator's to dispatch.
+  const expiredChain = chainState({
+    versionStatus: stale_!.live.status,
+    endState: stale_!.endState,
+    paymentConfirmedAt: stale_!.paymentConfirmedAt,
+  });
+  check(
+    "*** it is somebody's move, not nobody's *** [S67], [D2]",
+    expiredChain.owedBy !== null,
+    `position ${expiredChain.position}, owedBy ${expiredChain.owedBy}`,
+  );
+  check(
+    "and its position is a real one, not closed [S67]",
+    expiredChain.position !== "closed",
+    `got ${expiredChain.position}`,
+  );
 
   /* --- 14. Acceptance is internal approval only ------------------- */
 

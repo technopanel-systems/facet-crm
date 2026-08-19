@@ -412,3 +412,10 @@ page. Since S12 and S19 a company or contact name is one field written in
 English or Arabic, so an Arabic name must read correctly on an English page.
 This is the converse of the `dir="ltr"` rule, which only ever covered LTR
 content — references, decimals, dates — inside Arabic.
+
+**D63.** A **repeating entry row** — quotation lines, report signals, handover
+buckets — is the one place a form is not a single column `D24`. Its fields are
+grouped by the kind of question they ask, separated by a rule and **never by a
+section label**: a label repeated on every row is noise, not structure.
+Standard values are prefilled, so the row shows what is actually being typed. A
+computed value is never an input, and is not shown until the row exists.

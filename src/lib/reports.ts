@@ -703,9 +703,9 @@ export function today(): string {
  *
  * The greatest `on_hold_until` among its visible reports that has not passed.
  * Nothing is stored on the company, so correcting the report corrects the
- * suppression with nothing to keep in step `[20 §5]` — the same shape as the
- * quotation expiry sweep. A date in the past is simply not in force; the row
- * stays, because it is what happened.
+ * suppression with nothing to keep in step `[20 §5]` — the same shape as
+ * quotation validity since `S67`. A date in the past is simply not in force;
+ * the row stays, because it is what happened.
  */
 export async function companyOnHoldUntil(
   session: AuthSession,

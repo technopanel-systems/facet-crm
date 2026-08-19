@@ -38,6 +38,9 @@
  *      the other branch on the same thread: dispatching again takes the
  *      project it gained, and naming a different one is refused as a message.
  *
+ *  15. `S67` and `S57` over HTTP: reading a quotation whose validity has
+ *      passed does **not** write to it, and the line form offers no VAT rate.
+ *
  * This was 11 sections until feature slice 6: the old item 11 (the
  * message-key scan) is now section 12, and section 11 above — the
  * follow-up-date replay — existed in the code for a phase but was never
@@ -1747,14 +1750,10 @@ async function main(): Promise<void> {
       quotationFields.set("lengthM", "2.4");
       quotationFields.set("quantityPcs", "10");
       quotationFields.set("unitPrice", "95");
-      // Whatever the form itself defaults to — `S57` fixes it, and that is a
-      // different rule's slice.
-      quotationFields.set(
-        "vatRate",
-        quotationForm
-          .match(/<input[^>]*name="vatRate"[^>]*>/)?.[0]
-          ?.match(/value="([^"]*)"/)?.[1] ?? "15",
-      );
+      // **No VAT field is posted, because the form offers none** `S57`.
+      // This used to scrape the form's own default. Section 12 below
+      // asserts the input is gone rather than trusting that it is.
+
 
       const raised = await post(
         repJar,
@@ -1968,6 +1967,186 @@ async function main(): Promise<void> {
       leaked.size === leakedBefore,
       [...leaked.keys()].slice(leakedBefore).join(", "),
     );
+  }
+
+  console.log(
+    "\n15. Reading an expired quotation writes nothing to it [S67], [S57]",
+  );
+  {
+    // **The assertion that only works over HTTP.** `expireOverdueThreads` ran
+    // inside `listQuotationThreads` and `getQuotationThread`, so merely
+    // OPENING a quotation screen wrote `end_state = 'expired'` on any thread
+    // past its date. An in-process check can call the data layer and see the
+    // same thing, but this is the shape the defect actually had: a GET that
+    // mutates. So the walk is a real one, over the real routes, and what is
+    // asserted afterwards is the STORED value — not the rendered page, which
+    // would pass even if the write were still happening.
+    //
+    // **This file never imports `src/`**, and does not start now: `endStateOf`
+    // reads the row with the Postgres driver in raw SQL, so nothing about the
+    // assertion can be satisfied by the same code it is testing.
+    const repJar = jars["rep-a@example.test"];
+    const stamp = `${Date.now()}`.slice(-7);
+
+    const newCompany = await get(repJar, "/en/companies/new");
+    const companyForm = newCompany.body.match(
+      /<form[^>]*data-slot="form-shell"[\s\S]*?<\/form>/,
+    )?.[0];
+    const saudiId = newCompany.body
+      .match(/<select[^>]*name="countryId"[\s\S]*?<\/select>/)?.[0]
+      ?.match(/<option value="([0-9a-f-]{36})"[^>]*data-code="SA"/)?.[1];
+
+    const newQuotation = await get(repJar, "/en/quotations/new");
+    const quotationForm = newQuotation.body.match(
+      /<form[^>]*data-slot="form-shell"[\s\S]*?<\/form>/,
+    )?.[0];
+
+    // `S57` — the input is gone from the markup, not merely ignored by the
+    // action. A field the form still renders is a field a rep can still fill.
+    check(
+      "the line form offers NO VAT rate input [S57]",
+      Boolean(quotationForm) && !quotationForm!.includes('name="vatRate"'),
+    );
+
+    if (companyForm && saudiId && quotationForm) {
+      const envelopeOf = (form: string): FormData => {
+        const fields = new FormData();
+        for (const input of form.matchAll(/<input[^>]*>/g)) {
+          const name = input[0].match(/name="([^"]+)"/)?.[1];
+          if (!name?.startsWith("$ACTION")) continue;
+          fields.append(
+            name,
+            unescapeHtml(input[0].match(/value="([^"]*)"/)?.[1] ?? ""),
+          );
+        }
+        return fields;
+      };
+      const postTo = async (jar: Jar, path: string, body: FormData) => {
+        const response = await fetch(`${BASE}${path}`, {
+          method: "POST",
+          headers: { cookie: header(jar), origin: BASE },
+          body,
+          redirect: "manual",
+        });
+        store(jar, response);
+        return {
+          status: response.status,
+          location: response.headers.get("location") ?? "",
+        };
+      };
+
+      const companyFields = envelopeOf(companyForm);
+      companyFields.set("name", `s67-${stamp}`);
+      companyFields.set("phone", `+9665${stamp}90`);
+      companyFields.set("countryId", saudiId);
+      for (const empty of [
+        "cityId",
+        "region",
+        "vatNumber",
+        "categoryId",
+        "leadSourceId",
+        "notes",
+      ]) {
+        companyFields.set(empty, "");
+      }
+      const registered = await postTo(
+        repJar,
+        "/en/companies/new",
+        companyFields,
+      );
+      const companyId = registered.location.match(/[0-9a-f-]{36}/)?.[0];
+
+      const optionOf = (name: string) =>
+        quotationForm
+          .match(new RegExp(`<select[^>]*name="${name}"[\\s\\S]*?</select>`))?.[0]
+          ?.match(/<option value="([0-9a-f-]{36})"/)?.[1];
+      const line = {
+        supplierId: optionOf("supplierId"),
+        classId: optionOf("classId"),
+        fireRatingId: optionOf("fireRatingId"),
+        thicknessId: optionOf("thicknessId"),
+      };
+
+      if (!companyId || Object.values(line).some((id) => !id)) {
+        console.log("  skip  the fixture company or the product lookups");
+      } else {
+        const fields = envelopeOf(quotationForm);
+        fields.set("projectId", "");
+        fields.set("companyId", companyId);
+        fields.set("contactId", "");
+        // **Already expired when it is raised.** No sweep, no waiting.
+        fields.set("validUntil", "2020-01-01");
+        for (const empty of [
+          "deliveryPeriod",
+          "paymentMethod",
+          "shipmentTerms",
+        ]) {
+          fields.set(empty, "");
+        }
+        for (const [name, value] of Object.entries(line)) {
+          fields.set(name, value as string);
+        }
+        fields.set("customColour", "168");
+        fields.set("widthM", "1.24");
+        fields.set("lengthM", "5.8");
+        fields.set("quantityPcs", "3");
+        fields.set("unitPrice", "100");
+
+        const raised = await postTo(repJar, "/en/quotations/new", fields);
+        const threadId = raised.location.match(/[0-9a-f-]{36}/)?.[0];
+        check(
+          "a quotation raised with a past validity date is accepted [S67]",
+          raised.status === 303 && Boolean(threadId),
+          `got ${raised.status} ${raised.location}`,
+        );
+
+        if (threadId) {
+          // The two reads that used to expire it, in both locales, plus the
+          // list — which is where the sweep said it ran most often.
+          for (const locale of ["en", "ar"]) {
+            await get(repJar, `/${locale}/quotations`);
+            await get(repJar, `/${locale}/quotations/${threadId}`);
+          }
+
+          const stored = await endStateOf(threadId);
+          check(
+            "*** reading it over HTTP left end_state NULL *** [S67]",
+            stored === null,
+            `got ${String(stored)}`,
+          );
+
+          // And it is still shown as expired — the fact survives without the
+          // state, which is the whole of `S67` on one screen.
+          const detail = await get(repJar, `/en/quotations/${threadId}`);
+          check(
+            "and the screen still reports it as expired [S67]",
+            factHtmlOf(detail.body, "validUntil").includes("data-expired"),
+            factOf(detail.body, "validUntil"),
+          );
+        }
+      }
+    }
+  }
+}
+
+/**
+ * One quotation thread's `end_state`, read straight from Postgres.
+ *
+ * Deliberately raw SQL over the driver rather than through `src/lib` or
+ * `src/db`: the claim is that a GET does not write, and reading the answer
+ * through the same module under test would weaken it. `DATABASE_URL` is
+ * already in scope — every `verify:*` script runs with `--env-file=.env`.
+ */
+async function endStateOf(threadId: string): Promise<string | null> {
+  const { default: postgres } = await import("postgres");
+  const sql = postgres(process.env.DATABASE_URL ?? "", { max: 1 });
+  try {
+    const rows = await sql`
+      select end_state from quotation_threads where id = ${threadId}
+    `;
+    return (rows[0]?.end_state as string | null) ?? null;
+  } finally {
+    await sql.end({ timeout: 5 });
   }
 }
 

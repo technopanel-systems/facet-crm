@@ -95,8 +95,7 @@
     "quotationThreadEndState": {
       "accepted": "معتمد",
       "rejected": "مرفوض",
-      "cancelled": "ملغى",
-      "expired": "منتهي الصلاحية"
+      "cancelled": "ملغى"
     },
     "quotationVersionStatus": {
       "requested": "مطلوب",
@@ -164,7 +163,6 @@
       "comment": "تعليق"
     },
     "notificationType": {
-      "quotationExpired": "انتهت صلاحية عرض السعر",
       "recordAssigned": "أُسند إليك",
       "recordHandedOver": "تم تسليم عمل إليك",
       "shareGranted": "تمت مشاركته معك",
@@ -360,6 +358,7 @@
       "endState": "الحالة",
       "endStateOpen": "مفتوح",
       "validUntil": "صالح حتى",
+      "expired": "منتهي الصلاحية",
       "deliveryPeriod": "مدة التسليم",
       "paymentMethod": "طريقة الدفع",
       "shipmentTerms": "شروط الشحن",
@@ -390,7 +389,6 @@
       "sqm": "المساحة (م²)",
       "unitPrice": "السعر / م²",
       "lineTotal": "الإجمالي بدون ضريبة",
-      "vatRate": "نسبة الضريبة ٪",
       "vatAmount": "ضريبة القيمة المضافة",
       "service": "الخدمة",
       "serviceQuantity": "الكمية (م²)",
@@ -851,7 +849,6 @@
       "handoverUnknown": "تم تسليم عمل إليك.",
       "digestSummary": "{total} متابعات في {date}.",
       "digestLink": "فتح المتابعات",
-      "clearsThreadNoLongerExpired": "يزول عند تمديد عرض السعر أو مراجعته.",
       "clearsInteractionAgainstCompany": "يزول عند تسجيلك تواصلاً مع الشركة.",
       "mention": "أشار إليك {name} في تعليق.",
       "mentionUnknown": "أشار إليك أحدهم في تعليق.",

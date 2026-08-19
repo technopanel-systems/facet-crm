@@ -66,7 +66,6 @@ export default async function QuotationDetailPage({
   setRequestLocale(locale);
 
   const session = await requireSession();
-  // Also runs the expiry sweep `[16 §3]`.
   const thread = await getQuotationThread(session, id);
   if (!thread) notFound();
 
@@ -301,8 +300,18 @@ export default async function QuotationDetailPage({
             <Fact label={t("quotations.fields.origin")}>
               {t(`enums.quotationVersionOrigin.${live.origin}`)}
             </Fact>
-            <Fact label={t("quotations.fields.validUntil")}>
-              <span dir="ltr">{live.validUntil ?? dash}</span>
+            <Fact label={t("quotations.fields.validUntil")} name="validUntil">
+              <span dir="ltr" className="num">
+                {live.validUntil ?? dash}
+              </span>
+              {live.expired ? (
+                <span
+                  data-expired
+                  className="text-faint ms-2 text-xs font-normal"
+                >
+                  {t("quotations.fields.expired")}
+                </span>
+              ) : null}
             </Fact>
             {live.returnForEditRound > 0 ? (
               <Fact label={t("quotations.detail.returnedRounds")}>
@@ -447,6 +456,7 @@ export default async function QuotationDetailPage({
             isCoordinator={isCoordinator}
             liveStatus={live.status}
             endState={thread.endState}
+            expired={live.expired}
             nextVersionNumber={live.versionNumber + 1}
             paymentConfirmed={Boolean(thread.paymentConfirmedAt)}
             acceptedForProcessing={Boolean(thread.acceptedForProcessingAt)}

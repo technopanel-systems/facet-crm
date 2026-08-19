@@ -22,6 +22,8 @@ import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
 import { getQuotationVersion } from "@/lib/quotations";
 
+import { lineLabel } from "../../../line-display";
+
 export const dynamic = "force-dynamic";
 
 /**
@@ -85,6 +87,11 @@ export default async function QuotationVersionPage({
             </Fact>
             <Fact label={t("quotations.fields.validUntil")}>
               <span dir="ltr">{version.validUntil ?? dash}</span>
+              {version.expired ? (
+                <span className="text-faint ms-2 text-xs">
+                  {t("quotations.fields.expired")}
+                </span>
+              ) : null}
             </Fact>
             <Fact label={t("common.createdBy")}>
               {version.createdByName ?? t("common.unknownUser")}
@@ -107,19 +114,17 @@ export default async function QuotationVersionPage({
                   <TableHead className="text-start">
                     {t("quotations.detail.product")}
                   </TableHead>
-                  <TableHead className="text-start">
+                  <TableHead numeric>
                     {t("quotations.detail.quantityPcs")}
                   </TableHead>
-                  <TableHead className="text-start">
-                    {t("quotations.detail.sqm")}
-                  </TableHead>
-                  <TableHead className="text-start">
+                  <TableHead numeric>{t("quotations.detail.sqm")}</TableHead>
+                  <TableHead numeric>
                     {t("quotations.detail.unitPrice")}
                   </TableHead>
-                  <TableHead className="text-start">
+                  <TableHead numeric>
                     {t("quotations.detail.lineTotal")}
                   </TableHead>
-                  <TableHead className="text-start">
+                  <TableHead numeric>
                     {t("quotations.detail.vatAmount")}
                   </TableHead>
                 </TableRow>
@@ -127,22 +132,23 @@ export default async function QuotationVersionPage({
               <TableBody>
                 {version.lines.map((line) => (
                   <TableRow key={line.id}>
-                    <TableCell className="text-start" dir="ltr">
-                      {line.displayName}
+                    {/* Readable parts, not a rebuilt SMAC code `S53`. */}
+                    <TableCell className="text-start" dir="auto">
+                      {lineLabel(line, locale)}
                     </TableCell>
-                    <TableCell className="text-start" dir="ltr">
+                    <TableCell numeric dir="ltr">
                       {line.quantityPcs}
                     </TableCell>
-                    <TableCell className="text-start" dir="ltr">
+                    <TableCell numeric dir="ltr">
                       {line.sqm ?? dash}
                     </TableCell>
-                    <TableCell className="text-start" dir="ltr">
+                    <TableCell numeric dir="ltr">
                       {line.unitPrice ?? dash}
                     </TableCell>
-                    <TableCell className="text-start" dir="ltr">
+                    <TableCell numeric dir="ltr">
                       {line.lineTotal ?? dash}
                     </TableCell>
-                    <TableCell className="text-start" dir="ltr">
+                    <TableCell numeric dir="ltr">
                       {line.vatAmount ?? dash}
                     </TableCell>
                   </TableRow>

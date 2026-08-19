@@ -96,6 +96,7 @@ export function ThreadActions({
   isCoordinator,
   liveStatus,
   endState,
+  expired,
   nextVersionNumber,
   paymentConfirmed,
   acceptedForProcessing,
@@ -105,6 +106,8 @@ export function ThreadActions({
   isCoordinator: boolean;
   liveStatus: "requested" | "issued" | "superseded";
   endState: string | null;
+  /** Past its validity date — a display fact, never a state `S67`. */
+  expired: boolean;
   nextVersionNumber: number;
   paymentConfirmed: boolean;
   acceptedForProcessing: boolean;
@@ -133,17 +136,21 @@ export function ThreadActions({
   );
 
   // A revision's origin says which route produced it `[07 C2]`: the
-  // coordinator editing directly, or the rep asking for a change. When the
-  // quotation has expired it is `07 C7`'s "revise" instead.
-  const reviseOrigin =
-    endState === "expired"
-      ? "expiry_revision"
-      : isCoordinator
-        ? "coordinator_direct_edit"
-        : "rep_change_request";
+  // coordinator editing directly, or the rep asking for a change. Past its
+  // validity date it is a revision after expiry — read now from the date `S67`
+  // rather than from an end state, because there is no longer an end state to
+  // read. The origin stays: it records why a version exists, which is still
+  // true of a quotation whose price has gone stale.
+  const reviseOrigin = expired
+    ? "expiry_revision"
+    : isCoordinator
+      ? "coordinator_direct_edit"
+      : "rep_change_request";
 
-  // Expired is not final — `07 C7` offers extend or revise. Everything else is.
-  const open = !endState || endState === "expired";
+  // An end state is final, and expiry is no longer one `S67`. An expired
+  // quotation is simply open: it can still be issued, accepted, paid and
+  // dispatched, which is what "validity stops nothing" means on a screen.
+  const open = !endState;
 
   return (
     <div className="flex flex-col gap-6">

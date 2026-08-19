@@ -49,7 +49,6 @@ export default async function QuotationsPage({
   const viewerIsCoordinator = can(session, "canApproveQuotation");
 
   const currentPage = Number(page) || 1;
-  // Reading the list is also what expires overdue quotations `[16 §3]`.
   const { rows, total } = await listQuotationThreads(session, {
     q,
     page: currentPage,
@@ -156,9 +155,10 @@ export default async function QuotationsPage({
                         { name: row.raisedByName },
                       )}
                       // Uncoloured on purpose. No document sets a lateness
-                      // threshold for a quotation thread, and `16 §3`'s sweep
-                      // is what handles an overdue one — it expires on read,
-                      // so a live thread is never past its own date.
+                      // threshold for a quotation thread. A live thread CAN now
+                      // be past its own date — `S67` made validity a note, so
+                      // nothing closes on it — and that is shown in the
+                      // validity column rather than coloured in here.
                       elapsed={t("followUps.fields.days", {
                         count: daysSince(
                           row.paymentConfirmedAt ?? row.createdAt,
@@ -172,8 +172,25 @@ export default async function QuotationsPage({
                       {` · ${row.versionNumber}`}
                     </Badge>
                   </TableCell>
+                  {/* Expired is a fact about the date, shown beside it and
+                      never a state `S67`. Uncoloured: `D6` makes colour mean
+                      how long something has waited on somebody, and an expired
+                      quotation waits on nobody in particular — it stops
+                      nothing, so a red pill would be asking for an action the
+                      rule does not want. */}
                   <TableCell numeric dir="ltr">
-                    {row.validUntil ?? t("common.none")}
+                    {row.validUntil ? (
+                      <span className="inline-flex items-baseline gap-1.5">
+                        {row.validUntil}
+                        {row.expired ? (
+                          <span className="text-faint text-xs">
+                            {t("quotations.fields.expired")}
+                          </span>
+                        ) : null}
+                      </span>
+                    ) : (
+                      t("common.none")
+                    )}
                   </TableCell>
                   <TableCell numeric dir="ltr">
                     {row.grandTotal

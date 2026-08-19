@@ -38,12 +38,16 @@
  * and the after.
  *
  * **A note on the import graph.** This module imports `raise` from
- * `notifications.ts`, which imports `expireOverdueThreads` from
- * `quotations.ts`, which imports `insertComment` from here `[25 §13]`. That is
- * a cycle, and it is safe because every edge is a function called at runtime:
- * no module here reads another's binding while its body is still evaluating.
- * Keep it that way — a `const` initialised from an import across this cycle
- * would be a temporal-dead-zone crash at load, not a type error.
+ * `notifications.ts`, and `quotations.ts` imports `insertComment` from here
+ * `[25 §13]`. **It is no longer a cycle.** The third edge was
+ * `notifications.ts` importing `expireOverdueThreads` from `quotations.ts`,
+ * and `S67` deleted that function with the sweep it ran.
+ *
+ * The discipline that made the cycle safe is worth keeping anyway, because the
+ * chain is still there: every edge is a function called at runtime, and no
+ * module here reads another's binding while its body is still evaluating. A
+ * `const` initialised from an import across it would be a temporal-dead-zone
+ * crash at load, not a type error.
  */
 
 import { and, asc, eq, inArray } from "drizzle-orm";

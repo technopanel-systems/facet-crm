@@ -15,6 +15,7 @@ import {
   updateQuotationLineAction,
   updateServiceLineAction,
 } from "../actions";
+import { lineLabel, lineParts } from "../line-display";
 import {
   LineFields,
   ServiceFields,
@@ -38,19 +39,24 @@ import {
 export type LineRow = {
   id: string;
   supplierId: string;
+  supplierNameEn: string;
+  supplierNameAr: string;
   classId: string;
+  classNameEn: string;
+  classNameAr: string;
   fireRatingId: string;
+  fireRatingNameEn: string;
+  fireRatingNameAr: string;
   customColour: string | null;
   thicknessId: string;
+  thicknessMm: string;
   widthM: string;
   lengthM: string;
   quantityPcs: string;
   sqm: string | null;
   unitPrice: string | null;
   lineTotal: string | null;
-  vatRate: string | null;
   vatAmount: string | null;
-  displayName: string;
 };
 
 export type ServiceRow = {
@@ -69,7 +75,7 @@ function Money({ value, sar }: { value: string | null; sar: string }) {
   if (!value) return <span className="text-muted-foreground">—</span>;
   return (
     <span dir="ltr">
-      {value} {sar}
+      <span className="num">{value}</span> {sar}
     </span>
   );
 }
@@ -113,12 +119,25 @@ function ProductLine({
   return (
     <div className="flex flex-col gap-3 border-t py-4 first:border-t-0 first:pt-0">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <p className="text-start text-sm font-medium" dir="ltr">
-          {line.displayName}
+        {/* Supplier, class, fire rating, thickness, colour — set out as words
+            `S53`. This was one reassembled SMAC code until that rule. */}
+        <p className="flex flex-wrap items-baseline gap-x-2 text-start text-sm font-medium">
+          {lineParts(line, locale).map((part, index) => (
+            <span key={part + index} dir="auto">
+              {index > 0 ? (
+                <span aria-hidden className="text-faint me-2 font-normal">
+                  ·
+                </span>
+              ) : null}
+              {part}
+            </span>
+          ))}
         </p>
         <p className="text-muted-foreground text-start text-xs" dir="ltr">
-          {line.quantityPcs} × {line.widthM} × {line.lengthM} ={" "}
-          {line.sqm ?? "—"} {t("common.sqm")}
+          <span className="num">{line.quantityPcs}</span> ×{" "}
+          <span className="num">{line.widthM}</span> ×{" "}
+          <span className="num">{line.lengthM}</span> ={" "}
+          <span className="num">{line.sqm ?? "—"}</span> {t("common.sqm")}
         </p>
       </div>
 
@@ -131,9 +150,10 @@ function ProductLine({
           {t("quotations.detail.lineTotal")}:{" "}
           <Money value={line.lineTotal} sar={t("common.sar")} />
         </span>
+        {/* No rate beside it: VAT is fixed at 15% and never editable `S57`,
+            so the figure is the only thing that varies. */}
         <span>
-          {t("quotations.detail.vatAmount")}
-          {line.vatRate ? ` (${line.vatRate}%)` : ""}:{" "}
+          {t("quotations.detail.vatAmount")}:{" "}
           <Money value={line.vatAmount} sar={t("common.sar")} />
         </span>
       </div>
@@ -223,7 +243,7 @@ function ServiceLine({
             : service.serviceNameEn}
         </p>
         <p className="text-muted-foreground text-start text-xs" dir="ltr">
-          {service.quantity} {t("common.sqm")}
+          <span className="num">{service.quantity}</span> {t("common.sqm")}
         </p>
       </div>
 
@@ -238,7 +258,9 @@ function ServiceLine({
         </span>
         <span>
           {t("quotations.detail.appliesTo")}:{" "}
-          {appliesTo ? appliesTo.displayName : t("quotations.detail.wholeQuotation")}
+          {appliesTo
+            ? lineLabel(appliesTo, locale)
+            : t("quotations.detail.wholeQuotation")}
         </span>
       </div>
 
@@ -274,6 +296,7 @@ function ServiceLine({
               <AppliesToField
                 id={`service-${service.id}-appliesTo`}
                 lines={lines}
+                locale={locale}
                 defaultValue={service.quotationLineId}
               />
               <RowError state={updateState} />
@@ -294,10 +317,12 @@ function ServiceLine({
 function AppliesToField({
   id,
   lines,
+  locale,
   defaultValue,
 }: {
   id: string;
   lines: LineRow[];
+  locale: string;
   defaultValue?: string | null;
 }) {
   const t = useTranslations();
@@ -315,7 +340,7 @@ function AppliesToField({
         <option value="">{t("quotations.detail.wholeQuotation")}</option>
         {lines.map((line) => (
           <option key={line.id} value={line.id}>
-            {line.displayName}
+            {lineLabel(line, locale)}
           </option>
         ))}
       </select>
@@ -448,7 +473,11 @@ export function ThreadLines({
                   idPrefix="new-service"
                   errors={addServiceState.fieldErrors ?? {}}
                 />
-                <AppliesToField id="new-service-appliesTo" lines={lines} />
+                <AppliesToField
+                  id="new-service-appliesTo"
+                  lines={lines}
+                  locale={locale}
+                />
                 <RowError state={addServiceState} />
                 <div className="flex items-center gap-2">
                   <Button

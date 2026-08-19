@@ -1033,9 +1033,11 @@ async function main(): Promise<void> {
    * the one that stops it failing on rows FACET writes correctly.
    *
    * The first scanned the whole audit log over a ten-minute window, and failed
-   * on `verify:slice2`'s expiry sweep, which audits under a null actor ON
-   * PURPOSE `[16 §3]` so that whoever opened a list is not recorded as having
-   * expired a quotation. The second kept the window and filtered to a list of
+   * on `verify:slice2`'s expiry sweep, which audited under a null actor ON
+   * PURPOSE so that whoever opened a list was not recorded as having expired a
+   * quotation. That sweep is gone with `S67`, but the lesson is not: a
+   * whole-log scan fails on any legitimate null-actor write. The second kept
+   * the window and filtered to a list of
    * action names — and failed again, on `dev:fixtures`, which creates its four
    * users under a null actor, correctly, because nobody is signed in during a
    * seed, and `user.created` was on the list.

@@ -3,8 +3,9 @@
  *
  * **A follow-up is a condition, not a record.** Every kind below is a query
  * over real events and a `settings` threshold, computed on read — the pattern
- * the codebase has already chosen three times: the quotation expiry sweep
- * `[16 §3]`, Phase 9's coverage, and `on hold` `[20 §5]`. `20 §9` states it
+ * the codebase has chosen everywhere: Phase 9's coverage, `on hold` `[20 §5]`,
+ * and, since `S67`, quotation expiry, which used to be the counter-example
+ * because it wrote a state instead. `20 §9` states it
  * outright: *"Follow-up timers are computed on read, never fired and stored."*
  *
  * **The one thing written here is the rep's own date** — `setNextFollowUp`,

@@ -141,10 +141,16 @@ export const deleteRequestStatusEnum = pgEnum("delete_request_status", [
   "denied",
 ]);
 
-/** `[07 C5]`, `[07 C4]`, `[07 C7]` */
+/**
+ * `[07 C5]`, `[07 C4]` — the three the coordinator may set `S62`.
+ *
+ * `expired` was a fourth until `S67`. It is gone because validity is a note:
+ * expiry is computed from `valid_until` when a screen is read, and stops
+ * nothing. See `0014`'s header for why removing an enum value is not a drop.
+ */
 export const quotationThreadEndStateEnum = pgEnum(
   "quotation_thread_end_state",
-  ["accepted", "rejected", "cancelled", "expired"],
+  ["accepted", "rejected", "cancelled"],
 );
 
 /**
@@ -1089,7 +1095,13 @@ export const quotationVersions = pgTable(
     status: quotationVersionStatusEnum("status").notNull().default("requested"),
     /** The coordinator's return-for-edit round `[04 flow 10]`. */
     returnForEditRound: integer("return_for_edit_round").notNull().default(0),
-    /** Per quotation, set at creation, varies case by case `[07 C7]`, `[08 D9]`. */
+    /**
+     * Per quotation, set at creation, varies case by case `[08 D9]`.
+     *
+     * **A note, never a gate** `S67`. Nothing reads this as a condition. A
+     * version past it is *shown* as expired — computed in SQL at read time —
+     * and can still be issued, accepted, paid and dispatched.
+     */
     validUntil: date("valid_until"),
     /** Terms default from settings `[08 D9]` and are then per-version fields. */
     deliveryPeriod: text("delivery_period"),
@@ -1258,7 +1270,14 @@ export const quotationLines = pgTable(
     ),
     unitPrice: numeric("unit_price", MONEY),
     lineTotal: numeric("line_total", MONEY),
-    vatRate: numeric("vat_rate", { precision: 5, scale: 2 }),
+    /**
+     * **No `vat_rate` column** `S57`. The rate is fixed at 15% and never
+     * editable, so it is `VAT_RATE` in `enums.ts` and nowhere else — a column
+     * would be a place for it to disagree with itself.
+     *
+     * The *amount* stays stored, with `total_vat` and `grand_total`: those are
+     * SMAC's figures `S3`, and the schema records that FACET mirrors them.
+     */
     vatAmount: numeric("vat_amount", MONEY),
     createdAt: createdAt(),
   },

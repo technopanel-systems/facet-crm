@@ -63,7 +63,7 @@ import {
   serviceTypes,
   users,
 } from "@/db/schema";
-import { withAudit, type AuditActor, type AuditEntry } from "@/lib/audit";
+import { withAudit, type AuditEntry } from "@/lib/audit";
 import {
   MONEY_SCALE,
   SQM_SCALE,
@@ -85,11 +85,11 @@ import {
 // `comments.ts` about the import cycle this closes, and why it is safe.
 import { insertComment } from "@/lib/comments";
 import {
-  DEFAULT_VAT_RATE,
   QUOTATION_THREAD_END_STATES,
   QUOTATION_VERSION_ORIGINS,
   QUOTATION_VERSION_STATUSES,
   SMAC_VERIFICATIONS,
+  VAT_RATE,
   type QuotationThreadEndState,
   type QuotationVersionOrigin,
   type QuotationVersionStatus,
@@ -159,45 +159,6 @@ function applyPercent(amountScaled: bigint, rateScaled: bigint): bigint {
 }
 
 /* ------------------------------------------------------------------ *
- * The generated product name `[08 B1]`, `[08 D1]`
- * ------------------------------------------------------------------ */
-
-export type ProductNameParts = {
-  supplierCode: string;
-  classCode: string;
-  fireRatingCode: string;
-  customColour: string | null;
-  thicknessMm: string;
-  thicknessIsStandard: boolean;
-};
-
-/**
- * The printed product name, generated from the attribute parts so FACET's
- * output matches SMAC's without anyone retyping it `[08 D1]`.
- *
- * `08 B1` decomposes one real code — `N- CA FR 168` — into supplier, class,
- * fire rating and colour, and says the standard 4 mm thickness is omitted from
- * the printed name and written only for the thicker sheets.
- *
- * **`17 §4` settles the layout question `16 §10` left open.** `08 A` lists
- * `Product Name · thickness` as two columns on the SMAC form, which read
- * against `08 B1`'s "written" — but this name is FACET's own and does not
- * reproduce SMAC's form. The thickness joins the name, and 4 mm is omitted.
- * No real 5 mm quotation needs to be found first.
- *
- * The colour is one required typed value `[17 §2]` — the lookup half and
- * `colourCode` with it are gone since feature slice 6 `[26 §2]`.
- */
-export function productDisplayName(parts: ProductNameParts): string {
-  const colour = parts.customColour ?? "";
-  const base = `${parts.supplierCode}- ${parts.classCode} ${parts.fireRatingCode} ${colour}`.trim();
-  if (parts.thicknessIsStandard) return base;
-  // Trailing zeros off a numeric(5,2): "5.00" reads as "5mm", not "5.00mm".
-  const mm = parts.thicknessMm.replace(/\.?0+$/, "");
-  return `${base} ${mm}mm`;
-}
-
-/* ------------------------------------------------------------------ *
  * Qualification — derived from the event, never a field `[10 §1]`, `[04]`
  * ------------------------------------------------------------------ */
 
@@ -227,76 +188,33 @@ export function companyIsQualified(companyIdColumn: AnyPgColumn): SQL<boolean> {
 }
 
 /* ------------------------------------------------------------------ *
- * Expiry `[07 C7]`, `[16 §3]`, `[16 §7]`
+ * Expiry — a display fact, never a state `S67`
  * ------------------------------------------------------------------ */
 
-/** The system, not whoever happened to open the page `[16 §3]`. */
-const SYSTEM_ACTOR: AuditActor = { actorUserId: null, actingAsUserId: null };
-
 /**
- * Today as `YYYY-MM-DD` in Riyadh, for comparing against a `date` column.
+ * `valid_until < current_date`, selected as a column.
  *
- * The app's timezone is fixed at Asia/Riyadh, and a validity date is a day
- * there — not an instant. The sweep itself uses Postgres's `current_date` and
- * never this; this is only for the one comparison that happens in TypeScript.
+ * **Validity is a note, not a gate** `S67`. Nothing branches on this. An
+ * expired quotation is *shown* as expired and can still have its lines edited,
+ * and still be issued, accepted, paid and dispatched.
+ *
+ * It replaces a sweep that wrote `end_state = 'expired'` whenever a quotation
+ * screen was read. That made a read path write — and the terminal state it
+ * wrote then froze the lines, closed the chain, dropped the thread out of the
+ * follow-up queues and raised a persistent notification. One date, four gates,
+ * against a rule that says it stops nothing.
+ *
+ * **Derived in SQL, not in a screen** (`CLAUDE.md`), so the day a list filters
+ * on it the filter runs before pagination rather than over a fetched page.
+ * `current_date` is the database's day; the app's timezone is fixed at
+ * Asia/Riyadh and a validity date is a calendar day there, not an instant.
+ *
+ * `coalesce` because `null < current_date` is null, not false: a version with
+ * no validity date has not expired, and `null` is not an answer a screen can
+ * render.
  */
-function today(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Riyadh",
-    dateStyle: "short",
-  }).format(new Date());
-}
-
-/**
- * Mark every thread whose live version has passed its validity date.
- *
- * FACET has no scheduler, so this runs when a quotation screen is read
- * `[16 §3]`. It is one statement and writes nothing when nothing is due. The
- * same function is what a scheduled job will call when Phase 10 adds one —
- * there is no second code path.
- *
- * Two exclusions, both rules rather than conveniences:
- *  - a thread that already has an end state is finished;
- *  - **a payment-confirmed thread does not expire** `[16 §7]`. The customer
- *    has committed, and `07 C3` makes payment the gate that opens dispatch,
- *    not a state a date can take back.
- */
-export async function expireOverdueThreads(): Promise<number> {
-  return withAudit(SYSTEM_ACTOR, async (tx, log) => {
-    const expired = await tx
-      .update(quotationThreads)
-      .set({ endState: "expired" })
-      .where(
-        and(
-          isNull(quotationThreads.endState),
-          isNull(quotationThreads.paymentConfirmedAt),
-          exists(
-            subquery
-              .select({ one: sql`1` })
-              .from(quotationVersions)
-              .where(
-                and(
-                  eq(quotationVersions.threadId, quotationThreads.id),
-                  ne(quotationVersions.status, "superseded"),
-                  sql`${quotationVersions.validUntil} < current_date`,
-                ),
-              ),
-          ),
-        ),
-      )
-      .returning({ id: quotationThreads.id });
-
-    for (const row of expired) {
-      log({
-        action: "quotation_thread.expired",
-        entityType: "quotation_thread",
-        entityId: row.id,
-        before: { endState: null },
-        after: { endState: "expired" },
-      });
-    }
-    return expired.length;
-  });
+function versionIsExpired(): SQL<boolean> {
+  return sql<boolean>`coalesce(${quotationVersions.validUntil} < current_date, false)`;
 }
 
 /* ------------------------------------------------------------------ *
@@ -318,6 +236,8 @@ export type QuotationThreadListRow = {
   versionNumber: number;
   versionStatus: QuotationVersionStatus;
   validUntil: string | null;
+  /** Past its validity date — a display fact, never a state `S67`. */
+  expired: boolean;
   /**
    * The live version's quoted square metres.
    *
@@ -361,9 +281,6 @@ export async function listQuotationThreads(
   total: number;
   page: number;
 }> {
-  // Expiry happens on read `[16 §3]`; a list is the commonest read.
-  await expireOverdueThreads();
-
   const page = Math.max(1, options.page ?? 1);
   const where = and(
     visibleQuotationThreadsFilter(session),
@@ -393,6 +310,7 @@ export async function listQuotationThreads(
         versionNumber: quotationVersions.versionNumber,
         versionStatus: quotationVersions.status,
         validUntil: quotationVersions.validUntil,
+        expired: versionIsExpired(),
         totalSqm: quotationVersions.totalSqm,
         grandTotal: quotationVersions.grandTotal,
         createdAt: quotationThreads.createdAt,
@@ -535,23 +453,43 @@ export async function listQuotationFormOptions(
   };
 }
 
+/**
+ * One product line, as **ordinary readable fields** `S53`.
+ *
+ * There was a `displayName` here until `S53`: `productDisplayName` reassembled
+ * SMAC's own code — `N- CA FR 168`, space after the hyphen and all — and that
+ * string was the line's headline on every screen. FACET does not reproduce
+ * SMAC's code format, so the parts travel as parts and each screen writes them
+ * the way a person reads them.
+ *
+ * The names come from joins `loadLines` already made for the code, so this
+ * costs no extra query. They travel as `En`/`Ar` pairs and the screen resolves
+ * them with `lookupName`, the way project names already do — a lookup added
+ * next year cannot appear in `messages/*.json`.
+ */
 export type QuotationLineRow = {
   id: string;
   supplierId: string;
+  supplierNameEn: string;
+  supplierNameAr: string;
   classId: string;
+  classNameEn: string;
+  classNameAr: string;
   fireRatingId: string;
+  fireRatingNameEn: string;
+  fireRatingNameAr: string;
   customColour: string | null;
   thicknessId: string;
+  /** Trailing zeros off a `numeric(5,2)`: `"4.00"` reads as `4`, not `4.00`. */
+  thicknessMm: string;
   widthM: string;
   lengthM: string;
   quantityPcs: string;
   sqm: string | null;
   unitPrice: string | null;
   lineTotal: string | null;
-  vatRate: string | null;
+  /** At `VAT_RATE`, always `S57`. The rate itself is stored nowhere. */
   vatAmount: string | null;
-  /** Generated from the parts, never stored `[08 D1]`. */
-  displayName: string;
 };
 
 export type QuotationServiceLineRow = {
@@ -569,6 +507,8 @@ export type QuotationServiceLineRow = {
 
 export type QuotationVersionDetail = QuotationVersion & {
   createdByName: string | null;
+  /** Past its validity date — a display fact, never a state `S67`. */
+  expired: boolean;
   lines: QuotationLineRow[];
   serviceLines: QuotationServiceLineRow[];
 };
@@ -602,11 +542,13 @@ async function loadLines(versionId: string): Promise<QuotationLineRow[]> {
   const rows = await db
     .select({
       line: quotationLines,
-      supplierCode: productSuppliers.code,
-      classCode: productClasses.code,
-      fireRatingCode: productFireRatings.code,
+      supplierNameEn: productSuppliers.nameEn,
+      supplierNameAr: productSuppliers.nameAr,
+      classNameEn: productClasses.nameEn,
+      classNameAr: productClasses.nameAr,
+      fireRatingNameEn: productFireRatings.nameEn,
+      fireRatingNameAr: productFireRatings.nameAr,
       thicknessMm: productThicknesses.thicknessMm,
-      thicknessIsStandard: productThicknesses.isStandard,
     })
     .from(quotationLines)
     .innerJoin(
@@ -628,26 +570,24 @@ async function loadLines(versionId: string): Promise<QuotationLineRow[]> {
   return rows.map(({ line, ...parts }) => ({
     id: line.id,
     supplierId: line.supplierId,
+    supplierNameEn: parts.supplierNameEn,
+    supplierNameAr: parts.supplierNameAr,
     classId: line.classId,
+    classNameEn: parts.classNameEn,
+    classNameAr: parts.classNameAr,
     fireRatingId: line.fireRatingId,
+    fireRatingNameEn: parts.fireRatingNameEn,
+    fireRatingNameAr: parts.fireRatingNameAr,
     customColour: line.customColour,
     thicknessId: line.thicknessId,
+    thicknessMm: parts.thicknessMm.replace(/\.?0+$/, ""),
     widthM: line.widthM,
     lengthM: line.lengthM,
     quantityPcs: line.quantityPcs,
     sqm: line.sqm,
     unitPrice: line.unitPrice,
     lineTotal: line.lineTotal,
-    vatRate: line.vatRate,
     vatAmount: line.vatAmount,
-    displayName: productDisplayName({
-      supplierCode: parts.supplierCode,
-      classCode: parts.classCode,
-      fireRatingCode: parts.fireRatingCode,
-      customColour: line.customColour,
-      thicknessMm: parts.thicknessMm,
-      thicknessIsStandard: parts.thicknessIsStandard,
-    }),
   }));
 }
 
@@ -691,6 +631,7 @@ async function loadServiceLines(
 
 async function loadVersionDetail(
   version: QuotationVersion,
+  expired: boolean,
 ): Promise<QuotationVersionDetail> {
   const [creator] = version.createdBy
     ? await db
@@ -708,6 +649,7 @@ async function loadVersionDetail(
   return {
     ...version,
     createdByName: creator?.name ?? null,
+    expired,
     lines,
     serviceLines,
   };
@@ -717,8 +659,6 @@ export async function getQuotationThread(
   session: AuthSession,
   id: string,
 ): Promise<QuotationThreadDetail | null> {
-  await expireOverdueThreads();
-
   const [row] = await db
     .select({
       thread: quotationThreads,
@@ -740,13 +680,18 @@ export async function getQuotationThread(
 
   if (!row) return null;
 
-  const versions = await db
-    .select()
+  // Every version carries its own expiry flag `S67`, computed in SQL beside
+  // the row rather than from a clock in TypeScript.
+  const versionRows = await db
+    .select({ version: quotationVersions, expired: versionIsExpired() })
     .from(quotationVersions)
     .where(eq(quotationVersions.threadId, id))
     .orderBy(desc(quotationVersions.versionNumber));
 
-  const liveVersion = versions.find((v) => v.status !== "superseded");
+  const versions = versionRows.map((row) => row.version);
+  const liveVersion = versionRows.find(
+    (row) => row.version.status !== "superseded",
+  );
   // A thread always has a live version — they are created together, in one
   // transaction. If this is ever null the data is broken, not the request.
   if (!liveVersion) throw new Error(`Thread ${id} has no live version`);
@@ -776,7 +721,7 @@ export async function getQuotationThread(
     paymentConfirmedByName:
       names.get(row.thread.paymentConfirmedByUserId ?? "") ?? null,
     versions,
-    live: await loadVersionDetail(liveVersion),
+    live: await loadVersionDetail(liveVersion.version, liveVersion.expired),
     projectViewable,
     companyViewable,
   };
@@ -802,8 +747,8 @@ export async function getQuotationVersion(
   if (!(await canViewRecord(session, "quotation_thread", threadId))) {
     return null;
   }
-  const [version] = await db
-    .select()
+  const [row] = await db
+    .select({ version: quotationVersions, expired: versionIsExpired() })
     .from(quotationVersions)
     .where(
       and(
@@ -812,8 +757,8 @@ export async function getQuotationVersion(
       ),
     )
     .limit(1);
-  if (!version) return null;
-  return loadVersionDetail(version);
+  if (!row) return null;
+  return loadVersionDetail(row.version, row.expired);
 }
 
 /* ------------------------------------------------------------------ *
@@ -1025,8 +970,9 @@ async function recomputeVersionTotals(tx: Tx, versionId: string): Promise<void> 
 
   // Services carry no VAT columns of their own `[09 §5.5]`, but they are line
   // items on the same SMAC quotation and that form taxes every line `[08 A]`.
-  // The default rate applies rather than leaving them untaxed `[16 §1]`.
-  const serviceVatRate = toScaled(DEFAULT_VAT_RATE, MONEY_SCALE);
+  // The same fixed rate applies `S57` — the one constant, read here and in
+  // `lineMoney`, so a service and a product line can never disagree.
+  const serviceVatRate = toScaled(VAT_RATE, MONEY_SCALE);
   for (const service of services) {
     if (!service.unitPrice) continue;
     const amount = multiplyMoneyBySqm(
@@ -1075,13 +1021,13 @@ function lineMoney(input: QuotationLineInput): {
     toScaled(input.unitPrice, MONEY_SCALE),
     sqm,
   );
-  const vatAmount = input.vatRate
-    ? applyPercent(lineTotal, toScaled(input.vatRate, MONEY_SCALE))
-    : null;
+  // **Fixed at 15%, never editable** `S57`. There is no rate on the input and
+  // no column to hold one: a priced line is taxed, and that is the whole rule.
+  const vatAmount = applyPercent(lineTotal, toScaled(VAT_RATE, MONEY_SCALE));
 
   return {
     lineTotal: fromScaled(lineTotal, MONEY_SCALE),
-    vatAmount: vatAmount === null ? null : fromScaled(vatAmount, MONEY_SCALE),
+    vatAmount: fromScaled(vatAmount, MONEY_SCALE),
   };
 }
 
@@ -1113,7 +1059,6 @@ export type QuotationLineInput = {
   lengthM: string;
   quantityPcs: string;
   unitPrice: string | null;
-  vatRate: string | null;
 };
 
 export type ServiceLineInput = {
@@ -1153,7 +1098,6 @@ async function insertLine(
       lengthM: input.lengthM,
       quantityPcs: input.quantityPcs,
       unitPrice: input.unitPrice,
-      vatRate: input.vatRate,
       ...lineMoney(input),
     })
     .returning();
@@ -1669,9 +1613,10 @@ export async function createRevision(
       .limit(1);
     if (!thread) throw new RuleError("quotations.errors.notFound");
 
-    // An expired thread may be revised — that is one of `07 C7`'s two
-    // follow-on actions. Any other end state is final.
-    if (thread.endState && thread.endState !== "expired") {
+    // An end state is final. There is no longer an exception for `expired`:
+    // validity is a note `S67`, so a thread past its date is simply open, and
+    // revising it needs no special case.
+    if (thread.endState) {
       throw new RuleError("quotations.errors.threadClosed");
     }
 
@@ -1689,16 +1634,11 @@ export async function createRevision(
       after: { status: "superseded" },
     });
 
-    // Carry the validity forward only while it still has time to run. A date
-    // already in the past is not an offer window, and copying it would let the
-    // expiry sweep re-expire the new version on the very next read — which
-    // would make `07 C7`'s "revise" no remedy for expiry at all, when revise
-    // and extend are meant to be the two alternatives. Null leaves the new
-    // version with no expiry until someone sets one.
-    const carriedValidity =
-      previous.validUntil && previous.validUntil >= today()
-        ? previous.validUntil
-        : null;
+    // **Carried forward as it stands, past or not** `S67`. It used to be
+    // nulled when already in the past, so the expiry sweep could not re-expire
+    // the new version on the very next read. With no sweep and no state, a
+    // stale date is just a stale note, and silently dropping the coordinator's
+    // number would lose information to protect a mechanism that is gone.
 
     const [next] = await tx
       .insert(quotationVersions)
@@ -1707,7 +1647,7 @@ export async function createRevision(
         versionNumber: previous.versionNumber + 1,
         origin,
         status: "requested",
-        validUntil: carriedValidity,
+        validUntil: previous.validUntil,
         deliveryPeriod: previous.deliveryPeriod,
         paymentMethod: previous.paymentMethod,
         shipmentTerms: previous.shipmentTerms,
@@ -1744,7 +1684,6 @@ export async function createRevision(
           lengthM: line.lengthM,
           quantityPcs: line.quantityPcs,
           unitPrice: line.unitPrice,
-          vatRate: line.vatRate,
           lineTotal: line.lineTotal,
           vatAmount: line.vatAmount,
         })
@@ -1771,30 +1710,21 @@ export async function createRevision(
       });
     }
 
-    // Revising is `07 C7`'s answer to expiry, so it clears the expired state.
-    if (thread.endState === "expired") {
-      await tx
-        .update(quotationThreads)
-        .set({ endState: null })
-        .where(eq(quotationThreads.id, threadId));
-      log({
-        action: "quotation_thread.revived",
-        entityType: "quotation_thread",
-        entityId: threadId,
-        before: { endState: "expired" },
-        after: { endState: null },
-      });
-    }
-
     await recomputeVersionTotals(tx, next.id);
   });
 }
 
 /**
- * `07 C7`'s other follow-on action: **extend if nothing has changed.**
- *
- * Extending clears an `expired` end state, because the record is live again.
+ * Set the live version's validity date — **extend if nothing has changed.**
  * If price or materials changed it is a revision instead, not this.
+ *
+ * It used to also clear an `expired` end state, because that state was what
+ * this existed to undo. Since `S67` there is no state and nothing to undo:
+ * this writes a note, and the note stops nothing either way.
+ *
+ * **Not coordinator-only.** `S62`'s coordinator acts are issue, return,
+ * accept, reject and cancel; validity is not among them, so this stays on
+ * `assertThreadVisible` — the rep who raised the quotation may move its date.
  */
 export async function extendValidity(
   session: AuthSession,
@@ -1810,7 +1740,7 @@ export async function extendValidity(
       .where(eq(quotationThreads.id, threadId))
       .limit(1);
     if (!thread) throw new RuleError("quotations.errors.notFound");
-    if (thread.endState && thread.endState !== "expired") {
+    if (thread.endState) {
       throw new RuleError("quotations.errors.threadClosed");
     }
 
@@ -1826,20 +1756,6 @@ export async function extendValidity(
       before: { validUntil: version.validUntil },
       after: { validUntil },
     });
-
-    if (thread.endState === "expired") {
-      await tx
-        .update(quotationThreads)
-        .set({ endState: null })
-        .where(eq(quotationThreads.id, threadId));
-      log({
-        action: "quotation_thread.revived",
-        entityType: "quotation_thread",
-        entityId: threadId,
-        before: { endState: "expired" },
-        after: { endState: null },
-      });
-    }
   });
 }
 
@@ -1859,9 +1775,9 @@ async function setEndState(
       .where(eq(quotationThreads.id, threadId))
       .limit(1);
     if (!before) throw new RuleError("quotations.errors.notFound");
-    // Expired is not final — `07 C7` allows extend or revise. Everything else
-    // is, and re-deciding a decided quotation is a revision, not an edit.
-    if (before.endState && before.endState !== "expired") {
+    // Re-deciding a decided quotation is a revision, not an edit. Every end
+    // state is final now that `expired` is not one of them `S67`.
+    if (before.endState) {
       throw new RuleError("quotations.errors.threadClosed");
     }
 

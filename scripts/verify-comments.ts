@@ -342,7 +342,6 @@ async function main(): Promise<void> {
         lengthM: "5.8000",
         quantityPcs: "12.0000",
         unitPrice: "120.00",
-        vatRate: "15.00",
       },
     ],
     [],

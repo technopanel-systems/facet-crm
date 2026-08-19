@@ -33,9 +33,10 @@
  * rule about the audit log, which holds for the same reason wherever a row
  * names a record it does not gate.
  *
- * **The sweep is `expireOverdueThreads`'s shape** `[16 §3]`: idempotent,
- * system actor, run on read, and the one function a scheduled job will call
- * when Phase 12 adds one. There is no second code path.
+ * **The sweep is idempotent, runs under the system actor, and runs on read** —
+ * the one function a scheduled job will call when Phase 12 adds one, with no
+ * second code path. It took that shape from the quotation expiry sweep, which
+ * `S67` deleted along with the state it wrote.
  */
 
 import { and, count, desc, eq, isNull, or, sql } from "drizzle-orm";
@@ -65,7 +66,6 @@ import {
   type NotificationTypeName,
 } from "@/lib/enums";
 import { followUpsForRecipient, type FollowUpRow } from "@/lib/follow-ups";
-import { expireOverdueThreads } from "@/lib/quotations";
 import { today } from "@/lib/reports";
 import { shiftDays } from "@/lib/working-days";
 
@@ -272,26 +272,27 @@ export async function raise(
  * The sweep `[16 §3]`
  * ------------------------------------------------------------------ */
 
-export type SweepResult = { raised: number; resolved: number; digests: number };
+export type SweepResult = { resolved: number; digests: number };
 
 /**
  * Bring the notification table in step with the world, idempotently.
  *
- * Three steps, in order — resolve first, so a condition that cleared and became
- * true again in the same sweep ends up correctly raised rather than correctly
- * resolved:
+ * Two steps, in order:
  *
- *  1. **Resolve**, by condition and nothing else `[07 G1]`, `[10 §10]`. Every
- *     live `quotation.expired` whose thread is no longer expired — `07 C7`
- *     offers extend and revise as the two remedies and `extendValidity` already
- *     clears the end state, so that is the whole condition — and every live
- *     `record.assigned` or `share.granted` whose recipient has since logged an
- *     interaction against the anchor's company `[21 §3]`.
- *  2. **Raise** one `quotation.expired` per expired thread, to its raiser.
- *     `expireOverdueThreads` runs first so a thread that came due this minute
- *     is included in the same pass.
- *  3. **Digest** — one `followup.digest` per recipient for the most recent
+ *  1. **Resolve**, by condition and nothing else `[07 G1]`, `[10 §10]`: every
+ *     live `record.assigned` or `share.granted` whose recipient has since
+ *     logged an interaction against the anchor's company `[21 §3]`, and every
+ *     live notification whose share has been revoked.
+ *  2. **Digest** — one `followup.digest` per recipient for the most recent
  *     COMPLETED day.
+ *
+ * **The sweep raises nothing, so `SweepResult` no longer counts it.** There was
+ * a third step and a `quotation.expired` type until `S67`: one notification per
+ * thread carrying `end_state = 'expired'`, resolved when the thread stopped
+ * carrying it. Both halves stood on a state that no longer exists — validity is
+ * a note, so nothing expires, and a bell that rings because a date passed is
+ * exactly the gate `S67` denies. Assignment, sharing and mentions still raise;
+ * they do it from their own call sites and never from here.
  *
  * **Resolution is re-derived here rather than written at the completing call
  * site**, which is what "by condition, not by click" actually asks for: the
@@ -307,62 +308,13 @@ export type SweepResult = { raised: number; resolved: number; digests: number };
  * not written until the day is over.
  */
 export async function sweepNotifications(): Promise<SweepResult> {
-  await expireOverdueThreads();
-
   return withAudit(SYSTEM_ACTOR, async (tx, log) => {
     const resolved =
-      (await resolveExpiredQuotations(tx, log)) +
       (await resolveOnInteraction(tx, log)) +
       (await resolveRevokedShares(tx, log));
-    const raised = await raiseExpiredQuotations(tx, log);
     const digests = await generateDigests(tx, log);
-    return { raised, resolved, digests };
+    return { resolved, digests };
   });
-}
-
-async function expiredTypeId(tx: Tx): Promise<string | null> {
-  const [type] = await tx
-    .select({ id: notificationTypes.id })
-    .from(notificationTypes)
-    .where(eq(notificationTypes.key, NOTIFICATION_TYPES.quotationExpired))
-    .limit(1);
-  return type?.id ?? null;
-}
-
-/** `21 §3` — extended, revised, or ended some other way. */
-async function resolveExpiredQuotations(
-  tx: Tx,
-  log: (entry: AuditEntry) => void,
-): Promise<number> {
-  const typeId = await expiredTypeId(tx);
-  if (!typeId) return 0;
-
-  const cleared = await tx
-    .update(notifications)
-    .set({ resolvedAt: new Date() })
-    .where(
-      and(
-        eq(notifications.notificationTypeId, typeId),
-        isNull(notifications.resolvedAt),
-        eq(notifications.recordType, "quotation_thread"),
-        sql`not exists (
-          select 1 from quotation_threads qt
-           where qt.id = ${notifications.recordId}
-             and qt.end_state = 'expired'
-        )`,
-      ),
-    )
-    .returning({ id: notifications.id });
-
-  for (const row of cleared) {
-    log({
-      action: "notification.resolved",
-      entityType: "notification",
-      entityId: row.id,
-      after: { reason: "quotation_no_longer_expired" },
-    });
-  }
-  return cleared.length;
 }
 
 /**
@@ -504,32 +456,6 @@ async function resolveRevokedShares(
     });
   }
   return cleared.length;
-}
-
-/** `07 C7` — "on expiry, notify the rep". The raiser is the rep on the thread. */
-async function raiseExpiredQuotations(
-  tx: Tx,
-  log: (entry: AuditEntry) => void,
-): Promise<number> {
-  const threads = await tx
-    .select({
-      id: quotationThreads.id,
-      raisedBy: quotationThreads.raisedByUserId,
-    })
-    .from(quotationThreads)
-    .where(eq(quotationThreads.endState, "expired"));
-
-  let raised = 0;
-  for (const thread of threads) {
-    const id = await raise(tx, log, {
-      typeKey: NOTIFICATION_TYPES.quotationExpired,
-      recipientUserId: thread.raisedBy,
-      anchorType: "quotation_thread",
-      anchorId: thread.id,
-    });
-    if (id) raised += 1;
-  }
-  return raised;
 }
 
 /**
@@ -979,13 +905,8 @@ export const RESOLUTION_RULES: {
   typeKey: NotificationTypeKey;
   anchorType: NotificationAnchorType;
   /** How the condition clears, as a translation key on the screen. */
-  rule: "thread_no_longer_expired" | "interaction_against_company";
+  rule: "interaction_against_company";
 }[] = [
-  {
-    typeKey: NOTIFICATION_TYPES.quotationExpired,
-    anchorType: "quotation_thread",
-    rule: "thread_no_longer_expired",
-  },
   {
     typeKey: NOTIFICATION_TYPES.recordAssigned,
     anchorType: "company",

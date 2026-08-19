@@ -95,8 +95,7 @@
     "quotationThreadEndState": {
       "accepted": "Accepted",
       "rejected": "Rejected",
-      "cancelled": "Cancelled",
-      "expired": "Expired"
+      "cancelled": "Cancelled"
     },
     "quotationVersionStatus": {
       "requested": "Requested",
@@ -164,7 +163,6 @@
       "comment": "Comment"
     },
     "notificationType": {
-      "quotationExpired": "Quotation expired",
       "recordAssigned": "Assigned to you",
       "recordHandedOver": "Work handed over to you",
       "shareGranted": "Shared with you",
@@ -360,6 +358,7 @@
       "endState": "State",
       "endStateOpen": "Open",
       "validUntil": "Valid until",
+      "expired": "Expired",
       "deliveryPeriod": "Delivery period",
       "paymentMethod": "Method of payment",
       "shipmentTerms": "Terms of shipment",
@@ -390,7 +389,6 @@
       "sqm": "Area (m²)",
       "unitPrice": "Price / m²",
       "lineTotal": "Total excl. VAT",
-      "vatRate": "VAT %",
       "vatAmount": "VAT",
       "service": "Service",
       "serviceQuantity": "Quantity (m²)",
@@ -851,7 +849,6 @@
       "handoverUnknown": "Work was handed over to you.",
       "digestSummary": "{total} follow-ups on {date}.",
       "digestLink": "Open follow-ups",
-      "clearsThreadNoLongerExpired": "Clears when the quotation is extended or revised.",
       "clearsInteractionAgainstCompany": "Clears when you log an interaction with the company.",
       "mention": "{name} mentioned you in a comment.",
       "mentionUnknown": "Somebody mentioned you in a comment.",

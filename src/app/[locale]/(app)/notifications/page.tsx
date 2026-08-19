@@ -26,10 +26,10 @@ export const dynamic = "force-dynamic";
  * the daily digest of what went stale sits below and does not interrupt.
  * Without the split reps mute everything and miss what mattered.
  *
- * **The sweep runs on read** `[16 §3]`, exactly as quotation expiry does on a
- * quotation list: FACET has no scheduler, this is the commonest read, and it is
- * the same function a scheduled job will call. It writes nothing when nothing
- * is due.
+ * **The sweep runs on read**: FACET has no scheduler, this is the commonest
+ * read, and it is the same function a scheduled job will call. It writes
+ * nothing when nothing is due. Quotation expiry used to run the same way, on
+ * a quotation list, until `S67` — reading a quotation no longer writes to it.
  *
  * **Not gated.** A notification is addressed to one person, so the page needs
  * no permission and no visibility filter beyond that — the recipient term lives
@@ -277,12 +277,11 @@ function NotificationEntry({
       {row.isPersistent && !row.resolvedAt ? (
         <p className="text-muted-foreground text-start text-xs">
           {t("notifications.detail.persistent")}
+          {/* One rule left since `S67` took `thread_no_longer_expired` with the
+              expiry notification. The branch goes rather than standing as a
+              choice between one thing and nothing. */}
           {rule
-            ? ` ${
-                rule.rule === "thread_no_longer_expired"
-                  ? t("notifications.detail.clearsThreadNoLongerExpired")
-                  : t("notifications.detail.clearsInteractionAgainstCompany")
-              }`
+            ? ` ${t("notifications.detail.clearsInteractionAgainstCompany")}`
             : ""}
         </p>
       ) : null}

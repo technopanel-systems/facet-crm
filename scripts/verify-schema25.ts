@@ -46,6 +46,7 @@
  *      two new NOT NULLs, and the rule no CHECK can hold beside them: a
  *      company outside Saudi Arabia keeps no city and no region `S15`, which
  *      would need a subquery into `countries` to state in SQL.
+ *  12. *** Every priced line's VAT is 15% of its total *** `S57`.
  *  11. *** A dispatch's project IS its quotation's *** `S74` — the third rule
  *      of that kind, and the first to span two rows, so not even a CHECK could
  *      hold it. Asserted over every row in the table rather than over rows
@@ -304,6 +305,17 @@ const S26_DROPPED_COLUMNS = ["project_companies.is_buyer"];
 /** The index `S26` drops with it — see the note above. */
 const S26_DROPPED_INDEXES = ["project_companies_one_buyer_key"];
 
+/**
+ * The column `S57` drops: VAT is fixed at 15% and never editable, so there is
+ * no per-line rate to hold. Separate list, same reason the four above it are
+ * separate — one rule, one migration, one claim, legible without git blame.
+ *
+ * The *amount* is not dropped and must not be: `vat_amount`, `total_vat` and
+ * `grand_total` are SMAC's figures mirrored into FACET `S3`. What the rate
+ * bought was a place for a line to disagree with the country.
+ */
+const S57_DROPPED_COLUMNS = ["quotation_lines.vat_rate"];
+
 /** Whole tables feature slice 6 dropped `[26 §2, §6]`. */
 const SLICE6_DROPPED_TABLES = ["product_colours", "activities", "tasks"];
 
@@ -413,6 +425,33 @@ async function main(): Promise<void> {
   for (const key of S26_DROPPED_COLUMNS) {
     check(`${key} is gone [S26]`, !columns.has(key));
   }
+
+  for (const key of S57_DROPPED_COLUMNS) {
+    check(`${key} is gone [S57]`, !columns.has(key));
+  }
+
+  // `S67` — expiry is not a terminal state. The value cannot be dropped from a
+  // Postgres enum in place, so `0014` rebuilds the type; this asserts the
+  // rebuild landed with exactly the three the coordinator may set `S62`, and
+  // not, say, the old type left behind under its rename.
+  const endStates = (await db.execute(
+    sql`select unnest(enum_range(null::quotation_thread_end_state))::text as value`,
+  )) as unknown as { value: string }[];
+  const endStateValues = endStates.map((row) => row.value).sort();
+  check(
+    "quotation_thread_end_state holds accepted/rejected/cancelled only [S67]",
+    endStateValues.join(",") === "accepted,cancelled,rejected",
+    endStateValues.join(",") || "(empty)",
+  );
+  check(
+    "no quotation thread still carries an expiry end state [S67]",
+    (
+      (await db.execute(
+        sql`select count(*)::int as n from quotation_threads
+             where end_state::text = 'expired'`,
+      )) as unknown as { n: number }[]
+    )[0].n === 0,
+  );
 
   // The rule S26 states is "no participant is marked as the buyer by hand" —
   // which in SQL was the partial unique index, not the column. Asserted in its
@@ -1190,6 +1229,7 @@ async function main(): Promise<void> {
   /* --- 11. A dispatch's project is its quotation's [S74] ---------------- */
 
   await projectMatchesThread();
+  await vatIsFixed();
 }
 
 /**
@@ -1253,6 +1293,90 @@ async function projectMatchesThread(): Promise<void> {
     "a dispatch with no quotation still names no project [S75]",
     row.direct_with_project === 0,
     `${row.direct_with_project} do`,
+  );
+}
+
+/**
+ * `S57` - **VAT is fixed at 15% and is never editable.**
+ *
+ * Asserted by identity, not as a check that `0014`'s backfill ran. There is no
+ * `vat_rate` column left to compare against and no CHECK that could say this:
+ * `vat_amount` is written by `lineMoney` in TypeScript, and a CHECK would have
+ * to restate the rounding rule in SQL as a second definition of the same
+ * arithmetic. So the claim is made here, over every line ever written, and it
+ * fails the day a write path stops applying the constant.
+ *
+ * It is also the only thing that proves `0014`'s first statement. That
+ * `UPDATE` is the one in the migration that could be **wrong without
+ * failing**: a missed row keeps a plausible-looking amount that is simply not
+ * 15% of its total, and no screen would ever say so. On the database it was
+ * written against it changed nothing - all 162 priced lines already held the
+ * right figure - which is a fact about today's data, not about the rule.
+ *
+ * **The version totals are asserted in the same breath**, because a line whose
+ * VAT is right inside a version whose `total_vat` disagrees is the same defect
+ * one level up. Services carry no VAT column and are taxed at the same
+ * constant `[09 §5.5]`, so the expected total rounds twice - amount, then
+ * tax on it - exactly as `recomputeVersionTotals` does.
+ *
+ * **Counted in SQL and asserted `=== 0`**, never `!count`: `count(*)` comes
+ * back as a string and a truthiness test on `"0"` would pass for the wrong
+ * reason and keep passing on `"1"`.
+ */
+async function vatIsFixed(): Promise<void> {
+  console.log("\n12. *** Every priced line's VAT is 15% of its total *** [S57]");
+
+  const [lines] = (await db.execute(sql`
+    select
+      count(*)::int as priced,
+      count(*) filter (
+        where vat_amount is distinct from round(line_total * 0.15, 2)
+      )::int as wrong
+    from quotation_lines
+    where line_total is not null
+  `)) as unknown as { priced: number; wrong: number }[];
+
+  console.log(`  --    ${lines.priced} priced line(s)`);
+  check(
+    "*** no priced line's VAT differs from 15% of its total *** [S57]",
+    lines.wrong === 0,
+    `${lines.wrong} disagree`,
+  );
+
+  const [totals] = (await db.execute(sql`
+    select
+      count(*)::int as versions,
+      count(*) filter (where v.total_vat is distinct from e.expected)::int as wrong_vat,
+      count(*) filter (
+        where v.grand_total is distinct from v.total_excl_vat + e.expected
+      )::int as wrong_grand
+    from quotation_versions v
+    cross join lateral (
+      select
+        coalesce((select sum(l.vat_amount) from quotation_lines l
+                   where l.version_id = v.id), 0)
+      + coalesce((select sum(round(round(s.unit_price * s.quantity, 2) * 0.15, 2))
+                    from quotation_service_lines s
+                   where s.version_id = v.id
+                     and s.unit_price is not null), 0) as expected
+    ) e
+    where v.total_excl_vat is not null
+  `)) as unknown as {
+    versions: number;
+    wrong_vat: number;
+    wrong_grand: number;
+  }[];
+
+  console.log(`  --    ${totals.versions} version(s) with totals`);
+  check(
+    "every version total_vat equals the sum of its taxed parts [S57]",
+    totals.wrong_vat === 0,
+    `${totals.wrong_vat} disagree`,
+  );
+  check(
+    "and grand_total is total_excl_vat plus it [S57]",
+    totals.wrong_grand === 0,
+    `${totals.wrong_grand} disagree`,
   );
 }
 

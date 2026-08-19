@@ -52,7 +52,12 @@ export type ProjectEndState = (typeof PROJECT_END_STATES)[number];
 export const OTHER_LOSS_REASON_CODE = "other";
 
 /**
- * `[07 C5]`, `[07 C4]`, `[07 C7]`.
+ * `[07 C5]`, `[07 C4]` — the three states the **coordinator** may set `S62`.
+ *
+ * **`expired` is not among them, and is not a state at all** `S67`. Validity is
+ * a note: an expired quotation is shown as expired, computed from `valid_until`
+ * at read time, and stops nothing. A terminal state would have said the
+ * opposite — that the thread was over — which is what it did say until `S67`.
  *
  * **`accepted` is internal approval, never a won deal** `[16 §5]`: it means
  * the coordinator has the signatures. The customer commits later, at
@@ -63,7 +68,6 @@ export const QUOTATION_THREAD_END_STATES = [
   "accepted",
   "rejected",
   "cancelled",
-  "expired",
 ] as const;
 export type QuotationThreadEndState =
   (typeof QUOTATION_THREAD_END_STATES)[number];
@@ -288,7 +292,6 @@ export type DormancyOutcome = (typeof DORMANCY_OUTCOMES)[number];
  * the normal path.
  */
 export const NOTIFICATION_TYPES = {
-  quotationExpired: "quotation.expired",
   recordAssigned: "record.assigned",
   recordHandedOver: "record.handed_over",
   shareGranted: "share.granted",
@@ -344,11 +347,16 @@ export type FollowUpKind = (typeof FOLLOW_UP_KINDS)[number];
 export const TOUCH_INPUT_CLASS = "h-11 text-base";
 
 /**
- * `[16 §2]` — the Saudi rate, as a **default** and nothing more. FACET does
- * not do tax; SMAC does `[04 A1]`. The value lives here so a client form and
- * the data layer prefill the same number.
+ * **VAT is fixed at 15% and is never editable** `S57`. The Saudi rate, as a
+ * constant and not a default: no column stores it, no form offers it, and this
+ * is the only place it is written down.
+ *
+ * FACET still does not do tax — SMAC does `S3`. What FACET keeps is the
+ * *amount*, mirrored into `vat_amount`, `total_vat` and `grand_total`, because
+ * those are figures SMAC owns and FACET shows. The rate that produced them is
+ * not a fact about a line; it is a fact about the country.
  */
-export const DEFAULT_VAT_RATE = "15.00";
+export const VAT_RATE = "15.00";
 
 /** `[08 D3]` — offered as defaults, both editable; constraining them would
  *  block real orders. Sheets only `[12 §11]`. */
