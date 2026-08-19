@@ -51,6 +51,11 @@
  *      of that kind, and the first to span two rows, so not even a CHECK could
  *      hold it. Asserted over every row in the table rather than over rows
  *      this script wrote.
+ *  13. *** The repository and the database agree *** — CHECK constraints, enum
+ *      types and their values, and indexes, as set differences both ways. This
+ *      is the one claim `drizzle-kit generate` structurally cannot make: it
+ *      compares `schema.ts` to the snapshot, so what both get wrong together
+ *      is invisible to it (AUDIT 1 F19).
  *
  * Usage: `npm run verify:schema25`
  *
@@ -73,9 +78,11 @@
 
 process.loadEnvFile(".env");
 
-import { eq, sql } from "drizzle-orm";
+import { eq, is, sql } from "drizzle-orm";
+import { getTableConfig, isPgEnum, PgTable } from "drizzle-orm/pg-core";
 
 import { closeDatabase, db } from "@/db";
+import * as schema from "@/db/schema";
 import {
   cities,
   commentMentions,
@@ -532,9 +539,13 @@ async function main(): Promise<void> {
     check(`${key} is gone [SPEC §15]`, !columns.has(key));
   }
 
-  // Dropping a column takes its CHECK with it. `rep_reports_reference` was
-  // never declared in `schema.ts`, so drizzle-kit emits no statement for it
-  // and only the database can answer whether it went.
+  // Dropping a column takes its CHECK with it: Postgres removed
+  // `rep_reports_reference` along with `rep_reports.reference` in `0015`, and
+  // no statement said so. It WAS declared in `schema.ts`, and stayed declared
+  // there and in `meta/0015_snapshot.json` until `0016` deleted it — the drift
+  // section 13 now guards against. Named on its own line here so the next
+  // reader learns this constraint is absent deliberately; section 13 proves
+  // the same thing anonymously, as a diff rather than a story.
   const orphanChecks = (await db.execute(
     sql`select conname from pg_constraint where conname = 'rep_reports_reference'`,
   )) as unknown as { conname: string }[];
@@ -1300,6 +1311,7 @@ async function main(): Promise<void> {
 
   await projectMatchesThread();
   await vatIsFixed();
+  await repositoryMatchesDatabase();
 }
 
 /**
@@ -1448,6 +1460,172 @@ async function vatIsFixed(): Promise<void> {
     totals.wrong_grand === 0,
     `${totals.wrong_grand} disagree`,
   );
+}
+
+/**
+ * Both directions of one surface, as two checks that print the diff.
+ *
+ * A set difference each way, never a count: two drifts that cancel out — one
+ * thing declared and missing, another present and undeclared — must not pass.
+ */
+function assertSetsMatch(
+  surface: string,
+  declared: Set<string>,
+  live: Set<string>,
+): void {
+  const onlyLive = [...live].filter((name) => !declared.has(name)).sort();
+  const onlyDeclared = [...declared].filter((name) => !live.has(name)).sort();
+  check(
+    `every ${surface} in the database is declared in schema.ts`,
+    onlyLive.length === 0,
+    `only in the database: ${onlyLive.join(", ")}`,
+  );
+  check(
+    `every ${surface} schema.ts declares exists in the database`,
+    onlyDeclared.length === 0,
+    `only in schema.ts: ${onlyDeclared.join(", ")}`,
+  );
+}
+
+/**
+ * *** The repository and the database agree *** — the drift nothing could see.
+ *
+ * `drizzle-kit generate` compares `schema.ts` to `meta/*_snapshot.json`, so
+ * anything those two get wrong **together** is invisible to it forever. That
+ * is not hypothetical: `0015` dropped `rep_reports.reference` and Postgres
+ * dropped the CHECK `rep_reports_reference` with it, while both files went on
+ * declaring a ninth constraint through six migrations of "No schema changes"
+ * (AUDIT 1 F19, corrected by `0016`). Only something that reads `pg_catalog`
+ * can answer it, and nothing did.
+ *
+ * One blind spot, three surfaces — CHECK constraints, enum types and their
+ * values, indexes. Closing one of the three would read as complete and would
+ * not be.
+ *
+ * The declared side is Drizzle's own runtime config, never a grep over the
+ * file: `getTableConfig` is what drizzle-kit itself reads, so a constraint
+ * declared through a helper or spread from a shared list still counts.
+ */
+async function repositoryMatchesDatabase(): Promise<void> {
+  console.log("\n13. *** The repository and the database agree ***");
+
+  // `Object.values` types each export as its own concrete table or enum type,
+  // and neither `PgTable` nor `PgEnum` is assignable back to that union — so
+  // the narrowing has to start from `unknown`, exactly as `is()` reads it.
+  const exported: unknown[] = Object.values(schema);
+  const tables = exported.filter((value): value is PgTable =>
+    is(value, PgTable),
+  );
+
+  // `contype = 'c'` is CHECK alone on Postgres 17 (`docker-compose.yml`) — a
+  // NOT NULL is not a row in `pg_constraint` there. `conrelid <> 0` drops a
+  // domain's check, which belongs to no table and is not schema.ts's to hold.
+  const declaredChecks = new Set(
+    tables.flatMap((table) =>
+      getTableConfig(table).checks.map((constraint) => constraint.name),
+    ),
+  );
+  const liveChecks = new Set(
+    (
+      (await db.execute(sql`
+        select conname from pg_constraint
+        where contype = 'c'
+          and connamespace = 'public'::regnamespace
+          and conrelid <> 0
+      `)) as unknown as { conname: string }[]
+    ).map((row) => row.conname),
+  );
+  console.log(`  --    ${liveChecks.size} CHECK constraint(s) in the database`);
+  assertSetsMatch("CHECK", declaredChecks, liveChecks);
+
+  const declaredEnums = new Map(
+    exported
+      .filter(isPgEnum)
+      .map((pgEnum) => [pgEnum.enumName, [...pgEnum.enumValues].sort()]),
+  );
+  const liveEnumRows = (await db.execute(sql`
+    select t.typname, e.enumlabel
+    from pg_type t
+    join pg_enum e on e.enumtypid = t.oid
+    where t.typnamespace = 'public'::regnamespace
+    order by t.typname, e.enumsortorder
+  `)) as unknown as { typname: string; enumlabel: string }[];
+  const liveEnums = new Map<string, string[]>();
+  for (const row of liveEnumRows) {
+    liveEnums.set(row.typname, [
+      ...(liveEnums.get(row.typname) ?? []),
+      row.enumlabel,
+    ]);
+  }
+  for (const values of liveEnums.values()) values.sort();
+  console.log(`  --    ${liveEnums.size} enum type(s) in the database`);
+  assertSetsMatch(
+    "enum type",
+    new Set(declaredEnums.keys()),
+    new Set(liveEnums.keys()),
+  );
+
+  // Names alone would pass a type whose value list has drifted, and that is
+  // the same failure: AUDIT 1 found value-level gaps (`report_signal` against
+  // `S43`) that a name comparison cannot see. Only the types both sides have
+  // — a missing type is already a failure above, and would report twice.
+  const valueDrift = [...declaredEnums.entries()]
+    .map(([name, declared]) => {
+      const live = liveEnums.get(name);
+      if (!live) return null;
+      return {
+        name,
+        onlyLive: live.filter((value) => !declared.includes(value)),
+        onlyDeclared: declared.filter((value) => !live.includes(value)),
+      };
+    })
+    .filter((drift) => drift !== null)
+    .filter(
+      (drift) => drift.onlyLive.length > 0 || drift.onlyDeclared.length > 0,
+    );
+  check(
+    "every enum type's value list matches schema.ts",
+    valueDrift.length === 0,
+    valueDrift
+      .map(
+        (drift) =>
+          `${drift.name} — only in the database: [${drift.onlyLive.join(", ")}], only in schema.ts: [${drift.onlyDeclared.join(", ")}]`,
+      )
+      .join(" | "),
+  );
+
+  // An index declared without a name would vanish from the set in silence —
+  // exactly the hole this section exists to close — so it lands in the diff.
+  const declaredIndexes = new Set(
+    tables.flatMap((table) =>
+      getTableConfig(table).indexes.map(
+        (index) =>
+          index.config.name ?? `«unnamed on ${getTableConfig(table).name}»`,
+      ),
+    ),
+  );
+  // `not exists (… conindid = c.oid)` is load-bearing, not noise: Postgres
+  // lists the index behind every primary key and `unique()` constraint in
+  // `pg_class` too, and `schema.ts` declares those as constraints, never as
+  // indexes. Without the predicate this fails on nearly every table.
+  const liveIndexNames = new Set(
+    (
+      (await db.execute(sql`
+        select c.relname as indexname
+        from pg_class c
+        join pg_index i on i.indexrelid = c.oid
+        where c.relkind = 'i'
+          and c.relnamespace = 'public'::regnamespace
+          and not exists (
+            select 1 from pg_constraint con where con.conindid = c.oid
+          )
+      `)) as unknown as { indexname: string }[]
+    ).map((row) => row.indexname),
+  );
+  console.log(
+    `  --    ${liveIndexNames.size} index(es) in the database, constraint-owned excluded`,
+  );
+  assertSetsMatch("index", declaredIndexes, liveIndexNames);
 }
 
 main()

@@ -177,9 +177,7 @@ a session report does not exist.
 | `report_signal` has nine values. **Corrected by AUDIT 1: `S43` lists eleven, not ten, and two are missing, not one** — *stock shortage* and *customer went quiet*. `loss_reasons` also seeds nine and is missing a different two — *quality concern* and *payment terms* — so the two lists are complementary halves whose union is exactly `S43`'s eleven. Seven shared concepts carry different tokens (`competitor_cheaper`/`lost_to_competitor`, `lead_time_too_long`/`delivery_time_too_long`, `specification_unavailable`/`specification_not_offered`, `project_delayed`/`project_cancelled_or_postponed`, `colour_unavailable`/`colour_or_product_unavailable`), so unifying is not a union. Only two values are in use in 30 signal rows, so the data migration is small | `src/lib/enums.ts`, `src/db/schema.ts`, `scripts/seed/loss-reasons.ts` | Session 15, which unifies the vocabulary |
 
 **Added by AUDIT 1 (§6), ranked by consequence.** Counts are from the live
-database on 19 Aug 2026, after all sixteen migrations. One finding is **not**
-here on purpose — the `rep_reports_reference` drift between `schema.ts` and the
-snapshot, which is not deferrable and was reported separately.
+database on 19 Aug 2026, after all sixteen migrations.
 
 | What | Where | Disposition |
 |---|---|---|
@@ -199,7 +197,6 @@ snapshot, which is not deferrable and was reported separately.
 | **Dead enum values.** `record_type.quotation_version` is set nowhere — the `comments` CHECK excludes it, `SHARED_RECORD_TYPES` excludes it, and the three tables that could carry it are dead. `project_end_state.dormant` is writable from the project form but no rule defines a dormant project end state, and 0 of 354 projects use it. (`form_factor.coil` is its own row above) | `src/db/schema.ts` | Undecided — each needs a rule or a drop |
 | `product_suppliers.code`, `product_classes.code` and `product_fire_ratings.code` exist for the generated product name `S53` says FACET does not produce. Nothing renders them; they survive only as the `ORDER BY` of three dropdowns | `src/db/schema.ts`, `src/lib/lookups.ts:328-357` | Borderline — recorded so a later slice decides deliberately rather than inheriting them |
 | `SPEC §15` lists `accounts` under "Dropped outright". It was **not** dropped, deliberately: `accountsTable` is a non-optional member of the adapter's `DefaultPostgresSchema`. That decision lives only in migration `0015`'s header and a `schema.ts` comment, so the authority file currently says something untrue about the database | `SPEC.md` §15 | A `SPEC.md` correction |
-| The `§9` marker count reads 15 `[CHANGE]` / 22 `[BUILD]`, but two of those lines are the legend at `SPEC.md:10-11`. Rule-level it is **14 and 21**, and two of the 21 are inner markers on rules otherwise unmarked (`S16`) or `[CHANGE]` (`S29`). The "real progress bar" can never reach 0/0 as written | `SPEC.md:10-11`, `scripts/status.ps1` | Exclude the legend lines from the count, or accept the offset knowingly |
 | **Three markers name something already built, in whole or in part.** `S34` `[CHANGE]` — all five channels including `meeting` have existed since migration `0005` and the enum matches `S34` exactly; only the *definitions* of visit and meeting are new, and no label carries them. `S81` `[CHANGE]` — "divides equally" and "nobody types a percentage" are already true, and the open clause is open the other way round, because `divideEqually` *is* the remainder machinery `S81` says not to build. `S11` `[BUILD]` — password reset does not exist but deactivate/re-enable does; `S106` `[BUILD]` has the same shape, the review and its three outcomes existing while only the rep's way in is missing | `SPEC.md` | Each needs the founder to retire, narrow or restate the marker |
 
 ---
@@ -276,8 +273,9 @@ Write-Host "=== SIZE ==="
 (Get-ChildItem -Recurse src -Include *.ts,*.tsx |
   Get-Content | Measure-Object -Line).Lines
 Write-Host "=== OPEN MARKERS ==="
-(Select-String -Path SPEC.md -Pattern "\[CHANGE\]").Count
-(Select-String -Path SPEC.md -Pattern "\[BUILD\]").Count
+# SPEC.md:10-11 are the legend, not rules.
+@(Select-String -Path SPEC.md -Pattern '^(?!- \*\*\[).*\[CHANGE\]').Count
+@(Select-String -Path SPEC.md -Pattern '^(?!- \*\*\[).*\[BUILD\]').Count
 ```
 
 The last two numbers are the real progress bar. They start at **26 `[CHANGE]`
@@ -368,8 +366,10 @@ Write-Host "`n=== SIZE ==="
 (Get-ChildItem -Recurse src -Include *.ts,*.tsx | Get-Content |
   Measure-Object -Line).Lines
 Write-Host "`n=== OPEN MARKERS ==="
-"CHANGE: " + (Select-String -Path SPEC.md -Pattern "\[CHANGE\]").Count
-"BUILD:  " + (Select-String -Path SPEC.md -Pattern "\[BUILD\]").Count
+# SPEC.md:10-11 are the legend, not rules. A rule's marker never opens a
+# bullet, so excluding "- **[" is what makes these counts rule-level.
+"CHANGE: " + @(Select-String -Path SPEC.md -Pattern '^(?!- \*\*\[).*\[CHANGE\]').Count
+"BUILD:  " + @(Select-String -Path SPEC.md -Pattern '^(?!- \*\*\[).*\[BUILD\]').Count
 ```
 
 Then in `package.json` scripts:

@@ -1550,16 +1550,6 @@ export const repReports = pgTable(
       "rep_reports_on_hold",
       sql`(outcome is distinct from 'on_hold') = (on_hold_until is null)`,
     ),
-    /**
-     * `25 §34` puts the reference **beside the outcome**, and a field note has
-     * no outcome — it is anchored to nobody and touches no customer timeline
-     * `[20 §2]`. The narrow reading on purpose: relaxing a constraint later is
-     * a one-line migration, and a column that quietly accepts anything is not.
-     */
-    check(
-      "rep_reports_reference",
-      sql`reference is null or entry_type = 'interaction'`,
-    ),
   ],
 );
 

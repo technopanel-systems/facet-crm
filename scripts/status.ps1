@@ -11,5 +11,7 @@ Write-Host "`n=== SIZE ==="
 (Get-ChildItem -Recurse src -Include *.ts,*.tsx | Get-Content |
   Measure-Object -Line).Lines
 Write-Host "`n=== OPEN MARKERS ==="
-"CHANGE: " + (Select-String -Path SPEC.md -Pattern "\[CHANGE\]").Count
-"BUILD:  " + (Select-String -Path SPEC.md -Pattern "\[BUILD\]").Count
+# SPEC.md:10-11 are the legend, not rules. A rule's marker never opens a
+# bullet, so excluding "- **[" is what makes these counts rule-level.
+"CHANGE: " + @(Select-String -Path SPEC.md -Pattern '^(?!- \*\*\[).*\[CHANGE\]').Count
+"BUILD:  " + @(Select-String -Path SPEC.md -Pattern '^(?!- \*\*\[).*\[BUILD\]').Count

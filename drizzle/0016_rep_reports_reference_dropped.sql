@@ -1,0 +1,24 @@
+-- 0016 — the declaration `0015` left behind. `SPEC §15`, AUDIT 1 F19.
+--
+-- `0015` dropped `rep_reports.reference` and Postgres dropped the CHECK
+-- `rep_reports_reference` with it, so the live database has carried eight
+-- CHECK constraints since. `schema.ts` and `meta/0015_snapshot.json` both went
+-- on declaring a ninth, on a column neither of them still has.
+--
+-- Six migrations of "No schema changes" could not see it, and that is
+-- structural rather than bad luck: `drizzle-kit generate` compares `schema.ts`
+-- to the snapshot, and those are the two that agreed. Only something that
+-- reads the database could tell — `verify:schema25` §13 now does, for CHECK
+-- constraints, enum types and their values, and indexes.
+--
+-- **`IF EXISTS` is load-bearing.** drizzle-kit emits the bare form, which
+-- fails on every database that has already replayed `0015` — the constraint
+-- went with the column there and there is nothing left to drop. The office
+-- PC's database has never been migrated and still HAS it. This is the only
+-- form correct in both states: a no-op where `0015` already took it, a real
+-- drop where the column-drop has not run or where the schema was pushed
+-- rather than migrated. Postgres has no other conditional drop.
+--
+-- No rule marker moves. `SPEC §15` entries are not numbered rules.
+
+ALTER TABLE "rep_reports" DROP CONSTRAINT IF EXISTS "rep_reports_reference";
