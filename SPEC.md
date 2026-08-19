@@ -63,7 +63,7 @@ coordinator**.
 created them.
 
 **S11. [BUILD]** **Super Admin can reset a password.** Accounts can be
-deactivated and re-enabled.
+deactivated and re-enabled. Deactivate and re-enable are built; the reset is not.
 
 ---
 
@@ -95,7 +95,9 @@ automatically. The primary rep is always the first rep who had the company.
 **S19.** A **contact has one name field**, English or Arabic.
 
 **S20.** A contact has **no owner**. It is visible exactly when its company is,
-and moves with the company on handover.
+and moves with the company on handover. The coordinator is the one exception,
+per **S76** — they see every contact without seeing its company, because a
+dispatch names a contact.
 
 ---
 
@@ -147,8 +149,9 @@ else:
 **S30.** A project is visible **only to its owner or someone explicitly shared on
 it**. Seeing a company does not reveal its projects.
 
-**S31.** A project is **won** when payment arrives **or** the project is approved
-(اعتماد).
+**S31. [BUILD]** A project is **won** when payment arrives **or** the project is
+approved (اعتماد). Today `end_state` is only ever set by hand on the project
+form; nothing derives it.
 
 ---
 
@@ -162,7 +165,7 @@ and optionally names a contact and a project. A **field note** has no company at
 all — market research, scouting, exhibition, training, internal. Field notes are
 **rare**; roughly nine in ten entries attach to a company or project.
 
-**S34. [CHANGE]** Channel is one of: **visit** (the rep goes to the customer),
+**S34.** Channel is one of: **visit** (the rep goes to the customer),
 **meeting** (the customer comes to us and is seen here), call, WhatsApp, email.
 
 **S35.** An interaction carries **exactly one outcome**: introduced, catalogue
@@ -361,7 +364,9 @@ rep or both are credited.
 
 **S81. [CHANGE]** A split divides **equally**. Nobody types a percentage. Splits
 across three or more reps are so rare they may never occur, so no remainder-
-distribution machinery is built.
+distribution machinery is built. The first two sentences are true today; the
+third is not — `divideEqually` distributes a remainder, and that is what comes
+out.
 
 **S82.** A rep can never set their own split.
 
@@ -460,7 +465,7 @@ removal, with a reason**. The manager reviews and decides: **archive** · **keep
 **S106. [BUILD]** That is the same review, the same three outcomes and the same
 record as a company going quiet. The only difference is what raises it — the
 clock, or the rep's judgement. One table, one screen, one manager decision, two
-ways in.
+ways in. The review, the three outcomes and the one record all exist. Only the second way in — the rep's request — is missing.
 
 **S107.** **Nothing is ever deleted.** "Removed" means archived: if that customer
 resurfaces in two years, the record says they were already known and why someone
@@ -534,7 +539,10 @@ Ordered by what unblocks what.
 
 **Dropped outright**
 
-- `accounts`, `verificationTokens` — Auth.js leftovers, credentials-only login
+- `verificationTokens` — an Auth.js leftover, credentials-only login.
+  `accounts` was on this list and **stays**: `accountsTable` is a non-optional
+  member of the adapter's `DefaultPostgresSchema`, so dropping it fails
+  typecheck. A library requirement is a writer.
 - `pipeline_snapshots`, `person_snapshots` — the dashboard rebuild decides what
   history it needs rather than inheriting a guess
 - `project_companies.role` — S25
