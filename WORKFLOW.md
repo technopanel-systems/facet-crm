@@ -57,7 +57,9 @@ discussed".
    living file, not a record of intent.** If it drifts from the code, the whole
    arrangement fails the way it did last time.
 8. **Commit and push.** Every session, no exceptions.
-9. **Paste the status block (§7) into this chat.**
+9. **Append anything discovered and deferred to §5.** A defect that exists
+   only in a session report does not exist.
+10. **Paste the status block (§9) into this chat.**
 
 ---
 
@@ -108,7 +110,7 @@ Schema and data layer first, because the UI renders whatever the model says.
 | 8 | Coordinator sees projects and contacts | `S76` |
 | 9 | Drop dead structure — `accounts`, `verificationTokens`, both snapshot tables, `project_companies.role` | `SPEC §15` |; re-cite verify-routes.ts assertion labels to S numbers
 
-> **AUDIT 1 — the model.** See §5.
+> **AUDIT 1 — the model.** See §6.
 
 ### Phase 2 — The rebuild
 
@@ -120,7 +122,7 @@ Schema and data layer first, because the UI renders whatever the model says.
 | 13 | Grouped lists with per-object lead cells — companies, projects, quotations | `D22`–`D24` |
 | 14 | The stream — replaces `/reports` and `/activity`; comments narrowed to threads and projects | `S114` `D42`–`D45` |
 
-> **AUDIT 2 — the interface.** See §5.
+> **AUDIT 2 — the interface.** See §6.
 
 ### Phase 3 — Trust
 
@@ -145,7 +147,7 @@ Nothing below is optional before real users touch it.
 | 24 | Phone pass — rep screens at 375px | `D52` `D53` |
 | 25 | RTL pass — every screen, both locales | `D54` |
 
-> **AUDIT 3 — pre-pilot.** See §5.
+> **AUDIT 3 — pre-pilot.** See §6.
 
 ### Phase 5 — Pilot
 
@@ -154,7 +156,25 @@ Everything after this is decided by what they say, not by this plan.
 
 ---
 
-## 5. The three audits
+## 5. Known defects and deferred work
+
+Found during a session, correctly not fixed there. A defect that exists only in
+a session report does not exist.
+
+| What | Where | Disposition |
+|---|---|---|
+| Search filters `ilike` a raw name; `companies.ts` uses the normalised one, so the same Arabic name is findable on one screen and not another | five of six search filters in `src/lib/` | Own session after the model phase |
+| ~28 sites need `dir="auto"` per D62 | list cells, option labels, panels — inventory in session 3a's report | Sweep session with the `SelectField` item below |
+| Eight `SelectField`s should carry `required`; each validates server-side, so the placeholder costs a round trip, not correctness | user, contact, report and quotation-line forms | Same sweep session |
+| Participant add/remove forms never answer a no-JS POST — `Failed to parse body as FormData`; the write lands, the response does not. Bisected to pre-existing | `projects/[id]/project-links.tsx` | Own session |
+| `confirmPaymentAction` never answers a raw form POST. Same shape, different action | `quotations/[id]` | Same session as the above — likely one cause |
+| `verify-routes.ts` assertion labels cite archived document numbers | `scripts/verify-routes.ts` | Fold into session 9 |
+| `follow-ups.ts:166` filters in memory after the fetch | `src/lib/follow-ups.ts` | None — file is deleted in session 11 |
+| `listQuotationFormOptions` returns every visible company into one `<select>`. Fine at ~90 | `src/lib/quotations.ts` | Revisit after bulk import |
+
+---
+
+## 6. The three audits
 
 An audit is its own session, produces a findings list, and **changes nothing**.
 Fixes are separate sessions afterwards.
@@ -177,7 +197,7 @@ questions from `D3`, `D25` and `D31`, asked of a rep who has never seen it.
 
 ---
 
-## 6. Rules that keep this from going wrong again
+## 7. Rules that keep this from going wrong again
 
 - **No agent frameworks, swarms, hooks, or auto-generated documentation.** This
   has been installed twice by accident and removed twice. If anything proposes
@@ -192,7 +212,7 @@ questions from `D3`, `D25` and `D31`, asked of a rep who has never seen it.
 
 ---
 
-## 7. Repository access at milestones
+## 8. Repository access at milestones
 
 The repo is **private**. `legacy/` contains real colleague names and email
 addresses, so it stays that way.
@@ -204,7 +224,7 @@ block below is enough.
 
 ---
 
-## 8. The status block
+## 9. The status block
 
 Run this at the end of a session and paste the output. It is what Claude uses
 instead of repository access.
@@ -234,11 +254,11 @@ The last two numbers are the real progress bar. They start at **26 `[CHANGE]`
 and 24 `[BUILD]` — 50 open** and should only ever go down. If they rise,
 something was decided outside the spec.
 
-Better still, add the script to the repo once (see §9) and run `npm run status`.
+Better still, add the script to the repo once (see §11) and run `npm run status`.
 
 ---
 
-## 9. Current state, verified from the repository
+## 10. Current state, verified from the repository
 
 Checked directly against `main` at commit `12689b4`.
 
@@ -277,7 +297,7 @@ chain reaches it at module load anyway.
 
 ---
 
-## 10. Repository housekeeping
+## 11. Repository housekeeping
 
 Four small changes. None affects the workflow; all of them remove friction.
 Do them in one commit before session 1.
@@ -302,7 +322,7 @@ WORKFLOW.md
 
 **3. Move `INVENTORY.md`** to `docs/archive/` — its content is in `SPEC.md` now.
 
-**4. Add a status script** so §7 is one command. Save as `scripts/status.ps1`:
+**4. Add a status script** so §9 is one command. Save as `scripts/status.ps1`:
 
 ```powershell
 Write-Host "=== BRANCH & COMMITS ==="
