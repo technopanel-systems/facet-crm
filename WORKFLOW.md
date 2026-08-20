@@ -132,7 +132,7 @@ Nothing below is optional before real users touch it.
 |---|---|---|
 | 15 | Signals and loss reasons unified; loss cascades down | `S43`–`S49` |
 | 16 | Duplicate detection and manager resolution | `S21`–`S23` |
-| 17 | Credit terms — rep requests, manager approves | `S70` `S73` |
+| 17 | ~~Credit terms — rep requests, manager approves~~ **Removed.** Credit stopped being a company property to request and approve; it is now one payment method among six, recorded on the dispatch — `S71`. | — |
 | 18 | Archive requests folded into the dormancy review | `S105`–`S107` |
 | 19 | Sharing per project; contacts shareable | `S97` `S98` |
 | 20 | **Bulk import** — nobody hand-types the customer base | `SPEC §15` |
@@ -236,6 +236,10 @@ questions from `D3`, `D25` and `D31`, asked of a rep who has never seen it.
 - **Derived conditions are resolved in SQL, before pagination.** This has
   already shipped broken once, and it fails silently.
 - **One task per session**, and the plan reviewed here before approval.
+- **There is no production data.** Every row in every database is a fixture or
+  verify residue. A migration never preserves, backfills or merges data — it
+  clears, and `db:reset` is always available. This stops being true at the
+  pilot, and this line comes out then.
 
 ---
 

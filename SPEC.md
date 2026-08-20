@@ -151,9 +151,9 @@ else:
 **S30.** A project is visible **only to its owner or someone explicitly shared on
 it**. Seeing a company does not reveal its projects.
 
-**S31. [BUILD]** A project is **won** when payment arrives **or** the project is
-approved (اعتماد). Today `end_state` is only ever set by hand on the project
-form; nothing derives it.
+**S31. [BUILD]** A project is **won** when a quotation on it is **accepted**, or
+the project is approved (اعتماد). Acceptance is the commitment; payment may
+follow by any route and is recorded on the dispatch.
 
 ---
 
@@ -294,9 +294,9 @@ conversion figure may treat it as won.
 **S66.** A **revision** creates the next version carrying an RE number, and
 supersedes the previous one.
 
-**S67.** **Validity is a note, not a gate.** An expired quotation is
-shown as expired and **stops nothing**. Availability depends on the rep, the
-company and the situation, so no rule is built on it.
+**S67. [CHANGE]** **Validity and delivery period are SMAC's, not FACET's.**
+FACET does not carry a validity date, does not compute expiry, and does not show
+a delivery period.
 
 **S68.** **Quotations are never summed.** One project quoted three times at
 2,000 m² is the same 2,000 counted three times, not 6,000. Quoted means the
@@ -306,24 +306,31 @@ latest live version of one thread.
 
 ---
 
-## 9. Credit terms
+## 9. Payment
 
-**S70. [BUILD]** A **rep requests** that a company be treated as a credit
-customer. **The manager approves it.** Credit is a property of the company, never
-a per-dispatch tick.
+**S70.** **Payment is recorded on the dispatch, not on the quotation.** The
+coordinator records how the customer is paying, because she is the one who
+confirms it with finance.
 
-**S71.** Fewer than 5% of companies are credit customers.
+**S71. [BUILD]** The payment method is one of: **on delivery** · **in the office
+by card** · **cash in the office** · **bank transfer, full** · **bank transfer,
+downpayment** · **handled by finance** — credit, تساهيل, or a company contract,
+settled in SMAC, where FACET carries the reference only. An optional note
+carries anything the list does not.
 
 ---
 
 ## 10. Dispatch
 
-**S72.** The **coordinator** records what was actually dispatched. This is the
-only event that credits a target.
+**S72. [CHANGE]** **A rep requests a dispatch; the coordinator checks it and
+approves it.** She is the one who deals with SMAC and with finance. An approved
+dispatch is the only event that credits a target — not the request, and not the
+SMAC number that follows.
 
-**S73. [CHANGE]** A dispatch against a quotation is **blocked until payment is
-confirmed — unless the company is an approved credit customer**, in which case it
-proceeds and is flagged as a credit dispatch.
+**S73. [BUILD]** A dispatch cannot be approved without a payment method. Finance
+may refuse afterwards, so an approval is **reversible until the SMAC dispatch
+number is recorded**. After that, undoing it is a cancellation, which is a
+different act and stays visible.
 
 **S74.** **The project is recorded on the dispatch itself.** When the
 quotation has a project, the dispatch takes that project — it is shown, not
@@ -332,11 +339,10 @@ back onto the quotation, and the quotation's company is added to that project as
 a participant if it is not already one. A dispatch's project is never different
 from its quotation's.
 
-**S75. [CHANGE]** **Every dispatch has a project or a stated purpose, never
-neither.** A dispatch with no quotation may still name a project. When it names
-none, the coordinator states what the stock is for — the customer's own
-inventory, a sample, or other with a text field. It stays marked as a direct
-dispatch.
+**S75. [BUILD]** A dispatch is raised one of three ways: **exactly as a
+quotation** · **from a quotation, with edits** · **as a free entry with no
+quotation at all**. The second is the normal case after negotiation. A dispatch
+should name a project; where there is none it may be left empty for now.
 
 **S76.** The coordinator **sees projects and contacts**, because both
 are part of the dispatch. The name-only restriction is removed. This is a
@@ -345,9 +351,42 @@ only to its owner or someone explicitly shared on it, and seeing a company still
 reveals none of its projects. The coordinator sees them; **S62** is the whole of
 what they may do, and neither a project nor a contact is on it.
 
-**S77.** One quotation produces **any number of dispatches** — one, two, more.
-The quotation and the project are linked; quantities are never reconciled against
-each other.
+**S77. [CHANGE]** One quotation produces **any number of dispatches**. What was
+quoted and what was actually dispatched are **deliberately compared** — the gap
+is the point, not drift to be prevented.
+
+**S116. [BUILD]** **A dispatch carries its own lines**, the same shape as a
+quotation's product lines — product, thickness, colour, dimensions, pieces and
+price — but never service lines. Any line may differ from the quotation's,
+including price, and a dispatch may add a product the quotation never had. The
+invoice is made from these lines.
+
+**S117. [BUILD]** FACET **mirrors** the dispatch's money for comparison. SMAC
+issues the invoice and remains the system of record; a disagreement is SMAC's to
+settle.
+
+**S118. [BUILD]** A quotation is drawn from **one stock**: Riyadh, Malham, South
+or Dammam. The stock is on the quotation because SMAC's inventory needs it. The
+dispatch may draw from a different one; the change is recorded on the dispatch
+and the quotation is not rewritten.
+
+**S119. [BUILD]** Shipment is one of: **CT** (customer's own truck) · **TT**
+(Technopanel truck) · **Cargo** (third party). Only Riyadh and Malham stock have
+trucks, so a dispatch from **South or Dammam stock is CT**. Malham has fewer
+trucks than Riyadh; TT is discouraged there, never refused. Cargo carries a
+destination note.
+
+**S120. [BUILD]** **A dispatch that differs from its quotation is flagged**, and
+the flag is visible to the rep, the coordinator and the manager. Nobody is
+notified; it is a state of the record, not a message.
+
+**S121. [BUILD]** An approved dispatch carries its **SMAC dispatch number**,
+written by the coordinator once SMAC has issued it. A dispatch is approved
+before the number exists.
+
+**S122. [BUILD]** A **cancelled or refused dispatch request is archived**, not
+deleted, and is kept out of the working lists. It is inspectable and never
+clutters a rep's or the coordinator's day.
 
 ---
 
@@ -503,6 +542,13 @@ comment appears on the waiting list, so it cannot be missed.
 
 **S115.** **File attachments are Super Admin only** — a logo or general image.
 Rep file uploads are a possible later addition.
+
+**S123. [BUILD]** **Who created a record is a measure.** The normal case is the
+rep creating their own companies, contacts, projects, quotations and dispatch
+requests. A record created for a rep by the coordinator or a manager is
+recorded and counted, so the pattern is visible. It is a number to look at,
+never an enforcement — a rep in a meeting with no connection is a legitimate
+exception.
 
 ---
 
