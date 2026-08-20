@@ -391,15 +391,10 @@ settle. The figures are shown to the rep, the coordinator and the manager,
 **below square metres in prominence** — square metres are what a rep is
 measured on (S83, S85). VAT is 15%, as S57.
 
-**S118.** A quotation is drawn from **one stock**: Riyadh, Malham, South
-or Dammam. The stock is on the quotation because SMAC's inventory needs it. The
-dispatch may draw from a different one; the change is recorded on the dispatch
-and the quotation is not rewritten. The stock is a **fixed list chosen from a
-dropdown**; FACET holds no inventory, only the name SMAC needs. **A free-entry
-dispatch names a stock too.** After approval the stock cannot change — a
-dispatch that must change is cancelled as a whole (S73) and raised again. The
-**rep chooses the stock when requesting**, as they choose the shipment method
-(S119). The coordinator may change it until approval, after which it is fixed.
+**S118.** A quotation is drawn from **one stock**: Riyadh, Malham, South or
+Dammam. The stock is on the quotation because SMAC's inventory needs it — FACET
+holds no inventory, only the name. The rep chooses it when raising, from a fixed
+list.
 
 **S119. [BUILD]** Shipment is one of: **CT** (customer's own truck) · **TT**
 (Technopanel truck) · **Cargo** (third party). Only Riyadh and Malham stock have
@@ -452,6 +447,12 @@ rather than altering it (S66).
 **S127. [BUILD]** The coordinator may **raise a dispatch request against her
 own company and approve it herself**. She holds companies like any rep (S9),
 and nothing blocks the same person from both acts.
+
+**S130. [BUILD]** A dispatch may draw from a **different stock** than its
+quotation (S118). The rep chooses it when requesting, as they choose the
+shipment method (S119); the coordinator may change it until approval, after
+which it is fixed. The change is recorded on the dispatch and the quotation is
+not rewritten.
 
 ---
 
