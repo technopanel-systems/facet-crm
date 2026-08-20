@@ -137,8 +137,9 @@ per participant.
 it is hidden, not deleted, and can be re-linked.
 
 **S28. [CHANGE]** A project's **state is never reported — it is derived** from
-real events: quotation raised, issued, accepted, dispatched. The one exception
-is **committed**, which lives in the rep's head and nowhere else (S31, S108).
+real events: quotation raised, issued, accepted, dispatched. **S29** lists what
+the rep sets on top of that; of those, **committed** is the only one a
+conversion figure could mistake for won, and it never is (S31).
 
 **S29. [CHANGE]** The rep sets exactly **five things** on a project and nothing
 else:
@@ -155,9 +156,13 @@ it**. Seeing a company does not reveal its projects.
 
 **S31. [BUILD]** A project is **won when a dispatch against it is approved**.
 That is a real event and cannot be manufactured. Before that, a rep may mark a
-project **committed** — the customer has agreed, verbally or by اعتماد. That is
+project **committed** — the customer has agreed, verbally or otherwise. That is
 the rep's own judgement, and no conversion figure treats it as won. **S65** is
 unchanged: an accepted quotation is an internal signature and is neither.
+Reversing an approval un-wins the project, because won is derived and not
+stored. Cancelling after the SMAC number exists does not: the stock went out.
+The Arabic term for the customer's commitment is **OPEN — not chosen**, and it
+must not reuse اعتماد, which already labels the coordinator's internal accept.
 
 ---
 
@@ -344,8 +349,10 @@ already one. The write-back happens when the coordinator approves.
 
 **S75. [BUILD]** A dispatch is raised one of three ways: **exactly as a
 quotation** · **from a quotation, with edits** · **as a free entry with no
-quotation at all**. The second is the normal case after negotiation. A dispatch
-should name a project; where there is none it may be left empty for now.
+quotation at all**. The second is the normal case after negotiation. **A
+dispatch that names a project wins it on approval (S31); one that names none
+wins nothing**, which is why the project is asked for even when it is not
+refused.
 
 **S76.** The coordinator **sees projects and contacts**, because both
 are part of the dispatch. The name-only restriction is removed. This is a
@@ -362,34 +369,56 @@ is the point, not drift to be prevented.
 quotation's product lines — product, thickness, colour, dimensions, pieces and
 price — but never service lines. Any line may differ from the quotation's,
 including price, and a dispatch may add a product the quotation never had. The
-invoice is made from these lines.
+invoice is made from these lines. A dispatch raised from a quotation arrives
+**pre-filled with its lines**; the rep keeps them or edits them. **Every line
+carries a price**; nothing is dispatched free.
 
 **S117. [BUILD]** FACET **mirrors** the dispatch's money for comparison. SMAC
 issues the invoice and remains the system of record; a disagreement is SMAC's to
-settle.
+settle. The figures are shown to reps and managers, **below square metres in
+prominence** — square metres are what a rep is measured on (S83, S85). VAT is
+15%, as S57.
 
 **S118. [BUILD]** A quotation is drawn from **one stock**: Riyadh, Malham, South
 or Dammam. The stock is on the quotation because SMAC's inventory needs it. The
 dispatch may draw from a different one; the change is recorded on the dispatch
-and the quotation is not rewritten.
+and the quotation is not rewritten. The stock is a **fixed list chosen from a
+dropdown**; FACET holds no inventory, only the name SMAC needs. **A free-entry
+dispatch names a stock too.** After approval the stock cannot change — a
+dispatch that must change is refused as a whole (S124) and raised again.
 
 **S119. [BUILD]** Shipment is one of: **CT** (customer's own truck) · **TT**
 (Technopanel truck) · **Cargo** (third party). Only Riyadh and Malham stock have
 trucks, so a dispatch from **South or Dammam stock is CT**. Malham has fewer
 trucks than Riyadh; TT is discouraged there, never refused. Cargo carries a
-destination note.
+destination note. The rep chooses the shipment method when requesting. A Cargo
+destination note is optional. **That TT is discouraged at Malham is the
+coordinator's knowledge, not a rule FACET enforces.**
 
 **S120. [BUILD]** **A dispatch that differs from its quotation is flagged**, and
-the flag is visible to the rep, the coordinator and the manager. Nobody is
-notified; it is a state of the record, not a message.
+the flag is visible to the rep, the coordinator and the manager. **Any
+difference flags it** — a colour swapped at the same price and quantity counts.
+The flag is **permanent**: it survives approval and is kept for later analysis,
+because the gap between quoted and dispatched is the thing being measured (S77).
 
 **S121. [BUILD]** An approved dispatch carries its **SMAC dispatch number**,
 written by the coordinator once SMAC has issued it. A dispatch is approved
-before the number exists.
+before the number exists. The number is **unique** and arrives **immediately on
+approval**.
 
 **S122. [BUILD]** A **cancelled or refused dispatch request is archived**, not
 deleted, and is kept out of the working lists. It is inspectable and never
-clutters a rep's or the coordinator's day.
+clutters a rep's or the coordinator's day. A rep sees their own archived
+requests; coordinators and managers see all. **Only the coordinator may revive
+one**, and a revived request is treated as new.
+
+**S124. [BUILD]** **The coordinator refuses a dispatch request**, the same
+person who approves one. A refusal carries a reason and archives the request
+(S122).
+
+**S125. [BUILD]** A rep may **edit their own request until it is acted on** —
+a dispatch request until the coordinator approves or refuses it, a quotation
+request until the coordinator issues it. After that, a change is a new request.
 
 ---
 
