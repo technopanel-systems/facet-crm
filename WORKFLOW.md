@@ -356,12 +356,12 @@ Taken from `main` at commit `06aeb2b`.
 | Skills | `facet-ui`, `facet-verify` — nothing else |
 | claude-flow | fully removed, no remnants in the tree |
 | Routes | 38 |
-| Migrations | 19 — the only row re-measured since the stamp above, at `5444a89` |
+| Migrations | 20 — re-measured since the stamp above, at `S118` |
 | Tables | 41, of which **5 have no reference anywhere in `src/` or `scripts/`**: `delete_requests`, `product_specifications`, `duplicate_flags`, `non_duplicates`, `attachments`. `accounts` is referenced and stays — the adapter's TYPE requires it |
 | Code | `src/lib` 14,612 · `src/app` 14,480 · `src/db` 1,935 · `src/components` 1,691 · `scripts` 16,132 |
 | Largest under `src` | `quotations.ts` 1,956 · `schema.ts` 1,869 · `follow-ups.ts` 1,527 · `authz.ts` 1,527 · `notifications.ts` 934 |
 | Largest under `scripts` | `verify-routes.ts` 2,488 · `verify-schema25.ts` 1,732 · `verify-slice3.ts` 1,679 · `verify-phase9.ts` 1,558 · `verify-phase10a.ts` 1,447 |
-| Open markers | 17 `[CHANGE]`, 38 `[BUILD]` — **55 open**. See §9 for what a rise means |
+| Open markers | 16 `[CHANGE]`, 37 `[BUILD]` — **53 open**, re-measured at `S118`. The 17 was drift; `npm run status` is the reading, never a grep. See §9 for what a rise means |
 | Blocking | the Docker build |
 
 **Session 24 is larger than it looks.** It deletes `follow-ups.ts` (1,527) and

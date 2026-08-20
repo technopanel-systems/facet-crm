@@ -100,6 +100,23 @@ export type QuotationVersionOrigin =
 export const SMAC_VERIFICATIONS = ["unverified", "verified"] as const;
 export type SmacVerification = (typeof SMAC_VERIFICATIONS)[number];
 
+/**
+ * `S118` — the four stocks a quotation may be drawn from. FACET holds no
+ * inventory, only the name SMAC needs.
+ *
+ * A pg enum rather than a lookup table, for the reasons `stockEnum` carries in
+ * `src/db/schema.ts`. What matters here is the consequence: this list is the
+ * one a `"use client"` form renders its four options from, and `SameValues` in
+ * `src/lib/quotations.ts` proves at compile time that it still agrees with the
+ * database.
+ *
+ * The English names are SMAC's own. The Arabic labels are in `messages/*.json`
+ * and carry `مخزن`, because in Arabic the classifier is what makes each read
+ * as a stock rather than as a city.
+ */
+export const STOCKS = ["riyadh", "malham", "south", "dammam"] as const;
+export type Stock = (typeof STOCKS)[number];
+
 /** `[20 §2]` — an interaction has a company; a field note has nobody. */
 export const REPORT_ENTRY_TYPES = ["interaction", "field_note"] as const;
 export type ReportEntryType = (typeof REPORT_ENTRY_TYPES)[number];

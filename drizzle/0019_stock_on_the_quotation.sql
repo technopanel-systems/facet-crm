@@ -1,0 +1,65 @@
+-- 0019 — S118: a quotation is drawn from one stock.
+--
+-- Riyadh, Malham, South or Dammam, chosen by the rep when raising. The stock
+-- is on the quotation because SMAC's inventory needs it; FACET holds no
+-- inventory, only the name. This is the quotation half of S118 and nothing
+-- else: the dispatch drawing from a different stock, the coordinator changing
+-- it until approval and the freeze after all wait for a dispatch request to
+-- hang on.
+--
+-- **An enum, not a lookup table.** `schema.ts` states the test at the head of
+-- its enum block — a closed set fixed by a document is an enum, and anything a
+-- document says stays editable is a table. S118 says *fixed list*. The four
+-- lookups this resembles are all editable by design: `cities` grows,
+-- `lead_sources` expects marketing channels to multiply, `loss_reasons` and the
+-- product lookups are seeded vocabularies. A fifth stock is a new warehouse,
+-- which earns a migration. The deciding argument is S119 next door, which
+-- branches on identity — *a dispatch from South or Dammam stock is CT* — and a
+-- uuid into an editable table cannot carry that safely; it is why
+-- `loss_reasons` needed `OTHER_LOSS_REASON_CODE`. Here `enums.ts` mirrors the
+-- type and `SameValues` makes drift a compile error. Display names live in
+-- `messages/*.json`, so rewording a label costs no migration at all.
+--
+-- **On the version, not the thread.** S120 compares a dispatch against *the
+-- version it was raised from*, never the latest one. A column on
+-- `quotation_threads` would answer with today's value and manufacture a gap on
+-- a dispatch that never moved — silently, which is the failure S120 exists to
+-- prevent. On the version it also inherits the freeze S61 and S66 put there.
+--
+-- **NOT NULL, and statement 2 refuses to run against any database holding a
+-- quotation version.** That is `0010`'s phone precedent, deliberately, and not
+-- an oversight: the column has no default and nothing backfills it.
+--
+-- **Measured against `facet` before this file was written**, as `0018` was:
+-- 535 quotation versions, 503 threads, 463 lines, 362 dispatches. Every one is
+-- a fixture or verify residue — WORKFLOW §7, there is no production data — and
+-- not one of them was drawn from a stock anybody chose, because until this
+-- migration there was nothing to choose. So there is no fact here to preserve
+-- and none to infer. Writing `riyadh` across 535 rows would be exactly the
+-- placeholder `0010` refused for `phone` and `0017` refused for `region`: a
+-- value standing in for something nobody recorded, indistinguishable
+-- afterwards from one a rep really picked, and wrong the moment anyone counts
+-- by stock. Clearing IS available here — `npm run db:reset` — so §7's escape
+-- clause for a row whose deletion would break an invariant does not apply.
+--
+-- Run `npm run db:reset` first. The refusal is loud, happens before anything
+-- else changes, and says which column — driven against `facet` before this
+-- header was written, verbatim:
+--
+--     ERROR:  column "stock" of relation "quotation_versions"
+--             contains null values
+--
+-- **Both statements roll back together**, the `CREATE TYPE` included, so a
+-- database that refused this file is left exactly as it was — 19 migrations
+-- recorded, no `stock` type, no `stock` column — and the file re-runs cleanly
+-- once the table is empty. Confirmed the same way.
+--
+-- What holds the rule from here is not this file. It is
+-- `verify:slice2` §14 — the database refusing a version with no stock, beside
+-- the writer that cannot omit one — and `verify:routes` §14, which drives the
+-- same refusal through the form in both locales.
+--
+-- The two DDL statements are drizzle's own, reviewed as generated and left
+-- alone.
+CREATE TYPE "public"."stock" AS ENUM('riyadh', 'malham', 'south', 'dammam');--> statement-breakpoint
+ALTER TABLE "quotation_versions" ADD COLUMN "stock" "stock" NOT NULL;

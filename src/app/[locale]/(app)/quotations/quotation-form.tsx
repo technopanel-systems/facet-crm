@@ -6,11 +6,15 @@ import { useTranslations } from "next-intl";
 import {
   FormField,
   FormShell,
+  SelectField,
 } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Link } from "@/i18n/navigation";
+// A value import from a data module would bundle the Postgres driver here.
+// `enums.ts` imports nothing, on purpose, so a closed set is safe to read.
+import { STOCKS } from "@/lib/enums";
 import { emptyFormState, type FormState } from "@/lib/validation";
 
 import {
@@ -199,6 +203,35 @@ export function QuotationForm({
               </option>
             ))}
           </select>
+        </FormField>
+
+        {/* `S118` — the rep chooses the stock when requesting. A fixed list
+            of four, so a native `<select>` `D20` and not the city's combobox:
+            that exception is scoped to a two-hundred-item list.
+
+            No default. No rule picks one, and a prefilled stock is a stock
+            somebody would submit without reading — the value SMAC's inventory
+            is drawn against. `required` makes the browser refuse the
+            placeholder; the action refuses it again. */}
+        <FormField
+          name="stock"
+          label={t("quotations.fields.stock")}
+          error={errors.stock}
+          required
+        >
+          <SelectField
+            name="stock"
+            defaultValue={state.values?.stock ?? ""}
+            placeholder={t("common.none")}
+            required
+            invalid={Boolean(errors.stock)}
+          >
+            {STOCKS.map((stock) => (
+              <option key={stock} value={stock}>
+                {t(`enums.stock.${stock}`)}
+              </option>
+            ))}
+          </SelectField>
         </FormField>
 
         {/* `S67` — the form asks for no validity date and no delivery

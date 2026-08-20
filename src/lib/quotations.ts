@@ -90,12 +90,14 @@ import {
   QUOTATION_VERSION_ORIGINS,
   QUOTATION_VERSION_STATUSES,
   SMAC_VERIFICATIONS,
+  STOCKS,
   VAT_RATE,
   type QuotationThreadEndState,
   type QuotationVersionOrigin,
   type QuotationVersionStatus,
   type SameValues,
   type SmacVerification,
+  type Stock,
 } from "@/lib/enums";
 import { RuleError } from "@/lib/validation";
 
@@ -119,18 +121,22 @@ export type SmacVerificationMatchesSchema = SameValues<
   SmacVerification,
   QuotationVersion["smacReferenceVerification"]
 >;
+/** `S118` — the four stocks. Not nullable, so no `NonNullable` here. */
+export type StockMatchesSchema = SameValues<Stock, QuotationVersion["stock"]>;
 
 export {
   QUOTATION_THREAD_END_STATES,
   QUOTATION_VERSION_ORIGINS,
   QUOTATION_VERSION_STATUSES,
   SMAC_VERIFICATIONS,
+  STOCKS,
 };
 export type {
   QuotationThreadEndState,
   QuotationVersionOrigin,
   QuotationVersionStatus,
   SmacVerification,
+  Stock,
 };
 
 const PAGE_SIZE = 25;
@@ -1019,10 +1025,17 @@ export type QuotationThreadInput = {
 
 /**
  * `S67` took `validUntil` and `deliveryPeriod` off this: validity and the
- * delivery period are SMAC's, and FACET carries neither. The two that remain
- * are `S70`'s and `S119`'s to move onto the dispatch, in their own slices.
+ * delivery period are SMAC's, and FACET carries neither. Two of the three that
+ * remain are `S70`'s and `S119`'s to move onto the dispatch, in their own
+ * slices.
+ *
+ * **`stock` is not nullable** `S118`. A quotation is drawn from one stock and
+ * the rep chooses it when raising, so there is no caller with nothing to pass:
+ * omitting it is a compile error rather than a row the database refuses at
+ * runtime. That is the writer half of the `NOT NULL` on the column.
  */
 export type QuotationVersionInput = {
+  stock: Stock;
   paymentMethod: string | null;
   shipmentTerms: string | null;
 };
@@ -1176,6 +1189,8 @@ export async function createQuotationThread(
         versionNumber: 1,
         origin: "initial_request",
         status: "requested",
+        // `S118` — the rep's choice at raise. The only place it is chosen.
+        stock: version.stock,
         paymentMethod: version.paymentMethod,
         shipmentTerms: version.shipmentTerms,
         createdBy: session.user.id,
@@ -1618,6 +1633,10 @@ export async function createRevision(
         versionNumber: previous.versionNumber + 1,
         origin,
         status: "requested",
+        // `S118` — carried forward, like the two below it. Nothing on this
+        // path can change the stock: a revision takes no input, so the value
+        // is the one the rep chose at raise until a rule says otherwise.
+        stock: previous.stock,
         paymentMethod: previous.paymentMethod,
         shipmentTerms: previous.shipmentTerms,
         createdBy: session.user.id,

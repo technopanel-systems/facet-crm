@@ -131,6 +131,7 @@ import {
   createQuotationThread,
   issueVersion,
   listQuotationFormOptions,
+  type QuotationVersionInput,
 } from "@/lib/quotations";
 import { achievementForPeriod, listTargetHistory, setTarget } from "@/lib/targets";
 import { projectTimeline } from "@/lib/timeline";
@@ -331,7 +332,10 @@ async function main(): Promise<void> {
     quantityPcs: "12.0000", // 86.3040 m²
     unitPrice: "120.00",
   };
-  const version = {
+  // Annotated, not inferred: `stock` in a bare object literal widens to
+  // `string` and would never satisfy `Stock` `S118`.
+  const version: QuotationVersionInput = {
+    stock: "south",
     paymentMethod: "50% advance",
     shipmentTerms: "EX-F",
   };

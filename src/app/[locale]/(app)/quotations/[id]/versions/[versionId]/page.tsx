@@ -85,6 +85,13 @@ export default async function QuotationVersionPage({
             <Fact label={t("quotations.fields.origin")}>
               {t(`enums.quotationVersionOrigin.${version.origin}`)}
             </Fact>
+            {/* `S118` — a superseded version was drawn from a stock too, and
+                it is this one that `S120` will compare a dispatch against, not
+                the live version. A screen showing what was quoted has to show
+                what it was quoted from. */}
+            <Fact label={t("quotations.fields.stock")} name="stock">
+              {t(`enums.stock.${version.stock}`)}
+            </Fact>
             <Fact label={t("common.createdBy")}>
               {version.createdByName ?? t("common.unknownUser")}
             </Fact>

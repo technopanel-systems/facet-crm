@@ -181,6 +181,39 @@ export const quotationVersionOriginEnum = pgEnum("quotation_version_origin", [
   "coordinator_direct_edit",
 ]);
 
+/**
+ * `S118` — the four stocks a quotation may be drawn from. FACET holds no
+ * inventory; it holds the name SMAC's inventory needs.
+ *
+ * **An enum rather than a lookup table**, on the test at the head of this
+ * block: a closed set fixed by a document is an enum, and anything a document
+ * says stays editable is a table. `S118` says *fixed list*, and the four
+ * neighbours that look similar are all editable by design — `cities` grows,
+ * `lead_sources` expects marketing channels to multiply, `loss_reasons` and the
+ * product lookups are seeded vocabularies someone may extend. A fifth stock is
+ * a new warehouse, which earns a migration.
+ *
+ * The deciding argument is `S119`, which branches on identity: *a dispatch from
+ * South or Dammam stock is CT*. A uuid into an editable table cannot carry that
+ * safely — the row can be renamed or removed out from under the code — which is
+ * why `loss_reasons` needed `OTHER_LOSS_REASON_CODE`. Here `enums.ts` mirrors
+ * the type and `SameValues` makes drift a compile error.
+ *
+ * The display names live in `messages/*.json`, so rewording a label costs no
+ * migration at all.
+ *
+ * **The dispatch half of `S118` is not built.** A dispatch drawing from a
+ * different stock, the coordinator changing it until approval, and the freeze
+ * after all need a dispatch request to hang on. This type is the one they will
+ * use when they arrive — no module invents its own version of it `[CLAUDE.md]`.
+ */
+export const stockEnum = pgEnum("stock", [
+  "riyadh",
+  "malham",
+  "south",
+  "dammam",
+]);
+
 /** `[08 B2]` */
 export const formFactorEnum = pgEnum("form_factor", ["sheet", "coil"]);
 
@@ -1106,6 +1139,23 @@ export const quotationVersions = pgTable(
     status: quotationVersionStatusEnum("status").notNull().default("requested"),
     /** The coordinator's return-for-edit round `[04 flow 10]`. */
     returnForEditRound: integer("return_for_edit_round").notNull().default(0),
+    /**
+     * `S118` — the one stock this quotation is drawn from, chosen by the rep
+     * when raising.
+     *
+     * **On the version, not the thread**, and `S120` is why: a dispatch is
+     * compared against *the version it was raised from*, never the latest one.
+     * A thread-level column would answer with today's value and manufacture a
+     * gap on a dispatch that never moved — silently, which is the failure
+     * `S120` is written to prevent. It also inherits the freeze `S61` and `S66`
+     * put on a version: once issued, a change is a new version rather than an
+     * edit.
+     *
+     * **NOT NULL**: "a quotation is drawn from *one* stock", chosen at raise,
+     * so there is no legitimate moment with none. That is an invariant about
+     * what a row may contain, which the database holds `[CLAUDE.md]`.
+     */
+    stock: stockEnum("stock").notNull(),
     /**
      * `S67` took `valid_until` and `delivery_period` off this table: validity
      * and the delivery period are SMAC's, and FACET carries neither. The two

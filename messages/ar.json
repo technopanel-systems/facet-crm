@@ -107,6 +107,12 @@
       "rep_change_request": "طلب تعديل من المندوب",
       "coordinator_direct_edit": "تعديل من منسق المبيعات"
     },
+    "stock": {
+      "riyadh": "مخزن الرياض",
+      "malham": "مخزن ملهم",
+      "south": "مخزن الجنوب",
+      "dammam": "مخزن الدمام"
+    },
     "smacVerification": {
       "unverified": "غير مُتحقق منه",
       "verified": "مُتحقق منه"
@@ -359,6 +365,7 @@
       "paymentMethod": "طريقة الدفع",
       "shipmentTerms": "شروط الشحن",
       "origin": "المصدر",
+      "stock": "المخزن",
       "verification": "تم التحقق من المرجع",
       "grandTotal": "الإجمالي",
       "payment": "الدفع",

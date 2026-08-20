@@ -107,6 +107,12 @@
       "rep_change_request": "Change requested by rep",
       "coordinator_direct_edit": "Edited by coordinator"
     },
+    "stock": {
+      "riyadh": "Riyadh",
+      "malham": "Malham",
+      "south": "South",
+      "dammam": "Dammam"
+    },
     "smacVerification": {
       "unverified": "Unverified",
       "verified": "Verified"
@@ -359,6 +365,7 @@
       "paymentMethod": "Method of payment",
       "shipmentTerms": "Terms of shipment",
       "origin": "Origin",
+      "stock": "Stock",
       "verification": "Reference checked",
       "grandTotal": "Total",
       "payment": "Payment",

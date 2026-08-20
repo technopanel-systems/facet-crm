@@ -305,6 +305,13 @@ export default async function QuotationDetailPage({
                 <span dir="ltr">{live.returnForEditRound}</span>
               </Fact>
             ) : null}
+            {/* `S118` — what this version is drawn from. On the version and
+                not the thread, because `S120` compares a dispatch against the
+                version it was raised from. `name` is the DOM handle
+                `verify:routes` asserts on, never the translated label. */}
+            <Fact label={t("quotations.fields.stock")} name="stock">
+              {t(`enums.stock.${live.stock}`)}
+            </Fact>
             <Fact label={t("quotations.fields.paymentMethod")}>
               {live.paymentMethod ?? dash}
             </Fact>

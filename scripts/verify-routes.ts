@@ -38,6 +38,8 @@
  *      that project as a participant carrying a dispatched figure `S26`. Then
  *      the other branch on the same thread: dispatching again takes the
  *      project it gained, and naming a different one is refused as a message.
+ *      `S118` rides along on the same form: the stock is posted, refused when
+ *      cleared, and read back off the detail screen in both locales.
  *
  *  15. `S76` on the screens: the coordinator's `/projects` and `/contacts` are
  *      no longer empty, and neither carries a control they may not use — no
@@ -1703,6 +1705,8 @@ async function main(): Promise<void> {
     const leakedBefore = leaked.size;
     const stamp = `${Date.now()}`.slice(-7);
     let phoneSeq = 0;
+    /** `S118`'s rendered stock label per locale — compared after the loop. */
+    const stockLabels = new Map<string, string>();
 
     for (const locale of ["en", "ar"] as const) {
       const repJar = jars["rep-a@example.test"];
@@ -1722,6 +1726,11 @@ async function main(): Promise<void> {
         return fields;
       };
 
+      /**
+       * The body is returned as well as the status, which this helper used to
+       * discard. A refusal answers 200 and re-renders the form, so the ONLY
+       * evidence of which rule refused is in that markup.
+       */
       const post = async (jar: Jar, path: string, body: FormData) => {
         const response = await fetch(`${BASE}${path}`, {
           method: "POST",
@@ -1733,6 +1742,7 @@ async function main(): Promise<void> {
         return {
           status: response.status,
           location: response.headers.get("location") ?? "",
+          body: await response.text(),
         };
       };
 
@@ -1878,6 +1888,10 @@ async function main(): Promise<void> {
       for (const empty of ["paymentMethod", "shipmentTerms"]) {
         quotationFields.set(empty, "");
       }
+      // `S118` — the rep chooses one stock when raising. `verify:slice2` §14
+      // proves the value round-trips and survives a revision; what belongs
+      // here is that the form asks for it and the action refuses without it.
+      quotationFields.set("stock", "riyadh");
       for (const [name, value] of Object.entries(line)) {
         quotationFields.set(name, value as string);
       }
@@ -1890,6 +1904,37 @@ async function main(): Promise<void> {
       // This used to scrape the form's own default. Section 12 below
       // asserts the input is gone rather than trusting that it is.
 
+
+      // `S118` — the same POST with the stock cleared, sent BEFORE the good
+      // one so it cannot be mistaken for a duplicate-submission refusal.
+      //
+      // **"It did not answer 303" is not the assertion.** A POST whose
+      // `$ACTION` envelope never matched — the HTML-escaped `&quot;` trap the
+      // `envelope` helpers above exist to avoid — also fails to redirect, and
+      // would score as a pass with nothing validated at all. So what is
+      // asserted is that the action RAN AND REFUSED: 200 (`useActionState`
+      // re-renders, so never 303 and never 500), carrying the marker
+      // `FormField` emits only when `errors.stock` is set. A form-wide error
+      // does not produce it and an unmatched action cannot.
+      const stockless = new FormData();
+      for (const [name, value] of quotationFields.entries()) {
+        stockless.append(name, name === "stock" ? "" : value);
+      }
+      const refusedStock = await post(
+        repJar,
+        `/${locale}/quotations/new`,
+        stockless,
+      );
+      check(
+        `${locale}: *** raising a quotation with NO stock answers 200, not 303 or 500 *** [S118]`,
+        refusedStock.status === 200,
+        `got ${refusedStock.status} ${refusedStock.location}`,
+      );
+      check(
+        `${locale}: …and the error comes back ON the stock field [S118]`,
+        refusedStock.body.includes('id="stock-error"'),
+        "no stock-error marker in the re-rendered form",
+      );
 
       const raised = await post(
         repJar,
@@ -1919,6 +1964,20 @@ async function main(): Promise<void> {
       check(
         `${locale}: …and not as the em-dash an empty value takes`,
         factOf(thread.body, "project") !== DASH,
+      );
+
+      // `S118` — the stock reads on the screen, through the translation layer.
+      // The rendered text is recorded rather than compared to a literal: an
+      // assertion on "Riyadh" would be an assertion on a translated string,
+      // which this script may not make. What it may say is that the cell is
+      // filled and is not an empty value; the two locales are compared to each
+      // other after the loop, which proves the label was looked up.
+      const stockFact = factOf(thread.body, "stock");
+      stockLabels.set(locale, stockFact);
+      check(
+        `${locale}: the version says which stock it is drawn from [S118]`,
+        stockFact.length > 0 && stockFact !== DASH,
+        `got "${stockFact}"`,
       );
 
       /* --- 3. paid, so it can be dispatched [S73] ----------------------- */
@@ -2101,6 +2160,19 @@ async function main(): Promise<void> {
         `got ${refused.status} ${refused.location}`,
       );
     }
+
+    // `S118` — the same stock, rendered in both locales, must read
+    // differently. This is what replaces an assertion on "Riyadh": a value
+    // printed raw would be identical in both, so a difference proves the
+    // screen went through the translation layer, and it says so without this
+    // script ever reading a translated string. Section 12 covers the other
+    // failure — a label that did not resolve at all.
+    const [enStock, arStock] = [stockLabels.get("en"), stockLabels.get("ar")];
+    check(
+      "*** the stock label is translated, not printed raw *** [S118] [S113]",
+      Boolean(enStock) && Boolean(arStock) && enStock !== arStock,
+      `en "${enStock}" vs ar "${arStock}"`,
+    );
 
     // Section 12 has already run, and every screen above is one it could not
     // reach: the picker and its hints exist only for a project-less quotation.

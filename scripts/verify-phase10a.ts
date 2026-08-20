@@ -322,21 +322,31 @@ async function main(): Promise<void> {
   /**
    * A type nothing produces is the shape of v1's dead approval gate `[20 §11]`.
    *
-   * **This said five until feature slice 2, and the line moving is the point.**
-   * `21 §2` is headed *"Five notification types are seeded, and no sixth"*, but
-   * the rule underneath that heading is a **test**, not a cap: *"Each type below
-   * is named in a user-truth document AND has a real event in the code that can
-   * raise it."* `mention.received` passes both limbs — `25 §11` names it
-   * (*"Tagging a person raises a notification"*) and `src/lib/comments.ts`
-   * raises it, added in the same change. `25` is the later user-truth document
-   * besides, so it wins on its own.
+   * **This said five, then six, and is five again.** `21 §2` is headed *"Five
+   * notification types are seeded, and no sixth"*, but the rule underneath that
+   * heading is a **test**, not a cap: *"Each type below is named in a
+   * user-truth document AND has a real event in the code that can raise it."*
+   * `mention.received` passes both limbs — `25 §11` names it (*"Tagging a
+   * person raises a notification"*) and `src/lib/comments.ts` raises it — so
+   * feature slice 2 added it and moved this number to six.
    *
-   * What the number still guards is the thing `21 §2` actually cared about: a
-   * seeded type with no producer. Raise it only alongside one.
+   * It is five again because the same test took one away. `S67` deleted the
+   * expiry sweep and `quotation.expired` with it — the seed row went at
+   * `cd02a78`, since nothing can raise a type whose producer no longer exists.
+   * **This number was missed in that pass**, and went on passing only because
+   * `0014` marked the existing row non-persistent rather than deleting it
+   * (`12 §7` — FACET deletes nothing, and notifications already raised point at
+   * it). A database seeded before `S67` therefore still held six rows; one
+   * seeded after holds five, and `npm run db:reset` is what finally showed the
+   * difference.
+   *
+   * What the number guards is unchanged, and it is why it must track the seed
+   * exactly rather than be relaxed: a seeded type with no producer. Move it
+   * only alongside one, in either direction.
    */
   check(
-    "exactly six notification types — 21 §2's five, and 25 §11's [21 §2], [25 §11]",
-    types.length === 6,
+    "exactly five notification types — 25 §11's, less the one S67 retired [21 §2], [25 §11]",
+    types.length === 5,
     `got ${types.map((type) => type.key).join(", ")}`,
   );
 
@@ -503,6 +513,9 @@ async function main(): Promise<void> {
         versionNumber: 1,
         origin: "initial_request",
         status: threadStatus,
+        // `S118` — NOT NULL, so a direct insert has to name one too. This
+        // script is about dormancy and follow-ups; the stock is scenery.
+        stock: "riyadh",
         createdBy: ownerUser.id,
         createdAt: instantDaysAgo(ageDays),
       })

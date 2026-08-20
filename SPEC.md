@@ -391,7 +391,7 @@ settle. The figures are shown to the rep, the coordinator and the manager,
 **below square metres in prominence** — square metres are what a rep is
 measured on (S83, S85). VAT is 15%, as S57.
 
-**S118. [BUILD]** A quotation is drawn from **one stock**: Riyadh, Malham, South
+**S118.** A quotation is drawn from **one stock**: Riyadh, Malham, South
 or Dammam. The stock is on the quotation because SMAC's inventory needs it. The
 dispatch may draw from a different one; the change is recorded on the dispatch
 and the quotation is not rewritten. The stock is a **fixed list chosen from a

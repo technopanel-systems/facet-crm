@@ -394,6 +394,7 @@ async function main(): Promise<void> {
     repA,
     { projectId: project.id, companyId: company.id, contactId: null },
     {
+      stock: "riyadh",
       paymentMethod: "50% advance",
       shipmentTerms: "EX-F",
     },
@@ -728,6 +729,7 @@ async function main(): Promise<void> {
     repA,
     { projectId: project.id, companyId: company.id, contactId: null },
     {
+      stock: "riyadh",
       paymentMethod: "50% advance",
       shipmentTerms: "EX-F",
     },

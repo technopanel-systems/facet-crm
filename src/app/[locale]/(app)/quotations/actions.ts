@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { redirect } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
-import { COMMENT_BODY_MAX, SMAC_VERIFICATIONS } from "@/lib/enums";
+import { COMMENT_BODY_MAX, SMAC_VERIFICATIONS, STOCKS } from "@/lib/enums";
 import {
   acceptThread,
   addQuotationLine,
@@ -141,6 +141,10 @@ export async function createQuotationAction(
   const projectId = fields.uuid("projectId");
   const companyId = fields.uuid("companyId", { required: true });
   const contactId = fields.uuid("contactId");
+  // `S118` — the rep chooses the stock when requesting, from a fixed list.
+  // Required: a quotation is drawn from ONE stock and there is no moment in
+  // its life with none, which is why the column is NOT NULL.
+  const stock = fields.option("stock", STOCKS, { required: true });
   // `S67` — no validity date and no delivery period. Both are SMAC's.
   const version = {
     paymentMethod: fields.text("paymentMethod", { max: 200 }),
@@ -161,14 +165,14 @@ export async function createQuotationAction(
     if (service) serviceLines.push(service);
   }
 
-  if (!fields.ok || !companyId) return fields.state;
+  if (!fields.ok || !companyId || !stock) return fields.state;
 
   let threadId: string;
   try {
     const thread = await createQuotationThread(
       session,
       { projectId, companyId, contactId },
-      version,
+      { ...version, stock },
       lines,
       serviceLines,
     );

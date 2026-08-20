@@ -21,6 +21,8 @@
  *   7. Visibility: the raiser sees it, an unrelated rep does not, the project
  *      owner does `[11 §2]`.
  *   8. Qualification is derived from the event `[10 §1]`.
+ *   9. *** A quotation cannot be written without a stock *** `S118` — the
+ *      database refusing one, beside the writer that cannot omit one.
  *
  * Usage: `npm run verify:slice2`
  *
@@ -244,6 +246,7 @@ async function main(): Promise<void> {
     repA,
     { projectId: project.id, companyId: company.id, contactId: null },
     {
+      stock: "dammam",
       paymentMethod: "50% advance",
       shipmentTerms: "EX-F",
     },
@@ -559,7 +562,7 @@ async function main(): Promise<void> {
       createQuotationThread(
         repA,
         { projectId: project.id, companyId: other.id, contactId: null },
-        { paymentMethod: null, shipmentTerms: null },
+        { stock: "riyadh", paymentMethod: null, shipmentTerms: null },
         [
           {
             supplierId: supplier.id,
@@ -603,6 +606,96 @@ async function main(): Promise<void> {
     .where(sql`${auditLog.action} like 'quotation%'`);
   console.log(
     `        actions seen: ${actions.map((row) => row.action).sort().join(", ")}`,
+  );
+
+  /* --- 14. A quotation is drawn from one stock [S118] -------------- */
+
+  console.log(
+    "\n14. *** A quotation cannot be written without a stock *** [S118]",
+  );
+
+  // The claim is about the COLUMN, not about the row this script happened to
+  // write. A fixture that carries a stock proves only that the fixture carries
+  // one; what S118 needs is that a version without one cannot exist.
+  const [stockColumn] = (await db.execute(sql`
+    select is_nullable, data_type, udt_name
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'quotation_versions'
+      and column_name = 'stock'
+  `)) as unknown as {
+    is_nullable: string;
+    data_type: string;
+    udt_name: string;
+  }[];
+  check(
+    "quotation_versions.stock exists and is NOT NULL [S118]",
+    stockColumn?.is_nullable === "NO",
+    `got ${stockColumn?.is_nullable ?? "no such column"}`,
+  );
+  check(
+    "…and it is the `stock` enum, not free text",
+    stockColumn?.data_type === "USER-DEFINED" && stockColumn?.udt_name === "stock",
+    `got ${stockColumn?.data_type} / ${stockColumn?.udt_name}`,
+  );
+
+  // The refusal itself, at the database, against a thread that really exists.
+  // Raw SQL rather than the data layer on purpose: `QuotationVersionInput`
+  // makes the omission a compile error, so TypeScript is the only thing that
+  // can be asked about the writer, and this is the only way left to ask the
+  // database. A NOT NULL is not a row in `pg_constraint` on Postgres 17, so
+  // the assertion is on the message Postgres raises and the column it names.
+  try {
+    await db.execute(sql`
+      insert into quotation_versions (thread_id, version_number, origin)
+      values (${thread.id}, 99, 'initial_request')
+    `);
+    failures += 1;
+    console.error(
+      "  FAIL  a version with no stock was accepted — the database allowed it",
+    );
+  } catch (error) {
+    // The whole `cause` chain, not `error.message`: the driver wraps the
+    // refusal as "Failed query: …" and Postgres's own wording — with the
+    // column it names — sits one level down. Same shape as
+    // `verify-schema25`'s `causeChain`, and the reason that helper exists.
+    const parts: string[] = [];
+    let current: unknown = error;
+    for (let depth = 0; current && depth < 5; depth += 1) {
+      if (!(current instanceof Error)) {
+        parts.push(String(current));
+        break;
+      }
+      const pg = current as { column_name?: string; code?: string };
+      parts.push(current.message, pg.column_name ?? "", pg.code ?? "");
+      current = current.cause;
+    }
+    const thrown = parts.filter(Boolean).join(" | ");
+    check(
+      "*** a quotation version with no stock is refused *** [S118]",
+      // `23502` is not_null_violation, and the column it names must be ours —
+      // a refusal for some other missing column would prove nothing here.
+      thrown.includes("23502") && thrown.includes("stock"),
+      `threw ${thrown.slice(0, 200)}`,
+    );
+  }
+
+  // And the writer agrees with it. `dammam` deliberately, not `riyadh`: the
+  // first value of an enum is what a silent default would produce, so the
+  // round-trip would pass against `riyadh` whether or not anything read the
+  // input at all.
+  detail = await getQuotationThread(repA, thread.id);
+  check(
+    "*** the version carries the stock the rep chose *** [S118]",
+    detail?.live.stock === "dammam",
+    `got ${detail?.live.stock}`,
+  );
+  // Version 2 came from §8's revision, which takes no input at all — so this
+  // is the carry-forward, and the only reason the value survived a revision.
+  check(
+    "…and a revision carried it forward unchanged [S66]",
+    detail?.versions.every((version) => version.stock === "dammam") === true,
+    detail?.versions.map((v) => `v${v.versionNumber}=${v.stock}`).join(", "),
   );
 
   // Nothing is cleaned up: FACET does not delete history `[12 §7]`, and this

@@ -485,6 +485,9 @@ async function main(): Promise<void> {
       versionNumber: 1,
       origin: "initial_request",
       status: "issued",
+      // `S118` — NOT NULL, so a direct insert has to name one too. This
+      // script is about coverage and the timeline; the stock is scenery.
+      stock: "riyadh",
       smacReference: `${stamp}-9592`,
       createdBy: authorUser.id,
     })
