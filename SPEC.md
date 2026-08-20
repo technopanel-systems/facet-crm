@@ -91,8 +91,10 @@ exhibition, marketing, other. **Marketing is not selectable by an ordinary rep**
 — it means the lead came from the marketing team. A company that already carries
 it keeps it when a rep edits.
 
-**S18.** The rep who creates a company becomes its **primary rep**
-automatically. The primary rep is always the first rep who had the company.
+**S18. [CHANGE]** The rep who creates a company becomes its **primary rep**
+automatically. The primary rep is always the first rep who had the company. The
+first sentence ships. The second does not: handover and dormancy reassignment
+both carry primacy to the new holder.
 
 **S19.** A **contact has one name field**, English or Arabic.
 
@@ -105,8 +107,9 @@ dispatch names a contact.
 
 ## 4. Duplicates
 
-**S21. [BUILD]** A company is **always created**, even when it looks like a
-duplicate. Nothing blocks the rep.
+**S21.** A company is **always created**, even when it looks like a duplicate.
+Nothing blocks the rep. True today, because nothing flags a duplicate at all
+(S22).
 
 **S22. [BUILD]** A suspected duplicate raises a **flag to the Sales Manager**,
 who resolves it three ways: **false duplicate** · **who continues** · **shared
@@ -139,17 +142,19 @@ it is hidden, not deleted, and can be re-linked.
 **S28. [CHANGE]** A project's **state is never reported — it is derived** from
 real events: quotation raised, issued, accepted, dispatched. **S29** lists what
 the rep sets on top of that; of those, **committed** is the only one a
-conversion figure could mistake for won, and it never is (S31).
+conversion figure could mistake for won, and it never is (S31). The derivation
+ships. Only the committed half is pending (S29).
 
 **S29. [CHANGE]** The rep sets exactly **five things** on a project and nothing
 else:
 
 1. **Expected square metres** — the rep's estimate, the anchor number
 2. **In production** — a plain label, deliberately unverified, never checked
-   against the production module **[BUILD]**
+   against the production module
 3. **On hold until** — a date, which parks it
 4. **Lost, with a reason** — which closes it
 5. **Committed** — the customer has agreed, ahead of any dispatch (S31)
+   **[BUILD]**
 
 **S30.** A project is visible **only to its owner or someone explicitly shared on
 it**. Seeing a company does not reveal its projects.
@@ -294,7 +299,10 @@ thread is open.
 **S62. [CHANGE]** Only the coordinator may **issue, return, accept, reject or
 cancel** a quotation, and only she may **edit a submitted dispatch request**
 (S125) or **park a dispatch request** (S90). Returning, rejecting or cancelling
-requires a written reason, which becomes a comment on the thread.
+requires a written reason, which becomes a comment on the thread. Everything but
+the two dispatch clauses ships today — coordinator-only issue, return, accept,
+reject and cancel, and the written reason becoming a comment. Editing and
+parking a submitted dispatch request do not.
 
 **S63.** The coordinator creates the real quotation in SMAC and types the SMAC
 number back into FACET. Status becomes `issued`.
@@ -653,10 +661,12 @@ AR), and layout uses logical utilities so RTL works.
 
 **S114.** **Comments exist on quotation threads and projects only.** Not on
 companies, contacts or dispatches — the timeline already carries those. An unread
-comment appears on the waiting list, so it cannot be missed.
+comment appears on the waiting list, so it cannot be missed. Comments ship. The
+unread-comment surfacing does not — it needs the waiting list (S87).
 
 **S115.** **File attachments are Super Admin only** — a logo or general image.
-Rep file uploads are a possible later addition.
+Rep file uploads are a possible later addition. There is no attachment feature
+yet, so this restricts nothing today.
 
 **S123. [BUILD]** **Who created a record is a measure.** The normal case is the
 rep creating their own companies, contacts, projects, quotations and dispatch
@@ -668,7 +678,9 @@ meeting with no connection is a legitimate exception. This is not the deviation
 S120 measures. A gap the coordinator introduced is never the rep's deviation
 from a quotation; that the coordinator had to introduce it is a fact about how
 the request arrived. Two questions, two figures, and a screen showing both must
-say which is which.
+say which is which. `created_by` exists today on companies, contacts, projects
+and quotation versions. The dispatch request, the record of a coordinator's
+edit, and the two figures do not.
 
 ---
 
