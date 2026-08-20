@@ -505,7 +505,6 @@ async function main(): Promise<void> {
         status: threadStatus,
         createdBy: ownerUser.id,
         createdAt: instantDaysAgo(ageDays),
-        validUntil: shiftDays(today(), -1),
       })
       .returning();
     return { project, thread, version };
@@ -958,10 +957,10 @@ async function main(): Promise<void> {
   console.log("\n10. Persistence: raised once, and reading is not resolving");
 
   // **This used to ride on `quotation.expired`.** `S67` deleted that type with
-  // the state behind it, so the same four claims are made on `record.assigned`
-  // instead: act-now, persistent, anchored to one record. They were never
-  // claims about expiry — they are claims about the notification table, and
-  // the type was only ever the vehicle.
+  // the state behind it — and has since taken validity out of FACET entirely —
+  // so the same four claims are made on `record.assigned` instead: act-now,
+  // persistent, anchored to one record. They were never claims about expiry;
+  // they are claims about the notification table, and the type was the vehicle.
   //
   // `reassignCompany` raises unconditionally, so calling it twice attempts two
   // raises for the same recipient and record. `notifications_live_key` — the
@@ -1065,9 +1064,9 @@ async function main(): Promise<void> {
 
   // **The expiry case is gone.** It read: extend the quotation, sweep, and the
   // `quotation.expired` notification resolves. `S67` removed the type, the
-  // sweep step that raised it and the state it watched, so there is no
-  // condition left to reach. `extendValidity` still exists and still moves the
-  // date — it just no longer clears anything, because nothing was set.
+  // sweep step that raised it and the state it watched, and then the validity
+  // date itself along with `extendValidity`. There is no condition to reach and
+  // nothing left that could move one.
 
   // Assignment and share: an interaction against the anchor's company clears
   // them, on all three anchors. `share.granted` has no producer yet `[21 §11]`,

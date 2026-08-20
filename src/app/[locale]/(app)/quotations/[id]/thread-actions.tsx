@@ -15,7 +15,6 @@ import {
   cancelThreadAction,
   confirmPaymentAction,
   createRevisionAction,
-  extendValidityAction,
   issueVersionAction,
   markAcceptedForProcessingAction,
   rejectThreadAction,
@@ -96,7 +95,6 @@ export function ThreadActions({
   isCoordinator,
   liveStatus,
   endState,
-  expired,
   nextVersionNumber,
   paymentConfirmed,
   acceptedForProcessing,
@@ -106,8 +104,6 @@ export function ThreadActions({
   isCoordinator: boolean;
   liveStatus: "requested" | "issued" | "superseded";
   endState: string | null;
-  /** Past its validity date — a display fact, never a state `S67`. */
-  expired: boolean;
   nextVersionNumber: number;
   paymentConfirmed: boolean;
   acceptedForProcessing: boolean;
@@ -122,10 +118,6 @@ export function ThreadActions({
     cancelThreadAction.bind(null, threadId),
     emptyFormState,
   );
-  const [extendState, extend, extending] = useActionState(
-    extendValidityAction.bind(null, threadId),
-    emptyFormState,
-  );
   const [paymentState, confirm, confirming] = useActionState(
     confirmPaymentAction.bind(null, threadId),
     emptyFormState,
@@ -136,20 +128,14 @@ export function ThreadActions({
   );
 
   // A revision's origin says which route produced it `[07 C2]`: the
-  // coordinator editing directly, or the rep asking for a change. Past its
-  // validity date it is a revision after expiry — read now from the date `S67`
-  // rather than from an end state, because there is no longer an end state to
-  // read. The origin stays: it records why a version exists, which is still
-  // true of a quotation whose price has gone stale.
-  const reviseOrigin = expired
-    ? "expiry_revision"
-    : isCoordinator
-      ? "coordinator_direct_edit"
-      : "rep_change_request";
+  // coordinator editing directly, or the rep asking for a change. There was a
+  // third, `expiry_revision`, chosen when the version was past its validity
+  // date. `S67` took the date out of FACET, so there is nothing left to read
+  // and the two real routes are the whole vocabulary.
+  const reviseOrigin = isCoordinator
+    ? "coordinator_direct_edit"
+    : "rep_change_request";
 
-  // An end state is final, and expiry is no longer one `S67`. An expired
-  // quotation is simply open: it can still be issued, accepted, paid and
-  // dispatched, which is what "validity stops nothing" means on a screen.
   const open = !endState;
 
   return (
@@ -318,38 +304,6 @@ export function ThreadActions({
               action={createRevisionAction.bind(null, threadId, reviseOrigin)}
               label={t("quotations.actions.revise")}
             />
-          </Panel>
-        ) : null}
-
-        {open ? (
-          <Panel
-            title={t("quotations.actions.extend")}
-            hint={t("quotations.actions.extendHint")}
-          >
-            <form action={extend} className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <Label
-                    htmlFor="validUntil"
-                    className="text-muted-foreground text-start text-xs"
-                  >
-                    {t("quotations.fields.validUntil")}
-                  </Label>
-                  <Input
-                    id="validUntil"
-                    name="validUntil"
-                    type="date"
-                    dir="ltr"
-                    required
-                    className="text-start"
-                  />
-                </div>
-                <Button type="submit" size="sm" variant="outline" disabled={extending}>
-                  {extending ? t("common.saving") : t("common.confirm")}
-                </Button>
-              </div>
-              <Feedback state={extendState} />
-            </form>
           </Panel>
         ) : null}
 

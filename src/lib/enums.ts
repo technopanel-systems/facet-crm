@@ -54,10 +54,10 @@ export const OTHER_LOSS_REASON_CODE = "other";
 /**
  * `[07 C5]`, `[07 C4]` — the three states the **coordinator** may set `S62`.
  *
- * **`expired` is not among them, and is not a state at all** `S67`. Validity is
- * a note: an expired quotation is shown as expired, computed from `valid_until`
- * at read time, and stops nothing. A terminal state would have said the
- * opposite — that the thread was over — which is what it did say until `S67`.
+ * **`expired` is not among them, and is not a state at all** `S67`. It was one
+ * until `0014`, which made it a fact computed from `valid_until` at read time;
+ * `0018` then took the date too, because validity is SMAC's. A terminal state
+ * said the thread was over, which is the opposite of what the rule says.
  *
  * **`accepted` is internal approval, never a won deal** `[16 §5]`: it means
  * the coordinator has the signatures. The customer commits later, at
@@ -81,12 +81,17 @@ export const QUOTATION_VERSION_STATUSES = [
 export type QuotationVersionStatus =
   (typeof QUOTATION_VERSION_STATUSES)[number];
 
-/** `[07 C2]`, `[07 C7]`, plus `initial_request` for version 1 `[10 §4]`. */
+/**
+ * `[07 C2]`, plus `initial_request` for version 1 `[10 §4]`.
+ *
+ * **`expiry_revision` is gone** `S67`. It named a revision raised after a
+ * validity date had passed, and only a screen reading the computed `expired`
+ * fact could set it. FACET carries no validity date, so nothing can.
+ */
 export const QUOTATION_VERSION_ORIGINS = [
   "initial_request",
   "rep_change_request",
   "coordinator_direct_edit",
-  "expiry_revision",
 ] as const;
 export type QuotationVersionOrigin =
   (typeof QUOTATION_VERSION_ORIGINS)[number];

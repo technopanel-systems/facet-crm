@@ -201,37 +201,9 @@ export function QuotationForm({
           </select>
         </FormField>
 
-        {/* Per quotation, varies case by case — three days, seven, longer
-            `[07 C7]`. On expiry the record is kept and marked `[16 §3]`. */}
-        <FormField
-          name="validUntil"
-          label={t("quotations.fields.validUntil")}
-          error={errors.validUntil}
-        >
-          <Input
-            id="validUntil"
-            name="validUntil"
-            type="date"
-            dir="ltr"
-            defaultValue={state.values?.validUntil ?? ""}
-            aria-invalid={Boolean(errors.validUntil) || undefined}
-            className="text-start"
-          />
-        </FormField>
-
-        <FormField
-          name="deliveryPeriod"
-          label={t("quotations.fields.deliveryPeriod")}
-          error={errors.deliveryPeriod}
-        >
-          <Input
-            id="deliveryPeriod"
-            name="deliveryPeriod"
-            defaultValue={state.values?.deliveryPeriod ?? ""}
-            className="text-start"
-          />
-        </FormField>
-
+        {/* `S67` — the form asks for no validity date and no delivery
+            period. Both are SMAC's, and a field FACET still rendered is a
+            field a rep would still fill. */}
         <FormField
           name="paymentMethod"
           label={t("quotations.fields.paymentMethod")}

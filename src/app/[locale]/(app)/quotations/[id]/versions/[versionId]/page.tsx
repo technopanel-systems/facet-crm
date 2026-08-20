@@ -85,14 +85,6 @@ export default async function QuotationVersionPage({
             <Fact label={t("quotations.fields.origin")}>
               {t(`enums.quotationVersionOrigin.${version.origin}`)}
             </Fact>
-            <Fact label={t("quotations.fields.validUntil")}>
-              <span dir="ltr">{version.validUntil ?? dash}</span>
-              {version.expired ? (
-                <span className="text-faint ms-2 text-xs">
-                  {t("quotations.fields.expired")}
-                </span>
-              ) : null}
-            </Fact>
             <Fact label={t("common.createdBy")}>
               {version.createdByName ?? t("common.unknownUser")}
             </Fact>

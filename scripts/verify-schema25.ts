@@ -333,6 +333,22 @@ const S26_DROPPED_INDEXES = ["project_companies_one_buyer_key"];
 const S57_DROPPED_COLUMNS = ["quotation_lines.vat_rate"];
 
 /**
+ * The columns `S67` drops: validity and the delivery period are SMAC's, so
+ * FACET carries neither. Separate list, same reason as the five above it — one
+ * rule, one migration, one claim, legible without git blame.
+ *
+ * `0014` had already taken the *state* these fed. What `0018` takes is the
+ * date itself, and with it `versionIsExpired()`, the "Expired" badge on three
+ * screens and the Extend panel. `payment_method` and `shipment_terms` sit on
+ * the same table and are deliberately NOT here: `S70` and `S119` move them
+ * onto the dispatch in their own slices.
+ */
+const S67_DROPPED_COLUMNS = [
+  "quotation_versions.valid_until",
+  "quotation_versions.delivery_period",
+];
+
+/**
  * What `SPEC §15` "Dropped outright" removes: structure no rule asks for.
  * Same shape as the four lists above, separate for the same reason — one
  * decision, one migration, one claim, legible without git blame. These answer
@@ -480,10 +496,27 @@ async function main(): Promise<void> {
     check(`${key} is gone [S57]`, !columns.has(key));
   }
 
-  // `S67` — expiry is not a terminal state. The value cannot be dropped from a
-  // Postgres enum in place, so `0014` rebuilds the type; this asserts the
-  // rebuild landed with exactly the three the coordinator may set `S62`, and
-  // not, say, the old type left behind under its rename.
+  for (const key of S67_DROPPED_COLUMNS) {
+    check(`${key} is gone [S67]`, !columns.has(key));
+  }
+
+  // The counterpart claim, and the one worth asserting: the two columns beside
+  // them STAY. `S70` moves payment onto the dispatch and `S119` makes shipment
+  // a dispatch property, both in later Phase 1b slices — a sweep that took
+  // them early would be building ahead of the rule.
+  for (const key of [
+    "quotation_versions.payment_method",
+    "quotation_versions.shipment_terms",
+  ]) {
+    check(`${key} is still here — S70 and S119 are later`, columns.has(key));
+  }
+
+  // `S67` — expiry is not a terminal state, and since `0018` not a fact
+  // either. A value cannot be dropped from a Postgres enum in place, so `0014`
+  // rebuilds this type and `0018` rebuilds `quotation_version_origin` the same
+  // way; this asserts the rebuild landed with exactly the three the coordinator
+  // may set `S62`, and not, say, the old type left behind under its rename.
+  // §13 below makes the same claim about the origin enum, against schema.ts.
   const endStates = (await db.execute(
     sql`select unnest(enum_range(null::quotation_thread_end_state))::text as value`,
   )) as unknown as { value: string }[];

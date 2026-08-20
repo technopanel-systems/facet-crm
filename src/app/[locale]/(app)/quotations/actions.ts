@@ -14,7 +14,6 @@ import {
   confirmPayment,
   createQuotationThread,
   createRevision,
-  extendValidity,
   issueVersion,
   markAcceptedForProcessing,
   rejectThread,
@@ -142,9 +141,8 @@ export async function createQuotationAction(
   const projectId = fields.uuid("projectId");
   const companyId = fields.uuid("companyId", { required: true });
   const contactId = fields.uuid("contactId");
+  // `S67` — no validity date and no delivery period. Both are SMAC's.
   const version = {
-    validUntil: fields.date("validUntil"),
-    deliveryPeriod: fields.text("deliveryPeriod", { max: 200 }),
     paymentMethod: fields.text("paymentMethod", { max: 200 }),
     shipmentTerms: fields.text("shipmentTerms", { max: 200 }),
   };
@@ -376,7 +374,7 @@ export async function returnForEditAction(
 
 export async function createRevisionAction(
   threadId: string,
-  origin: "rep_change_request" | "coordinator_direct_edit" | "expiry_revision",
+  origin: "rep_change_request" | "coordinator_direct_edit",
 ): Promise<FormState> {
   const session = await requireSession();
   try {
@@ -384,27 +382,6 @@ export async function createRevisionAction(
   } catch (error) {
     return ruleErrorState(error);
   }
-  revalidatePath("/quotations");
-  revalidatePath(`/quotations/${threadId}`);
-  return {};
-}
-
-export async function extendValidityAction(
-  threadId: string,
-  _previous: FormState,
-  formData: FormData,
-): Promise<FormState> {
-  const session = await requireSession();
-  const fields = readFields(formData);
-  const validUntil = fields.date("validUntil", { required: true });
-  if (!fields.ok || !validUntil) return fields.state;
-
-  try {
-    await extendValidity(session, threadId, validUntil);
-  } catch (error) {
-    return ruleErrorState(error, fields.values);
-  }
-
   revalidatePath("/quotations");
   revalidatePath(`/quotations/${threadId}`);
   return {};

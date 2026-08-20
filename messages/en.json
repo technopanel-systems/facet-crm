@@ -105,8 +105,7 @@
     "quotationVersionOrigin": {
       "initial_request": "Initial request",
       "rep_change_request": "Change requested by rep",
-      "coordinator_direct_edit": "Edited by coordinator",
-      "expiry_revision": "Revised after expiry"
+      "coordinator_direct_edit": "Edited by coordinator"
     },
     "smacVerification": {
       "unverified": "Unverified",
@@ -357,9 +356,6 @@
       "versionStatus": "Version",
       "endState": "State",
       "endStateOpen": "Open",
-      "validUntil": "Valid until",
-      "expired": "Expired",
-      "deliveryPeriod": "Delivery period",
       "paymentMethod": "Method of payment",
       "shipmentTerms": "Terms of shipment",
       "origin": "Origin",
@@ -432,8 +428,6 @@
       "cancelHint": "A written reason is required.",
       "revise": "Create a revision",
       "reviseHint": "Version {number} carrying the RE number. The lines are carried forward and the current version becomes read-only.",
-      "extend": "Extend validity",
-      "extendHint": "Use this when nothing has changed. Otherwise revise.",
       "confirmPayment": "Confirm payment",
       "confirmPaymentHint": "The date the payment was received.",
       "markAccepted": "Accept for processing",

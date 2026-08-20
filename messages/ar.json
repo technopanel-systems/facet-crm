@@ -105,8 +105,7 @@
     "quotationVersionOrigin": {
       "initial_request": "الطلب الأول",
       "rep_change_request": "طلب تعديل من المندوب",
-      "coordinator_direct_edit": "تعديل من منسق المبيعات",
-      "expiry_revision": "مراجعة بعد انتهاء الصلاحية"
+      "coordinator_direct_edit": "تعديل من منسق المبيعات"
     },
     "smacVerification": {
       "unverified": "غير مُتحقق منه",
@@ -357,9 +356,6 @@
       "versionStatus": "النسخة",
       "endState": "الحالة",
       "endStateOpen": "مفتوح",
-      "validUntil": "صالح حتى",
-      "expired": "منتهي الصلاحية",
-      "deliveryPeriod": "مدة التسليم",
       "paymentMethod": "طريقة الدفع",
       "shipmentTerms": "شروط الشحن",
       "origin": "المصدر",
@@ -432,8 +428,6 @@
       "cancelHint": "يلزم كتابة سبب.",
       "revise": "إنشاء مراجعة",
       "reviseHint": "النسخة {number} تحمل رقم RE. تُنقل البنود إليها وتصبح النسخة الحالية للقراءة فقط.",
-      "extend": "تمديد الصلاحية",
-      "extendHint": "استخدم هذا إذا لم يتغير شيء. وإلا فأنشئ مراجعة.",
       "confirmPayment": "تأكيد الدفع",
       "confirmPaymentHint": "تاريخ استلام الدفعة.",
       "markAccepted": "اعتماد للتنفيذ",

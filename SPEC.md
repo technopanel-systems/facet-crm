@@ -309,7 +309,7 @@ conversion figure may treat it as won.
 **S66.** A **revision** creates the next version carrying an RE number, and
 supersedes the previous one.
 
-**S67. [CHANGE]** **Validity and delivery period are SMAC's, not FACET's.**
+**S67.** **Validity and delivery period are SMAC's, not FACET's.**
 FACET does not carry a validity date, does not compute expiry, and does not show
 a delivery period.
 

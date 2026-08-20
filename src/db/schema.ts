@@ -146,9 +146,9 @@ export const deleteRequestStatusEnum = pgEnum("delete_request_status", [
 /**
  * `[07 C5]`, `[07 C4]` — the three the coordinator may set `S62`.
  *
- * `expired` was a fourth until `S67`. It is gone because validity is a note:
- * expiry is computed from `valid_until` when a screen is read, and stops
- * nothing. See `0014`'s header for why removing an enum value is not a drop.
+ * `expired` was a fourth until `S67`, which took the state. `0018` then took
+ * the date it was computed from: FACET carries no validity and no expiry at
+ * all. See `0014`'s header for why removing an enum value is not a drop.
  */
 export const quotationThreadEndStateEnum = pgEnum(
   "quotation_thread_end_state",
@@ -166,12 +166,19 @@ export const quotationVersionStatusEnum = pgEnum("quotation_version_status", [
   "superseded",
 ]);
 
-/** `[07 C2]`, `[07 C7]`, plus `initial_request` for version 1 `[10 §4]`. */
+/**
+ * `[07 C2]`, plus `initial_request` for version 1 `[10 §4]`.
+ *
+ * `expiry_revision` was a fourth until `S67`. It named a revision raised after
+ * a quotation had passed its validity date, and the only thing that could set
+ * it was a screen reading the computed `expired` fact. `S67` takes validity out
+ * of FACET, so there is no fact to read and nothing can write the value. See
+ * `0018`'s header for why removing an enum value is not a column drop.
+ */
 export const quotationVersionOriginEnum = pgEnum("quotation_version_origin", [
   "initial_request",
   "rep_change_request",
   "coordinator_direct_edit",
-  "expiry_revision",
 ]);
 
 /** `[08 B2]` */
@@ -1100,15 +1107,11 @@ export const quotationVersions = pgTable(
     /** The coordinator's return-for-edit round `[04 flow 10]`. */
     returnForEditRound: integer("return_for_edit_round").notNull().default(0),
     /**
-     * Per quotation, set at creation, varies case by case `[08 D9]`.
-     *
-     * **A note, never a gate** `S67`. Nothing reads this as a condition. A
-     * version past it is *shown* as expired — computed in SQL at read time —
-     * and can still be issued, accepted, paid and dispatched.
+     * `S67` took `valid_until` and `delivery_period` off this table: validity
+     * and the delivery period are SMAC's, and FACET carries neither. The two
+     * below are per-version fields `[08 D9]` and stay until `S70` moves
+     * payment to the dispatch and `S119` makes shipment a dispatch property.
      */
-    validUntil: date("valid_until"),
-    /** Terms default from settings `[08 D9]` and are then per-version fields. */
-    deliveryPeriod: text("delivery_period"),
     paymentMethod: text("payment_method"),
     shipmentTerms: text("shipment_terms"),
     /** Totals mirror SMAC. Where they disagree, SMAC is correct `[08 D5]`. */

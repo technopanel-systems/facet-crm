@@ -300,27 +300,11 @@ export default async function QuotationDetailPage({
             <Fact label={t("quotations.fields.origin")}>
               {t(`enums.quotationVersionOrigin.${live.origin}`)}
             </Fact>
-            <Fact label={t("quotations.fields.validUntil")} name="validUntil">
-              <span dir="ltr" className="num">
-                {live.validUntil ?? dash}
-              </span>
-              {live.expired ? (
-                <span
-                  data-expired
-                  className="text-faint ms-2 text-xs font-normal"
-                >
-                  {t("quotations.fields.expired")}
-                </span>
-              ) : null}
-            </Fact>
             {live.returnForEditRound > 0 ? (
               <Fact label={t("quotations.detail.returnedRounds")}>
                 <span dir="ltr">{live.returnForEditRound}</span>
               </Fact>
             ) : null}
-            <Fact label={t("quotations.fields.deliveryPeriod")}>
-              {live.deliveryPeriod ?? dash}
-            </Fact>
             <Fact label={t("quotations.fields.paymentMethod")}>
               {live.paymentMethod ?? dash}
             </Fact>
@@ -456,7 +440,6 @@ export default async function QuotationDetailPage({
             isCoordinator={isCoordinator}
             liveStatus={live.status}
             endState={thread.endState}
-            expired={live.expired}
             nextVersionNumber={live.versionNumber + 1}
             paymentConfirmed={Boolean(thread.paymentConfirmedAt)}
             acceptedForProcessing={Boolean(thread.acceptedForProcessingAt)}

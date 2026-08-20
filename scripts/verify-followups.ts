@@ -351,8 +351,6 @@ async function main(): Promise<void> {
       owner,
       { projectId: project.id, companyId, contactId: null },
       {
-        validUntil: "2031-01-01",
-        deliveryPeriod: "4 weeks",
         paymentMethod: "50% advance",
         shipmentTerms: "EX-F",
       },

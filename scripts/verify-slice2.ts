@@ -20,9 +20,7 @@
  *      after `[04 flow 12–13]`.
  *   7. Visibility: the raiser sees it, an unrelated rep does not, the project
  *      owner does `[11 §2]`.
- *   8. Expiry marks an overdue thread, skips a paid one `[16 §3]`, `[16 §7]`,
- *      and writes its audit row under a **null actor**.
- *   9. Qualification is derived from the event `[10 §1]`.
+ *   8. Qualification is derived from the event `[10 §1]`.
  *
  * Usage: `npm run verify:slice2`
  *
@@ -59,13 +57,11 @@ import {
   productThicknesses,
   projectCompanies,
   projects,
-  quotationThreads,
   roles,
   serviceTypes,
   users,
 } from "@/db/schema";
 import type { AuthSession } from "@/lib/authz";
-import { chainState } from "@/lib/chain";
 import { getCompany } from "@/lib/companies";
 import { SAUDI_CODE } from "@/lib/enums";
 import { listCountries } from "@/lib/lookups";
@@ -74,7 +70,6 @@ import {
   addQuotationLine,
   addServiceLine,
   cancelThread,
-  confirmPayment,
   createQuotationThread,
   createRevision,
   getQuotationThread,
@@ -249,8 +244,6 @@ async function main(): Promise<void> {
     repA,
     { projectId: project.id, companyId: company.id, contactId: null },
     {
-      validUntil: "2030-01-01",
-      deliveryPeriod: "4 weeks",
       paymentMethod: "50% advance",
       shipmentTerms: "EX-F",
     },
@@ -566,7 +559,7 @@ async function main(): Promise<void> {
       createQuotationThread(
         repA,
         { projectId: project.id, companyId: other.id, contactId: null },
-        { validUntil: null, deliveryPeriod: null, paymentMethod: null, shipmentTerms: null },
+        { paymentMethod: null, shipmentTerms: null },
         [
           {
             supplierId: supplier.id,
@@ -584,153 +577,9 @@ async function main(): Promise<void> {
       ),
   );
 
-  /* --- 12. *** Validity stops nothing *** ------------------------ */
+  /* --- 12. Acceptance is internal approval only ------------------- */
 
-  console.log("\n12. *** An expired quotation stops nothing *** [S67]");
-
-  // Put the live version's validity a long way in the past. Until `S67` this
-  // was enough, on the very next read, to write `end_state = 'expired'` and
-  // with it freeze the lines, close the chain, drop the thread out of the
-  // follow-up queues and raise a persistent notification. The whole point of
-  // this section is that a date now changes nothing but what a screen says.
-  // **Its own thread, deliberately.** Section 14 asserts that `thread` has
-  // been accepted and still carries no payment, so this section may not issue,
-  // accept or pay that one. It raises an expired thread of its own and drives
-  // the whole chain on it.
-  const stale = await createQuotationThread(
-    repA,
-    { projectId: project.id, companyId: company.id, contactId: null },
-    {
-      validUntil: "2020-01-01",
-      deliveryPeriod: null,
-      paymentMethod: null,
-      shipmentTerms: null,
-    },
-    [
-      {
-        supplierId: supplier.id,
-        classId: productClass.id,
-        fireRatingId: fireRating.id,
-        customColour: "168",
-        thicknessId: thickness.id,
-        widthM: "1.2400",
-        lengthM: "5.8000",
-        quantityPcs: "2.0000",
-        unitPrice: "100.00",
-      },
-    ],
-    [],
-  );
-
-  let stale_ = await getQuotationThread(repA, stale.id);
-  check(
-    "reading it does NOT close the thread [S67]",
-    stale_?.endState === null,
-  );
-  check(
-    "and it IS reported as expired [S67]",
-    stale_?.live.expired === true,
-    `got ${stale_?.live.expired}`,
-  );
-
-  // A read that writes is the specific defect `S67` removes. `expired` is
-  // derived, so two reads in a row must leave the row exactly as it was.
-  const beforeRead = await db
-    .select({ endState: quotationThreads.endState })
-    .from(quotationThreads)
-    .where(eq(quotationThreads.id, stale.id));
-  await listQuotationThreads(repA);
-  await getQuotationThread(repA, stale.id);
-  const afterRead = await db
-    .select({ endState: quotationThreads.endState })
-    .from(quotationThreads)
-    .where(eq(quotationThreads.id, stale.id));
-  check(
-    "*** reading a quotation writes nothing to it *** [S67]",
-    beforeRead[0].endState === null && afterRead[0].endState === null,
-    `${beforeRead[0].endState} -> ${afterRead[0].endState}`,
-  );
-
-  const listed = await listQuotationThreads(repA);
-  check(
-    "the list reports expiry too, resolved in SQL [S67]",
-    listed.rows.find((row) => row.id === stale.id)?.expired === true,
-  );
-
-  // `S61` — lines are editable while the live version is `requested` and the
-  // thread is open. An expired thread IS open, so this must be allowed. It was
-  // refused with `quotations.errors.threadClosed` before this slice.
-  await addQuotationLine(repA, stale.id, {
-    supplierId: supplier.id,
-    classId: productClass.id,
-    fireRatingId: fireRating.id,
-    customColour: "expired-line",
-    thicknessId: thickness.id,
-    widthM: "1.2400",
-    lengthM: "5.8000",
-    quantityPcs: "1.0000",
-    unitPrice: "100.00",
-  });
-  stale_ = await getQuotationThread(repA, stale.id);
-  check(
-    "an expired quotation still takes a new line [S61], [S67]",
-    stale_?.live.lines.some((l) => l.customColour === "expired-line") === true,
-  );
-
-  // The rest of the chain, on the same expired thread: issued, accepted, paid.
-  // Dispatch is `verify:slice3`'s subject and is not re-driven here.
-  await issueVersion(coordinator, stale.id, {
-    smacReference: `${stamp}-EXP`.slice(-24),
-    verification: "verified",
-  });
-  stale_ = await getQuotationThread(repA, stale.id);
-  check(
-    "an expired quotation can still be issued [S67]",
-    stale_?.live.status === "issued",
-  );
-
-  await acceptThread(coordinator, stale.id);
-  await confirmPayment(repA, stale.id, "2026-08-19");
-  stale_ = await getQuotationThread(repA, stale.id);
-  check(
-    "accepted, on an expired quotation [S67]",
-    stale_?.endState === "accepted",
-  );
-  check("and paid [S67]", stale_?.paymentConfirmedAt !== null);
-  check(
-    "which leaves it still expired — a note, not a state [S67]",
-    stale_?.live.expired === true,
-  );
-
-  /* --- 13. Whose move it is, on an expired quotation -------------- */
-
-  console.log(
-    "\n13. An expired quotation still names whose move it is [S67], [D2]",
-  );
-
-  // `chain.ts` sent every ended thread to `closed`, where `owedBy` is null:
-  // nobody owes the next action on a finished quotation. Expiry used to reach
-  // that branch, so a date could silently take a live deal off everybody's
-  // list. Accepted and paid, this thread is the coordinator's to dispatch.
-  const expiredChain = chainState({
-    versionStatus: stale_!.live.status,
-    endState: stale_!.endState,
-    paymentConfirmedAt: stale_!.paymentConfirmedAt,
-  });
-  check(
-    "*** it is somebody's move, not nobody's *** [S67], [D2]",
-    expiredChain.owedBy !== null,
-    `position ${expiredChain.position}, owedBy ${expiredChain.owedBy}`,
-  );
-  check(
-    "and its position is a real one, not closed [S67]",
-    expiredChain.position !== "closed",
-    `got ${expiredChain.position}`,
-  );
-
-  /* --- 14. Acceptance is internal approval only ------------------- */
-
-  console.log("\n14. Accepted is internal approval, not a won deal [16 §5]");
+  console.log("\n12. Accepted is internal approval, not a won deal [16 §5]");
   await acceptThread(coordinator, thread.id);
   detail = await getQuotationThread(repA, thread.id);
   check("end state is accepted", detail?.endState === "accepted");
@@ -739,9 +588,9 @@ async function main(): Promise<void> {
     detail?.paymentConfirmedAt === null,
   );
 
-  /* --- 15. The audit trail ---------------------------------------- */
+  /* --- 13. The audit trail ---------------------------------------- */
 
-  console.log("\n15. Every write is audited [07 E1]");
+  console.log("\n13. Every write is audited [07 E1]");
   const [{ total }] = await db
     .select({ total: sql<number>`count(*)::int` })
     .from(auditLog)

@@ -189,36 +189,6 @@ export function companyIsQualified(companyIdColumn: AnyPgColumn): SQL<boolean> {
 }
 
 /* ------------------------------------------------------------------ *
- * Expiry — a display fact, never a state `S67`
- * ------------------------------------------------------------------ */
-
-/**
- * `valid_until < current_date`, selected as a column.
- *
- * **Validity is a note, not a gate** `S67`. Nothing branches on this. An
- * expired quotation is *shown* as expired and can still have its lines edited,
- * and still be issued, accepted, paid and dispatched.
- *
- * It replaces a sweep that wrote `end_state = 'expired'` whenever a quotation
- * screen was read. That made a read path write — and the terminal state it
- * wrote then froze the lines, closed the chain, dropped the thread out of the
- * follow-up queues and raised a persistent notification. One date, four gates,
- * against a rule that says it stops nothing.
- *
- * **Derived in SQL, not in a screen** (`CLAUDE.md`), so the day a list filters
- * on it the filter runs before pagination rather than over a fetched page.
- * `current_date` is the database's day; the app's timezone is fixed at
- * Asia/Riyadh and a validity date is a calendar day there, not an instant.
- *
- * `coalesce` because `null < current_date` is null, not false: a version with
- * no validity date has not expired, and `null` is not an answer a screen can
- * render.
- */
-function versionIsExpired(): SQL<boolean> {
-  return sql<boolean>`coalesce(${quotationVersions.validUntil} < current_date, false)`;
-}
-
-/* ------------------------------------------------------------------ *
  * Reads
  * ------------------------------------------------------------------ */
 
@@ -236,9 +206,6 @@ export type QuotationThreadListRow = {
   smacReference: string | null;
   versionNumber: number;
   versionStatus: QuotationVersionStatus;
-  validUntil: string | null;
-  /** Past its validity date — a display fact, never a state `S67`. */
-  expired: boolean;
   /**
    * The live version's quoted square metres.
    *
@@ -310,8 +277,6 @@ export async function listQuotationThreads(
         smacReference: quotationVersions.smacReference,
         versionNumber: quotationVersions.versionNumber,
         versionStatus: quotationVersions.status,
-        validUntil: quotationVersions.validUntil,
-        expired: versionIsExpired(),
         totalSqm: quotationVersions.totalSqm,
         grandTotal: quotationVersions.grandTotal,
         createdAt: quotationThreads.createdAt,
@@ -514,8 +479,6 @@ export type QuotationServiceLineRow = {
 
 export type QuotationVersionDetail = QuotationVersion & {
   createdByName: string | null;
-  /** Past its validity date — a display fact, never a state `S67`. */
-  expired: boolean;
   lines: QuotationLineRow[];
   serviceLines: QuotationServiceLineRow[];
 };
@@ -642,7 +605,6 @@ async function loadServiceLines(
 
 async function loadVersionDetail(
   version: QuotationVersion,
-  expired: boolean,
 ): Promise<QuotationVersionDetail> {
   const [creator] = version.createdBy
     ? await db
@@ -660,7 +622,6 @@ async function loadVersionDetail(
   return {
     ...version,
     createdByName: creator?.name ?? null,
-    expired,
     lines,
     serviceLines,
   };
@@ -691,10 +652,8 @@ export async function getQuotationThread(
 
   if (!row) return null;
 
-  // Every version carries its own expiry flag `S67`, computed in SQL beside
-  // the row rather than from a clock in TypeScript.
   const versionRows = await db
-    .select({ version: quotationVersions, expired: versionIsExpired() })
+    .select({ version: quotationVersions })
     .from(quotationVersions)
     .where(eq(quotationVersions.threadId, id))
     .orderBy(desc(quotationVersions.versionNumber));
@@ -737,7 +696,7 @@ export async function getQuotationThread(
     paymentConfirmedByName:
       names.get(row.thread.paymentConfirmedByUserId ?? "") ?? null,
     versions,
-    live: await loadVersionDetail(liveVersion.version, liveVersion.expired),
+    live: await loadVersionDetail(liveVersion.version),
     projectViewable,
     companyViewable,
   };
@@ -764,7 +723,7 @@ export async function getQuotationVersion(
     return null;
   }
   const [row] = await db
-    .select({ version: quotationVersions, expired: versionIsExpired() })
+    .select({ version: quotationVersions })
     .from(quotationVersions)
     .where(
       and(
@@ -774,7 +733,7 @@ export async function getQuotationVersion(
     )
     .limit(1);
   if (!row) return null;
-  return loadVersionDetail(row.version, row.expired);
+  return loadVersionDetail(row.version);
 }
 
 /* ------------------------------------------------------------------ *
@@ -1058,9 +1017,12 @@ export type QuotationThreadInput = {
   contactId: string | null;
 };
 
+/**
+ * `S67` took `validUntil` and `deliveryPeriod` off this: validity and the
+ * delivery period are SMAC's, and FACET carries neither. The two that remain
+ * are `S70`'s and `S119`'s to move onto the dispatch, in their own slices.
+ */
 export type QuotationVersionInput = {
-  validUntil: string | null;
-  deliveryPeriod: string | null;
   paymentMethod: string | null;
   shipmentTerms: string | null;
 };
@@ -1214,8 +1176,6 @@ export async function createQuotationThread(
         versionNumber: 1,
         origin: "initial_request",
         status: "requested",
-        validUntil: version.validUntil,
-        deliveryPeriod: version.deliveryPeriod,
         paymentMethod: version.paymentMethod,
         shipmentTerms: version.shipmentTerms,
         createdBy: session.user.id,
@@ -1599,10 +1559,12 @@ export async function returnForEdit(
 /**
  * A revision — version N+1, carrying forward the lines `[07 C2]`.
  *
- * Three origins, three callers, one mechanism:
+ * Two origins, two callers, one mechanism:
  *  - `rep_change_request` — the rep asks for a change;
- *  - `coordinator_direct_edit` — the coordinator changes it on a call;
- *  - `expiry_revision` — `07 C7`'s "revise if price or materials changed".
+ *  - `coordinator_direct_edit` — the coordinator changes it on a call.
+ *
+ * There was a third, `expiry_revision`, until `S67`. Only a screen reading a
+ * computed expiry could set it, and FACET no longer carries a validity date.
  *
  * The new version starts `requested` with **no SMAC reference**: the `RE`
  * number is typed when the coordinator issues it, like every other SMAC link
@@ -1629,9 +1591,8 @@ export async function createRevision(
       .limit(1);
     if (!thread) throw new RuleError("quotations.errors.notFound");
 
-    // An end state is final. There is no longer an exception for `expired`:
-    // validity is a note `S67`, so a thread past its date is simply open, and
-    // revising it needs no special case.
+    // An end state is final. `expired` stopped being one at `0014` and `S67`
+    // has now taken the date behind it, so there is no special case here.
     if (thread.endState) {
       throw new RuleError("quotations.errors.threadClosed");
     }
@@ -1650,12 +1611,6 @@ export async function createRevision(
       after: { status: "superseded" },
     });
 
-    // **Carried forward as it stands, past or not** `S67`. It used to be
-    // nulled when already in the past, so the expiry sweep could not re-expire
-    // the new version on the very next read. With no sweep and no state, a
-    // stale date is just a stale note, and silently dropping the coordinator's
-    // number would lose information to protect a mechanism that is gone.
-
     const [next] = await tx
       .insert(quotationVersions)
       .values({
@@ -1663,8 +1618,6 @@ export async function createRevision(
         versionNumber: previous.versionNumber + 1,
         origin,
         status: "requested",
-        validUntil: previous.validUntil,
-        deliveryPeriod: previous.deliveryPeriod,
         paymentMethod: previous.paymentMethod,
         shipmentTerms: previous.shipmentTerms,
         createdBy: session.user.id,
@@ -1730,51 +1683,6 @@ export async function createRevision(
   });
 }
 
-/**
- * Set the live version's validity date — **extend if nothing has changed.**
- * If price or materials changed it is a revision instead, not this.
- *
- * It used to also clear an `expired` end state, because that state was what
- * this existed to undo. Since `S67` there is no state and nothing to undo:
- * this writes a note, and the note stops nothing either way.
- *
- * **Not coordinator-only.** `S62`'s coordinator acts are issue, return,
- * accept, reject and cancel; validity is not among them, so this stays on
- * `assertThreadVisible` — the rep who raised the quotation may move its date.
- */
-export async function extendValidity(
-  session: AuthSession,
-  threadId: string,
-  validUntil: string,
-): Promise<void> {
-  await assertThreadVisible(session, threadId);
-
-  await withAudit(session.actor, async (tx, log) => {
-    const [thread] = await tx
-      .select()
-      .from(quotationThreads)
-      .where(eq(quotationThreads.id, threadId))
-      .limit(1);
-    if (!thread) throw new RuleError("quotations.errors.notFound");
-    if (thread.endState) {
-      throw new RuleError("quotations.errors.threadClosed");
-    }
-
-    const version = await liveVersionOf(tx, threadId);
-    await tx
-      .update(quotationVersions)
-      .set({ validUntil })
-      .where(eq(quotationVersions.id, version.id));
-    log({
-      action: "quotation_version.validity_extended",
-      entityType: "quotation_version",
-      entityId: version.id,
-      before: { validUntil: version.validUntil },
-      after: { validUntil },
-    });
-  });
-}
-
 /** Shared body for the three coordinator end states. */
 async function setEndState(
   session: AuthSession,
@@ -1792,7 +1700,7 @@ async function setEndState(
       .limit(1);
     if (!before) throw new RuleError("quotations.errors.notFound");
     // Re-deciding a decided quotation is a revision, not an edit. Every end
-    // state is final now that `expired` is not one of them `S67`.
+    // state is final; `expired` has not been one of them since `S67`.
     if (before.endState) {
       throw new RuleError("quotations.errors.threadClosed");
     }

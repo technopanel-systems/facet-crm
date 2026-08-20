@@ -39,10 +39,7 @@
  *      the other branch on the same thread: dispatching again takes the
  *      project it gained, and naming a different one is refused as a message.
  *
- *  15. `S67` and `S57` over HTTP: reading a quotation whose validity has
- *      passed does **not** write to it, and the line form offers no VAT rate.
- *
- *  16. `S76` on the screens: the coordinator's `/projects` and `/contacts` are
+ *  15. `S76` on the screens: the coordinator's `/projects` and `/contacts` are
  *      no longer empty, and neither carries a control they may not use — no
  *      New button, no edit link, no composer, no follow-up panel. Every one of
  *      those is asserted against the manager on the same path, so a screen
@@ -1862,6 +1859,15 @@ async function main(): Promise<void> {
         continue;
       }
 
+      // `S57` — the input is gone from the markup, not merely ignored by
+      // the action. A field the form still renders is a field a rep can still
+      // fill. It moved here when `S67` took the section that used to carry it:
+      // this one already has the form in hand, in both locales.
+      check(
+        `${locale}: the line form offers NO VAT rate input [S57]`,
+        !quotationForm.includes('name="vatRate"'),
+      );
+
       const quotationFields = envelope(quotationForm);
       // **The project is sent EMPTY**, exactly as an untouched form sends it:
       // the combobox posts a hidden input whose value is "" until somebody
@@ -1869,12 +1875,7 @@ async function main(): Promise<void> {
       quotationFields.set("projectId", "");
       quotationFields.set("companyId", companyId);
       quotationFields.set("contactId", "");
-      for (const empty of [
-        "validUntil",
-        "deliveryPeriod",
-        "paymentMethod",
-        "shipmentTerms",
-      ]) {
+      for (const empty of ["paymentMethod", "shipmentTerms"]) {
         quotationFields.set(empty, "");
       }
       for (const [name, value] of Object.entries(line)) {
@@ -2112,167 +2113,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    "\n15. Reading an expired quotation writes nothing to it [S67], [S57]",
-  );
-  {
-    // **The assertion that only works over HTTP.** `expireOverdueThreads` ran
-    // inside `listQuotationThreads` and `getQuotationThread`, so merely
-    // OPENING a quotation screen wrote `end_state = 'expired'` on any thread
-    // past its date. An in-process check can call the data layer and see the
-    // same thing, but this is the shape the defect actually had: a GET that
-    // mutates. So the walk is a real one, over the real routes, and what is
-    // asserted afterwards is the STORED value — not the rendered page, which
-    // would pass even if the write were still happening.
-    //
-    // **This file never imports `src/`**, and does not start now: `endStateOf`
-    // reads the row with the Postgres driver in raw SQL, so nothing about the
-    // assertion can be satisfied by the same code it is testing.
-    const repJar = jars["rep-a@example.test"];
-    const stamp = `${Date.now()}`.slice(-7);
-
-    const newCompany = await get(repJar, "/en/companies/new");
-    const companyForm = newCompany.body.match(
-      /<form[^>]*data-slot="form-shell"[\s\S]*?<\/form>/,
-    )?.[0];
-    const saudiId = newCompany.body
-      .match(/<select[^>]*name="countryId"[\s\S]*?<\/select>/)?.[0]
-      ?.match(/<option value="([0-9a-f-]{36})"[^>]*data-code="SA"/)?.[1];
-
-    const newQuotation = await get(repJar, "/en/quotations/new");
-    const quotationForm = newQuotation.body.match(
-      /<form[^>]*data-slot="form-shell"[\s\S]*?<\/form>/,
-    )?.[0];
-
-    // `S57` — the input is gone from the markup, not merely ignored by the
-    // action. A field the form still renders is a field a rep can still fill.
-    check(
-      "the line form offers NO VAT rate input [S57]",
-      Boolean(quotationForm) && !quotationForm!.includes('name="vatRate"'),
-    );
-
-    if (companyForm && saudiId && quotationForm) {
-      const envelopeOf = (form: string): FormData => {
-        const fields = new FormData();
-        for (const input of form.matchAll(/<input[^>]*>/g)) {
-          const name = input[0].match(/name="([^"]+)"/)?.[1];
-          if (!name?.startsWith("$ACTION")) continue;
-          fields.append(
-            name,
-            unescapeHtml(input[0].match(/value="([^"]*)"/)?.[1] ?? ""),
-          );
-        }
-        return fields;
-      };
-      const postTo = async (jar: Jar, path: string, body: FormData) => {
-        const response = await fetch(`${BASE}${path}`, {
-          method: "POST",
-          headers: { cookie: header(jar), origin: BASE },
-          body,
-          redirect: "manual",
-        });
-        store(jar, response);
-        return {
-          status: response.status,
-          location: response.headers.get("location") ?? "",
-        };
-      };
-
-      const companyFields = envelopeOf(companyForm);
-      companyFields.set("name", `s67-${stamp}`);
-      companyFields.set("phone", `+9665${stamp}90`);
-      companyFields.set("countryId", saudiId);
-      // `S15` — mandatory for a Saudi company, and not in the HTML. See
-      // `aCityId`; section 13 is the one that proves the refusal.
-      companyFields.set("cityId", (await aCityId()) ?? "");
-      for (const empty of [
-        "vatNumber",
-        "categoryId",
-        "leadSourceId",
-        "notes",
-      ]) {
-        companyFields.set(empty, "");
-      }
-      const registered = await postTo(
-        repJar,
-        "/en/companies/new",
-        companyFields,
-      );
-      const companyId = registered.location.match(/[0-9a-f-]{36}/)?.[0];
-
-      const optionOf = (name: string) =>
-        quotationForm
-          .match(new RegExp(`<select[^>]*name="${name}"[\\s\\S]*?</select>`))?.[0]
-          ?.match(/<option value="([0-9a-f-]{36})"/)?.[1];
-      const line = {
-        supplierId: optionOf("supplierId"),
-        classId: optionOf("classId"),
-        fireRatingId: optionOf("fireRatingId"),
-        thicknessId: optionOf("thicknessId"),
-      };
-
-      if (!companyId || Object.values(line).some((id) => !id)) {
-        console.log("  skip  the fixture company or the product lookups");
-      } else {
-        const fields = envelopeOf(quotationForm);
-        fields.set("projectId", "");
-        fields.set("companyId", companyId);
-        fields.set("contactId", "");
-        // **Already expired when it is raised.** No sweep, no waiting.
-        fields.set("validUntil", "2020-01-01");
-        for (const empty of [
-          "deliveryPeriod",
-          "paymentMethod",
-          "shipmentTerms",
-        ]) {
-          fields.set(empty, "");
-        }
-        for (const [name, value] of Object.entries(line)) {
-          fields.set(name, value as string);
-        }
-        fields.set("customColour", "168");
-        fields.set("widthM", "1.24");
-        fields.set("lengthM", "5.8");
-        fields.set("quantityPcs", "3");
-        fields.set("unitPrice", "100");
-
-        const raised = await postTo(repJar, "/en/quotations/new", fields);
-        const threadId = raised.location.match(/[0-9a-f-]{36}/)?.[0];
-        check(
-          "a quotation raised with a past validity date is accepted [S67]",
-          raised.status === 303 && Boolean(threadId),
-          `got ${raised.status} ${raised.location}`,
-        );
-
-        if (threadId) {
-          // The two reads that used to expire it, in both locales, plus the
-          // list — which is where the sweep said it ran most often.
-          for (const locale of ["en", "ar"]) {
-            await get(repJar, `/${locale}/quotations`);
-            await get(repJar, `/${locale}/quotations/${threadId}`);
-          }
-
-          const stored = await endStateOf(threadId);
-          check(
-            "*** reading it over HTTP left end_state NULL *** [S67]",
-            stored === null,
-            `got ${String(stored)}`,
-          );
-
-          // And it is still shown as expired — the fact survives without the
-          // state, which is the whole of `S67` on one screen.
-          const detail = await get(repJar, `/en/quotations/${threadId}`);
-          check(
-            "and the screen still reports it as expired [S67]",
-            factHtmlOf(detail.body, "validUntil").includes("data-expired"),
-            factOf(detail.body, "validUntil"),
-          );
-        }
-      }
-    }
-  }
-
-  console.log(
-    "\n16. The coordinator's projects and contacts, read and no further [S76]",
+    "\n15. The coordinator's projects and contacts, read and no further [S76]",
   );
   {
     // **Both halves on every check.** The coordinator reaching a screen proves
@@ -2355,38 +2196,16 @@ async function main(): Promise<void> {
 }
 
 /**
- * One quotation thread's `end_state`, read straight from Postgres.
- *
- * Deliberately raw SQL over the driver rather than through `src/lib` or
- * `src/db`: the claim is that a GET does not write, and reading the answer
- * through the same module under test would weaken it. `DATABASE_URL` is
- * already in scope — every `verify:*` script runs with `--env-file=.env`.
- */
-async function endStateOf(threadId: string): Promise<string | null> {
-  const { default: postgres } = await import("postgres");
-  const sql = postgres(process.env.DATABASE_URL ?? "", { max: 1 });
-  try {
-    const rows = await sql`
-      select end_state from quotation_threads where id = ${threadId}
-    `;
-    return (rows[0]?.end_state as string | null) ?? null;
-  } finally {
-    await sql.end({ timeout: 5 });
-  }
-}
-
-/**
  * Any seeded city's id, read straight from Postgres.
  *
  * `S15` makes the city mandatory for a Saudi company, and the city control is
  * a `Combobox` in a Radix portal — its options are not in the server HTML, so
- * a black-box POST has no id to send. Sections 14 and 15 need a Saudi company
- * to hang a quotation on, so they need one id.
+ * a black-box POST has no id to send. Section 14 needs a Saudi company to hang
+ * a quotation on, so it needs one id.
  *
- * Read over the driver in raw SQL, exactly as `endStateOf` does and for a
- * weaker reason: this is fixture setup, not an assertion, so nothing about
- * what the sections prove depends on where it came from. **This file still
- * never imports `src/`.**
+ * Read over the driver in raw SQL: this is fixture setup, not an assertion, so
+ * nothing about what the section proves depends on where it came from. **This
+ * file still never imports `src/`.**
  *
  * Section 13 deliberately does NOT use it. Its subject is what a browser can
  * post, and a browser without a city id is precisely the case `S15` must

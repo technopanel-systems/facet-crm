@@ -332,8 +332,6 @@ async function main(): Promise<void> {
     unitPrice: "120.00",
   };
   const version = {
-    validUntil: "2031-01-01",
-    deliveryPeriod: "4 weeks",
     paymentMethod: "50% advance",
     shipmentTerms: "EX-F",
   };
