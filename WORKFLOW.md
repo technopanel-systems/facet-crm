@@ -112,15 +112,44 @@ Schema and data layer first, because the UI renders whatever the model says.
 
 > **AUDIT 1 — the model.** See §6.
 
+### Phase 1b — Dispatch and payment
+
+The dispatch and payment model changed after a session with the sales
+coordinator. It comes before any interface work, because the interface renders
+whatever the model says.
+
+| # | Session | Rules |
+|---|---|---|
+| 10 | Validity and delivery period leave FACET | `S67` |
+| 11 | Stock on the quotation | `S118` |
+| 12 | Dispatch lines and the three modes | `S116` `S75` `S126` |
+| 13 | Request, approve, refuse; the `canDispatch` split | `S72` `S124` `S125` `S122` `S62` |
+| 14 | Payment method, shipment, SMAC number | `S70` `S71` `S73` `S119` `S121` |
+| 15 | The difference flag | `S120` `S77` |
+| 16 | Won derived from dispatch; committed | `S28` `S29` `S31` |
+| 17 | Told — refusals, cancellations, credit | `S128` `S129` `S92` |
+| 18 | Compliance metric | `S123` `S127` |
+
+Then AUDIT 1's remaining fixes, which are independent and small.
+
+| # | Session | Rules |
+|---|---|---|
+| 19 | Primary rep on handover and reassignment | `S18` |
+| 20 | Coordinator's comment access; the cancellation reason | `S62` `S114` |
+| 21 | Handover recipients narrowed to the roles `S9` names | `S9` |
+| 22 | Dead-structure sweep — AUDIT 1 F9–F18 | `SPEC §15` |
+
+Session 22 runs **last** of these, so it sweeps up whatever Phase 1b orphans.
+
 ### Phase 2 — The rebuild
 
 | # | Session | Rules |
 |---|---|---|
-| 10 | The shell — seven-item rail, tokens, layout cap, theme, permission boolean | `D5`–`D23` `D46` `D47` |
-| 11 | **The waiting list, rep scope** — and the notification tiers, persistence flags, per-anchor resolution and digest machinery come out in the same slice | `S86`–`S95` `D29`–`D34` |
-| 12 | The waiting list, manager scope, and "Needs a decision" | `D35`–`D38` |
-| 13 | Grouped lists with per-object lead cells — companies, projects, quotations | `D22`–`D24` |
-| 14 | The stream — replaces `/reports` and `/activity`; comments narrowed to threads and projects | `S114` `D42`–`D45` |
+| 23 | The shell — seven-item rail, tokens, layout cap, theme, permission boolean | `D5`–`D23` `D46` `D47` |
+| 24 | **The waiting list, rep scope** — and the notification tiers, persistence flags, per-anchor resolution and digest machinery come out in the same slice. The list now carries **dispatch requests as a fourth kind of item** (`S86`, `S89`) | `S86`–`S95` `D29`–`D34` |
+| 25 | The waiting list, manager scope, and "Needs a decision". **The coordinator has her own queue** (`S88`) | `D35`–`D38` `S88` |
+| 26 | Grouped lists with per-object lead cells — companies, projects, quotations | `D22`–`D24` |
+| 27 | The stream — replaces `/reports` and `/activity`; comments narrowed to threads and projects | `S114` `D42`–`D45` |
 
 > **AUDIT 2 — the interface.** See §6.
 
@@ -130,22 +159,22 @@ Nothing below is optional before real users touch it.
 
 | # | Session | Rules |
 |---|---|---|
-| 15 | Signals and loss reasons unified; loss cascades down | `S43`–`S49` |
-| 16 | Duplicate detection and manager resolution | `S21`–`S23` |
-| 17 | ~~Credit terms — rep requests, manager approves~~ **Removed.** Credit stopped being a company property to request and approve; it is now one payment method among six, recorded on the dispatch — `S71`. | — |
-| 18 | Archive requests folded into the dormancy review | `S105`–`S107` |
-| 19 | Sharing per project; contacts shareable | `S97` `S98` |
-| 20 | **Bulk import** — nobody hand-types the customer base | `SPEC §15` |
+| 28 | Signals and loss reasons unified; loss cascades down | `S43`–`S49` |
+| 29 | Duplicate detection and manager resolution | `S21`–`S23` |
+| 30 | ~~Credit terms — rep requests, manager approves~~ **Removed.** Credit stopped being a company property to request and approve; it is now one payment method among six, recorded on the dispatch — `S71`. | — |
+| 31 | Archive requests folded into the dormancy review | `S105`–`S107` |
+| 32 | Sharing per project; contacts shareable | `S97` `S98` |
+| 33 | **Bulk import** — nobody hand-types the customer base | `SPEC §15` |
 
 ### Phase 4 — Complete the picture
 
 | # | Session | Rules |
 |---|---|---|
-| 21 | The board view for projects | `D25` `D26` |
-| 22 | The monthly rollup | `D39`–`D41` |
-| 23 | Password reset; holiday calendar; thresholds into `settings`; the three dead flags made live | `S8` `S11` `S94` |
-| 24 | Phone pass — rep screens at 375px | `D52` `D53` |
-| 25 | RTL pass — every screen, both locales | `D54` |
+| 34 | The board view for projects | `D25` `D26` |
+| 35 | The monthly rollup | `D39`–`D41` |
+| 36 | Password reset; holiday calendar; thresholds into `settings`; the three dead flags made live | `S8` `S11` `S94` |
+| 37 | Phone pass — rep screens at 375px | `D52` `D53` |
+| 38 | RTL pass — every screen, both locales | `D54` |
 
 > **AUDIT 3 — pre-pilot.** See §6.
 
@@ -168,13 +197,13 @@ a session report does not exist.
 | Eight `SelectField`s should carry `required`; each validates server-side, so the placeholder costs a round trip, not correctness | user, contact, report and quotation-line forms | Same sweep session |
 | Participant add/remove forms never answer a no-JS POST — `Failed to parse body as FormData`; the write lands, the response does not. Bisected to pre-existing | `projects/[id]/project-links.tsx` | Own session |
 | `confirmPaymentAction` never answers a raw form POST. Same shape, different action | `quotations/[id]` | Same session as the above — likely one cause |
-| `follow-ups.ts:166` filters in memory after the fetch. **Corrected by AUDIT 1: it is the whole function, not one line.** `followUps()` fetches every row with no SQL limit, then applies four in-memory filters, a sort and `.slice()` for pagination | `src/lib/follow-ups.ts:1151-1224` | None — file is deleted in session 11 |
+| `follow-ups.ts:166` filters in memory after the fetch. **Corrected by AUDIT 1: it is the whole function, not one line.** `followUps()` fetches every row with no SQL limit, then applies four in-memory filters, a sort and `.slice()` for pagination | `src/lib/follow-ups.ts:1151-1224` | None — file is deleted in session 24 |
 | `listQuotationFormOptions` returns every visible company into one `<select>`. Fine at ~90 | `src/lib/quotations.ts` | Revisit after bulk import |
-| Comments render on companies, contacts and dispatches. `S114` and `D48` allow quotation threads and projects only; the `comments_record_type` CHECK admits five kinds, the company screen imports `CommentBox`, and `verify:routes` §9 asserts the wider behaviour | `src/db/schema.ts`, `companies/[id]/page.tsx`, `scripts/verify-routes.ts` §9 | Session 14, which narrows comments — it deletes that walk |
+| Comments render on companies, contacts and dispatches. `S114` and `D48` allow quotation threads and projects only; the `comments_record_type` CHECK admits five kinds, the company screen imports `CommentBox`, and `verify:routes` §9 asserts the wider behaviour | `src/db/schema.ts`, `companies/[id]/page.tsx`, `scripts/verify-routes.ts` §9 | Session 27, which narrows comments — it deletes that walk |
 | `quotation_threads.closed_at` and `closed_by_user_id` have no writer and no reader outside the schema. `src/lib/projects.ts` never touches `quotationThreads`, so `S47`'s cascade — which is what would write them — is not built. AUDIT 1: 0 of 352 threads carry either, and the `quotation_threads_closed` CHECK guards the pair, so it goes with them | `src/db/schema.ts` | The loss-cascade slice `S47`, which builds their writer or drops them |
-| `companies.merged_into_id` has readers (isNull filters) but no writer. **Corrected by AUDIT 1: four modules, not five** — `coverage.ts`, `dispatches.ts`, `dormancy.ts`, `follow-ups.ts`. 0 of 844 companies carry one | `src/db/schema.ts` | Session 16, which builds duplicate merge |
+| `companies.merged_into_id` has readers (isNull filters) but no writer. **Corrected by AUDIT 1: four modules, not five** — `coverage.ts`, `dispatches.ts`, `dormancy.ts`, `follow-ups.ts`. 0 of 844 companies carry one | `src/db/schema.ts` | Session 29, which builds duplicate merge |
 | `quotation_lines.form_factor` is always written `'sheet'`; the enum's `coil` value is set nowhere and nothing branches on it. AUDIT 1: 0 of 331 lines are anything but `sheet`, so a drop costs no migration | `src/db/schema.ts` | Undecided — needs a rule or a drop |
-| `report_signal` has nine values. **Corrected by AUDIT 1: `S43` lists eleven, not ten, and two are missing, not one** — *stock shortage* and *customer went quiet*. `loss_reasons` also seeds nine and is missing a different two — *quality concern* and *payment terms* — so the two lists are complementary halves whose union is exactly `S43`'s eleven. Seven shared concepts carry different tokens (`competitor_cheaper`/`lost_to_competitor`, `lead_time_too_long`/`delivery_time_too_long`, `specification_unavailable`/`specification_not_offered`, `project_delayed`/`project_cancelled_or_postponed`, `colour_unavailable`/`colour_or_product_unavailable`), so unifying is not a union. Only two values are in use in 30 signal rows, so the data migration is small | `src/lib/enums.ts`, `src/db/schema.ts`, `scripts/seed/loss-reasons.ts` | Session 15, which unifies the vocabulary |
+| `report_signal` has nine values. **Corrected by AUDIT 1: `S43` lists eleven, not ten, and two are missing, not one** — *stock shortage* and *customer went quiet*. `loss_reasons` also seeds nine and is missing a different two — *quality concern* and *payment terms* — so the two lists are complementary halves whose union is exactly `S43`'s eleven. Seven shared concepts carry different tokens (`competitor_cheaper`/`lost_to_competitor`, `lead_time_too_long`/`delivery_time_too_long`, `specification_unavailable`/`specification_not_offered`, `project_delayed`/`project_cancelled_or_postponed`, `colour_unavailable`/`colour_or_product_unavailable`), so unifying is not a union. Only two values are in use in 30 signal rows, so the data migration is small | `src/lib/enums.ts`, `src/db/schema.ts`, `scripts/seed/loss-reasons.ts` | Session 28, which unifies the vocabulary |
 
 **Added by AUDIT 1 (§6), ranked by consequence.** Counts are from the live
 database on 19 Aug 2026, after all sixteen migrations.
@@ -182,15 +211,15 @@ database on 19 Aug 2026, after all sixteen migrations.
 | What | Where | Disposition |
 |---|---|---|
 | `S20` says a contact "is visible exactly when its company is". False since `S76`: `visibleContactsFilter` returns `undefined` for `can_dispatch`, so the coordinator reads every contact while every company stays closed to them. `S76` names itself an exception to `S30` and amends `S30` in place; it never amends `S20`. The code is right and the rule is stale | `SPEC.md` `S20`, `src/lib/authz.ts:546-555` | A `SPEC.md` correction — `S20` needs `S76`'s exception written onto it, as `S30` has |
-| The coordinator reads every rep's comment conversation on **every project and every contact**. `visibleCommentsFilter` composes each anchor's own filter, and for those two they are the `S76`-widened ones, so both branches degrade to "the record exists". Company comments stay closed, so the asymmetry is real rather than uniform. No rule states this; `S38` protects a report's note from a share and comments have no equivalent half | `src/lib/authz.ts:878-898` | Needs a founder decision, then either a `SPEC.md` sentence or a narrowing. Session 14 touches the same code |
+| The coordinator reads every rep's comment conversation on **every project and every contact**. `visibleCommentsFilter` composes each anchor's own filter, and for those two they are the `S76`-widened ones, so both branches degrade to "the record exists". Company comments stay closed, so the asymmetry is real rather than uniform. No rule states this; `S38` protects a report's note from a share and comments have no equivalent half | `src/lib/authz.ts:878-898` | Needs a founder decision, then either a `SPEC.md` sentence or a narrowing. Session 27 touches the same code |
 | `projects.region` and `projects.city_id` have **no writer that has ever fired**: 0 of 414 projects carry either, and no `project.created` or `project.updated` row in the audit log ever set one. **The discarded-input half is fixed** — `449a7e8` removed `regionForCity`'s fallback, which left the project form rendering a region select whose value silently vanished; that select, its `readProjectForm` read and `ProjectInput.region` are gone `D51`, and `verify:routes` asserts the form offers no region in both locales. The project's CITY select is deliberately untouched: what a rep picks there **is** stored, so it has something behind it. **What stays open is the columns question**, and it is three shapes: **(a)** a project's city is mandatory and the region derives from it; **(b)** it derives from the project's own city and the city stays optional, so the region is usually null; **(c)** both columns are dropped as unused structure, and a project's region is derived from its participants' cities if it is ever wanted. **It cannot simply mirror the company fix: `projects` has no country column**, so `S15`'s "mandatory when Saudi" has nothing to hang on | `src/db/schema.ts:813-814`, `src/lib/projects.ts` | Own session — needs a founder decision between the three, then one of them |
 | `S18` says "the primary rep is always the first rep who had the company". False in both handover paths: `team.ts` carries `is_primary` to the recipient and `dormancy.ts` writes `isPrimary: true` on the new rep. **75 of 950 live memberships are primary *and* `origin = 'assigned'`.** `team.ts` records the sibling case as `OPEN [19 §8]` while the other branch settles it silently | `src/lib/team.ts:299-311`, `src/lib/dormancy.ts:234-246` | Needs a founder decision on what "primary" means after a handover, then `SPEC.md` or the two writers |
-| `S62` says returning **or cancelling** requires a reason "which becomes a comment on the thread". `returnForEdit` writes the comment; `cancelThread` writes only `quotation_threads.cancellation_reason` — no comment, no mention, so the rep is never told a signed quotation was killed | `src/lib/quotations.ts:1846-1862` | Own small slice, or folded into session 14 which owns comments |
+| `S62` says returning **or cancelling** requires a reason "which becomes a comment on the thread". `returnForEdit` writes the comment; `cancelThread` writes only `quotation_threads.cancellation_reason` — no comment, no mention, so the rep is never told a signed quotation was killed | `src/lib/quotations.ts:1846-1862` | Now `S128`'s problem rather than a standalone defect — the rule requires the reason to reach the rep. Session 17 |
 | `S31` ("a project is **won** when payment arrives **or** the project is approved") carries no marker but is not built. `projects.end_state` is only ever set by hand from the project form; nothing derives `won` from `payment_confirmed_at` or an approval | `SPEC.md` `S31`, `src/lib/projects.ts` | `S31` needs a `[CHANGE]` marker, or `S28`'s scope stated to cover it |
 | Handover and dormancy reassignment accept **any** active user as recipient — only `isActive` is checked and the picker is `listActiveUsers()` unfiltered — so a company book can land on an Executive or a Super Admin. `S9` names "a rep, a desk rep, or the coordinator". The code is wider than the rule, not narrower | `src/lib/team.ts:236-241`, `src/lib/dormancy.ts:199-207` | With `S9`, whose `[CHANGE]` currently implies the opposite gap |
 | `users.city_id` has no writer and no reader. `createUser` accepts `cityId` but no form or action posts it, `UserUpdateInput` omits it and `ManagedUserRow` never selects it. **0 of 417 users carry one.** A live foreign key to `cities` that nothing fills | `src/db/schema.ts`, `src/lib/authz.ts:1294` | Undecided — needs a rule or a drop. Only `users.region` serves `10 §7` today |
 | `quotation_threads.cancelled_at` is written by `cancelThread` and read by nothing; 0 rows carry one. `cancelled_by_user_id` beside it *is* read | `src/db/schema.ts` | With the `S62` row above, which reopens `cancelThread` |
-| `notifications.channel` is written from `notification_types.default_channel` and read by nothing — no query, screen or filter | `src/db/schema.ts` | Session 11, which deletes the notification machinery per `S91` |
+| `notifications.channel` is written from `notification_types.default_channel` and read by nothing — no query, screen or filter | `src/db/schema.ts` | Session 24, which deletes the notification machinery per `S91` |
 | **Five tables with no reference anywhere in `src/` or `scripts/`, and 0 rows each**: `attachments` (`S115`), `delete_requests` (`S8`, `S105`–`S107`), `duplicate_flags` and `non_duplicates` (`S21`–`S23`), `product_specifications` (SPEC §16 open). `SPEC §15`'s "Dropped outright" names none of them. `accounts` is the documented sixth — the adapter's TYPE requires it | `src/db/schema.ts` | Each with the slice that would build its writer; or a second deletion pass like `0015` |
 | **Ten indexes nothing uses.** Six sit on those dead tables. Four more are live: `comments_author_idx` (no query filters or orders by `author_user_id`), `comment_mentions_user_idx` (the one predicate is inside a delete already scoped by `comment_id`), `rep_report_signals_signal_idx` (its own comment says it is for `S49`, which is `[BUILD]`), `companies_merged_into_idx` | `src/db/schema.ts` | With the table or column each serves |
 | **Dead enum values.** `record_type.quotation_version` is set nowhere — the `comments` CHECK excludes it, `SHARED_RECORD_TYPES` excludes it, and the three tables that could carry it are dead. `project_end_state.dormant` is writable from the project form but no rule defines a dormant project end state, and 0 of 354 projects use it. (`form_factor.coil` is its own row above) | `src/db/schema.ts` | Undecided — each needs a rule or a drop |
@@ -198,6 +227,10 @@ database on 19 Aug 2026, after all sixteen migrations.
 | `SPEC §15` lists `accounts` under "Dropped outright". It was **not** dropped, deliberately: `accountsTable` is a non-optional member of the adapter's `DefaultPostgresSchema`. That decision lives only in migration `0015`'s header and a `schema.ts` comment, so the authority file currently says something untrue about the database | `SPEC.md` §15 | A `SPEC.md` correction |
 | **Three markers name something already built, in whole or in part.** `S34` `[CHANGE]` — all five channels including `meeting` have existed since migration `0005` and the enum matches `S34` exactly; only the *definitions* of visit and meeting are new, and no label carries them. `S81` `[CHANGE]` — "divides equally" and "nobody types a percentage" are already true, and the open clause is open the other way round, because `divideEqually` *is* the remainder machinery `S81` says not to build. `S11` `[BUILD]` — password reset does not exist but deactivate/re-enable does; `S106` `[BUILD]` has the same shape, the review and its three outcomes existing while only the rep's way in is missing | `SPEC.md` | Each needs the founder to retire, narrow or restate the marker |
 | `canDispatch` **gates the whole dispatch act today** — `recordDispatch`, the `/dispatches/new` route, and five visibility filters in `authz.ts`, which is how `S76` is implemented. `S72` splits the act: a **rep requests with no flag at all**, the coordinator approves behind `canDispatch`. The flag must be re-read as "may **approve** a dispatch", four call sites change meaning, and `S76`'s widening rides on the same boolean | `src/lib/dispatches.ts:193`, `src/lib/authz.ts:429,549,603,696,1060`, `src/app/[locale]/(app)/dispatches/` | The session that builds `S72`. **No new flag** — do not invent `canEditDispatchRequest` |
+| **`S90` and `S92` name two surfaces for one message.** `S90` shows a refused, rejected or cancelled item to the person it was taken from "as it leaves", at the list; `S92` now carries the same decision as **bell news** and says it does not belong on the list. `S90`'s paragraph predates `S92` gaining the item | `SPEC.md` `S90` `S92` | Decide against a real screen, in session 24 which builds `S90` |
+| **`S122` gates archiving on the rep "having been told"**, and the telling is now a bell item (`S128`, `S92`). Either the bell needs a **read state** — the persistence machinery `S91` forbids — or "told" means "sent" and the gate is nominal | `SPEC.md` `S122` `S128` | The same decision as the row above, session 24 |
+| **`S92` keeps "never work" while carrying "credit granted to you"** (`S129`). Nothing in SPEC lets a rep query or contest a split — `S82` forbids them setting one — so it holds as written. Untested the first time a rep disagrees | `SPEC.md` `S92` `S129` `S82` | None. Recorded so the pilot watches for it |
+| **Session 24 deletes the notification machinery per `S91` while `S92` gains two new bell items** (`S128`, `S129`). The deletion must not take them with it | `SPEC.md` `S91` `S92`, session 24 | Session 24 itself — it deletes and adds in the same breath |
 
 ---
 
@@ -282,8 +315,10 @@ Write-Host "=== OPEN MARKERS ==="
 @(Select-String -Path SPEC.md -Pattern '^(?!- \*\*\[).*\[BUILD\]').Count
 ```
 
-The last two numbers are the real progress bar. The count **rises when rules are
-written and falls when they ship**. A rise is only wrong when no rule was added.
+The last two numbers are the real progress bar. The count started at **26
+`[CHANGE]` and 24 `[BUILD]` — 50 open**, rose to **55** when the dispatch and
+payment rules were written, and falls as they ship. A rise is only wrong when no
+rule was added.
 
 Better still, add the script to the repo once (see §11) and run `npm run status`.
 
@@ -310,7 +345,7 @@ down. If they rise, something was decided outside the spec.** as of commit
 12689b4, and should only ever go down.
 | Blocking | the Docker build |
 
-**Session 11 is larger than it looks.** It deletes `follow-ups.ts` (1,497) and
+**Session 24 is larger than it looks.** It deletes `follow-ups.ts` (1,497) and
 `notifications.ts` (1,011), and with them `verify-phase10a.ts` (1,431) and
 `verify-followups.ts` (1,087) — roughly **5,000 lines**, against a much smaller
 waiting list. Expect that, or it will look like something went wrong.
