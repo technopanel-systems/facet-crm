@@ -45,7 +45,11 @@
  *  10. *** The writer and the constraint agree, again *** `S13`, `S14` — the
  *      two new NOT NULLs, and the rule no CHECK can hold beside them: a
  *      company outside Saudi Arabia keeps no city and no region `S15`, which
- *      would need a subquery into `countries` to state in SQL.
+ *      would need a subquery into `countries` to state in SQL. Since AUDIT 1
+ *      F3, also both refusals `S15` makes of a Saudi company with no city.
+ *  10b. *** No company carries a region its city does not imply *** `S15` —
+ *      the same claim as 10, made over every row ever written instead of over
+ *      the rows this script just created.
  *  12. *** Every priced line's VAT is 15% of its total *** `S57`.
  *  11. *** A dispatch's project IS its quotation's *** `S74` — the third rule
  *      of that kind, and the first to span two rows, so not even a CHECK could
@@ -97,7 +101,6 @@ import type { AuthSession } from "@/lib/authz";
 import { createCompany, updateCompany } from "@/lib/companies";
 import {
   OTHER_LOSS_REASON_CODE,
-  REGIONS,
   REPORT_OUTCOMES,
   SAUDI_CODE,
 } from "@/lib/enums";
@@ -614,14 +617,16 @@ async function main(): Promise<void> {
   const saudiId = (await listCountries()).find(
     (row) => row.code === SAUDI_CODE,
   )!.id;
+  // Saudi, so `S15` requires a city. Any seeded row will do — what is being
+  // exercised here is the loss vocabulary, not the place.
+  const [fixtureCity] = await db.select({ id: cities.id }).from(cities).limit(1);
   const company = await createCompany(rep, {
     name: `${stamp} company`,
     phone: `+9665${stamp.slice(-7)}1`,
     countryId: saudiId,
     categoryId: null,
     vatNumber: null,
-    region: null,
-    cityId: null,
+    cityId: fixtureCity.id,
     leadSourceId: null,
     notes: null,
   });
@@ -1204,16 +1209,17 @@ async function main(): Promise<void> {
   );
 
   if (aCity && saudi && abroad) {
-    // Saudi: the city stands and the region comes from it `15 §4`. The posted
-    // region is deliberately wrong, so a pass cannot mean "it kept what I sent".
-    const wrongRegion = REGIONS.find((region) => region !== aCity.region)!;
+    // Saudi: the city stands and the region comes from it `S15`. There is no
+    // longer a wrong region to post alongside it — `CompanyInput` has no
+    // `region` field and `regionForCity` has no fallback `[AUDIT 1 F3]` — so
+    // the old "it kept what I sent" failure is now a compile error rather than
+    // a runtime one. The refusals below are what replace that proof.
     const saudiCompany = await createCompany(rep, {
       name: `${stamp} saudi company`,
       phone: `+9665${stamp.slice(-7)}2`,
       countryId: saudi.id,
       categoryId: null,
       vatNumber: null,
-      region: wrongRegion,
       cityId: aCity.id,
       leadSourceId: null,
       notes: null,
@@ -1224,9 +1230,45 @@ async function main(): Promise<void> {
       `got ${saudiCompany.cityId}`,
     );
     check(
-      "…and takes the region from that city, not from the form [15 §4]",
+      "…and takes the region from that city [S15]",
       saudiCompany.region === aCity.region,
       `got ${saudiCompany.region}, city says ${aCity.region}`,
+    );
+
+    /* --- S15: a Saudi company cannot be written without a city ---------- */
+
+    // One refusal per writer, because there are exactly two. Keyed to
+    // `cityId`, so the form renders it under the control rather than as a
+    // form-wide message.
+    await refuses(
+      "*** registering a Saudi company with NO city is refused *** [S15]",
+      "validation.required",
+      () =>
+        createCompany(rep, {
+          name: `${stamp} cityless`,
+          phone: `+9665${stamp.slice(-7)}5`,
+          countryId: saudi.id,
+          categoryId: null,
+          vatNumber: null,
+          cityId: null,
+          leadSourceId: null,
+          notes: null,
+        }),
+    );
+    await refuses(
+      "*** …and an edit cannot clear the city of a Saudi company *** [S15]",
+      "validation.required",
+      () =>
+        updateCompany(rep, saudiCompany.id, {
+          name: saudiCompany.name,
+          phone: saudiCompany.phone,
+          countryId: saudi.id,
+          categoryId: null,
+          vatNumber: null,
+          cityId: null,
+          leadSourceId: null,
+          notes: null,
+        }),
     );
 
     // Abroad: the SAME input, one field different, and both must go.
@@ -1236,7 +1278,6 @@ async function main(): Promise<void> {
       countryId: abroad.id,
       categoryId: null,
       vatNumber: null,
-      region: wrongRegion,
       cityId: aCity.id,
       leadSourceId: null,
       notes: null,
@@ -1260,7 +1301,6 @@ async function main(): Promise<void> {
         countryId: abroad.id,
         categoryId: null,
         vatNumber: null,
-        region: wrongRegion,
         cityId: aCity.id,
         leadSourceId: null,
         notes: `${stamp} edited`,
@@ -1279,7 +1319,6 @@ async function main(): Promise<void> {
         countryId: abroad.id,
         categoryId: null,
         vatNumber: null,
-        region: null,
         cityId: aCity.id,
         leadSourceId: null,
         notes: null,
@@ -1299,7 +1338,6 @@ async function main(): Promise<void> {
           countryId: "00000000-0000-0000-0000-000000000000",
           categoryId: null,
           vatNumber: null,
-          region: null,
           cityId: null,
           leadSourceId: null,
           notes: null,
@@ -1309,9 +1347,69 @@ async function main(): Promise<void> {
 
   /* --- 11. A dispatch's project is its quotation's [S74] ---------------- */
 
+  await regionIsAlwaysDerived();
   await projectMatchesThread();
   await vatIsFixed();
   await repositoryMatchesDatabase();
+}
+
+/**
+ * `S15` — **no company carries a region its city does not imply.**
+ *
+ * Asserted by identity, not as a check that `0017`'s backfill ran. There is no
+ * CHECK that could say this: the region lives on `companies` and the fact that
+ * decides it lives on `cities`, and Postgres cannot express "equal to a column
+ * on another table" without a trigger or a composite key nobody asked for. So
+ * the claim is made here, over every company ever written, and it fails the day
+ * a write path stops deriving.
+ *
+ * **One `LEFT JOIN` states both halves.** A region with no city fails, because
+ * the join produces a null city region and a region is not null; a region that
+ * disagrees with its city fails directly. Two defects, one predicate.
+ *
+ * **`is distinct from`, never `<>`.** `<>` returns null on the null side and
+ * the row passes silently — the same trap `rep_reports_on_hold` documents, and
+ * the reason `projects_loss_state` is written the way it is. A `<>` here would
+ * be green against exactly the 50 rows this slice exists to remove.
+ *
+ * It is also the only thing that proves `0017`. That `UPDATE` is the kind that
+ * can be **wrong without failing**: a missed row keeps a plausible-looking
+ * region that no city implies, and no screen would ever say so. On the database
+ * it was written against it cleared 50 of 979 — a fact about that data, not
+ * about the rule.
+ *
+ * **Counted in SQL and asserted `=== 0`**, never `!count`: `count(*)` comes
+ * back as a string and a truthiness test on `"0"` would pass for the wrong
+ * reason and keep passing on `"1"`.
+ */
+async function regionIsAlwaysDerived(): Promise<void> {
+  console.log(
+    "\n10b. *** No company carries a region its city does not imply *** [S15]",
+  );
+
+  const [row] = (await db.execute(sql`
+    select
+      count(*)::int as companies,
+      count(*) filter (where c.region is not null)::int as with_region,
+      count(*) filter (
+        where c.region is distinct from ci.region
+      )::int as wrong
+    from companies c
+    left join cities ci on ci.id = c.city_id
+  `)) as unknown as {
+    companies: number;
+    with_region: number;
+    wrong: number;
+  }[];
+
+  console.log(
+    `  --    ${row.companies} company(ies), ${row.with_region} carrying a region`,
+  );
+  check(
+    "*** no company's region disagrees with its city — or stands without one *** [S15]",
+    row.wrong === 0,
+    `${row.wrong} disagree`,
+  );
 }
 
 /**

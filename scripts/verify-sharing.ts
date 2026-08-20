@@ -56,6 +56,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { closeDatabase, db } from "@/db";
 import {
   auditLog,
+  cities,
   companies,
   companyReps,
   contacts,
@@ -332,9 +333,18 @@ async function main(): Promise<void> {
   // fixture gets its own — from the run stamp plus a counter, because a shared
   // literal would make each run's companies duplicates of the last run's.
   // `S14` — both of them are Saudi, so `S15`'s city and region still apply.
+  // Since AUDIT 1 F3 the city is REQUIRED for a Saudi company, and these rows
+  // are inserted directly rather than through `createCompany`, so they carry
+  // their own place: a city, and the region that city implies. One without the
+  // other would fail `verify:schema25` §10b, which counts every company in the
+  // table rather than only the ones a writer made.
   const saudiId = (await listCountries()).find(
     (row) => row.code === SAUDI_CODE,
   )!.id;
+  const [place] = await db
+    .select({ id: cities.id, region: cities.region })
+    .from(cities)
+    .limit(1);
   let phoneSeq = 0;
   const nextPhone = () => `+9665${stamp.slice(-7)}${(phoneSeq += 1)}`;
 
@@ -345,6 +355,8 @@ async function main(): Promise<void> {
       nameNormalized: normalizeName(`${stamp} Co`),
       phone: nextPhone(),
       countryId: saudiId,
+      cityId: place.id,
+      region: place.region,
       createdBy: repA.user.id,
     })
     .returning();
@@ -564,7 +576,6 @@ async function main(): Promise<void> {
     countryId: detail!.countryId,
     categoryId: detail!.categoryId,
     vatNumber: detail!.vatNumber,
-    region: detail!.region,
     cityId: detail!.cityId,
     leadSourceId: detail!.leadSourceId,
     notes: `${stamp} edited by the shared rep`,
@@ -590,7 +601,9 @@ async function main(): Promise<void> {
         countryId: detail!.countryId,
         categoryId: null,
         vatNumber: null,
-        region: null,
+        // Null, deliberately: `canViewRecord` refuses before `placeForCountry`
+        // is reached, so this must come back as `notFound` and never as the
+        // required-city error `S15` would raise if that order ever flipped.
         cityId: null,
         leadSourceId: null,
         notes: `${stamp} should never land`,
@@ -790,6 +803,8 @@ async function main(): Promise<void> {
       nameNormalized: normalizeName(`${stamp} Lonely Co`),
       phone: nextPhone(),
       countryId: saudiId,
+      cityId: place.id,
+      region: place.region,
       createdBy: repA.user.id,
     })
     .returning();

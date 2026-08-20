@@ -17,7 +17,7 @@ import type { CityRow, CountryRow, LookupRow } from "@/lib/lookups";
 // Values come from `lib/enums`, never from `lib/lookups` or `lib/companies`:
 // importing a data module here would pull the Postgres driver into the browser
 // bundle. The `import type` lines above are erased and pull in nothing.
-import { REGIONS, SAUDI_CODE } from "@/lib/enums";
+import { SAUDI_CODE } from "@/lib/enums";
 import type { CompanyInput } from "@/lib/companies";
 import { emptyFormState, type FormState } from "@/lib/validation";
 
@@ -226,11 +226,16 @@ export function CompanyForm({
           {/* City before region, because the city now answers the region
               `[15 §4]` and a field should not sit above the one that fills
               it. */}
+          {/* Required `S15`: the region is derived from it, so without a city
+              there is nothing to derive from. `required` here is the label's
+              marker only — `placeForCountry` is what refuses the write, since
+              whether a city is needed depends on the country. */}
           <FormField
             name="cityId"
             label={t("common.city")}
             error={errors.cityId}
             hint={cities.length === 0 ? t("common.noOptions") : undefined}
+            required
           >
             <Combobox
               name="cityId"
@@ -244,42 +249,36 @@ export function CompanyForm({
               placeholder={t("common.none")}
               searchPlaceholder={t("common.searchCity")}
               emptyLabel={t("common.noMatches")}
-              clearLabel={t("common.none")}
+              // No `clearLabel`: a required field offers no "none" row.
               disabled={cities.length === 0}
               invalid={Boolean(errors.cityId)}
               onChange={setCityId}
             />
           </FormField>
 
+          {/* Shown, never asked `S15`. There was a `<select>` here when no city
+              was chosen, and it is what let a rep type a region — 50 companies
+              carried one `[AUDIT 1 F3]`. It is gone rather than hidden: no form
+              control carries the name `region` in either state, so the rendered
+              HTML holds no `name="region"` for a POST to fill. `FormField`'s
+              own `name` is the label's `htmlFor` and the error's `id`, never a
+              posted field — which is what makes that string a usable DOM
+              marker for `verify:routes` §13.
+
+              Rendered in both states rather than only once a city is picked, so
+              the form does not grow a field under the rep's thumb. */}
           <FormField
             name="region"
             label={t("common.region")}
             error={errors.region}
-            hint={cityRegion ? t("common.regionFromCity") : undefined}
+            hint={t("common.regionFromCity")}
           >
-            {cityRegion ? (
-              // Derived, so it is shown rather than asked. No input is posted:
-              // the data layer reads the city's region regardless `[15 §4]`.
-              <p
-                className="border-input bg-muted text-muted-foreground flex h-9
-                  items-center rounded-md border px-3 text-start text-sm"
-              >
-                {t(`enums.region.${cityRegion}`)}
-              </p>
-            ) : (
-              <SelectField
-                name="region"
-                defaultValue={value("region")}
-                placeholder={t("common.none")}
-                invalid={Boolean(errors.region)}
-              >
-                {REGIONS.map((region) => (
-                  <option key={region} value={region}>
-                    {t(`enums.region.${region}`)}
-                  </option>
-                ))}
-              </SelectField>
-            )}
+            <p
+              className="border-input bg-muted text-muted-foreground flex h-9
+                items-center rounded-md border px-3 text-start text-sm"
+            >
+              {cityRegion ? t(`enums.region.${cityRegion}`) : t("common.none")}
+            </p>
           </FormField>
         </>
       ) : null}

@@ -78,7 +78,9 @@ Arabic. Not two.
 Egypt, Jordan, Syria and others.
 
 **S15.** For a Saudi company, the **region is derived from the city** and shown
-read-only. The rep is never asked for it.
+read-only. The rep is never asked for it. **The city is mandatory for a Saudi
+company** — a derived value with no source is worse than a typed one. A company
+outside Saudi Arabia has neither.
 
 **S16.** Company category is one of: factory, contractor, advertising, real
 estate, owner, consultant, station management, workshop, personal, other.

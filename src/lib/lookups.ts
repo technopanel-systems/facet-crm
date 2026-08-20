@@ -69,11 +69,16 @@ export async function listCities(): Promise<CityRow[]> {
 }
 
 /**
- * The region to write for a record `[15 §4]`.
+ * The region to write for a record `S15`.
  *
- * A city knows its region, so nobody is asked for it: with a city chosen the
- * city decides, and the submitted value is ignored rather than trusted. Without
- * one, the manually chosen region stands.
+ * A city knows its region, so **nobody is ever asked for it**: the city
+ * decides, and no submitted value is consulted. With no city there is no
+ * region — null, never a fallback.
+ *
+ * There used to be a `chosenRegion` parameter here, and with no city it won
+ * `[AUDIT 1 F3]`. That is what `S15` forbids, and the parameter is gone rather
+ * than ignored: a caller passing one would be a bug, and a parameter nothing
+ * may legitimately supply should not exist to be passed.
  *
  * This lives in the data layer on purpose. A form that fills the field in
  * JavaScript is a suggestion — every caller has to get the same answer,
@@ -81,9 +86,8 @@ export async function listCities(): Promise<CityRow[]> {
  */
 export async function regionForCity(
   cityId: string | null,
-  chosenRegion: Region | null,
 ): Promise<Region | null> {
-  if (!cityId) return chosenRegion;
+  if (!cityId) return null;
 
   const [city] = await db
     .select({ region: cities.region })
@@ -139,20 +143,26 @@ export async function listCountries(): Promise<CountryRow[]> {
  *  2. **Not Saudi Arabia → both are null.** Whatever the form posted is
  *     discarded, not trusted: there are no foreign cities in `cities` for it
  *     to have meant, and a region is a Saudi administrative region.
- *  3. **Saudi Arabia → `regionForCity` decides**, exactly as it did before
- *     this rule existed.
+ *  3. **Saudi Arabia → the city is required**, and it decides the region.
+ *
+ * Step 3's refusal is `S15`'s second half. It is here rather than on the form
+ * because the form is a suggestion, and it is here rather than as a CHECK
+ * because the Saudi test has to subquery `countries` for a code — the same
+ * reason `0010`'s header gives for leaving `city_id` nullable. The column
+ * stays nullable and must: a company abroad carries no city, so "not null" is
+ * false of the table even while it is true of every Saudi row.
  *
  * It lives in the data layer for the reason `regionForCity` does: a form that
  * hides the city field in JavaScript is a suggestion, and every caller has to
  * get the same answer — including one that never rendered a form.
  *
- * Companies only. `regionForCity` stays as it is because `projects` has a city
- * and a region and no country `S14`.
+ * Companies only. `regionForCity` is the half `projects` shares, because a
+ * project has a city and a region and **no country** `S14` — so there is no
+ * Saudi test there to require a city against.
  */
 export async function placeForCountry(
   countryId: string,
   cityId: string | null,
-  chosenRegion: Region | null,
 ): Promise<{ cityId: string | null; region: Region | null }> {
   const [country] = await db
     .select({ code: countries.code })
@@ -163,7 +173,12 @@ export async function placeForCountry(
 
   if (country.code !== SAUDI_CODE) return { cityId: null, region: null };
 
-  return { cityId, region: await regionForCity(cityId, chosenRegion) };
+  // `S15` — a Saudi company's region is derived from its city, so without one
+  // there is nothing to derive from and the region would be permanently null.
+  // Reported against the field, so the form renders it under the control.
+  if (!cityId) throw new RuleError("validation.required", "cityId");
+
+  return { cityId, region: await regionForCity(cityId) };
 }
 
 export async function listCompanyCategories(): Promise<LookupRow[]> {

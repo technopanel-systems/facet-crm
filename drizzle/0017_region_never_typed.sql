@@ -1,0 +1,48 @@
+-- 0017 — S15: the region is derived from the city and never typed. AUDIT 1 F3.
+--
+-- `S15` has always said the region "is derived from the city and shown
+-- read-only. The rep is never asked for it." The code asked anyway: with no
+-- city chosen the company form rendered a region `<select>`, and
+-- `regionForCity(null, chosen)` returned the rep's pick. Both come out in this
+-- slice, along with the `chosenRegion` parameter that carried the value.
+--
+-- **The rows this clears were written by a script, not by a person.** At the
+-- time of writing 50 of 979 companies carried a region with no city — 44 when
+-- AUDIT 1 counted on 19 Aug, plus six from verify runs since. Every one of the
+-- 50 agrees on four markers: the name is `routes-<stamp>-{en|ar}-saudi`,
+-- `created_by` is `rep-a@example.test`, the region is `center`, and the phone
+-- has the shape `+9665<stamp><seq>`. That is `scripts/verify-routes.ts` §13,
+-- which posted `region=center` with an empty `cityId` and then asserted the
+-- result was correct — the defect and its proof were the same code. It is the
+-- sole writer of every row this statement touches, and it is fixed in this
+-- slice, so nothing writes another.
+--
+-- The audit log closes it: 76 `company.created` rows have ever carried a
+-- region — these 50, plus 26 that `verify:schema25` §10 later cleared by moving
+-- them abroad — and **no `company.updated` row has ever set one**. No human has
+-- ever typed a region, so there is nothing here to preserve.
+--
+-- **Cleared, not backfilled**, which is `0010`'s precedent for null phones: a
+-- city invented to justify a region would be a placeholder standing in for a
+-- fact nobody recorded. 0 of 979 companies carry a city at all, so there is no
+-- city to infer one from either.
+--
+-- **Idempotent, and a no-op on a clean database.** A database that never ran
+-- the old script has no such row and is untouched; one that ran it is fixed
+-- once and unchanged on every replay after. That matters because the office
+-- PC's database has never been migrated.
+--
+-- No schema change: `region` and `city_id` stay nullable, because `S15` is
+-- Saudi-only and a company abroad carries neither. `drizzle-kit generate`
+-- therefore reports "No schema changes" with this file in place — the file,
+-- its journal entry and its snapshot came from `generate --custom`.
+--
+-- What holds the rule from here is not this statement. It is
+-- `verify:schema25` §10: two refusals, one per writer, and a count over every
+-- row ever written asserting that no company carries a region its city does
+-- not imply. This `UPDATE` is the kind that can be **wrong without failing**,
+-- so that count is the only thing that proves it ran.
+--
+-- `S15` gains no marker. It was always the rule; the code was wrong.
+
+UPDATE "companies" SET "region" = NULL WHERE "city_id" IS NULL;

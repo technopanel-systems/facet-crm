@@ -520,10 +520,16 @@ export async function createProject(
     links.map((link) => link.companyId),
   );
 
-  // The city decides the region when there is one `[15 §4]`. Read before the
-  // transaction opens — it only reads, and a bad city id should not have
-  // started one. The loss reason is the same: a lookup read, not a write.
-  const region = await regionForCity(input.cityId, input.region);
+  // The city decides the region, and with no city there is none `S15`. Read
+  // before the transaction opens — it only reads, and a bad city id should not
+  // have started one. The loss reason is the same: a lookup read, not a write.
+  //
+  // `regionForCity` no longer takes a fallback `[AUDIT 1 F3]`, so a posted
+  // `input.region` is discarded here as it already was whenever a city was
+  // chosen. Nothing has ever written one — 0 of 414 projects carry a region —
+  // and the field's removal waits on the shape decision recorded in
+  // `WORKFLOW §5`, because a project has no country to require a city against.
+  const region = await regionForCity(input.cityId);
   const loss = await lossFieldsFor(input);
 
   return withAudit(session.actor, async (tx, log) => {
@@ -600,7 +606,7 @@ export async function updateProject(
     const values = {
       ...input,
       ...(await lossFieldsFor(input, before)),
-      region: await regionForCity(input.cityId, input.region),
+      region: await regionForCity(input.cityId),
     };
 
     const changed = EDITABLE.filter((key) => before[key] !== values[key]);

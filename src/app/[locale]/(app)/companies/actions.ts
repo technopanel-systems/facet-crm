@@ -8,7 +8,6 @@ import { requireSession } from "@/lib/authz";
 import {
   createCompany,
   updateCompany,
-  REGIONS,
   type CompanyInput,
 } from "@/lib/companies";
 import {
@@ -51,10 +50,15 @@ function readCompanyForm(formData: FormData) {
     countryId: fields.uuid("countryId", { required: true }) ?? "",
     categoryId: fields.uuid("categoryId"),
     vatNumber: fields.text("vatNumber", { max: 50 }),
-    // Both are posted only for a Saudi country and `placeForCountry` discards
-    // them otherwise `S15` — the form does not render the fields, and the data
-    // layer does not trust that it didn't.
-    region: fields.option("region", REGIONS),
+    // Posted only for a Saudi country, and `placeForCountry` discards it
+    // otherwise `S15` — the form does not render the field, and the data layer
+    // does not trust that it didn't. It is not `{ required: true }` here for
+    // the same reason: whether a city is required depends on the country, so
+    // the refusal belongs where the country is resolved.
+    //
+    // **There is no `region` beside it.** `S15` says the rep is never asked,
+    // so the form posts none and this reader must not invent a way to accept
+    // one `[AUDIT 1 F3]`.
     cityId: fields.uuid("cityId"),
     leadSourceId: fields.uuid("leadSourceId"),
     notes: fields.text("notes", { max: 4000 }),

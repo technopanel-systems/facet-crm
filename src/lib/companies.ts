@@ -71,7 +71,13 @@ export type CompanyInput = {
   countryId: string;
   categoryId: string | null;
   vatNumber: string | null;
-  region: Region | null;
+  /** `S15` — required when the country is Saudi Arabia, forbidden otherwise.
+   *  Both are `placeForCountry`'s to enforce, not this type's, because the
+   *  answer depends on `countryId` rather than on the field itself.
+   *
+   *  There is deliberately no `region` beside it: `S15` says the rep is never
+   *  asked, so there is no form field to read and nothing for a caller to
+   *  supply `[AUDIT 1 F3]`. The column is written from the city. */
   cityId: string | null;
   leadSourceId: string | null;
   notes: string | null;
@@ -318,11 +324,7 @@ export async function createCompany(
   // Both rules run before the transaction opens: they only read, and a refusal
   // should not have started one.
   await assertLeadSourceSelectable(session, input.leadSourceId);
-  const place = await placeForCountry(
-    input.countryId,
-    input.cityId,
-    input.region,
-  );
+  const place = await placeForCountry(input.countryId, input.cityId);
 
   return withAudit(session.actor, async (tx, log) => {
     const [company] = await tx
@@ -330,8 +332,9 @@ export async function createCompany(
       .values({
         ...input,
         // The country decides whether there is a city at all `S15`, and the
-        // city decides the region `[15 §4]`. Whatever the form posted for
-        // either is not consulted — it is spread first and overwritten here.
+        // city decides the region. Nothing the form posted for either is
+        // consulted — the input is spread first and overwritten here, and
+        // `region` is not on the input at all.
         ...place,
         nameNormalized: normalizeName(input.name),
         createdBy: session.user.id,
@@ -367,7 +370,13 @@ export async function createCompany(
   });
 }
 
-/** The columns a rep may change, for the before/after diff. */
+/**
+ * The columns a rep may change, for the before/after diff.
+ *
+ * **`region` stays here though it left `CompanyInput`** `S15`. A rep cannot
+ * type it, but changing the city changes it, and the audit log should say so:
+ * dropping it would silently hide the one consequence picking a city has.
+ */
 const EDITABLE = [
   "name",
   "phone",
@@ -407,14 +416,17 @@ export async function updateCompany(
       before.leadSourceId,
     );
 
-    // What will actually be written: the region comes from the city when there
-    // is one `[15 §4]`, and both go when the country is not Saudi `S15`. The
-    // diff below compares against this, not against the form, so a derived
-    // region — or a city dropped by a change of country — shows up in the
-    // audit log as the real change it is.
-    const values: CompanyInput = {
+    // What will actually be written: the region comes from the city `S15`, and
+    // both go when the country is not Saudi. The diff below compares against
+    // this, not against the form, so a derived region — or a city dropped by a
+    // change of country — shows up in the audit log as the real change it is.
+    //
+    // Inferred rather than annotated `CompanyInput`, because the written shape
+    // is wider than the typed one: `region` is derived here and is not a field
+    // a caller may supply.
+    const values = {
       ...input,
-      ...(await placeForCountry(input.countryId, input.cityId, input.region)),
+      ...(await placeForCountry(input.countryId, input.cityId)),
     };
 
     const changed = EDITABLE.filter((key) => before[key] !== values[key]);

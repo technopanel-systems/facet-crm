@@ -28,9 +28,10 @@
  *      clock, replayed the same way section 7 replays a lost project.
  *  12. No screen renders anything shaped like an unresolved message key.
  *  13. Registering a company replays `S13`, `S14`, `S15`: a POST with no phone
- *      is refused as a message rather than a 500, and the same payload sent
- *      twice — differing only in country — stores a region for Saudi Arabia
- *      and none for anywhere else.
+ *      is refused as a message rather than a 500; no form asks for a region at
+ *      all; and the same payload sent twice — differing only in country — is
+ *      REFUSED for Saudi Arabia, which needs a city, and accepted with neither
+ *      city nor region for anywhere else.
  *  14. `S50` and `S74`, end to end: a quotation is raised with **no project**,
  *      paid, and dispatched — the coordinator choosing a project, which is
  *      written back onto the quotation and puts the quotation's company on
@@ -1453,10 +1454,22 @@ async function main(): Promise<void> {
     //
     // **The city is out of reach here, deliberately.** It is a `Combobox` in a
     // Radix portal, so its options are not in the server HTML and this script
-    // has no city id to post. `verify:schema25` §10 proves the city half in
-    // process, where one is a query away. What is provable over HTTP is the
-    // REGION, and it is the sharper assertion anyway: the same payload is sent
-    // twice, differing only in country, and the two must store opposite things.
+    // has no city id to post. `verify:schema25` §10 proves the positive half in
+    // process, where one is a query away.
+    //
+    // **This section used to assert the defect it was creating** `[AUDIT 1 F3]`.
+    // It posted `region=center` with an empty `cityId` and then checked that
+    // the region had been KEPT — which is exactly what `S15` forbids, and it
+    // was the sole writer of all 50 companies that carried a hand-typed region.
+    // Its comment cited `15 §4`, an archive document, which `CLAUDE.md` says is
+    // never authority. The rule was `S15` all along.
+    //
+    // So both halves invert. No region is posted, because no form offers one;
+    // and the payload that used to be ACCEPTED for Saudi Arabia must now be
+    // REFUSED, because a Saudi company needs a city and this script cannot
+    // supply one. The abroad half is unchanged and is what keeps the pair
+    // honest: the two POSTs still differ in nothing but the country, and they
+    // must still end differently.
     const jar = jars["rep-a@example.test"];
     const stamp = `${Date.now()}`.slice(-7);
     let phoneSeq = 0;
@@ -1497,12 +1510,20 @@ async function main(): Promise<void> {
       );
       if (!saudiId || !foreignId) continue;
 
-      // Saudi is preselected `S14`, which is why the city and region fields are
-      // on the page at all before a rep touches anything.
+      // Saudi is preselected `S14`, which is why the city field is on the page
+      // at all before a rep touches anything.
       check(
         `${locale}: Saudi Arabia is preselected, so the city field is rendered`,
-        form.body.includes('name="cityId"') &&
-          form.body.includes('name="region"'),
+        form.body.includes('name="cityId"'),
+      );
+      // **The assertion this section exists for now.** `S15` — the rep is never
+      // asked for a region, so no control carries that name in any state.
+      // `FormField`'s own `name` becomes a `for=` and an error `id`, never a
+      // posted field, so this string appears in the HTML only if a real input
+      // or select is back.
+      check(
+        `${locale}: *** the register form asks for NO region *** [S15]`,
+        !form.body.includes('name="region"'),
       );
 
       /**
@@ -1531,11 +1552,13 @@ async function main(): Promise<void> {
         // would make every run's companies duplicates of the last run's.
         fields.set("phone", `+9665${stamp}${phoneSeq++}`);
         fields.set("countryId", country);
-        // **Posted for both**, which is the point: `15 §4` keeps a manually
-        // chosen region when there is no city, so Saudi must store it — and
-        // `S15` says a company abroad must not, however insistent the POST.
-        fields.set("region", "center");
-        // The rest, empty, exactly as an untouched form would send them.
+        // **No region is set.** The form offers no such field `S15`, so an
+        // untouched form sends none, and a payload that invented one would be
+        // testing a control that does not exist.
+        //
+        // The rest, empty, exactly as an untouched form would send them —
+        // `cityId` included, which is what makes the Saudi POST below the
+        // no-city case.
         for (const empty of [
           "cityId",
           "vatNumber",
@@ -1577,33 +1600,28 @@ async function main(): Promise<void> {
         `got ${refused.status} ${refused.location}`,
       );
 
-      /* --- S15: Saudi keeps the region, abroad does not --------------- */
+      /* --- S15: Saudi needs a city, abroad has none ------------------- */
 
-      const created = await post(fieldsFor(saudiId, "saudi"));
+      // **Refused, where this used to be accepted.** `S15` derives the region
+      // from the city, so a Saudi company without one has nothing to derive
+      // from — `placeForCountry` raises `validation.required` against `cityId`
+      // and `useActionState` re-renders the form, so 200, not 303. The same
+      // shape as the no-phone case above, and for the same reason: this is the
+      // only proof the SERVER refuses on its own terms rather than the browser
+      // doing it, since a POST skips `required` entirely.
+      const refusedCity = await post(fieldsFor(saudiId, "saudi"));
       check(
-        `${locale}: registering a Saudi company answers 303 [S13], [S14]`,
-        created.status === 303,
-        `got ${created.status} ${created.location}`,
-      );
-      if (created.status !== 303) continue;
-
-      const saudiDetail = await get(jar, created.location.replace(BASE, ""));
-      check(
-        `${locale}: *** a Saudi company KEPT the posted region *** [S15]`,
-        factOf(saudiDetail.body, "region") !== DASH,
-        `region reads "${factOf(saudiDetail.body, "region")}"`,
-      );
-      check(
-        `${locale}: …and its country reads back [S14]`,
-        factOf(saudiDetail.body, "country") !== DASH,
-        `country reads "${factOf(saudiDetail.body, "country")}"`,
+        `${locale}: *** registering a Saudi company with NO city answers 200, not 303 *** [S15]`,
+        refusedCity.status === 200,
+        `got ${refusedCity.status} ${refusedCity.location}`,
       );
 
-      // **The assertion that matters.** A 303 proves nothing here: the broken
-      // version, where the Saudi token never matches, answers 303 just as
-      // happily. Only the stored value says which branch `placeForCountry`
-      // took — and this pair catches the token being wrong in EITHER
-      // direction, because the two POSTs differ in nothing but the country.
+      // **The assertion that matters, and the reason both POSTs are still
+      // sent.** A refusal proves nothing on its own: a `placeForCountry` whose
+      // Saudi token never matched would refuse nothing and a broken one that
+      // refused everything would pass the check above. Only the PAIR says which
+      // branch was taken, because the two payloads differ in nothing but the
+      // country — and it catches the token being wrong in either direction.
       const abroad = await post(fieldsFor(foreignId, "abroad"));
       check(
         `${locale}: registering a company outside Saudi Arabia answers 303 [S14]`,
@@ -1615,40 +1633,40 @@ async function main(): Promise<void> {
       const abroadPath = abroad.location.replace(BASE, "");
       const abroadDetail = await get(jar, abroadPath);
       check(
-        `${locale}: *** a company abroad stores NO region, though one was posted *** [S15]`,
-        factOf(abroadDetail.body, "region") === DASH,
-        `region reads "${factOf(abroadDetail.body, "region")}"`,
-      );
-      check(
-        `${locale}: …and no city [S15]`,
+        `${locale}: *** a company abroad stores NO city *** [S15]`,
         factOf(abroadDetail.body, "city") === DASH,
         `city reads "${factOf(abroadDetail.body, "city")}"`,
       );
       check(
-        `${locale}: …and it is not the Saudi one [S14]`,
-        factOf(abroadDetail.body, "country") !==
-          factOf(saudiDetail.body, "country"),
-        `both read "${factOf(abroadDetail.body, "country")}"`,
+        `${locale}: *** …and NO region, because it has no city to imply one *** [S15]`,
+        factOf(abroadDetail.body, "region") === DASH,
+        `region reads "${factOf(abroadDetail.body, "region")}"`,
+      );
+      check(
+        `${locale}: …and its country reads back, and is not Saudi Arabia [S14]`,
+        factOf(abroadDetail.body, "country") !== DASH,
+        `country reads "${factOf(abroadDetail.body, "country")}"`,
       );
 
-      // The edit screen drops both fields abroad — the form half of the same
-      // rule. Asserted AFTER the stored values, never instead of them: this
-      // branch is computed in the browser from the same constant, so it would
-      // agree with a `placeForCountry` that had the token wrong.
+      // The edit screen drops the city abroad — the form half of the same
+      // rule — and asks for a region on neither screen `S15`. Asserted AFTER
+      // the stored values, never instead of them: this branch is computed in
+      // the browser from the same constant, so it would agree with a
+      // `placeForCountry` that had the token wrong.
+      //
+      // There is no Saudi EDIT screen asserted beside it any more, and that is
+      // a consequence rather than an omission: this section can no longer
+      // create a Saudi company over HTTP, so it owns none to open. The positive
+      // side of the same `isSaudi` branch is asserted on `/companies/new`
+      // above — the identical component, with Saudi preselected.
       const edit = await get(jar, `${abroadPath}/edit`);
       check(
-        `${locale}: the edit form drops the city and region abroad [S15]`,
-        !edit.body.includes('name="cityId"') &&
-          !edit.body.includes('name="region"'),
-      );
-      const saudiEdit = await get(
-        jar,
-        `${created.location.replace(BASE, "")}/edit`,
+        `${locale}: the edit form drops the city abroad [S15]`,
+        !edit.body.includes('name="cityId"'),
       );
       check(
-        `${locale}: …and keeps them for a Saudi company [S15]`,
-        saudiEdit.body.includes('name="cityId"') &&
-          saudiEdit.body.includes('name="region"'),
+        `${locale}: *** …and asks for no region there either *** [S15]`,
+        !edit.body.includes('name="region"'),
       );
     }
   }
@@ -1755,7 +1773,12 @@ async function main(): Promise<void> {
       const saudiId = newCompany.body
         .match(/<select[^>]*name="countryId"[\s\S]*?<\/select>/)?.[0]
         ?.match(/<option value="([0-9a-f-]{36})"[^>]*data-code="SA"/)?.[1];
-      if (!companyForm || !saudiId) {
+      // `S15` — a Saudi company needs a city, and the combobox does not put one
+      // in the HTML. Section 13 owns the refusal; this section only needs a
+      // company, so it takes an id from the database rather than proving
+      // anything about how it got there.
+      const cityId = await aCityId();
+      if (!companyForm || !saudiId || !cityId) {
         check(`${locale}: the company form is reachable`, false);
         continue;
       }
@@ -1763,9 +1786,8 @@ async function main(): Promise<void> {
       companyFields.set("name", `s74-${stamp}-${locale}`);
       companyFields.set("phone", `+9665${stamp}${phoneSeq++}`);
       companyFields.set("countryId", saudiId);
+      companyFields.set("cityId", cityId);
       for (const empty of [
-        "cityId",
-        "region",
         "vatNumber",
         "categoryId",
         "leadSourceId",
@@ -2145,9 +2167,10 @@ async function main(): Promise<void> {
       companyFields.set("name", `s67-${stamp}`);
       companyFields.set("phone", `+9665${stamp}90`);
       companyFields.set("countryId", saudiId);
+      // `S15` — mandatory for a Saudi company, and not in the HTML. See
+      // `aCityId`; section 13 is the one that proves the refusal.
+      companyFields.set("cityId", (await aCityId()) ?? "");
       for (const empty of [
-        "cityId",
-        "region",
         "vatNumber",
         "categoryId",
         "leadSourceId",
@@ -2333,6 +2356,34 @@ async function endStateOf(threadId: string): Promise<string | null> {
       select end_state from quotation_threads where id = ${threadId}
     `;
     return (rows[0]?.end_state as string | null) ?? null;
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+/**
+ * Any seeded city's id, read straight from Postgres.
+ *
+ * `S15` makes the city mandatory for a Saudi company, and the city control is
+ * a `Combobox` in a Radix portal — its options are not in the server HTML, so
+ * a black-box POST has no id to send. Sections 14 and 15 need a Saudi company
+ * to hang a quotation on, so they need one id.
+ *
+ * Read over the driver in raw SQL, exactly as `endStateOf` does and for a
+ * weaker reason: this is fixture setup, not an assertion, so nothing about
+ * what the sections prove depends on where it came from. **This file still
+ * never imports `src/`.**
+ *
+ * Section 13 deliberately does NOT use it. Its subject is what a browser can
+ * post, and a browser without a city id is precisely the case `S15` must
+ * refuse.
+ */
+async function aCityId(): Promise<string | null> {
+  const { default: postgres } = await import("postgres");
+  const sql = postgres(process.env.DATABASE_URL ?? "", { max: 1 });
+  try {
+    const rows = await sql`select id from cities order by name_en limit 1`;
+    return (rows[0]?.id as string | undefined) ?? null;
   } finally {
     await sql.end({ timeout: 5 });
   }

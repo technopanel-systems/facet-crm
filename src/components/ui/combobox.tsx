@@ -61,8 +61,14 @@ export function Combobox({
   searchPlaceholder: string;
   /** Shown when the query matches nothing. */
   emptyLabel: string;
-  /** The "no value" entry — the field is nullable, like the native version. */
-  clearLabel: string;
+  /**
+   * The "no value" entry — the field is nullable, like the native version.
+   *
+   * **Omitted for a required field**, which then offers no way back to empty,
+   * the way a required `<select>` has no empty `<option>`. The company form's
+   * city is the one that omits it `S15`.
+   */
+  clearLabel?: string;
   disabled?: boolean;
   invalid?: boolean;
   /** For a field that drives another one — the region display `[15 §4]`. */
@@ -97,12 +103,21 @@ export function Combobox({
     setActive(0);
   }
 
+  // The clear row occupies index 0 when it exists, so every match sits one
+  // lower. `offset` is that shift, and it is the only difference between the
+  // required and nullable renderings.
+  const clearable = clearLabel !== undefined;
+  const offset = clearable ? 1 : 0;
+
   function onKeyDown(event: React.KeyboardEvent) {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       const step = event.key === "ArrowDown" ? 1 : -1;
-      // +1 for the clear row, which sits above the matches and is selectable.
-      const count = matches.length + 1;
+      // +1 for the clear row, when there is one: it sits above the matches and
+      // is selectable, so it shifts every index below it. Without a
+      // `clearLabel` there is no such row and the matches start at 0.
+      const count = matches.length + (clearable ? 1 : 0);
+      if (count === 0) return;
       const next = (active + step + count) % count;
       setActive(next);
       listRef.current
@@ -112,8 +127,8 @@ export function Combobox({
     }
     if (event.key === "Enter") {
       event.preventDefault(); // never submit the form from inside the popup
-      if (active === 0) choose("");
-      else if (matches[active - 1]) choose(matches[active - 1].value);
+      if (clearable && active === 0) choose("");
+      else if (matches[active - offset]) choose(matches[active - offset].value);
     }
   }
 
@@ -205,35 +220,40 @@ export function Combobox({
               className="max-h-64 overflow-y-auto py-1"
             >
               {/* The nullable field's "no value" row, mirroring the native
-                  select's empty <option>. */}
-              <div
-                id={`${name}-option-0`}
-                role="option"
-                aria-selected={value === ""}
-                data-index={0}
-                onClick={() => choose("")}
-                onMouseEnter={() => setActive(0)}
-                className={rowClass(0)}
-              >
-                <Check
-                  aria-hidden
-                  className={cn("size-4 shrink-0", value !== "" && "opacity-0")}
-                />
-                <span className="text-muted-foreground truncate">
-                  {clearLabel}
-                </span>
-              </div>
+                  select's empty <option>. A required field renders none. */}
+              {clearable ? (
+                <div
+                  id={`${name}-option-0`}
+                  role="option"
+                  aria-selected={value === ""}
+                  data-index={0}
+                  onClick={() => choose("")}
+                  onMouseEnter={() => setActive(0)}
+                  className={rowClass(0)}
+                >
+                  <Check
+                    aria-hidden
+                    className={cn(
+                      "size-4 shrink-0",
+                      value !== "" && "opacity-0",
+                    )}
+                  />
+                  <span className="text-muted-foreground truncate">
+                    {clearLabel}
+                  </span>
+                </div>
+              ) : null}
 
               {matches.map((option, index) => (
                 <div
                   key={option.value}
-                  id={`${name}-option-${index + 1}`}
+                  id={`${name}-option-${index + offset}`}
                   role="option"
                   aria-selected={option.value === value}
-                  data-index={index + 1}
+                  data-index={index + offset}
                   onClick={() => choose(option.value)}
-                  onMouseEnter={() => setActive(index + 1)}
-                  className={rowClass(index + 1)}
+                  onMouseEnter={() => setActive(index + offset)}
+                  className={rowClass(index + offset)}
                 >
                   <Check
                     aria-hidden
