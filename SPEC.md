@@ -162,10 +162,10 @@ unchanged: an accepted quotation is an internal signature and is neither.
 Cancelling an approved dispatch **un-wins the project and takes back the
 credit**. A cancelled dispatch never happened, whatever stage it reached — the
 alternative is a rule about when stock physically moved, which FACET cannot
-know. The cancelled dispatch stays visible on its record with its reason (S107),
-and its difference flag stays with it — but **it is excluded from every
-figure**, including the quoted-versus-dispatched comparison (S77). Visible as
-history, counted nowhere.
+know. The cancelled dispatch stays visible on its record with its reason —
+nothing is ever deleted (S107) — and its difference flag stays with it, but
+**it is excluded from every figure**, including the quoted-versus-dispatched
+comparison (S77). Visible as history, counted nowhere.
 The Arabic term for the customer's commitment is **OPEN — not chosen**, and it
 must not reuse اعتماد, which already labels the coordinator's internal accept.
 
@@ -291,10 +291,10 @@ sqm**. Targets measure cladding, not fabrication.
 **S61.** Lines are editable only while the live version is `requested` and the
 thread is open.
 
-**S62.** Only the coordinator may **issue, return, accept, reject or cancel** a
-quotation, and only she may **edit a submitted dispatch request** (S125).
-Returning or cancelling requires a written reason, which becomes a comment on
-the thread.
+**S62. [CHANGE]** Only the coordinator may **issue, return, accept, reject or
+cancel** a quotation, and only she may **edit a submitted dispatch request**
+(S125). Returning or cancelling requires a written reason, which becomes a
+comment on the thread.
 
 **S63.** The coordinator creates the real quotation in SMAC and types the SMAC
 number back into FACET. Status becomes `issued`.
@@ -426,7 +426,8 @@ numbered.
 kept out of the working lists. A rep sees their own; coordinators and managers
 see all. Only the coordinator may revive one, and a revived request is treated
 as new. A rep who wants to withdraw a submitted request asks the coordinator to
-refuse it — there is no separate act.
+refuse it — there is no separate act. A revived request returns to the **rep**,
+unsubmitted, and they edit and submit it as they would a new one (S125).
 
 **S124. [BUILD]** **The coordinator refuses a dispatch request**, the same
 person who approves one. A refusal carries a reason and archives the request
@@ -436,6 +437,12 @@ person who approves one. A refusal carries a reason and archives the request
 that the coordinator edits it, usually after phoning the rep — that is faster
 than refusing and re-raising. A quotation is different: **S61** keeps its lines
 editable until the coordinator issues it, so the rep edits throughout.
+
+**S126. [BUILD]** A dispatch may only be raised from a quotation the coordinator
+has **issued**. A requested version is still being edited (S61) and is not
+something to dispatch against. This is what makes S120's comparison stable: an
+issued version does not change, and a later revision creates a new version
+rather than altering it (S66).
 
 ---
 
@@ -598,7 +605,11 @@ requests. A record **created for a rep by the coordinator or a manager**, and a
 request the **coordinator had to edit before approving**, are both recorded and
 counted. Both are someone else doing the rep's work, and both are what the
 number is for. It is a number to look at, never an enforcement — a rep in a
-meeting with no connection is a legitimate exception.
+meeting with no connection is a legitimate exception. This is not the deviation
+S120 measures. A gap the coordinator introduced is never the rep's deviation
+from a quotation; that the coordinator had to introduce it is a fact about how
+the request arrived. Two questions, two figures, and a screen showing both must
+say which is which.
 
 ---
 
