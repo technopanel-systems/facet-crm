@@ -793,6 +793,18 @@ async function main(): Promise<void> {
         `${locale}: the picker offers a non-'other' reason`,
         Boolean(nonOtherReasonId),
       );
+      // The project form asks for no region either, and for the same reason the
+      // company form does not: `regionForCity` has no fallback, so a control
+      // here would take input nothing stores `D51`. Its CITY control stays and
+      // is deliberately not asserted absent — what a rep picks there IS written.
+      check(
+        `${locale}: *** the project form asks for NO region *** [D51]`,
+        !form.includes('name="region"'),
+      );
+      check(
+        `${locale}: …and still offers a city, which is stored`,
+        form.includes('name="cityId"'),
+      );
       if (!otherReasonId || !nonOtherReasonId) continue;
 
       /** The action envelope plus the fields a browser would send. */
@@ -823,7 +835,9 @@ async function main(): Promise<void> {
         fields.set("nameAr", "");
         fields.set("sqmExpected", "");
         fields.set("cityId", "");
-        fields.set("region", "");
+        // No `region`: the project form no longer renders one, so an untouched
+        // form sends none `D51`. The city is still sent, because that control
+        // is still there and what it posts is still stored.
         fields.set("endState", endState);
         fields.set("lostReasonId", lostReasonId);
         fields.set("lossReason", lossReason);

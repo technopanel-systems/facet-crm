@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
 import { setCreditSplit } from "@/lib/credit-splits";
-import { PROJECT_END_STATES, REGIONS } from "@/lib/enums";
+import { PROJECT_END_STATES } from "@/lib/enums";
 import {
   addProjectCompany,
   createProject,
@@ -25,7 +25,10 @@ function readProjectForm(formData: FormData) {
     // numeric(14,4) — kept as a string so a forecast the business is measured
     // on never passes through a float.
     sqmExpected: fields.decimal("sqmExpected", { min: 0, maxScale: 4 }),
-    region: fields.option("region", REGIONS),
+    // No `region` beside it: the form offers no such control and
+    // `regionForCity` has no fallback to give one to, so a reader that accepted
+    // one would be accepting input nothing stores `D51`. The column is written
+    // from the city.
     cityId: fields.uuid("cityId"),
     endState: fields.option("endState", PROJECT_END_STATES),
     // Shape only — "required when lost, one of the nine, and only 'other'

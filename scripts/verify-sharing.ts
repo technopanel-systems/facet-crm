@@ -713,7 +713,6 @@ async function main(): Promise<void> {
     nameEn: shared!.nameEn,
     nameAr: shared!.nameAr,
     sqmExpected: "1234.5000",
-    region: shared!.region,
     cityId: shared!.cityId,
     endState: shared!.endState,
     lostReasonId: shared!.lostReasonId,

@@ -84,7 +84,13 @@ export type ProjectInput = {
   nameEn: string;
   nameAr: string | null;
   sqmExpected: string | null;
-  region: Region | null;
+  /** Optional, and deliberately not conditioned on anything: a project has no
+   *  country, so `S15`'s "mandatory when Saudi" has nothing to hang on here.
+   *  Whether it should be required at all is one of the three shapes open in
+   *  `WORKFLOW §5`. What is settled is that this is the ONLY place a region can
+   *  come from — there is no `region` field beside it, because `regionForCity`
+   *  has no fallback and a caller supplying one would be supplying something
+   *  the writer discards. */
   cityId: string | null;
   endState: ProjectEndState | null;
   /** Which of the nine `[25 §5]`; required when `endState` is `lost`. */

@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "@/i18n/navigation";
-import { OTHER_LOSS_REASON_CODE, PROJECT_END_STATES, REGIONS } from "@/lib/enums";
+import { OTHER_LOSS_REASON_CODE, PROJECT_END_STATES } from "@/lib/enums";
 import type { CityRow, LossReasonRow } from "@/lib/lookups";
 import type { ProjectInput } from "@/lib/projects";
 import { emptyFormState, type FormState } from "@/lib/validation";
@@ -129,7 +129,11 @@ export function ProjectForm({
         />
       </FormField>
 
-      {/* City before region — the city answers the region `[15 §4]`. */}
+      {/* City before region — the city answers the region `S15`. Unlike the
+          company form's, this one is NOT required: that turns on a country, and
+          a project has none. Which of the three shapes `projects.city_id` takes
+          is open in `WORKFLOW §5`. What a rep picks here IS stored, so the
+          control has something behind it `D51`. */}
       <FormField
         name="cityId"
         label={t("common.city")}
@@ -154,33 +158,29 @@ export function ProjectForm({
         />
       </FormField>
 
+      {/* Shown, never asked. `449a7e8` removed `regionForCity`'s fallback, so
+          from that commit a posted region was discarded here — a rep could pick
+          one, submit, and watch it vanish. `D51`: a control with nothing behind
+          it is not rendered. Gone the same way the company form's went: no form
+          control carries the name `region` in either state, so the rendered HTML
+          holds none for a POST to fill. `FormField`'s own `name` is the label's
+          `htmlFor` and the error's `id`, never a posted field.
+
+          This says nothing about whether `projects.region` should exist — that
+          is still one of the three shapes open in `WORKFLOW §5`. It only stops
+          the form taking input nothing stores. */}
       <FormField
         name="region"
         label={t("common.region")}
         error={errors.region}
-        hint={cityRegion ? t("common.regionFromCity") : undefined}
+        hint={t("common.regionFromCity")}
       >
-        {cityRegion ? (
-          <p
-            className="border-input bg-muted text-muted-foreground flex h-9
-              items-center rounded-md border px-3 text-start text-sm"
-          >
-            {t(`enums.region.${cityRegion}`)}
-          </p>
-        ) : (
-          <SelectField
-            name="region"
-            defaultValue={value("region")}
-            placeholder={t("common.none")}
-            invalid={Boolean(errors.region)}
-          >
-            {REGIONS.map((region) => (
-              <option key={region} value={region}>
-                {t(`enums.region.${region}`)}
-              </option>
-            ))}
-          </SelectField>
-        )}
+        <p
+          className="border-input bg-muted text-muted-foreground flex h-9
+            items-center rounded-md border px-3 text-start text-sm"
+        >
+          {cityRegion ? t(`enums.region.${cityRegion}`) : t("common.none")}
+        </p>
       </FormField>
 
       <FormField
