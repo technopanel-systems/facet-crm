@@ -353,16 +353,19 @@ nothing and wins nothing (S31).
 quotation has a project, the dispatch takes it. When the quotation has none, the
 project chosen at dispatch is written back onto the quotation, and the
 quotation's company is added to that project as a participant if it is not
-already one. The write-back happens when the coordinator approves.
+already one. The write-back happens when the coordinator approves. The project
+on the dispatch, taking the thread's, and the write-back all ship today; the
+write-back fires at record time, because there is no approval act yet.
 
 **S75. [BUILD]** A dispatch is raised one of three ways: **exactly as a
 quotation** · **from a quotation, with edits** · **as a free entry with no
 quotation at all**. The second is the normal case after negotiation. **A
 dispatch that names a project wins it on approval (S31); one that names none
 wins nothing**, which is why the project is asked for even when it is not
-refused.
+refused. Two of the three routes exist today — exactly as a quotation, and free
+entry. The middle one, and winning on approval, do not.
 
-**S76.** The coordinator **sees projects and contacts**, because both
+**S76. [CHANGE]** The coordinator **sees projects and contacts**, because both
 are part of the dispatch. The name-only restriction is removed. This is a
 role-level exception to **S30**, which is unchanged: a project is still visible
 only to its owner or someone explicitly shared on it, and seeing a company still
@@ -371,7 +374,8 @@ either. Her edit right under **S62** reaches a submitted dispatch request's own
 fields — lines, stock, shipment, payment — and never the project or contact
 records it names.
 
-**S77. [CHANGE]** One quotation produces **any number of dispatches**. What was
+**S77. [CHANGE]** One quotation produces **any number of dispatches**. That is
+true today. The comparison is not — it is S120's, and unbuilt. What was
 quoted and what was actually dispatched are **deliberately compared** — the gap
 is the point, not drift to be prevented.
 
@@ -452,7 +456,9 @@ and nothing blocks the same person from both acts.
 quotation (S118). The rep chooses it when requesting, as they choose the
 shipment method (S119); the coordinator may change it until approval, after
 which it is fixed. The change is recorded on the dispatch and the quotation is
-not rewritten.
+not rewritten. A **free-entry dispatch names a stock too** (S75). After approval
+the stock cannot change; a dispatch that must change is **cancelled as a whole**
+(S73) and raised again.
 
 ---
 

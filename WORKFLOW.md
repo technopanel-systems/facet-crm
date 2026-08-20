@@ -275,6 +275,11 @@ questions from `D3`, `D25` and `D31`, asked of a rep who has never seen it.
   27 in `docs/archive/` exist because that rule did not.
 - **When a rule replaces an old mechanism, the old mechanism comes out in the
   same slice.** Otherwise you end up with both.
+- **A rule that is only partly built says so in its own text.** A marker is one
+  bit and a rule can be three quarters done — `S118` read as finished while two
+  of its three clauses were unbuilt. `S81` and `S129` are the model: they name
+  which half is true today. The marker says whether work remains; the sentence
+  says what.
 - **Derived conditions are resolved in SQL, before pagination.** This has
   already shipped broken once, and it fails silently.
 - **One task per session**, and the plan reviewed here before approval.
