@@ -280,7 +280,11 @@ questions from `D3`, `D25` and `D31`, asked of a rep who has never seen it.
 - **One task per session**, and the plan reviewed here before approval.
 - **There is no production data.** Every row in every database is a fixture or
   verify residue. A migration never preserves, backfills or merges data — it
-  clears, and `db:reset` is always available. This stops being true at the
+  clears, and `db:reset` is always available. Where clearing is not available
+  — a NOT NULL column losing an enum value, a row whose deletion would break an
+  invariant — the migration may map onto a value the surviving vocabulary
+  already names, and the header says why. That is not a backfill: nothing is
+  being preserved that a reset would not recreate. This stops being true at the
   pilot, and this line comes out then.
 
 ---
@@ -352,7 +356,7 @@ Taken from `main` at commit `06aeb2b`.
 | Skills | `facet-ui`, `facet-verify` — nothing else |
 | claude-flow | fully removed, no remnants in the tree |
 | Routes | 38 |
-| Migrations | 18 |
+| Migrations | 19 — the only row re-measured since the stamp above, at `5444a89` |
 | Tables | 41, of which **5 have no reference anywhere in `src/` or `scripts/`**: `delete_requests`, `product_specifications`, `duplicate_flags`, `non_duplicates`, `attachments`. `accounts` is referenced and stays — the adapter's TYPE requires it |
 | Code | `src/lib` 14,612 · `src/app` 14,480 · `src/db` 1,935 · `src/components` 1,691 · `scripts` 16,132 |
 | Largest under `src` | `quotations.ts` 1,956 · `schema.ts` 1,869 · `follow-ups.ts` 1,527 · `authz.ts` 1,527 · `notifications.ts` 934 |
