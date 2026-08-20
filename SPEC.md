@@ -162,7 +162,10 @@ unchanged: an accepted quotation is an internal signature and is neither.
 Cancelling an approved dispatch **un-wins the project and takes back the
 credit**. A cancelled dispatch never happened, whatever stage it reached — the
 alternative is a rule about when stock physically moved, which FACET cannot
-know.
+know. The cancelled dispatch stays visible on its record with its reason (S107),
+and its difference flag stays with it — but **it is excluded from every
+figure**, including the quoted-versus-dispatched comparison (S77). Visible as
+history, counted nowhere.
 The Arabic term for the customer's commitment is **OPEN — not chosen**, and it
 must not reuse اعتماد, which already labels the coordinator's internal accept.
 
@@ -288,9 +291,10 @@ sqm**. Targets measure cladding, not fabrication.
 **S61.** Lines are editable only while the live version is `requested` and the
 thread is open.
 
-**S62.** **Only the coordinator** may issue, return, accept, reject or cancel.
-Returning or cancelling requires a written reason, which becomes a comment on the
-thread.
+**S62.** Only the coordinator may **issue, return, accept, reject or cancel** a
+quotation, and only she may **edit a submitted dispatch request** (S125).
+Returning or cancelling requires a written reason, which becomes a comment on
+the thread.
 
 **S63.** The coordinator creates the real quotation in SMAC and types the SMAC
 number back into FACET. Status becomes `issued`.
@@ -408,18 +412,21 @@ The flag is **permanent**: it survives approval and is kept for later analysis,
 because the gap between quoted and dispatched is the thing being measured (S77).
 **The flag records who made each difference** — the rep before submitting, or
 the coordinator after. A gap the coordinator created while fixing a request is
-not the rep's deviation, and no figure may read it as one.
+not the rep's deviation, and no figure may read it as one. The comparison is
+against **the version the dispatch was raised from**, not the latest one (S68).
+A later revision changes what is quoted; it does not retroactively create a gap
+on a dispatch that never moved.
 
 **S121. [BUILD]** An approved dispatch carries its **SMAC dispatch number**,
 which is unique. The coordinator writes it when SMAC issues it — usually at
 once. **It is not a condition of approval**; a dispatch is approved, then
 numbered.
 
-**S122. [BUILD]** A **cancelled or refused dispatch request is archived**, not
-deleted, and is kept out of the working lists. It is inspectable and never
-clutters a rep's or the coordinator's day. A rep sees their own archived
-requests; coordinators and managers see all. **Only the coordinator may revive
-one**, and a revived request is treated as new.
+**S122. [BUILD]** A **refused dispatch request is archived**, not deleted, and
+kept out of the working lists. A rep sees their own; coordinators and managers
+see all. Only the coordinator may revive one, and a revived request is treated
+as new. A rep who wants to withdraw a submitted request asks the coordinator to
+refuse it — there is no separate act.
 
 **S124. [BUILD]** **The coordinator refuses a dispatch request**, the same
 person who approves one. A refusal carries a reason and archives the request
@@ -587,10 +594,11 @@ Rep file uploads are a possible later addition.
 
 **S123. [BUILD]** **Who created a record is a measure.** The normal case is the
 rep creating their own companies, contacts, projects, quotations and dispatch
-requests. A record created for a rep by the coordinator or a manager is
-recorded and counted, so the pattern is visible. It is a number to look at,
-never an enforcement — a rep in a meeting with no connection is a legitimate
-exception.
+requests. A record **created for a rep by the coordinator or a manager**, and a
+request the **coordinator had to edit before approving**, are both recorded and
+counted. Both are someone else doing the rep's work, and both are what the
+number is for. It is a number to look at, never an enforcement — a rep in a
+meeting with no connection is a legitimate exception.
 
 ---
 
