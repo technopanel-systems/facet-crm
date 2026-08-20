@@ -485,10 +485,11 @@ than overwriting, so history stays visible.
 **S85.** **Achievement is derived entirely from dispatches.** No rep ever types
 how much they did.
 
-**S129. [BUILD]** **A rep is told when credit is granted to them**, at the
-moment the coordinator confirms it (S80). A split is a dated row with an author
-(S110), so the event exists; nothing surfaces it today. Being told it was taken
-back (S128) without ever being told it was given is not disclosure.
+**S129. [BUILD]** **A rep is told when they are given a share of someone else's
+credit** — the split case S80 confirms at approval, never the ordinary 100% of
+S78, which needs no telling. A split is a dated row with an author (S110), so
+the event exists; nothing surfaces it today. Being told it was taken back
+(S128) without ever being told it was given is not disclosure.
 
 ---
 
@@ -536,7 +537,10 @@ digest. If it is on the list it is waiting; if not, it is not.
 
 **S92. [CHANGE]** A **bell** carries news only, never work: *a rep was handed to
 you*, *you have been shared a record*. A handover raises one summary, not one
-per record.
+per record. The news also carries **credit granted to you (S129)**, and **a
+decision that ended your work (S128)** — a refusal, a rejection, a cancellation.
+Both are news: nothing is waiting on the person told, so neither belongs on the
+list.
 
 **S93.** **Friday and Saturday are the weekend for everyone.** Saturday work is
 recorded and never required.
@@ -603,7 +607,10 @@ record they have no reason to revisit. A record that vanishes with its reason in
 a column nobody reads is the same as no reason at all. Where the person told
 cannot see the record — a co-credited rep has no sight of the dispatch itself —
 **the message carries the reason and stands alone**. It is not a link into
-something they cannot open.
+something they cannot open. This is a deliberate exception to **S112**, which is
+otherwise unchanged: an audit row is never shown without joining back to the
+record and applying its visibility. Here the rep's own credit was taken, so the
+reason reaches them even where the record does not.
 
 ---
 
