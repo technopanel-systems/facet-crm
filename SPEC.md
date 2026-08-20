@@ -336,10 +336,10 @@ approves it.** She is the one who deals with SMAC and with finance. An approved
 dispatch is the only event that credits a target — not the request, and not the
 SMAC number that follows.
 
-**S73. [BUILD]** A dispatch cannot be approved without a payment method. Finance
-may refuse afterwards, so an approval is **reversible until the SMAC dispatch
-number is recorded**. After that, undoing it is a cancellation, which is a
-different act and stays visible.
+**S73. [BUILD]** A dispatch cannot be approved without a payment method.
+**Approval is final.** Anything wrong after it is a cancellation (S122), which
+is a different act and stays visible. If finance refuses later, the dispatch is
+cancelled, not un-approved.
 
 **S74. [CHANGE]** **The project is recorded on the dispatch itself.** When the
 quotation has a project, the dispatch takes it. When the quotation has none, the
@@ -371,13 +371,15 @@ price — but never service lines. Any line may differ from the quotation's,
 including price, and a dispatch may add a product the quotation never had. The
 invoice is made from these lines. A dispatch raised from a quotation arrives
 **pre-filled with its lines**; the rep keeps them or edits them. **Every line
-carries a price**; nothing is dispatched free.
+carries a price**; nothing is dispatched free. A quotation line with no price
+(S58) arrives unpriced and **the rep prices it before submitting**. A dispatch
+request with an unpriced line cannot be submitted.
 
 **S117. [BUILD]** FACET **mirrors** the dispatch's money for comparison. SMAC
 issues the invoice and remains the system of record; a disagreement is SMAC's to
-settle. The figures are shown to reps and managers, **below square metres in
-prominence** — square metres are what a rep is measured on (S83, S85). VAT is
-15%, as S57.
+settle. The figures are shown to the rep, the coordinator and the manager,
+**below square metres in prominence** — square metres are what a rep is
+measured on (S83, S85). VAT is 15%, as S57.
 
 **S118. [BUILD]** A quotation is drawn from **one stock**: Riyadh, Malham, South
 or Dammam. The stock is on the quotation because SMAC's inventory needs it. The
@@ -385,7 +387,7 @@ dispatch may draw from a different one; the change is recorded on the dispatch
 and the quotation is not rewritten. The stock is a **fixed list chosen from a
 dropdown**; FACET holds no inventory, only the name SMAC needs. **A free-entry
 dispatch names a stock too.** After approval the stock cannot change — a
-dispatch that must change is refused as a whole (S124) and raised again.
+dispatch that must change is cancelled as a whole (S73) and raised again.
 
 **S119. [BUILD]** Shipment is one of: **CT** (customer's own truck) · **TT**
 (Technopanel truck) · **Cargo** (third party). Only Riyadh and Malham stock have
@@ -402,9 +404,9 @@ The flag is **permanent**: it survives approval and is kept for later analysis,
 because the gap between quoted and dispatched is the thing being measured (S77).
 
 **S121. [BUILD]** An approved dispatch carries its **SMAC dispatch number**,
-written by the coordinator once SMAC has issued it. A dispatch is approved
-before the number exists. The number is **unique** and arrives **immediately on
-approval**.
+which is unique. The coordinator writes it when SMAC issues it — usually at
+once. **It is not a condition of approval**; a dispatch is approved, then
+numbered.
 
 **S122. [BUILD]** A **cancelled or refused dispatch request is archived**, not
 deleted, and is kept out of the working lists. It is inspectable and never
@@ -416,9 +418,10 @@ one**, and a revived request is treated as new.
 person who approves one. A refusal carries a reason and archives the request
 (S122).
 
-**S125. [BUILD]** A rep may **edit their own request until it is acted on** —
-a dispatch request until the coordinator approves or refuses it, a quotation
-request until the coordinator issues it. After that, a change is a new request.
+**S125. [BUILD]** A rep edits their own request **until they submit it**. After
+that the coordinator edits it, usually after phoning the rep — that is faster
+than refusing and re-raising. A quotation request is the same: the rep edits
+until the coordinator issues it.
 
 ---
 
