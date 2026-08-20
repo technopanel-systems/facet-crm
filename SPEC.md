@@ -505,9 +505,10 @@ the event exists; nothing surfaces it today. Being told it was taken back
 This replaces coverage, the follow-up queue, the notification bell and the
 dashboard. It is one idea, and it is the heart of the system.
 
-**S86.** Every company, project, quotation **and dispatch request** is in
-exactly one of three states: **moving**, **waiting on a named person**, or
-**closed with a reason**. No other state is legal.
+**S86. [BUILD]** Every company, project, quotation **and dispatch request** is
+in exactly one of three states: **moving**, **waiting on a named person**, or
+**closed with a reason**. No other state is legal. The first three exist today.
+A dispatch request does not — S72 creates it.
 
 **S87. [BUILD]** Each person has **one list of what is waiting on them**, oldest
 first. That list is the dashboard, the follow-up queue and the notification
@@ -522,7 +523,9 @@ her.
 **S89. [BUILD]** Something joins the list when a company has had no contact for
 too long, a project has not moved, a quotation is sitting with someone, a
 record was assigned or shared and has not been touched, or a dispatch request
-is sitting with the coordinator.
+is sitting with the coordinator. Three of the five conditions are computed in SQL
+today — company quiet, project stage unchanged, quotation awaiting a response.
+What does not exist is the one list they join (S87).
 
 **S90. [BUILD]** Something leaves the list exactly three ways:
 
@@ -536,7 +539,8 @@ is sitting with the coordinator.
 
 An item leaving the list by refusal, rejection or cancellation is **shown to the
 person it was taken from as it leaves** (S128). Leaving the list is not the same
-as leaving without a word.
+as leaving without a word. All three exits work today on their own anchors. What
+does not exist is the single list they leave.
 
 **S91. [CHANGE]** **The list is the notification.** There are no notification
 tiers, no persistence flags, no per-anchor resolution conditions and no daily
@@ -547,7 +551,9 @@ you*, *you have been shared a record*. A handover raises one summary, not one
 per record. The news also carries **credit granted to you (S129)**, and **a
 decision that ended your work (S128)** — a refusal, a rejection, a cancellation.
 Both are news: nothing is waiting on the person told, so neither belongs on the
-list.
+list. Both named items are raised today, and a handover already raises one
+summary rather than one per record. The two added items — S128 and S129 — are
+not, and the narrowing to news only is not: the digest still carries work.
 
 **S93.** **Friday and Saturday are the weekend for everyone.** Saturday work is
 recorded and never required.
@@ -555,8 +561,10 @@ recorded and never required.
 **S94. [BUILD]** A **holiday calendar** exists. When Eid or a national holiday is
 announced it is entered as a date range and skipped.
 
-**S95.** Clearing your own queue is what you get back for typing. A rep logs;
-the coordinator approves or refuses. Same list, different act.
+**S95. [BUILD]** Clearing your own queue is what you get back for typing. A rep
+logs; the coordinator approves or refuses. Same list, different act. The rep logs
+today. The coordinator approves and refuses nothing yet (S72), and the single
+list is S87's.
 
 ---
 
