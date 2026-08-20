@@ -104,11 +104,11 @@ Schema and data layer first, because the UI renders whatever the model says.
 |---|---|---|
 | 3 | One name field on companies and contacts; phone mandatory; country added | `S12` `S13` `S14` `S19` |
 | 4 | Drop project role labels — participants only | `S25` |
-| 5 | Quotation project optional; project chosen at dispatch and written back; company added as participant | `S50` `S74` |
-| 6 | VAT fixed at 15%; validity becomes a note, not a gate; readable product fields | `S53` `S57` `S67` |
+| 5 | Quotation project optional — a quotation may be raised without one. **The write-back half moved to session 13**, where approval exists: `S74` fires when the coordinator approves, and that cannot be built before approval can | `S50` |
+| 6 | VAT fixed at 15%; readable product fields. **Validity is no longer a note** — it leaves FACET entirely in session 10 (`S67`) | `S53` `S57` |
 | 7 | Report splits into shared half and private note; same-day edit only; author keeps their own | `S38` `S39` `S40` |
-| 8 | Coordinator sees projects and contacts | `S76` |
-| 9 | Drop dead structure — `accounts`, `verificationTokens`, both snapshot tables, `project_companies.role` | `SPEC §15` |; re-cite verify-routes.ts assertion labels to S numbers
+| 8 | Coordinator sees projects and contacts. **The sight half is built here**; the edit right `S76` now mentions (`S62`) arrives in session 13 | `S76` |
+| 9 | ~~Drop dead structure — `accounts`, `verificationTokens`, both snapshot tables, `project_companies.role`~~ **Folded into session 22.** Both were dead-structure sweeps citing `SPEC §15`, and 22 runs last so it catches Phase 1b's orphans too. The verify-routes.ts re-cite goes with it | — |
 
 > **AUDIT 1 — the model.** See §6.
 
@@ -137,7 +137,7 @@ Then AUDIT 1's remaining fixes, which are independent and small.
 | 19 | Primary rep on handover and reassignment | `S18` |
 | 20 | Coordinator's comment access; the cancellation reason | `S62` `S114` |
 | 21 | Handover recipients narrowed to the roles `S9` names | `S9` |
-| 22 | Dead-structure sweep — AUDIT 1 F9–F18 | `SPEC §15` |
+| 22 | Dead-structure sweep — AUDIT 1 F9–F18, plus everything session 9 carried: `accounts`, `verificationTokens`, both snapshot tables, `project_companies.role`, and re-citing verify-routes.ts assertion labels to S numbers | `SPEC §15` |
 
 Session 22 runs **last** of these, so it sweeps up whatever Phase 1b orphans.
 
@@ -240,15 +240,19 @@ An audit is its own session, produces a findings list, and **changes nothing**.
 Fixes are separate sessions afterwards.
 
 **AUDIT 1 — the model.** Does the database say what `SPEC.md` says? Every table
-and column against `S12`–`S85`. No column without a writer. No flag without a
+and column against `S12`–`S129`. No column without a writer. No flag without a
 reader. All verify scripts green. And: do the `[CHANGE]` markers for phase 1
-now read as plain rules?
+now read as plain rules? **An audit that stops at `S85` does not look at the
+dispatch and payment rules at all** — that was the old range, and it now misses
+`S116`–`S129` entirely.
 
 **AUDIT 2 — the interface.** Every screen against `DESIGN.md`, in both themes
 and both locales, at 1366px. The `D21` checklist run by eye on each. Does any
 screen still not answer `D3`'s question in five seconds? Is the waiting-list
 predicate resolved in SQL before pagination — check the query, do not trust the
-screen.
+screen. That predicate now resolves **dispatch requests sitting with the
+coordinator** (`S89`) alongside the other three kinds — a different join, and
+exactly the shape §7 warns fails silently.
 
 **AUDIT 3 — pre-pilot.** The full route walk with realistic data volumes. A
 real phone in a real hand. Restore the backup onto a second machine and confirm
@@ -326,29 +330,35 @@ Better still, add the script to the repo once (see §11) and run `npm run status
 
 ## 10. Current state, verified from the repository
 
-Checked directly against `main` at commit `12689b4`.
+**A snapshot, not a live reading.** Every figure below was taken by hand at the
+commit named, and none of it updates itself. Re-take it rather than trusting it;
+the previous version of this table was carried forward until nearly every row
+disagreed with the repository, one of them a corrupted cell sitting beside a
+number people trust.
+
+Taken from `main` at commit `06aeb2b`.
 
 | | |
 |---|---|
-| Branch | `main`, up to date, feature branch merged |
-| Authority files | `CLAUDE.md` 142 lines · `SPEC.md` 544 · `DESIGN.md` 395, all at root |
-| Docs | 27 in `docs/archive/`; `docs/design/` holds v5 only |
+| Branch | `main`, clean, no uncommitted work |
+| Authority files | `CLAUDE.md` 144 lines · `SPEC.md` 718 · `DESIGN.md` 421, all at root |
+| Rules | 129 `S` numbers · 63 `D` numbers |
+| Docs | `docs/archive/` holds 27 numbered documents plus `INVENTORY.md`. `docs/design/` holds v5 at the top level, with v2, v3 and v4 under `archive/` and an empty `superseded/` |
 | Skills | `facet-ui`, `facet-verify` — nothing else |
 | claude-flow | fully removed, no remnants in the tree |
 | Routes | 38 |
-| Tables | 43, of which **8 have no reference anywhere**: `verificationTokens`, `deleteRequests`, `productSpecifications`, `duplicateFlags`, `nonDuplicates`, `pipelineSnapshots`, `personSnapshots`, `attachments` |
-| Code | `src/lib` 13,966 · `src/app` 14,272 · `src/components` 1,619 · `scripts` 13,120 |
-| Largest files | `quotations.ts` 1,965 · `schema.ts` 1,857 · `follow-ups.ts` 1,497 · `authz.ts` 1,318 · `notifications.ts` 1,011 |
-| Open markers | 26 `[CHANGE]`, 24 `[BUILD]` | They start at **The last two numbers are the real progress bar. They start at **26 `[CHANGE]`
-and 24 `[BUILD]` — 50 open** as of commit `12689b4`, and should only ever go
-down. If they rise, something was decided outside the spec.** as of commit
-12689b4, and should only ever go down.
+| Migrations | 18 |
+| Tables | 41, of which **5 have no reference anywhere in `src/` or `scripts/`**: `delete_requests`, `product_specifications`, `duplicate_flags`, `non_duplicates`, `attachments`. `accounts` is referenced and stays — the adapter's TYPE requires it |
+| Code | `src/lib` 14,612 · `src/app` 14,480 · `src/db` 1,935 · `src/components` 1,691 · `scripts` 16,132 |
+| Largest under `src` | `quotations.ts` 1,956 · `schema.ts` 1,869 · `follow-ups.ts` 1,527 · `authz.ts` 1,527 · `notifications.ts` 934 |
+| Largest under `scripts` | `verify-routes.ts` 2,488 · `verify-schema25.ts` 1,732 · `verify-slice3.ts` 1,679 · `verify-phase9.ts` 1,558 · `verify-phase10a.ts` 1,447 |
+| Open markers | 17 `[CHANGE]`, 38 `[BUILD]` — **55 open**. See §9 for what a rise means |
 | Blocking | the Docker build |
 
-**Session 24 is larger than it looks.** It deletes `follow-ups.ts` (1,497) and
-`notifications.ts` (1,011), and with them `verify-phase10a.ts` (1,431) and
-`verify-followups.ts` (1,087) — roughly **5,000 lines**, against a much smaller
-waiting list. Expect that, or it will look like something went wrong.
+**Session 24 is larger than it looks.** It deletes `follow-ups.ts` (1,527) and
+`notifications.ts` (934), and with them `verify-phase10a.ts` (1,447) and
+`verify-followups.ts` (1,098) — **5,006 lines**, against a much smaller waiting
+list. Expect that, or it will look like something went wrong.
 
 **Session 1 head start.** Three causes of the Docker build failure are already
 ruled out and must not be re-investigated:
