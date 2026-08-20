@@ -485,6 +485,11 @@ than overwriting, so history stays visible.
 **S85.** **Achievement is derived entirely from dispatches.** No rep ever types
 how much they did.
 
+**S129. [BUILD]** **A rep is told when credit is granted to them**, at the
+moment the coordinator confirms it (S80). A split is a dated row with an author
+(S110), so the event exists; nothing surfaces it today. Being told it was taken
+back (S128) without ever being told it was given is not disclosure.
+
 ---
 
 ## 12. The waiting list — the core loop
@@ -595,7 +600,10 @@ reaches **everyone whose work it ends** — the rep who raised it, and any rep
 whose credit it takes back (S80). A cancelled dispatch un-wins a project and
 removes square metres from a rep's month (S31, S85); nobody learns that from a
 record they have no reason to revisit. A record that vanishes with its reason in
-a column nobody reads is the same as no reason at all.
+a column nobody reads is the same as no reason at all. Where the person told
+cannot see the record — a co-credited rep has no sight of the dispatch itself —
+**the message carries the reason and stands alone**. It is not a link into
+something they cannot open.
 
 ---
 
