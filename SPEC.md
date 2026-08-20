@@ -159,8 +159,10 @@ That is a real event and cannot be manufactured. Before that, a rep may mark a
 project **committed** — the customer has agreed, verbally or otherwise. That is
 the rep's own judgement, and no conversion figure treats it as won. **S65** is
 unchanged: an accepted quotation is an internal signature and is neither.
-Reversing an approval un-wins the project, because won is derived and not
-stored. Cancelling after the SMAC number exists does not: the stock went out.
+Cancelling an approved dispatch **un-wins the project and takes back the
+credit**. A cancelled dispatch never happened, whatever stage it reached — the
+alternative is a rule about when stock physically moved, which FACET cannot
+know.
 The Arabic term for the customer's commitment is **OPEN — not chosen**, and it
 must not reuse اعتماد, which already labels the coordinator's internal accept.
 
@@ -337,9 +339,11 @@ dispatch is the only event that credits a target — not the request, and not th
 SMAC number that follows.
 
 **S73. [BUILD]** A dispatch cannot be approved without a payment method.
-**Approval is final.** Anything wrong after it is a cancellation (S122), which
-is a different act and stays visible. If finance refuses later, the dispatch is
-cancelled, not un-approved.
+**Approval is final.** If something is wrong afterwards — finance refuses, the
+customer changes — the dispatch is **cancelled**, never un-approved. A
+cancelled dispatch stays visible on the record it belonged to, carries a
+reason, and is **never revived**: a new dispatch is raised instead. It credits
+nothing and wins nothing (S31).
 
 **S74. [CHANGE]** **The project is recorded on the dispatch itself.** When the
 quotation has a project, the dispatch takes it. When the quotation has none, the
@@ -402,6 +406,9 @@ the flag is visible to the rep, the coordinator and the manager. **Any
 difference flags it** — a colour swapped at the same price and quantity counts.
 The flag is **permanent**: it survives approval and is kept for later analysis,
 because the gap between quoted and dispatched is the thing being measured (S77).
+**The flag records who made each difference** — the rep before submitting, or
+the coordinator after. A gap the coordinator created while fixing a request is
+not the rep's deviation, and no figure may read it as one.
 
 **S121. [BUILD]** An approved dispatch carries its **SMAC dispatch number**,
 which is unique. The coordinator writes it when SMAC issues it — usually at
@@ -420,8 +427,8 @@ person who approves one. A refusal carries a reason and archives the request
 
 **S125. [BUILD]** A rep edits their own request **until they submit it**. After
 that the coordinator edits it, usually after phoning the rep — that is faster
-than refusing and re-raising. A quotation request is the same: the rep edits
-until the coordinator issues it.
+than refusing and re-raising. A quotation is different: **S61** keeps its lines
+editable until the coordinator issues it, so the rep edits throughout.
 
 ---
 
