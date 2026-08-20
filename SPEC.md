@@ -101,7 +101,8 @@ both carry primacy to the new holder.
 **S20.** A contact has **no owner**. It is visible exactly when its company is,
 and moves with the company on handover. The coordinator is the one exception,
 per **S76** — they see every contact without seeing its company, because a
-dispatch names a contact.
+dispatch names a contact. A dispatch does not carry a contact today; the reason
+is S76's, and S76 carries its own marker.
 
 ---
 
@@ -618,7 +619,9 @@ ways in. The review, the three outcomes and the one record all exist. Only the s
 
 **S107.** **Nothing is ever deleted.** "Removed" means archived: if that customer
 resurfaces in two years, the record says they were already known and why someone
-gave up on them. Archiving is gated by the delete-approval flag (S8).
+gave up on them. Archiving is gated by the delete-approval flag (S8). That gate
+is not built. `canApproveDeletion` has no reader anywhere today (S8), and
+archiving is gated by `canAssign` instead.
 
 **S128. [BUILD]** **A decision that ends someone's work reaches them.** A
 refused dispatch request (S124), a cancelled or rejected quotation (S62), and a
