@@ -366,8 +366,10 @@ refused.
 are part of the dispatch. The name-only restriction is removed. This is a
 role-level exception to **S30**, which is unchanged: a project is still visible
 only to its owner or someone explicitly shared on it, and seeing a company still
-reveals none of its projects. The coordinator sees them; **S62** is the whole of
-what they may do, and neither a project nor a contact is on it.
+reveals none of its projects. The coordinator sees them; she may not edit
+either. Her edit right under **S62** reaches a submitted dispatch request's own
+fields — lines, stock, shipment, payment — and never the project or contact
+records it names.
 
 **S77. [CHANGE]** One quotation produces **any number of dispatches**. What was
 quoted and what was actually dispatched are **deliberately compared** — the gap
@@ -395,7 +397,9 @@ dispatch may draw from a different one; the change is recorded on the dispatch
 and the quotation is not rewritten. The stock is a **fixed list chosen from a
 dropdown**; FACET holds no inventory, only the name SMAC needs. **A free-entry
 dispatch names a stock too.** After approval the stock cannot change — a
-dispatch that must change is cancelled as a whole (S73) and raised again.
+dispatch that must change is cancelled as a whole (S73) and raised again. The
+**rep chooses the stock when requesting**, as they choose the shipment method
+(S119). The coordinator may change it until approval, after which it is fixed.
 
 **S119. [BUILD]** Shipment is one of: **CT** (customer's own truck) · **TT**
 (Technopanel truck) · **Cargo** (third party). Only Riyadh and Malham stock have
@@ -444,6 +448,11 @@ something to dispatch against. This is what makes S120's comparison stable: an
 issued version does not change, and a later revision creates a new version
 rather than altering it (S66).
 
+**S127.** The coordinator may **raise a dispatch request against her own
+company and approve it herself**. She holds companies like any rep (S9), and
+nothing blocks the same person from both acts. It is recorded like any other
+(S123).
+
 ---
 
 ## 11. Credit and targets
@@ -483,9 +492,9 @@ how much they did.
 This replaces coverage, the follow-up queue, the notification bell and the
 dashboard. It is one idea, and it is the heart of the system.
 
-**S86.** Every company, project and quotation is in exactly one of three states:
-**moving**, **waiting on a named person**, or **closed with a reason**. No other
-state is legal.
+**S86.** Every company, project, quotation **and dispatch request** is in
+exactly one of three states: **moving**, **waiting on a named person**, or
+**closed with a reason**. No other state is legal.
 
 **S87. [BUILD]** Each person has **one list of what is waiting on them**, oldest
 first. That list is the dashboard, the follow-up queue and the notification
@@ -496,8 +505,9 @@ rep**. One screen, two scopes. There is no separate coverage screen and no
 separate activity screen.
 
 **S89. [BUILD]** Something joins the list when a company has had no contact for
-too long, a project has not moved, a quotation is sitting with someone, or a
-record was assigned or shared and has not been touched.
+too long, a project has not moved, a quotation is sitting with someone, a
+record was assigned or shared and has not been touched, or a dispatch request
+is sitting with the coordinator.
 
 **S90. [BUILD]** Something leaves the list exactly three ways:
 
