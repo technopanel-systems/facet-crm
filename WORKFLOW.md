@@ -206,7 +206,12 @@ a session report does not exist.
 | `report_signal` has nine values. **Corrected by AUDIT 1: `S43` lists eleven, not ten, and two are missing, not one** — *stock shortage* and *customer went quiet*. `loss_reasons` also seeds nine and is missing a different two — *quality concern* and *payment terms* — so the two lists are complementary halves whose union is exactly `S43`'s eleven. Seven shared concepts carry different tokens (`competitor_cheaper`/`lost_to_competitor`, `lead_time_too_long`/`delivery_time_too_long`, `specification_unavailable`/`specification_not_offered`, `project_delayed`/`project_cancelled_or_postponed`, `colour_unavailable`/`colour_or_product_unavailable`), so unifying is not a union. Only two values are in use in 30 signal rows, so the data migration is small | `src/lib/enums.ts`, `src/db/schema.ts`, `scripts/seed/loss-reasons.ts` | Session 28, which unifies the vocabulary |
 
 **Added by AUDIT 1 (§6), ranked by consequence.** Counts are from the live
-database on 19 Aug 2026, after all sixteen migrations.
+database on 19 Aug 2026, after the first **sixteen** migrations. There are now
+**18**: `0016_rep_reports_reference_dropped` and `0017_region_never_typed`
+landed afterwards. The counts stay as they are — dated, and honest as history —
+but read them against that. In particular **`0017` is the region migration**, so
+"0 of 414 projects carry a region" below describes exactly the state that
+migration was written to change.
 
 | What | Where | Disposition |
 |---|---|---|
