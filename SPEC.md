@@ -137,9 +137,10 @@ per participant.
 it is hidden, not deleted, and can be re-linked.
 
 **S28. [CHANGE]** A project's **state is never reported — it is derived** from
-real events: quotation raised, issued, paid, dispatched.
+real events: quotation raised, issued, accepted, dispatched. The one exception
+is **committed**, which lives in the rep's head and nowhere else (S31, S108).
 
-**S29. [CHANGE]** The rep sets exactly **four things** on a project and nothing
+**S29. [CHANGE]** The rep sets exactly **five things** on a project and nothing
 else:
 
 1. **Expected square metres** — the rep's estimate, the anchor number
@@ -147,13 +148,16 @@ else:
    against the production module **[BUILD]**
 3. **On hold until** — a date, which parks it
 4. **Lost, with a reason** — which closes it
+5. **Committed** — the customer has agreed, ahead of any dispatch (S31)
 
 **S30.** A project is visible **only to its owner or someone explicitly shared on
 it**. Seeing a company does not reveal its projects.
 
-**S31. [BUILD]** A project is **won** when a quotation on it is **accepted**, or
-the project is approved (اعتماد). Acceptance is the commitment; payment may
-follow by any route and is recorded on the dispatch.
+**S31. [BUILD]** A project is **won when a dispatch against it is approved**.
+That is a real event and cannot be manufactured. Before that, a rep may mark a
+project **committed** — the customer has agreed, verbally or by اعتماد. That is
+the rep's own judgement, and no conversion figure treats it as won. **S65** is
+unchanged: an accepted quotation is an internal signature and is neither.
 
 ---
 
@@ -308,9 +312,9 @@ latest live version of one thread.
 
 ## 9. Payment
 
-**S70.** **Payment is recorded on the dispatch, not on the quotation.** The
-coordinator records how the customer is paying, because she is the one who
-confirms it with finance.
+**S70. [CHANGE]** **Payment is recorded on the dispatch, not on the
+quotation.** The coordinator records how the customer is paying, because she is
+the one who confirms it with finance.
 
 **S71. [BUILD]** The payment method is one of: **on delivery** · **in the office
 by card** · **cash in the office** · **bank transfer, full** · **bank transfer,
@@ -332,12 +336,11 @@ may refuse afterwards, so an approval is **reversible until the SMAC dispatch
 number is recorded**. After that, undoing it is a cancellation, which is a
 different act and stays visible.
 
-**S74.** **The project is recorded on the dispatch itself.** When the
-quotation has a project, the dispatch takes that project — it is shown, not
-chosen. When the quotation has none, the coordinator chooses one, it is written
-back onto the quotation, and the quotation's company is added to that project as
-a participant if it is not already one. A dispatch's project is never different
-from its quotation's.
+**S74. [CHANGE]** **The project is recorded on the dispatch itself.** When the
+quotation has a project, the dispatch takes it. When the quotation has none, the
+project chosen at dispatch is written back onto the quotation, and the
+quotation's company is added to that project as a participant if it is not
+already one. The write-back happens when the coordinator approves.
 
 **S75. [BUILD]** A dispatch is raised one of three ways: **exactly as a
 quotation** · **from a quotation, with edits** · **as a free entry with no
@@ -400,8 +403,8 @@ already happened.
 project. It is rare.
 
 **S80. [BUILD]** When a dispatch is linked to a quotation carrying more than one
-rep, **the coordinator is prompted before dispatching** to confirm whether one
-rep or both are credited.
+rep, **the coordinator is prompted at approval** to confirm whether one rep or
+both are credited. Approval is the moment credit is decided (S72).
 
 **S81. [CHANGE]** A split divides **equally**. Nobody types a percentage. Splits
 across three or more reps are so rare they may never occur, so no remainder-
@@ -567,7 +570,7 @@ Ordered by what unblocks what.
 3. One name field on companies and contacts; phone mandatory; country added
 4. Drop project role labels
 5. Quotation project becomes optional; write-back at dispatch
-6. VAT fixed; validity becomes a note; readable product fields
+6. VAT fixed; validity and delivery period leave FACET; readable product fields
 7. Report split into shared half and private note; same-day edit
 8. Signals and loss reasons unified; loss cascade
 9. Coordinator sees projects and contacts
@@ -580,10 +583,9 @@ Ordered by what unblocks what.
 **Then**
 
 11. Duplicate detection and manager resolution
-12. Credit terms request and approval
-13. Sharing per project; contacts shareable
-14. Archive requests folded into the dormancy review
-15. Password reset; holiday calendar; signal aggregation; the three dead flags
+12. Sharing per project; contacts shareable
+13. Archive requests folded into the dormancy review
+14. Password reset; holiday calendar; signal aggregation; the three dead flags
 
 **Dropped outright**
 
@@ -596,6 +598,8 @@ Ordered by what unblocks what.
 - `project_companies.role` — S25
 - Notification tiers, persistence flags, per-anchor resolution, digest
   machinery — S91
+- `companies.has_credit_terms` — S70 and S73 were its only citations and both
+  were rewritten. No rule stands behind it.
 
 ---
 

@@ -188,7 +188,6 @@ database on 19 Aug 2026, after all sixteen migrations.
 | `S62` says returning **or cancelling** requires a reason "which becomes a comment on the thread". `returnForEdit` writes the comment; `cancelThread` writes only `quotation_threads.cancellation_reason` — no comment, no mention, so the rep is never told a signed quotation was killed | `src/lib/quotations.ts:1846-1862` | Own small slice, or folded into session 14 which owns comments |
 | `S31` ("a project is **won** when payment arrives **or** the project is approved") carries no marker but is not built. `projects.end_state` is only ever set by hand from the project form; nothing derives `won` from `payment_confirmed_at` or an approval | `SPEC.md` `S31`, `src/lib/projects.ts` | `S31` needs a `[CHANGE]` marker, or `S28`'s scope stated to cover it |
 | Handover and dormancy reassignment accept **any** active user as recipient — only `isActive` is checked and the picker is `listActiveUsers()` unfiltered — so a company book can land on an Executive or a Super Admin. `S9` names "a rep, a desk rep, or the coordinator". The code is wider than the rule, not narrower | `src/lib/team.ts:236-241`, `src/lib/dormancy.ts:199-207` | With `S9`, whose `[CHANGE]` currently implies the opposite gap |
-| `companies.has_credit_terms` has **no writer and no reader anywhere**, and 0 of 844 rows are true. `S70` (request/approve) is `[BUILD]` and `S73` is `[CHANGE]`, so the column landed a whole slice ahead of both — CLAUDE.md's "never land a column without its writer in the same slice" | `src/db/schema.ts` | Session 17 (credit terms), which builds its writer or drops it |
 | `users.city_id` has no writer and no reader. `createUser` accepts `cityId` but no form or action posts it, `UserUpdateInput` omits it and `ManagedUserRow` never selects it. **0 of 417 users carry one.** A live foreign key to `cities` that nothing fills | `src/db/schema.ts`, `src/lib/authz.ts:1294` | Undecided — needs a rule or a drop. Only `users.region` serves `10 §7` today |
 | `quotation_threads.cancelled_at` is written by `cancelThread` and read by nothing; 0 rows carry one. `cancelled_by_user_id` beside it *is* read | `src/db/schema.ts` | With the `S62` row above, which reopens `cancelThread` |
 | `notifications.channel` is written from `notification_types.default_channel` and read by nothing — no query, screen or filter | `src/db/schema.ts` | Session 11, which deletes the notification machinery per `S91` |
@@ -282,9 +281,8 @@ Write-Host "=== OPEN MARKERS ==="
 @(Select-String -Path SPEC.md -Pattern '^(?!- \*\*\[).*\[BUILD\]').Count
 ```
 
-The last two numbers are the real progress bar. They start at **26 `[CHANGE]`
-and 24 `[BUILD]` — 50 open** and should only ever go down. If they rise,
-something was decided outside the spec.
+The last two numbers are the real progress bar. The count **rises when rules are
+written and falls when they ship**. A rise is only wrong when no rule was added.
 
 Better still, add the script to the repo once (see §11) and run `npm run status`.
 
