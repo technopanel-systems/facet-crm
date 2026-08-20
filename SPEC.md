@@ -448,10 +448,9 @@ something to dispatch against. This is what makes S120's comparison stable: an
 issued version does not change, and a later revision creates a new version
 rather than altering it (S66).
 
-**S127.** The coordinator may **raise a dispatch request against her own
-company and approve it herself**. She holds companies like any rep (S9), and
-nothing blocks the same person from both acts. It is recorded like any other
-(S123).
+**S127. [BUILD]** The coordinator may **raise a dispatch request against her
+own company and approve it herself**. She holds companies like any rep (S9),
+and nothing blocks the same person from both acts.
 
 ---
 
@@ -502,7 +501,9 @@ inbox.
 
 **S88. [BUILD]** A manager sees **the same list across their team, grouped by
 rep**. One screen, two scopes. There is no separate coverage screen and no
-separate activity screen.
+separate activity screen. A **dispatch request waits on the coordinator, not on
+a rep**, so it appears on her own list (S87) and on the manager's grouped under
+her.
 
 **S89. [BUILD]** Something joins the list when a company has had no contact for
 too long, a project has not moved, a quotation is sitting with someone, a
@@ -511,9 +512,13 @@ is sitting with the coordinator.
 
 **S90. [BUILD]** Something leaves the list exactly three ways:
 
-1. **Moved** — an interaction was logged, or the chain advanced
-2. **Parked** — on hold until a date the rep set
-3. **Closed** — lost, with a reason
+1. **Moved** — an interaction was logged, or the chain advanced. An approved
+   dispatch request has moved.
+2. **Parked** — held until a date, set by whoever it is waiting on. A rep parks
+   their own record; the coordinator parks a request she is waiting on finance
+   or a callback for.
+3. **Closed with a reason** — a project or quotation is **lost** (S43-S49); a
+   dispatch request is **refused** (S124). Different vocabularies, same exit.
 
 **S91. [CHANGE]** **The list is the notification.** There are no notification
 tiers, no persistence flags, no per-anchor resolution conditions and no daily
@@ -529,8 +534,8 @@ recorded and never required.
 **S94. [BUILD]** A **holiday calendar** exists. When Eid or a national holiday is
 announced it is entered as a date range and skipped.
 
-**S95.** Logging is how a rep clears their own queue. That is what they get back
-for typing.
+**S95.** Clearing your own queue is what you get back for typing. A rep logs;
+the coordinator approves or refuses. Same list, different act.
 
 ---
 
@@ -577,6 +582,12 @@ ways in. The review, the three outcomes and the one record all exist. Only the s
 **S107.** **Nothing is ever deleted.** "Removed" means archived: if that customer
 resurfaces in two years, the record says they were already known and why someone
 gave up on them. Archiving is gated by the delete-approval flag (S8).
+
+**S128. [BUILD]** **A decision that ends someone's work reaches them.** A
+refused dispatch request (S124) and a cancelled or rejected quotation (S62) each
+carry a written reason, and that reason reaches the rep who raised it — on their
+own list, not only in an archive. A record that vanishes with its reason in a
+column nobody reads is the same as no reason at all.
 
 ---
 
