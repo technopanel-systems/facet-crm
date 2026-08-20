@@ -293,8 +293,8 @@ thread is open.
 
 **S62. [CHANGE]** Only the coordinator may **issue, return, accept, reject or
 cancel** a quotation, and only she may **edit a submitted dispatch request**
-(S125). Returning or cancelling requires a written reason, which becomes a
-comment on the thread.
+(S125) or **park a dispatch request** (S90). Returning, rejecting or cancelling
+requires a written reason, which becomes a comment on the thread.
 
 **S63.** The coordinator creates the real quotation in SMAC and types the SMAC
 number back into FACET. Status becomes `issued`.
@@ -427,11 +427,12 @@ once. **It is not a condition of approval**; a dispatch is approved, then
 numbered.
 
 **S122. [BUILD]** A **refused dispatch request is archived**, not deleted, and
-kept out of the working lists. A rep sees their own; coordinators and managers
-see all. Only the coordinator may revive one, and a revived request is treated
-as new. A rep who wants to withdraw a submitted request asks the coordinator to
-refuse it — there is no separate act. A revived request returns to the **rep**,
-unsubmitted, and they edit and submit it as they would a new one (S125).
+kept out of the working lists once the rep has been told (S128). A rep sees
+their own; coordinators and managers see all. Only the coordinator may revive
+one, and a revived request is treated as new. A rep who wants to withdraw a
+submitted request asks the coordinator to refuse it — there is no separate act.
+A revived request returns to the **rep**, unsubmitted, and they edit and submit
+it as they would a new one (S125).
 
 **S124. [BUILD]** **The coordinator refuses a dispatch request**, the same
 person who approves one. A refusal carries a reason and archives the request
@@ -520,6 +521,10 @@ is sitting with the coordinator.
 3. **Closed with a reason** — a project or quotation is **lost** (S43-S49); a
    dispatch request is **refused** (S124). Different vocabularies, same exit.
 
+An item leaving the list by refusal, rejection or cancellation is **shown to the
+person it was taken from as it leaves** (S128). Leaving the list is not the same
+as leaving without a word.
+
 **S91. [CHANGE]** **The list is the notification.** There are no notification
 tiers, no persistence flags, no per-anchor resolution conditions and no daily
 digest. If it is on the list it is waiting; if not, it is not.
@@ -584,10 +589,13 @@ resurfaces in two years, the record says they were already known and why someone
 gave up on them. Archiving is gated by the delete-approval flag (S8).
 
 **S128. [BUILD]** **A decision that ends someone's work reaches them.** A
-refused dispatch request (S124) and a cancelled or rejected quotation (S62) each
-carry a written reason, and that reason reaches the rep who raised it — on their
-own list, not only in an archive. A record that vanishes with its reason in a
-column nobody reads is the same as no reason at all.
+refused dispatch request (S124), a cancelled or rejected quotation (S62), and a
+**cancelled dispatch (S73)** each carry a written reason, and that reason
+reaches **everyone whose work it ends** — the rep who raised it, and any rep
+whose credit it takes back (S80). A cancelled dispatch un-wins a project and
+removes square metres from a rep's month (S31, S85); nobody learns that from a
+record they have no reason to revisit. A record that vanishes with its reason in
+a column nobody reads is the same as no reason at all.
 
 ---
 
