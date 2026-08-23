@@ -114,6 +114,7 @@ import {
 } from "@/lib/timeline";
 
 import { addDispatchLine } from "./dispatch-fixture";
+import { addQuotationLineRow } from "./quotation-fixture";
 
 let failures = 0;
 
@@ -494,6 +495,10 @@ async function main(): Promise<void> {
       createdBy: authorUser.id,
     })
     .returning();
+  // `S60` — a quotation always keeps at least one product line, and a version
+  // written by hand has to say so itself. This script's versions were the
+  // reason the rule had rows disagreeing with it.
+  await addQuotationLineRow(versionA.id);
   // The issue event has no column of its own; it lives in the audit log
   // `[20 §8]`, written the way `quotations.ts` writes it.
   await db.insert(auditLog).values({

@@ -585,6 +585,27 @@ async function loadLines(versionId: string): Promise<QuotationLineRow[]> {
  * decided whether this identity may see the record, and `getDispatch` asks
  * `canOpenRecord` for the thread before it renders a line of it.
  */
+/**
+ * Recompute a version's four totals, for the verify scripts that write a
+ * `quotation_versions` row **by hand** — NOT a feature.
+ *
+ * Two of them do (`verify-phase9`, `verify-phase10a`), to reach a state their
+ * own subject needs without going through the quotation gates, and since `S60`
+ * is asserted over every row they each have to give their version a product
+ * line. A line without its totals would leave the version's stored figures
+ * disagreeing with the line they are made of — which `S77` reads as
+ * `quotedSqm`.
+ *
+ * Exported rather than copied for `productLineMoney`'s reason: a fixture
+ * holding its own arithmetic fails the totals checks for a reason about the
+ * fixture, which is the least useful failure a verify script can produce.
+ */
+export function recomputeQuotationVersionTotals(
+  versionId: string,
+): Promise<void> {
+  return db.transaction((tx) => recomputeVersionTotals(tx, versionId));
+}
+
 export function quotationVersionLines(
   versionId: string,
 ): Promise<QuotationLineRow[]> {
@@ -1195,6 +1216,9 @@ export async function createQuotationThread(
   }
   await assertContactOnCompany(thread.companyId, thread.contactId);
 
+  // `S60` — *a quotation always keeps at least one product line*, and this is
+  // where it starts. Uncited until now, which is why nothing could be said to
+  // enforce the rule by reading the code for it.
   if (lines.length === 0) {
     throw new RuleError("quotations.errors.atLeastOneLine");
   }
@@ -1338,6 +1362,10 @@ export async function removeQuotationLine(
 
     const target = remaining.find((row) => row.id === lineId);
     if (!target) throw new RuleError("quotations.errors.notFound");
+    // `S60` — the word in the rule is *keeps*, and this is the only statement
+    // in the codebase that deletes a `quotation_lines` row. Between this and
+    // `createQuotationThread` above, no application path can leave a version
+    // with none.
     if (remaining.length <= 1) {
       throw new RuleError("quotations.errors.lastLine");
     }
@@ -1488,6 +1516,42 @@ export async function issueVersion(
     const version = await liveVersionOf(tx, threadId);
     if (version.status !== "requested") {
       throw new RuleError("quotations.errors.alreadyIssued");
+    }
+
+    // `S60` — **the last moment the rule can be kept.**
+    //
+    // Raising refuses a version with no lines and removal refuses the last
+    // one, so no application path *creates* this state. What issuing is, is
+    // the point after which it could never be **repaired**: `S61` makes lines
+    // editable only while the live version is `requested`, so nothing adds a
+    // line to an issued one, and `S66` makes a revision a new version rather
+    // than a way back into this one.
+    //
+    // It is also the point at which four other rules start reading these
+    // lines and would each get a quiet wrong answer from none of them:
+    // `S126` makes an issued version the only thing dispatchable, `S116`
+    // prefills a request from it, `S120` compares a dispatch against it, and
+    // `S77` quotes its total.
+    //
+    // **Reachable, and not only in theory.** `createRevision` copies the
+    // previous version's lines forward, so a version that is already lineless
+    // — the thirteen this database held before `db:reset`, every one written
+    // by a verify script inserting `quotation_versions` directly — produces a
+    // lineless revision that is `requested`, and therefore issuable. This
+    // refuses to let that state spread past the one row that has it.
+    //
+    // **Not a database CHECK, and it cannot be.** *At least one child row* is
+    // not row-local, so no CHECK can express it; `CLAUDE.md` puts what a row
+    // may contain in the database and this is not that. The pair that holds it
+    // is this refusal and `verify:schema25` §18, which asserts over every row
+    // ever written that none is lineless.
+    const [line] = await tx
+      .select({ id: quotationLines.id })
+      .from(quotationLines)
+      .where(eq(quotationLines.versionId, version.id))
+      .limit(1);
+    if (!line) {
+      throw new RuleError("quotations.errors.atLeastOneLine");
     }
 
     const [after] = await tx

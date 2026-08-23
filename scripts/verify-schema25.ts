@@ -2342,6 +2342,62 @@ async function repositoryMatchesDatabase(): Promise<void> {
     `${flags.unattributed} unattributed`,
   );
 
+  /* --- 18. At least one product line, over every row [S60] --------- */
+
+  console.log(
+    "\n18. *** No quotation version carries zero product lines *** [S60]",
+  );
+
+  // **The invariant, not the fixture** — and the one shape of rule this
+  // project's database genuinely cannot hold. *At least one child row* is not
+  // row-local, so no CHECK can express it, and `CLAUDE.md` puts in the database
+  // only what a row may contain. What holds `S60` is three refusals in
+  // `quotations.ts` — raising, removing the last line, issuing — and this,
+  // asserted over every row ever written rather than over the rows a script
+  // just made. It is the exact twin of §14's claim for `S116`.
+  //
+  // It has teeth: it was **false** when it was written. Thirteen versions
+  // carried no lines, six of them `issued`, every one inserted directly by
+  // `verify-phase9` or `verify-phase10a` — the two scripts that reach a
+  // quotation state without going through the gates. Both now give their
+  // versions a line through `scripts/quotation-fixture.ts`.
+  const [empties] = (await db.execute(sql`
+    select
+      count(*)::int as versions,
+      count(*) filter (
+        where not exists (
+          select 1 from quotation_lines l where l.version_id = v.id
+        )
+      )::int as lineless,
+      count(*) filter (
+        where v.status <> 'requested'
+          and not exists (
+            select 1 from quotation_lines l where l.version_id = v.id
+          )
+      )::int as frozen_lineless
+    from quotation_versions v
+  `)) as unknown as {
+    versions: number;
+    lineless: number;
+    frozen_lineless: number;
+  }[];
+
+  console.log(`  --    ${empties.versions} quotation version(s)`);
+  check(
+    "*** no quotation version carries zero product lines *** [S60]",
+    empties.lineless === 0,
+    `${empties.lineless} carry none`,
+  );
+  // Named separately because it is the unrepairable half: past `requested`,
+  // `S61` will not let a line be added, so one of these could never be fixed
+  // in the application at all — and `S126` makes it dispatchable, `S116`
+  // prefills nothing from it, and `S77` reads its total as what was quoted.
+  check(
+    "*** and none that is issued or superseded, where no line could be added *** [S60], [S61]",
+    empties.frozen_lineless === 0,
+    `${empties.frozen_lineless} frozen with none`,
+  );
+
   console.log("\n13. *** The repository and the database agree ***");
 
   // `Object.values` types each export as its own concrete table or enum type,

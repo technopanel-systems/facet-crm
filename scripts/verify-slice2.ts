@@ -23,6 +23,8 @@
  *   8. Qualification is derived from the event `[10 §1]`.
  *   9. *** A quotation cannot be written without a stock *** `S118` — the
  *      database refusing one, beside the writer that cannot omit one.
+ *  10. *** A quotation always keeps at least one product line *** `S60` — all
+ *      three moments: raising, removing the last one, and issuing.
  *
  * Usage: `npm run verify:slice2`
  *
@@ -59,6 +61,8 @@ import {
   productThicknesses,
   projectCompanies,
   projects,
+  quotationThreads,
+  quotationVersions,
   roles,
   serviceTypes,
   users,
@@ -78,8 +82,11 @@ import {
   issueVersion,
   listQuotationThreads,
   markAcceptedForProcessing,
+  removeQuotationLine,
   updateQuotationLine,
 } from "@/lib/quotations";
+
+import { addQuotationLineRow } from "./quotation-fixture";
 
 let failures = 0;
 
@@ -694,6 +701,123 @@ async function main(): Promise<void> {
     "…and a revision carried it forward unchanged [S66]",
     detail?.versions.every((version) => version.stock === "dammam") === true,
     detail?.versions.map((v) => `v${v.versionNumber}=${v.stock}`).join(", "),
+  );
+
+  /* --- 15. At least one product line [S60] ------------------------ */
+
+  console.log(
+    "\n15. *** A quotation always keeps at least one product line *** [S60]",
+  );
+
+  // **Three moments, and until now only two of them were guarded** — and
+  // neither of those cited the rule, so nothing in the codebase could be read
+  // as enforcing it. `tx.delete(quotationLines)` appears exactly once in
+  // `src/`, inside `removeQuotationLine`, and `createQuotationThread` is the
+  // only writer that can create a version with none; between them no
+  // application path could reach the state. What had no guard was **issuing**,
+  // which is where the rule stops being repairable: `S61` freezes the lines at
+  // `issued` and `S66` makes a revision a new version rather than a way back.
+
+  await refuses(
+    "*** a quotation cannot be RAISED with no product line *** [S60]",
+    "quotations.errors.atLeastOneLine",
+    () =>
+      createQuotationThread(
+        repA,
+        { projectId: project.id, companyId: company.id, contactId: null },
+        { stock: "riyadh" },
+        [],
+        [],
+      ),
+  );
+
+  // The thread §2 built carries one line, so removing it is removing the last.
+  const soleThread = await createQuotationThread(
+    repA,
+    { projectId: project.id, companyId: company.id, contactId: null },
+    { stock: "riyadh" },
+    [
+      {
+        supplierId: supplier.id,
+        classId: productClass.id,
+        fireRatingId: fireRating.id,
+        customColour: "168",
+        thicknessId: thickness.id,
+        widthM: "1.0000",
+        lengthM: "1.0000",
+        quantityPcs: "4.0000",
+        unitPrice: "100.00",
+      },
+    ],
+    [],
+  );
+  const soleDetail = await getQuotationThread(repA, soleThread.id);
+  await refuses(
+    "*** nor have its last line REMOVED *** [S60]",
+    "quotations.errors.lastLine",
+    () =>
+      removeQuotationLine(repA, soleThread.id, soleDetail!.live.lines[0].id),
+  );
+
+  // **The moment this slice added, and the one that needed constructing.** No
+  // application path produces a lineless version, so the only way to put
+  // `issueVersion` in front of one is to write it the way the two scripts that
+  // made the thirteen wrote theirs — directly. That is the state the guard
+  // exists for: `createRevision` carries the previous version's lines forward,
+  // so a lineless version already in the database yields a lineless revision
+  // that is `requested`, and therefore issuable.
+  const [emptyThread] = await db
+    .insert(quotationThreads)
+    .values({
+      projectId: project.id,
+      companyId: company.id,
+      raisedByUserId: repA.user.id,
+    })
+    .returning();
+  const [emptyVersion] = await db
+    .insert(quotationVersions)
+    .values({
+      threadId: emptyThread.id,
+      versionNumber: 1,
+      origin: "initial_request",
+      status: "requested",
+      stock: "riyadh",
+      createdBy: repA.user.id,
+    })
+    .returning();
+  await refuses(
+    "*** and a version with no line cannot be ISSUED *** [S60], [S61]",
+    "quotations.errors.atLeastOneLine",
+    () =>
+      issueVersion(coordinator, emptyThread.id, {
+        smacReference: `${stamp}-60`,
+        verification: "unverified",
+      }),
+  );
+  check(
+    "…and it is still requested, so nothing was half-issued [S63]",
+    (await getQuotationThread(coordinator, emptyThread.id))?.live.status ===
+      "requested",
+  );
+
+  // **Give it the line rather than delete the row.** Nothing is cleaned up in
+  // these scripts `[12 §7]`, and §18 of `verify:schema25` asserts over every
+  // row that no version is lineless — so a fixture built to prove the refusal
+  // must not be left behind as the one row that breaks the claim. Completing
+  // it is not cleanup: nothing is removed, and the mirror half of the rule is
+  // worth asserting anyway.
+  await addQuotationLineRow(emptyVersion.id, "7.0000");
+  await issueVersion(coordinator, emptyThread.id, {
+    smacReference: `${stamp}-60`,
+    verification: "unverified",
+  });
+  const nowIssued = await getQuotationThread(coordinator, emptyThread.id);
+  check(
+    "*** give it one line and the same call goes through *** [S60], [S63]",
+    nowIssued?.live.status === "issued" &&
+      nowIssued.live.lines.length === 1 &&
+      nowIssued.live.totalSqm === "7.0000",
+    `${nowIssued?.live.status}, ${nowIssued?.live.lines.length} line(s), ${nowIssued?.live.totalSqm} m2`,
   );
 
   // Nothing is cleaned up: FACET does not delete history `[12 §7]`, and this

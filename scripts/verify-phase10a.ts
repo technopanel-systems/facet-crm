@@ -124,6 +124,8 @@ import {
   workingDaysBetween,
 } from "@/lib/working-days";
 
+import { addQuotationLineRow } from "./quotation-fixture";
+
 let failures = 0;
 
 function check(label: string, condition: boolean, detail = ""): void {
@@ -520,6 +522,10 @@ async function main(): Promise<void> {
         createdAt: instantDaysAgo(ageDays),
       })
       .returning();
+    // `S60` — see the same note in `verify-phase9`. Every version this helper
+    // makes gets its one line, which is what stops the rule's only violating
+    // rows being written by the scripts that verify everything else.
+    await addQuotationLineRow(version.id);
     return { project, thread, version };
   }
 
