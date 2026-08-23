@@ -48,6 +48,14 @@ import {
   users,
 } from "@/db/schema";
 import { withAudit, type AuditEntry } from "@/lib/audit";
+/**
+ * `S72`'s one predicate `[dispatches.ts]`. **This import closes a cycle** —
+ * `dispatches.ts` imports `ensureProjectParticipant` from here — and it is safe
+ * because neither side is used at module-evaluation time: both are function
+ * references resolved when a query runs. The alternative was a seventh
+ * hand-written `status = 'approved'`, which is the copy that gets missed.
+ */
+import { approvedDispatches } from "@/lib/dispatches";
 import {
   canViewRecord,
   visibleCompaniesFilter,
@@ -323,6 +331,10 @@ export async function getProject(
  * No visibility term of its own: the caller has already proved the project
  * visible, and a project's figures follow it `[20 §13]` — the same terms
  * `listDispatchableThreads` totals on.
+ *
+ * **Approved only** `S72`, through `dispatches.ts`'s one predicate rather than
+ * a term written out here. That is the same argument this function's `sum()`
+ * already makes about arithmetic: one definition, one place to change.
  */
 async function dispatchedSqmByCompany(
   projectId: string,
@@ -331,7 +343,16 @@ async function dispatchedSqmByCompany(
     .select({ companyId: dispatches.companyId, total: sum(dispatchLines.sqm) })
     .from(dispatches)
     .innerJoin(dispatchLines, eq(dispatchLines.dispatchId, dispatches.id))
-    .where(eq(dispatches.projectId, projectId))
+    .where(
+      and(
+        // `S72` — *who bought* is derived from APPROVED dispatches. A request
+        // sitting with the coordinator has not bought anything, and counting it
+        // would put a participant's name against square metres that may yet be
+        // refused.
+        approvedDispatches(),
+        eq(dispatches.projectId, projectId),
+      ),
+    )
     .groupBy(dispatches.companyId);
 
   return new Map(

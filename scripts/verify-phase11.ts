@@ -639,6 +639,13 @@ async function main(): Promise<void> {
       userId: departing.user.id,
       dispatchDate: period,
       recordedByUserId: coordinator.user.id,
+      // `S72` — a hand-written dispatch says which of the four states it is
+      // in, and these fixtures all want the one that COUNTS: an approved
+      // dispatch is the only thing that credits a target, and every figure
+      // below reads it through `approvedDispatches()`. The three stamps move
+      // together or the `dispatches_approval_stamps` CHECK refuses the row.
+      status: "approved" as const,
+      submittedAt: new Date(),
       approvedByUserId: coordinator.user.id,
       approvedAt: new Date(),
     })

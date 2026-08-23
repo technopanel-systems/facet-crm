@@ -47,7 +47,7 @@ role is configuration.
 | Sales Rep | owns companies, raises quotations, confirms payment |
 | Desk Rep | works like a rep, never in the field, filters and passes on leads |
 | Marketing | works like a rep, plus assigns companies to others |
-| Sales Coordinator | issues quotations in SMAC, accepts them, records dispatches |
+| Sales Coordinator | issues quotations in SMAC, accepts them, approves dispatch requests |
 | Sales Manager | sees every rep, sets targets, shares records, manages users |
 | Executive | the CEOs — sees everything, sets targets, no operational entry |
 | Super Admin | everything, plus impersonation and system configuration |
@@ -346,7 +346,7 @@ carries anything the list does not.
 
 ## 10. Dispatch
 
-**S72. [CHANGE]** **A rep requests a dispatch; the coordinator checks it and
+**S72.** **A rep requests a dispatch; the coordinator checks it and
 approves it.** She is the one who deals with SMAC and with finance. An approved
 dispatch is the only event that credits a target — not the request, and not the
 SMAC number that follows.
@@ -358,13 +358,13 @@ cancelled dispatch stays visible on the record it belonged to, carries a
 reason, and is **never revived**: a new dispatch is raised instead. It credits
 nothing and wins nothing (S31).
 
-**S74. [CHANGE]** **The project is recorded on the dispatch itself.** When the
+**S74.** **The project is recorded on the dispatch itself.** When the
 quotation has a project, the dispatch takes it. When the quotation has none, the
 project chosen at dispatch is written back onto the quotation, and the
 quotation's company is added to that project as a participant if it is not
-already one. The write-back happens when the coordinator approves. The project
-on the dispatch, taking the thread's, and the write-back all ship today; the
-write-back fires at record time, because there is no approval act yet.
+already one. The write-back happens when the coordinator approves — so a
+request that is refused writes nothing back, and a request that names a project
+its quotation does not yet carry is the ordinary state of one before approval.
 
 **S75. [BUILD]** A dispatch is raised one of three ways: **exactly as a
 quotation** · **from a quotation, with edits** · **as a free entry with no
@@ -373,8 +373,8 @@ dispatch that names a project wins it on approval (S31); one that names none
 wins nothing**, which is why the project is asked for even when it is not
 refused. All three routes exist today: a dispatch raised from a quotation
 arrives with its lines and is kept or edited (S116), and a free entry types
-them. **Winning on approval does not** — there is no approval act yet (S72),
-and nothing derives a won project (S31).
+them. The approval act exists too (S72). **Winning on approval does not** —
+nothing derives a won project (S31).
 
 **S76. [CHANGE]** The coordinator **sees projects and contacts**, because both
 are part of the dispatch. The name-only restriction is removed. This is a
@@ -390,7 +390,7 @@ true today. The comparison is not — it is S120's, and unbuilt. What was
 quoted and what was actually dispatched are **deliberately compared** — the gap
 is the point, not drift to be prevented.
 
-**S116. [BUILD]** **A dispatch carries its own lines**, the same shape as a
+**S116.** **A dispatch carries its own lines**, the same shape as a
 quotation's product lines — product, thickness, colour, dimensions, pieces and
 price — but never service lines. Any line may differ from the quotation's,
 including price, and a dispatch may add a product the quotation never had. The
@@ -398,12 +398,10 @@ invoice is made from these lines. A dispatch raised from a quotation arrives
 **pre-filled with its lines**; the rep keeps them or edits them. **Every line
 carries a price**; nothing is dispatched free. A quotation line with no price
 (S58) arrives unpriced and **the rep prices it before submitting**. A dispatch
-request with an unpriced line cannot be submitted. The lines, the pre-fill, the
-edits and the refusal of an unpriced line all ship today, and a dispatch's
-square metres are the sum of its lines rather than a figure anybody types. What
-does not is **submitting**: there is no request to submit until S72, so today
-the refusal lands when the dispatch is recorded, and it is the coordinator who
-prices the line rather than the rep.
+request with an unpriced line cannot be submitted — and cannot be saved
+either, because a dispatch line's price is not nullable, so the refusal lands
+before the rule has to. A dispatch's square metres are the sum of its lines
+rather than a figure anybody types.
 
 **S117. [BUILD]** FACET **mirrors** the dispatch's money for comparison. SMAC
 issues the invoice and remains the system of record; a disagreement is SMAC's to
@@ -441,19 +439,22 @@ which is unique. The coordinator writes it when SMAC issues it — usually at
 once. **It is not a condition of approval**; a dispatch is approved, then
 numbered.
 
-**S122. [BUILD]** A **refused dispatch request is archived**, not deleted, and
+**S122. [CHANGE]** A **refused dispatch request is archived**, not deleted, and
 kept out of the working lists once the rep has been told (S128). A rep sees
 their own; coordinators and managers see all. Only the coordinator may revive
 one, and a revived request is treated as new. A rep who wants to withdraw a
 submitted request asks the coordinator to refuse it — there is no separate act.
 A revived request returns to the **rep**, unsubmitted, and they edit and submit
-it as they would a new one (S125).
+it as they would a new one (S125). All of that ships but the **timing**: a
+refused request leaves the working lists **at refusal**, not once the rep has
+been told, because S128 is not built. Whether being told ever gates it is still
+open, and the alternative needs a read state, which S91 forbids.
 
-**S124. [BUILD]** **The coordinator refuses a dispatch request**, the same
+**S124.** **The coordinator refuses a dispatch request**, the same
 person who approves one. A refusal carries a reason and archives the request
 (S122).
 
-**S125. [BUILD]** A rep edits their own request **until they submit it**. After
+**S125.** A rep edits their own request **until they submit it**. After
 that the coordinator edits it, usually after phoning the rep — that is faster
 than refusing and re-raising. A quotation is different: **S61** keeps its lines
 editable until the coordinator issues it, so the rep edits throughout.
@@ -464,7 +465,7 @@ something to dispatch against. This is what makes S120's comparison stable: an
 issued version does not change, and a later revision creates a new version
 rather than altering it (S66).
 
-**S127. [BUILD]** The coordinator may **raise a dispatch request against her
+**S127.** The coordinator may **raise a dispatch request against her
 own company and approve it herself**. She holds companies like any rep (S9),
 and nothing blocks the same person from both acts.
 
@@ -523,8 +524,10 @@ dashboard. It is one idea, and it is the heart of the system.
 
 **S86. [BUILD]** Every company, project, quotation **and dispatch request** is
 in exactly one of three states: **moving**, **waiting on a named person**, or
-**closed with a reason**. No other state is legal. The first three exist today.
-A dispatch request does not — S72 creates it.
+**closed with a reason**. No other state is legal. All four anchors exist now:
+a dispatch request is a draft waiting on its rep, a submitted one waiting on
+the coordinator, an approved one that has moved, or a refusal — closed with a
+reason. What does not exist is the one list they belong on (S87).
 
 **S87. [BUILD]** Each person has **one list of what is waiting on them**, oldest
 first. That list is the dashboard, the follow-up queue and the notification
@@ -539,9 +542,10 @@ her.
 **S89. [BUILD]** Something joins the list when a company has had no contact for
 too long, a project has not moved, a quotation is sitting with someone, a
 record was assigned or shared and has not been touched, or a dispatch request
-is sitting with the coordinator. Three of the five conditions are computed in SQL
-today — company quiet, project stage unchanged, quotation awaiting a response.
-What does not exist is the one list they join (S87).
+is sitting with the coordinator. Four of the five conditions are computed in SQL
+today — company quiet, project stage unchanged, quotation awaiting a response,
+and a dispatch request submitted and not yet decided, ordered by when it was
+submitted. What does not exist is the one list they join (S87).
 
 **S90. [BUILD]** Something leaves the list exactly three ways:
 
@@ -578,9 +582,9 @@ recorded and never required.
 announced it is entered as a date range and skipped.
 
 **S95. [BUILD]** Clearing your own queue is what you get back for typing. A rep
-logs; the coordinator approves or refuses. Same list, different act. The rep logs
-today. The coordinator approves and refuses nothing yet (S72), and the single
-list is S87's.
+logs; the coordinator approves or refuses. Same list, different act. Both acts
+exist today — the rep logs, and the coordinator approves and refuses (S72).
+What does not is the single list they clear, which is S87's.
 
 ---
 
@@ -689,8 +693,10 @@ S120 measures. A gap the coordinator introduced is never the rep's deviation
 from a quotation; that the coordinator had to introduce it is a fact about how
 the request arrived. Two questions, two figures, and a screen showing both must
 say which is which. `created_by` exists today on companies, contacts, projects
-and quotation versions. The dispatch request, the record of a coordinator's
-edit, and the two figures do not.
+and quotation versions; the dispatch request records who raised it, and a
+coordinator's edit of a submitted one is an audit row naming her. **The two
+figures do not exist** — nothing counts either, and no screen says which is
+which.
 
 ---
 

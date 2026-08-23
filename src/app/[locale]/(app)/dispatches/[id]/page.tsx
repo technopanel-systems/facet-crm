@@ -1,11 +1,11 @@
-import { getFormatter, getTranslations, setRequestLocale } from "next-intl/server";
+import {
+  getFormatter,
+  getTranslations,
+  setRequestLocale,
+} from "next-intl/server";
 import { notFound } from "next/navigation";
 
-import {
-  Fact,
-  Facts,
-  DetailHeader,
-} from "@/components/page-header";
+import { Fact, Facts, DetailHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/table";
 import { Timeline } from "@/components/timeline";
 import { Link } from "@/i18n/navigation";
-import { requireSession } from "@/lib/authz";
+import { can, requireSession } from "@/lib/authz";
 import { getDispatch } from "@/lib/dispatches";
 import { lookupName } from "@/lib/lookups";
 import { recordTimeline } from "@/lib/timeline";
@@ -32,6 +32,8 @@ import { recordTimeline } from "@/lib/timeline";
 import { lineParts } from "../../quotations/line-display";
 import { CommentBox } from "../../_components/comment-box";
 import { ListPagination } from "../../_components/list-controls";
+import { TurnPanel } from "../../_components/turn";
+import { RequestActions } from "./request-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -54,10 +56,18 @@ export default async function DispatchPage({
   // A record hidden by visibility and one that never existed look identical.
   if (!dispatch) notFound();
 
-  // `25 §9` — a dispatch takes a comment like any other record. Note what it
-  // still does not take: a turn `[22 §4]`. A dispatch owes nobody the next
-  // action; it is an event that already happened, and colleagues talking about
-  // it does not make it somebody's move.
+  const isRaiser = dispatch.recordedByUserId === session.user.id;
+  const isCoordinator = can(session, "canDispatch");
+
+  // `25 §9` — a dispatch takes a comment like any other record.
+  //
+  // **It now takes a turn too, and only sometimes** `[22 §4]`. `D26` says a
+  // dispatch owes nobody, and for an APPROVED one that is still exactly right:
+  // it is an event that already happened. A REQUEST is different — `S86` puts
+  // it in one of three states and `S88` says a submitted one *waits on the
+  // coordinator, not on a rep*. So the panel renders for a draft and for a
+  // submitted request, and for nothing else: approved and refused are both
+  // finished, and a panel on either would claim somebody owed something.
   const timeline = await recordTimeline(session, "dispatch", dispatch.id, {
     page: Number(page) || 1,
   });
@@ -80,6 +90,62 @@ export default async function DispatchPage({
         reference={dispatch.smacReference ?? undefined}
       />
 
+      {/* `22 §4` — whose move it is, not what the status is. Two states own a
+          turn and two do not; see the note above. */}
+      {dispatch.status === "draft" ? (
+        <TurnPanel
+          line={
+            isRaiser
+              ? t("dispatches.turn.yours")
+              : t("dispatches.turn.rep", { name: dispatch.recordedByName })
+          }
+          detail={t("dispatches.turn.draftDetail")}
+        />
+      ) : null}
+      {dispatch.status === "submitted" ? (
+        <TurnPanel
+          line={
+            isCoordinator
+              ? t("dispatches.turn.coordinatorYours")
+              : t("dispatches.turn.coordinator")
+          }
+          detail={
+            dispatch.submittedAt
+              ? t("dispatches.turn.submittedDetail", {
+                  date: format.dateTime(dispatch.submittedAt, {
+                    dateStyle: "medium",
+                  }),
+                })
+              : undefined
+          }
+        />
+      ) : null}
+
+      {/* `S124` — a refusal carries a reason, and the reason is what the rep
+          opens this screen to read. `S128` will also carry it to them; that is
+          its own session, and until then this is where it lives. */}
+      {dispatch.status === "refused" && dispatch.refusalReason ? (
+        <Card data-slot="refusal">
+          <CardHeader>
+            <CardTitle className="text-start">
+              {t("dispatches.detail.refused")}
+            </CardTitle>
+            <CardDescription className="text-start">
+              {t("dispatches.detail.refusedNotice")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p
+              dir="auto"
+              className="text-start text-sm whitespace-pre-wrap"
+              data-refusal-reason
+            >
+              {dispatch.refusalReason}
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-start">
@@ -100,9 +166,7 @@ export default async function DispatchPage({
                 dispatch.companyName
               )}
             </Fact>
-            <Fact label={t("dispatches.fields.rep")}>
-              {dispatch.userName}
-            </Fact>
+            <Fact label={t("dispatches.fields.rep")}>{dispatch.userName}</Fact>
             {/* `S116` — the sum of the lines below, never a typed figure.
                 A magnitude, so mono and end-aligned together `D11` `D24`. */}
             <Fact label={t("dispatches.fields.sqm")} name="sqm" numeric>
@@ -144,17 +208,27 @@ export default async function DispatchPage({
                 )
               )}
             </Fact>
-            <Fact label={t("dispatches.fields.recordedBy")}>
+            {/* `S72` — the state, named. The turn panel above says whose move
+                it is `D2`; this says which of the four states it is in, which
+                is what a rep checking back needs to read. */}
+            <Fact label={t("dispatches.fields.status")} name="status">
+              <Badge
+                variant={dispatch.status === "approved" ? "default" : "outline"}
+                data-status={dispatch.status}
+              >
+                {t(`dispatches.status.${dispatch.status}`)}
+              </Badge>
+            </Fact>
+            <Fact label={t("dispatches.fields.raisedBy")}>
               {dispatch.recordedByName}
             </Fact>
           </Facts>
         </CardContent>
       </Card>
 
-      {/* `S116` — **what actually went out**, and what the invoice is made
-          from. Read-only: a rep edits a request until they submit it and the
-          coordinator after `S125`, and neither act exists yet, so no control
-          is rendered `D53`.
+      {/* `S116` — **what a dispatch carries**, and what the invoice is made
+          from once it is approved. Editing them is `S125`'s act and lives on
+          its own route; the control for it is in the panel below.
 
           Every figure is `num` and end-aligned `D11` `D24`. The money sits
           BELOW the square metres in prominence `S117` — smaller type, second
@@ -185,7 +259,10 @@ export default async function DispatchPage({
                     {lineParts(line, locale).map((part, index) => (
                       <span key={part + index} dir="auto">
                         {index > 0 ? (
-                          <span aria-hidden className="text-faint me-2 font-normal">
+                          <span
+                            aria-hidden
+                            className="text-faint me-2 font-normal"
+                          >
                             ·
                           </span>
                         ) : null}
@@ -227,8 +304,12 @@ export default async function DispatchPage({
         </CardContent>
       </Card>
 
-      {/* `07 C6` — the direct route is visible as such, so it cannot quietly
-          become a way to skip the chain. */}
+      {/* `07 C6` — the free-entry route is visible as such, so it cannot
+          quietly become a way to skip the chain. **Approval is no longer part
+          of what distinguishes them** `S72`: it used to be stamped on the
+          direct route alone, standing in for a payment gate that had no object
+          there, and both routes now pass through the same act — so it is one
+          fact below rather than a branch. */}
       <Card>
         <CardHeader>
           <CardTitle className="text-start">
@@ -241,22 +322,12 @@ export default async function DispatchPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {dispatch.isDirect ? (
-            <Facts>
+          <Facts>
+            {dispatch.isDirect ? (
               <Fact label={t("dispatches.fields.source")}>
-                <Badge variant="outline">
-                  {t("dispatches.fields.direct")}
-                </Badge>
+                <Badge variant="outline">{t("dispatches.fields.direct")}</Badge>
               </Fact>
-              <Fact label={t("dispatches.fields.approvedBy")}>
-                {dispatch.approvedByName ?? dash}
-                {dispatch.approvedAt
-                  ? ` · ${format.dateTime(dispatch.approvedAt, { dateStyle: "medium" })}`
-                  : ""}
-              </Fact>
-            </Facts>
-          ) : (
-            <Facts>
+            ) : (
               <Fact label={t("dispatches.fields.quotation")}>
                 {dispatch.threadViewable ? (
                   <Link
@@ -270,64 +341,87 @@ export default async function DispatchPage({
                   <span dir="ltr">{dispatch.smacReference ?? dash}</span>
                 )}
               </Fact>
-              <Fact label={t("dispatches.fields.paymentGate")}>
-                {t("dispatches.detail.paymentConfirmed")}
-              </Fact>
-            </Facts>
-          )}
+            )}
+            {/* `S72` — the approval, on whichever route. Absent until it
+                happens, which is the whole of what the state means. */}
+            <Fact label={t("dispatches.fields.approvedBy")} name="approvedBy">
+              {dispatch.approvedByName ?? dash}
+              {dispatch.approvedAt
+                ? ` · ${format.dateTime(dispatch.approvedAt, { dateStyle: "medium" })}`
+                : ""}
+            </Fact>
+          </Facts>
         </CardContent>
       </Card>
 
+      {/* The acts `S72` `S124` `S125` `S122`. `RequestActions` renders nothing
+          at all when this identity has none available `D53`, so an approved
+          dispatch — where approval is final `S73` — carries no card. */}
+      <RequestActions
+        dispatchId={dispatch.id}
+        status={dispatch.status}
+        isRaiser={isRaiser}
+        isCoordinator={isCoordinator}
+      />
+
       {/* Credit `[07 D3]`, `[18 §1]`, `[18 §5]`. The shares always add back to
-          the dispatch's own square metres. */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-start">
-            {t("dispatches.detail.credit")}
-          </CardTitle>
-          <CardDescription className="text-start">
-            {dispatch.credit.basis === "split"
-              ? t("dispatches.detail.creditBySplit", {
-                  date: dispatch.credit.generationEffectiveFrom ?? "",
-                })
-              : t("dispatches.detail.creditByRep")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-start">
-                    {t("dispatches.fields.rep")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("credit.fields.share")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("dispatches.fields.sqm")}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dispatch.credit.shares.map((share) => (
-                  <TableRow key={share.userId}>
-                    <TableCell className="text-start">
-                      {share.userName}
-                    </TableCell>
-                    <TableCell className="text-start" dir="ltr">
-                      {share.percentage}%
-                    </TableCell>
-                    <TableCell className="text-start" dir="ltr">
-                      {share.sqm}
-                    </TableCell>
+          the dispatch's own square metres.
+
+          **Rendered only once approved** `S72`. *An approved dispatch is the
+          only event that credits a target — not the request.* A table of
+          shares beside a request nobody has approved would state a slice of
+          somebody's month that has not been given; `getDispatch` returns null
+          rather than zeroes, so there is no empty table to explain. */}
+      {dispatch.credit ? (
+        <Card data-slot="credit">
+          <CardHeader>
+            <CardTitle className="text-start">
+              {t("dispatches.detail.credit")}
+            </CardTitle>
+            <CardDescription className="text-start">
+              {dispatch.credit.basis === "split"
+                ? t("dispatches.detail.creditBySplit", {
+                    date: dispatch.credit.generationEffectiveFrom ?? "",
+                  })
+                : t("dispatches.detail.creditByRep")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-start">
+                      {t("dispatches.fields.rep")}
+                    </TableHead>
+                    <TableHead className="text-start">
+                      {t("credit.fields.share")}
+                    </TableHead>
+                    <TableHead className="text-start">
+                      {t("dispatches.fields.sqm")}
+                    </TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {dispatch.credit.shares.map((share) => (
+                    <TableRow key={share.userId}>
+                      <TableCell className="text-start">
+                        {share.userName}
+                      </TableCell>
+                      <TableCell className="text-start" dir="ltr">
+                        {share.percentage}%
+                      </TableCell>
+                      <TableCell className="text-start" dir="ltr">
+                        {share.sqm}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Timeline
         events={timeline.events}

@@ -105,6 +105,7 @@ import {
 } from "@/db/schema";
 import type { AuthSession } from "@/lib/authz";
 import { createCompany, updateCompany } from "@/lib/companies";
+import { dispatchesInPeriod } from "@/lib/dispatches";
 import {
   OTHER_LOSS_REASON_CODE,
   REPORT_OUTCOMES,
@@ -272,6 +273,12 @@ const LANDED: ColumnSpec[] = [
   { key: "comment_mentions.mentioned_user_id", type: "uuid", nullable: false, cite: "25 §11" },
   { key: "quotation_threads.closed_at", type: "timestamp with time zone", nullable: true, cite: "25 §24" },
   { key: "quotation_threads.closed_by_user_id", type: "uuid", nullable: true, cite: "25 §24" },
+  // `S72` — the request. `status` is NOT NULL with no default on purpose: a
+  // default is a place for a writer to forget, and each of the six writers in
+  // `dispatches.ts` sets it outright.
+  { key: "dispatches.status", type: "USER-DEFINED", nullable: false, cite: "S72" },
+  { key: "dispatches.submitted_at", type: "timestamp with time zone", nullable: true, cite: "S72" },
+  { key: "dispatches.refusal_reason", type: "text", nullable: true, cite: "S124" },
 ];
 
 /**
@@ -1379,6 +1386,7 @@ async function main(): Promise<void> {
   await projectMatchesThread();
   await vatIsFixed();
   await dispatchLinesHold();
+  await requestStatesHold();
   await repositoryMatchesDatabase();
 }
 
@@ -1461,17 +1469,37 @@ async function regionIsAlwaysDerived(): Promise<void> {
  * reason and would keep passing on `"1"`.
  */
 async function projectMatchesThread(): Promise<void> {
-  console.log("\n11. *** A dispatch's project IS its quotation's *** [S74]");
+  console.log(
+    "\n11. *** An APPROVED dispatch's project IS its quotation's *** [S74], [S72]",
+  );
 
+  /*
+   * **`S72` narrowed this claim, and the narrowing is the rule rather than a
+   * concession.** `S74`'s write-back *happens when the coordinator approves*.
+   * Before that a request may perfectly well name a project its quotation does
+   * not carry — that is precisely the state the write-back exists to resolve,
+   * and it is what a request against a project-less quotation `S50` looks like
+   * from the moment the rep raises it until the moment she approves it.
+   *
+   * So the invariant is asserted over the approved, and the unapproved get
+   * their own claim below: they may disagree, and none of them may have
+   * written anything back. Asserting the old, wider version would have failed
+   * on the very state `S72` created — and quietly asserting nothing at all
+   * about the request would have been worse.
+   */
   const [row] = (await db.execute(sql`
     select
       count(*) filter (
-        where d.project_id is distinct from t.project_id
+        where d.status = 'approved' and d.project_id is distinct from t.project_id
       )::int as disagreeing,
       count(*) filter (
-        where t.project_id is not null and d.project_id is null
+        where d.status = 'approved' and t.project_id is not null and d.project_id is null
       )::int as unfilled,
+      count(*) filter (where d.status = 'approved')::int as approved,
       count(*)::int as linked,
+      count(*) filter (
+        where d.status <> 'approved' and d.project_id is distinct from t.project_id
+      )::int as pending_writeback,
       (select count(*)::int from dispatches
         where quotation_thread_id is null and project_id is not null) as direct_with_project
     from dispatches d
@@ -1479,13 +1507,17 @@ async function projectMatchesThread(): Promise<void> {
   `)) as unknown as {
     disagreeing: number;
     unfilled: number;
+    approved: number;
     linked: number;
+    pending_writeback: number;
     direct_with_project: number;
   }[];
 
-  console.log(`  --    ${row.linked} dispatch(es) against a quotation`);
+  console.log(
+    `  --    ${row.linked} dispatch(es) against a quotation, ${row.approved} of them approved`,
+  );
   check(
-    "*** no dispatch carries a project different from its quotation's *** [S74]",
+    "*** no APPROVED dispatch carries a project different from its quotation's *** [S74]",
     row.disagreeing === 0,
     `${row.disagreeing} disagree`,
   );
@@ -1494,6 +1526,42 @@ async function projectMatchesThread(): Promise<void> {
     row.unfilled === 0,
     `${row.unfilled} unfilled`,
   );
+  console.log(
+    `  --    ${row.pending_writeback} request(s) naming a project their quotation has not gained yet [S74]`,
+  );
+
+  /*
+   * The other half, and the one that would catch a write-back firing early.
+   *
+   * **Asked of the audit row, not of the thread's state.** A thread carrying a
+   * project proves nothing on its own: the rep may have named one when they
+   * raised the quotation `S50`, which is the ordinary case and has nothing to
+   * do with any dispatch. What `S72` moved is one specific write, and
+   * `quotation_thread.project_set` is written by that write and by nothing
+   * else — so every one of those rows must belong to a thread that has an
+   * approved dispatch. One that does not is a write-back that fired at request
+   * time, which is exactly the behaviour this slice moved.
+   */
+  const [early] = (await db.execute(sql`
+    select
+      count(*)::int as writebacks,
+      count(*) filter (
+        where not exists (
+          select 1 from dispatches d
+          where d.quotation_thread_id = a.entity_id and d.status = 'approved'
+        )
+      )::int as unapproved
+    from audit_log a
+    where a.entity_type = 'quotation_thread'
+      and a.action = 'quotation_thread.project_set'
+  `)) as unknown as { writebacks: number; unapproved: number }[];
+  console.log(`  --    ${early.writebacks} write-back(s) ever performed [S74]`);
+  check(
+    "*** every write-back belongs to a thread with an APPROVED dispatch *** [S74], [S72]",
+    early.unapproved === 0,
+    `${early.unapproved} fired without one`,
+  );
+
   // `S75`'s stated-purpose half is session 6b. Until it lands, a dispatch with
   // no quotation reaches no project, and this is what says so — the assertion
   // that fails the day someone routes a direct dispatch to a project without
@@ -1724,6 +1792,183 @@ function assertSetsMatch(
     `every ${surface} schema.ts declares exists in the database`,
     onlyDeclared.length === 0,
     `only in schema.ts: ${onlyDeclared.join(", ")}`,
+  );
+}
+
+/**
+ * `S72` — **an unapproved request counts for nothing**, made as a claim about
+ * every row rather than about the rows a script just wrote.
+ *
+ * Three claims, and they are three because each fails differently:
+ *
+ *  1. **The status and its stamps cannot disagree.** `approved_at`,
+ *     `approved_by_user_id`, `refusal_reason` and `submitted_at` each belong to
+ *     exactly one state, and the three CHECKs hold that row-locally. Asserted
+ *     here over every row too, because a CHECK proves what the database will
+ *     refuse *from now on* — it says nothing about a row that predates it or
+ *     one written while it was `NOT VALID`.
+ *
+ *  2. **Every CHECK actually refuses**, driven rather than read out of
+ *     `pg_constraint`. A constraint that exists and a constraint that fires are
+ *     different claims, and §3 makes the same distinction for every other one.
+ *
+ *  3. **No figure reads an unapproved row.** The structural half of `S72`: the
+ *     one predicate is `dispatches.ts`'s `approvedDispatches()`, and this asks
+ *     the database directly whether any square metre reachable through the
+ *     credit path belongs to a row that is not approved. `verify:slice3` §18
+ *     and §22 make the behavioural half at each reader; this one cannot be
+ *     satisfied by a reader that happens to be filtered correctly today.
+ *
+ * **Counted in SQL and asserted `=== 0`**, never `!count`: `count(*)` comes
+ * back as a string and a truthiness test on `"0"` passes for the wrong reason.
+ */
+async function requestStatesHold(): Promise<void> {
+  console.log(
+    "\n15. *** A request's state and its stamps cannot disagree *** [S72], [S124], [S122]",
+  );
+
+  const [rows] = (await db.execute(sql`
+    select
+      count(*)::int as total,
+      count(*) filter (where status = 'approved')::int as approved,
+      count(*) filter (where status = 'submitted')::int as submitted,
+      count(*) filter (where status = 'draft')::int as draft,
+      count(*) filter (where status = 'refused')::int as refused,
+      count(*) filter (
+        where (status = 'approved') is distinct from (approved_at is not null)
+           or (status = 'approved') is distinct from (approved_by_user_id is not null)
+      )::int as bad_approval,
+      count(*) filter (
+        where (status = 'refused') is distinct from (refusal_reason is not null)
+      )::int as bad_reason,
+      count(*) filter (
+        where (status = 'draft') is distinct from (submitted_at is null)
+      )::int as bad_submitted
+    from dispatches
+  `)) as unknown as {
+    total: number;
+    approved: number;
+    submitted: number;
+    draft: number;
+    refused: number;
+    bad_approval: number;
+    bad_reason: number;
+    bad_submitted: number;
+  }[];
+
+  console.log(
+    `  --    ${rows.total} dispatch(es): ${rows.approved} approved, ` +
+      `${rows.submitted} submitted, ${rows.draft} draft, ${rows.refused} refused`,
+  );
+  check(
+    "no row's approval stamps disagree with its status [S72]",
+    rows.bad_approval === 0,
+    `${rows.bad_approval} disagree`,
+  );
+  check(
+    "refused, and only refused, carries a reason [S124]",
+    rows.bad_reason === 0,
+    `${rows.bad_reason} disagree`,
+  );
+  check(
+    "a draft has not been submitted, and everything else has [S72]",
+    rows.bad_submitted === 0,
+    `${rows.bad_submitted} disagree`,
+  );
+
+  // The three CHECKs, driven. `is distinct from` above says what the data
+  // looks like; this says what the database will do about it tomorrow.
+  const [any] = (await db.execute(sql`
+    select id, company_id, user_id, recorded_by_user_id, dispatch_date
+    from dispatches limit 1
+  `)) as unknown as {
+    id: string;
+    company_id: string;
+    user_id: string;
+    recorded_by_user_id: string;
+    dispatch_date: string;
+  }[];
+  if (!any) {
+    console.error("  --    no dispatch to shape a refusal from; skipping");
+    return;
+  }
+  const columns =
+    "(company_id, user_id, recorded_by_user_id, dispatch_date, status";
+  const values = `('${any.company_id}', '${any.user_id}', '${any.recorded_by_user_id}', '${any.dispatch_date}'`;
+
+  await databaseRefuses(
+    "approved with no approval time is refused [S72]",
+    "dispatches_approval_stamps",
+    `insert into dispatches ${columns}, submitted_at) values ${values}, 'approved', now())`,
+  );
+  await databaseRefuses(
+    "an approval time on a draft is refused [S72]",
+    "dispatches_approval_stamps",
+    `insert into dispatches ${columns}, approved_at, approved_by_user_id) values ${values}, 'draft', now(), '${any.recorded_by_user_id}')`,
+  );
+  await databaseRefuses(
+    "refused with no reason is refused [S124]",
+    "dispatches_refusal_reason",
+    `insert into dispatches ${columns}, submitted_at) values ${values}, 'refused', now())`,
+  );
+  await databaseRefuses(
+    "a reason on anything but a refusal is refused [S124]",
+    "dispatches_refusal_reason",
+    `insert into dispatches ${columns}, refusal_reason) values ${values}, 'draft', 'no')`,
+  );
+  await databaseRefuses(
+    "submitted with no submission time is refused [S72]",
+    "dispatches_submitted_at",
+    `insert into dispatches ${columns}) values ${values}, 'submitted')`,
+  );
+  await databaseRefuses(
+    "a draft carrying a submission time is refused [S122]",
+    "dispatches_submitted_at",
+    `insert into dispatches ${columns}, submitted_at) values ${values}, 'draft', now())`,
+  );
+
+  /*
+   * **The claim the whole slice exists to make.** Every square metre that can
+   * reach a target passes through `dispatch_lines` joined to `dispatches`, so
+   * this asks the database how many of those belong to a row that is not
+   * approved, and how many square metres that is. Both must be visible: a
+   * count alone would not say whether the leak was one line or a month.
+   */
+  const [unapproved] = (await db.execute(sql`
+    select
+      count(*)::int as lines,
+      coalesce(sum(l.sqm), 0)::numeric(14, 4) as sqm
+    from dispatch_lines l
+    join dispatches d on d.id = l.dispatch_id
+    where d.status <> 'approved'
+  `)) as unknown as { lines: number; sqm: string }[];
+  console.log(
+    `  --    ${unapproved.lines} line(s) on unapproved requests, ${unapproved.sqm} m2 that must count nowhere`,
+  );
+
+  // `dispatchesInPeriod` is `S85`'s reader and the one every target figure
+  // passes through. Asked over all time, it must return exactly the approved.
+  const counted = await dispatchesInPeriod("2000-01-01", "2100-01-01");
+  const [approvedRows] = (await db.execute(sql`
+    select count(*)::int as n from dispatches where status = 'approved'
+  `)) as unknown as { n: number }[];
+  check(
+    "*** the credit reader returns exactly the approved dispatches, no more *** [S72], [S85]",
+    counted.length === approvedRows.n,
+    `${counted.length} counted against ${approvedRows.n} approved`,
+  );
+
+  const approvedIds = new Set(
+    (
+      (await db.execute(sql`
+        select id from dispatches where status = 'approved'
+      `)) as unknown as { id: string }[]
+    ).map((row) => row.id),
+  );
+  check(
+    "*** and not one of them is a request nobody approved *** [S72]",
+    counted.every((row) => approvedIds.has(row.id)),
+    `${counted.filter((row) => !approvedIds.has(row.id)).length} leaked`,
   );
 }
 

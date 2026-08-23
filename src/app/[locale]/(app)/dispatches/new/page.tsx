@@ -1,5 +1,4 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -19,7 +18,7 @@ import {
   lookupName,
 } from "@/lib/lookups";
 
-import { recordDispatchAction } from "../actions";
+import { requestDispatchAction } from "../actions";
 import { DispatchForm } from "../dispatch-form";
 
 export const dynamic = "force-dynamic";
@@ -46,9 +45,17 @@ export default async function NewDispatchPage({
   const session = await requireSession();
   const t = await getTranslations();
 
-  // `notFound()` rather than a message: a screen someone may not use and one
-  // that does not exist must look identical, the rule the whole app follows.
-  if (!can(session, "canDispatch")) notFound();
+  // **No gate** `S72`. *A rep requests a dispatch* — this screen used to
+  // `notFound()` for anyone without `can_dispatch`, which was the whole act
+  // being behind the flag. What is left behind the flag is the approving,
+  // which happens on the detail screen and nowhere near this form.
+  //
+  // The rep still sees only what they hold: `listDispatchableThreads` composes
+  // `visibleQuotationThreadsFilter`, the project picker composes
+  // `visibleProjectsFilter`, and `searchDispatchCompanies` degrades to
+  // `visibleCompaniesFilter` for anyone without the flag. Not one of those
+  // needed widening for this screen to work for a rep.
+  const canNameRep = can(session, "canDispatch");
 
   const mode = rawMode === "direct" ? "direct" : "linked";
   const query = companyQ?.trim() ?? "";
@@ -68,7 +75,8 @@ export default async function NewDispatchPage({
   ] = await Promise.all([
     mode === "linked" ? listDispatchableThreads(session) : [],
     mode === "direct" ? searchDispatchCompanies(session, query) : [],
-    mode === "direct" ? listActiveUsers() : [],
+    // `S108` — only somebody who may name another rep gets the picker at all.
+    mode === "direct" && canNameRep ? listActiveUsers() : [],
     // `S74` — only the linked form ever picks one: a direct dispatch names no
     // project this slice `S75`.
     mode === "linked" ? listDispatchProjectOptions(session) : [],
@@ -81,7 +89,7 @@ export default async function NewDispatchPage({
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title={t("dispatches.newTitle")}
+        title={t("dispatches.requestTitle")}
         description={
           mode === "direct"
             ? t("dispatches.detail.directNotice")
@@ -143,8 +151,9 @@ export default async function NewDispatchPage({
       ) : null}
 
       <DispatchForm
-        action={recordDispatchAction}
+        action={requestDispatchAction}
         mode={mode}
+        canNameRep={canNameRep}
         threads={threads.map((thread) => {
           // `S50` — the quotation may have no project, in which case the
           // option names its company instead of leaving a gap between two
@@ -157,7 +166,7 @@ export default async function NewDispatchPage({
             : null;
           return {
             id: thread.id,
-            label: `${thread.smacReference ?? t("common.none")} · ${projectLabel ?? thread.companyName} · ${t("dispatches.fields.dispatchedSoFar")} ${thread.dispatchedSqm}`,
+            label: `${thread.smacReference} · ${projectLabel ?? thread.companyName} · ${t("dispatches.fields.dispatchedSoFar")} ${thread.dispatchedSqm}`,
             companyLabel: thread.companyName,
             raisedByName: thread.raisedByName,
             quotedSqm: thread.quotedSqm,

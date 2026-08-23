@@ -89,12 +89,13 @@
  * ships the whole catalogue to every page, so a string grep proves nothing —
  * it matches the message bundle whether or not the screen rendered it.
  *
- * **Assert the 200, not merely the absence of a 500** `[23]`. Three of stage
- * 1's "failures" were wrong expectations rather than bugs: `/dispatches/new`
- * 404s for a rep AND a manager, because `can_dispatch` belongs to the
- * coordinator and the super admin; a manager 404s on a report's edit screen,
- * because only the author may edit `S39`; and a rep's empty lists yield no
- * id to follow, which is a legitimate empty state rather than a broken link.
+ * **Assert the 200, not merely the absence of a 500** `[23]`. Two of stage
+ * 1's "failures" were wrong expectations rather than bugs: a manager 404s on
+ * a report's edit screen, because only the author may edit `S39`; and a rep's
+ * empty lists yield no id to follow, which is a legitimate empty state rather
+ * than a broken link. The third — `/dispatches/new` 404ing for a rep and a
+ * manager — **stopped being true with `S72`**, which is now `FORBIDDEN`'s own
+ * note.
  */
 
 import { readFileSync, statSync } from "node:fs";
@@ -295,8 +296,12 @@ const STATIC_ROUTES = [
  * identity that does hold it.
  */
 const FORBIDDEN: Record<string, readonly string[]> = {
-  "rep-a@example.test": ["/dispatches/new", "/users", "/users/new"],
-  "manager@example.test": ["/dispatches/new"],
+  // **`/dispatches/new` came off both of these lists** `S72`. *A rep requests
+  // a dispatch* — the screen used to 404 for everyone without `can_dispatch`,
+  // which was the whole act being behind the flag. What is behind it now is
+  // approving, which lives on a request's own screen and is asserted in §15.
+  "rep-a@example.test": ["/users", "/users/new"],
+  "manager@example.test": [],
   // A project needs a company `S27` and a contact belongs to one `[07 A2]`,
   // and the coordinator holds none — so both forms are `D53` 404s for them,
   // and `S76` made the lists behind them worth reading anyway.
@@ -2165,6 +2170,25 @@ async function main(): Promise<void> {
       const dispatchPath = dispatched.location.replace(BASE, "");
       const dispatchPage = await get(coordJar, dispatchPath);
 
+      // `S72` — what landed is a **request**, not a dispatch. The screen says
+      // so with a status marker rather than a translated word, and the turn
+      // panel names whose move it is `D2`.
+      check(
+        `${locale}: *** posting the form raises a REQUEST, not a dispatch *** [S72]`,
+        dispatchPage.body.includes('data-status="draft"'),
+        factOf(dispatchPage.body, "status"),
+      );
+      check(
+        `${locale}: …and the screen says whose move it is [D2], [S86]`,
+        dispatchPage.body.includes('data-slot="turn-panel"'),
+      );
+      // Not approved yet, so there is no approver and no credit table.
+      check(
+        `${locale}: an unapproved request names no approver [S72]`,
+        factOf(dispatchPage.body, "approvedBy") === DASH,
+        factOf(dispatchPage.body, "approvedBy"),
+      );
+
       // `S116` — the lines landed and the screen shows them. A DOM marker,
       // never the rendered numbers: what is asserted is that the dispatch
       // carries its own lines, and one row is one line.
@@ -2205,7 +2229,118 @@ async function main(): Promise<void> {
         dispatchPage.body.includes(`/projects/${projectId}"`),
       );
 
-      /* --- 6. written back onto the quotation [S74] --------------------- */
+      /* --- 6. asking is not deciding [S74], [S72] ---------------------- */
+
+      // **The quotation must NOT have gained the project yet.** The write-back
+      // used to fire at record time, because there was no approval act to hang
+      // it on; `S72` made one, and a project written onto a quotation by a
+      // request nobody approved would be a decision nobody made.
+      const stillNone = await get(repJar, threadPath);
+      check(
+        `${locale}: *** raising it writes NOTHING back onto the quotation *** [S74], [S72]`,
+        factHtmlOf(stillNone.body, "project").includes(
+          'data-slot="fact-absent"',
+        ),
+        factOf(stillNone.body, "project"),
+      );
+
+      /* --- 7. submit, then approve, through the real controls ---------- */
+
+      // The two acts as forms, scraped and posted like any other — `data-act`
+      // is the marker, because a translated button label proves nothing.
+      const actForm = (body: string, act: string): string | undefined =>
+        body.match(
+          new RegExp(`<form[^>]*data-act="${act}"[\\s\\S]*?</form>`),
+        )?.[0];
+
+      const submitForm = actForm(dispatchPage.body, "submit");
+      if (!submitForm) {
+        check(`${locale}: the submit control renders on a draft [S72]`, false);
+        continue;
+      }
+      const submitted = await post(
+        coordJar,
+        dispatchPath,
+        envelope(submitForm),
+      );
+      check(
+        `${locale}: submitting answers 200 and does not redirect [S72]`,
+        submitted.status === 200,
+        `got ${submitted.status} ${submitted.location}`,
+      );
+      const waiting = await get(coordJar, dispatchPath);
+      check(
+        `${locale}: *** the request is now waiting on the coordinator *** [S72], [S88]`,
+        waiting.body.includes('data-status="submitted"'),
+        factOf(waiting.body, "status"),
+      );
+      check(
+        `${locale}: …and submitting still wrote nothing back [S74]`,
+        factHtmlOf((await get(repJar, threadPath)).body, "project").includes(
+          'data-slot="fact-absent"',
+        ),
+      );
+
+      // **The rep may not approve it, and is not offered the control.** The
+      // 404-shaped rule `D53` applied to a button: an unavailable act is not
+      // rendered, and the action refuses it anyway `S109`.
+      const repView = await get(repJar, dispatchPath);
+      check(
+        `${locale}: *** the rep is offered no approve control *** [S72], [D53]`,
+        repView.status === 200 && !actForm(repView.body, "approve"),
+        `status ${repView.status}`,
+      );
+      check(
+        `${locale}: …nor a refuse control [S124]`,
+        !actForm(repView.body, "refuse"),
+      );
+      // And the rep cannot edit it any more either `S125`.
+      check(
+        `${locale}: *** and after submitting, the edit route 404s for the rep *** [S125]`,
+        (await get(repJar, `${dispatchPath}/edit`)).status === 404,
+      );
+      check(
+        `${locale}: …while it opens for the coordinator [S125], [S62]`,
+        (await get(coordJar, `${dispatchPath}/edit`)).status === 200,
+      );
+
+      const approveForm = actForm(waiting.body, "approve");
+      if (!approveForm) {
+        check(`${locale}: the approve control renders [S72]`, false);
+        continue;
+      }
+      const approved = await post(
+        coordJar,
+        dispatchPath,
+        envelope(approveForm),
+      );
+      check(
+        `${locale}: *** approving answers 200 *** [S72]`,
+        approved.status === 200,
+        `got ${approved.status} ${approved.location}`,
+      );
+      const live = await get(coordJar, dispatchPath);
+      check(
+        `${locale}: *** the request is approved, and names its approver *** [S72]`,
+        live.body.includes('data-status="approved"') &&
+          factOf(live.body, "approvedBy") !== DASH,
+        factOf(live.body, "approvedBy"),
+      );
+      // **Credit is a consequence of approval** `S72`, so the card that shows
+      // it appears at this moment and not before. Asserted both ways: absent
+      // on the request above, present now.
+      check(
+        `${locale}: *** and only NOW does it carry a credit table *** [S72], [S78]`,
+        !dispatchPage.body.includes('data-slot="credit"') &&
+          live.body.includes('data-slot="credit"'),
+      );
+      check(
+        `${locale}: …nothing is waiting on anyone any more [D26], [S86]`,
+        !live.body.includes('data-slot="turn-panel"') &&
+          !actForm(live.body, "approve"),
+      );
+
+      /* --- 8. and THAT is what writes back [S74] ----------------------- */
 
       const rewritten = await get(repJar, threadPath);
       check(
@@ -2218,7 +2353,7 @@ async function main(): Promise<void> {
         rewritten.body.includes(`/projects/${projectId}"`),
       );
 
-      /* --- 7. the company is a participant, with the derived figure ----- */
+      /* --- 9. the company is a participant, with the derived figure ----- */
 
       const project = await get(repJar, `/${locale}/projects/${projectId}`);
       check(
@@ -2234,9 +2369,9 @@ async function main(): Promise<void> {
         project.body.includes(`data-dispatched="${companyId}"`),
       );
 
-      /* --- 8. the other branch, on the same thread [S74] ---------------- */
+      /* --- 10. the other branch, on the same thread [S74] --------------- */
 
-      // It has a project now, so a second dispatch takes it with nothing
+      // It has a project now, so a second request takes it with nothing
       // chosen — the "shown, not chosen" half of the rule.
       const again = await post(
         coordJar,
@@ -2244,7 +2379,7 @@ async function main(): Promise<void> {
         dispatchFields(""),
       );
       check(
-        `${locale}: dispatching it again takes the project it gained [S74]`,
+        `${locale}: requesting against it again takes the project it gained [S74]`,
         again.status === 303,
         `got ${again.status}`,
       );
@@ -2264,6 +2399,9 @@ async function main(): Promise<void> {
       // that wrote it anyway, and never a 500 from the rule throwing. WHICH
       // rule refused is `verify:slice3` §15's assertion; this is the boundary
       // that no in-process script crosses.
+      //
+      // It only became a refusal at the moment above: before the approval the
+      // quotation carried no project, so any visible one was lawful `S74`.
       const otherId =
         projectIds[1] ?? "00000000-0000-0000-0000-000000000000";
       console.log(
@@ -2384,6 +2522,229 @@ async function main(): Promise<void> {
       check(
         "the participants render for the coordinator — what S76 is for [S26]",
         asCoordinator.body.includes("data-participant="),
+      );
+    }
+  }
+
+  console.log(
+    "\n16. A rep raises one and the coordinator refuses it, over HTTP [S72], [S124], [S122]",
+  );
+  {
+    // **The half section 14 cannot make.** Section 14 drives the whole chain as
+    // the coordinator, which is lawful `S127` but says nothing about the rule
+    // `S72` exists for: that a rep raises a request *with no flag at all*. This
+    // section is the rep's path, and the refusal at the end of it.
+    const repJar = jars["rep-a@example.test"];
+    const coordJar = jars["coordinator@example.test"];
+
+    /** The same shape section 14 uses. Block-scoped, so neither leaks. */
+    const post = async (jar: Jar, path: string, body: FormData) => {
+      const response = await fetch(`${BASE}${path}`, {
+        method: "POST",
+        headers: { cookie: header(jar), origin: BASE },
+        body,
+        redirect: "manual",
+      });
+      store(jar, response);
+      return {
+        status: response.status,
+        location: response.headers.get("location") ?? "",
+        body: await response.text(),
+      };
+    };
+
+    for (const locale of ["en", "ar"] as const) {
+      /** Every `$ACTION…` input of one form, unescaped, as a browser sends it. */
+      const envelope = (form: string): FormData => {
+        const fields = new FormData();
+        for (const input of form.matchAll(/<input[^>]*>/g)) {
+          const name = input[0].match(/name="([^"]+)"/)?.[1];
+          if (!name?.startsWith("$ACTION")) continue;
+          fields.append(
+            name,
+            unescapeHtml(input[0].match(/value="([^"]*)"/)?.[1] ?? ""),
+          );
+        }
+        return fields;
+      };
+      const actForm = (body: string, act: string): string | undefined =>
+        body.match(
+          new RegExp(`<form[^>]*data-act="${act}"[\\s\\S]*?</form>`),
+        )?.[0];
+
+      /* --- 1. the screen opens for a rep at all [S72] ------------------ */
+
+      const form = await get(repJar, `/${locale}/dispatches/new`);
+      check(
+        `${locale}: *** /dispatches/new opens for a rep, with no flag *** [S72]`,
+        form.status === 200,
+        `got ${form.status}`,
+      );
+      const shell = form.body.match(
+        /<form[^>]*data-slot="form-shell"[\s\S]*?<\/form>/,
+      )?.[0];
+      if (!shell) {
+        console.log(`  --    ${locale}: rep-a has no issued quotation to offer`);
+        continue;
+      }
+
+      const option = shell.match(
+        /<option value="([0-9a-f-]{36})"[^>]*data-project="set"/,
+      );
+      if (!option) {
+        console.log(`  --    ${locale}: no quotation with a project to request against`);
+        continue;
+      }
+
+      /* --- 2. the rep raises one ------------------------------------- */
+
+      /** The first real option of a named `<select>` — never the placeholder. */
+      const optionOf = (name: string) =>
+        shell
+          .match(new RegExp(`<select[^>]*name="${name}"[\\s\\S]*?</select>`))?.[0]
+          ?.match(/<option value="([0-9a-f-]{36})"/)?.[1];
+      const lookups = {
+        supplierId: optionOf("supplierId"),
+        classId: optionOf("classId"),
+        fireRatingId: optionOf("fireRatingId"),
+        thicknessId: optionOf("thicknessId"),
+      };
+      if (Object.values(lookups).some((id) => !id)) {
+        console.log(`  skip  ${locale}: the product lookups are not seeded`);
+        continue;
+      }
+
+      const fields = envelope(shell);
+      fields.set("quotationThreadId", option[1]);
+      fields.set("dispatchDate", "2026-08-19");
+      // `S116` — the rep prices every line before submitting, so the price is
+      // posted like any other field and an empty one would be refused.
+      for (const [name, value] of Object.entries({
+        ...lookups,
+        customColour: "168",
+        widthM: "1.2",
+        lengthM: "2.4",
+        quantityPcs: "5",
+        unitPrice: "88",
+      })) {
+        fields.set(name, value as string);
+      }
+      const raised = await post(repJar, `/${locale}/dispatches/new`, fields);
+      check(
+        `${locale}: *** a rep posts the form and it answers 303 *** [S72]`,
+        raised.status === 303,
+        `got ${raised.status} ${raised.location}`,
+      );
+      if (raised.status !== 303) continue;
+      const path = raised.location.replace(BASE, "");
+      const draft = await get(repJar, path);
+      check(
+        `${locale}: it lands as a draft, waiting on the rep [S72], [S86]`,
+        draft.body.includes('data-status="draft"'),
+        factOf(draft.body, "status"),
+      );
+      check(
+        `${locale}: …and the rep is offered edit and submit, and nothing else [S125], [D53]`,
+        Boolean(actForm(draft.body, "submit")) &&
+          !actForm(draft.body, "approve") &&
+          !actForm(draft.body, "refuse"),
+      );
+      check(
+        `${locale}: the rep may open their own edit route [S125]`,
+        (await get(repJar, `${path}/edit`)).status === 200,
+      );
+
+      /* --- 3. and submits it ---------------------------------------- */
+
+      const submit = actForm(draft.body, "submit");
+      if (!submit) continue;
+      await post(repJar, path, envelope(submit));
+      const sitting = await get(coordJar, path);
+      check(
+        `${locale}: *** the request waits on the coordinator *** [S72], [S88]`,
+        sitting.body.includes('data-status="submitted"'),
+        factOf(sitting.body, "status"),
+      );
+
+      /* --- 4. she refuses it, with a reason [S124] ------------------- */
+
+      const refuseForm = actForm(sitting.body, "refuse");
+      if (!refuseForm) {
+        check(`${locale}: the refuse control renders [S124]`, false);
+        continue;
+      }
+      // **The reason is required, and the empty post proves it.** 200 with the
+      // form re-rendered, never a 303 that archived it with nothing to read.
+      const noReason = envelope(refuseForm);
+      noReason.set("reason", "   ");
+      const empty = await post(coordJar, path, noReason);
+      check(
+        `${locale}: *** a refusal with no reason is refused *** [S124]`,
+        empty.status === 200,
+        `got ${empty.status} ${empty.location}`,
+      );
+      check(
+        `${locale}: …and the request is still submitted, not archived`,
+        (await get(coordJar, path)).body.includes('data-status="submitted"'),
+      );
+
+      const withReason = envelope(refuseForm);
+      const REASON = `verify-routes ${locale} colour unavailable`;
+      withReason.set("reason", REASON);
+      const done = await post(coordJar, path, withReason);
+      check(
+        `${locale}: *** refusing it answers 200 *** [S124]`,
+        done.status === 200,
+        `got ${done.status} ${done.location}`,
+      );
+
+      /* --- 5. archived, out of the working list, reason readable ----- */
+
+      const archivedPage = await get(repJar, path);
+      check(
+        `${locale}: *** the rep can still open it, and read WHY *** [S122], [S124]`,
+        archivedPage.status === 200 &&
+          archivedPage.body.includes("data-refusal-reason") &&
+          archivedPage.body.includes(REASON),
+        `status ${archivedPage.status}`,
+      );
+      const id = path.split("/").pop() as string;
+      const working = await get(coordJar, `/${locale}/dispatches`);
+      check(
+        `${locale}: *** and it is OUT of the working list *** [S122]`,
+        !working.body.includes(`/dispatches/${id}"`),
+      );
+      const archive = await get(coordJar, `/${locale}/dispatches?status=refused`);
+      check(
+        `${locale}: …and in the archive, which is one query parameter [S122], [D28]`,
+        archive.body.includes(`/dispatches/${id}"`),
+      );
+
+      /* --- 6. only she may revive it, and it returns to the rep ------ */
+
+      const repOnRefused = await get(repJar, path);
+      check(
+        `${locale}: *** the rep is offered no revive control *** [S122], [D53]`,
+        !actForm(repOnRefused.body, "revive"),
+      );
+      const coordOnRefused = await get(coordJar, path);
+      const reviveForm = actForm(coordOnRefused.body, "revive");
+      if (!reviveForm) {
+        check(`${locale}: the revive control renders for her [S122]`, false);
+        continue;
+      }
+      await post(coordJar, path, envelope(reviveForm));
+      const back = await get(repJar, path);
+      check(
+        `${locale}: *** a revived request returns to the rep, unsubmitted *** [S122]`,
+        back.body.includes('data-status="draft"') &&
+          !back.body.includes("data-refusal-reason"),
+        factOf(back.body, "status"),
+      );
+      check(
+        `${locale}: …and the rep may edit and submit it as a new one [S122], [S125]`,
+        (await get(repJar, `${path}/edit`)).status === 200 &&
+          Boolean(actForm(back.body, "submit")),
       );
     }
   }

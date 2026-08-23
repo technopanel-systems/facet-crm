@@ -217,6 +217,37 @@ export const stockEnum = pgEnum("stock", [
 /** `[08 B2]` */
 export const formFactorEnum = pgEnum("form_factor", ["sheet", "coil"]);
 
+/**
+ * `S72` — the life of a dispatch, from the rep's request to the coordinator's
+ * approval.
+ *
+ * **One row throughout, and that is the whole design decision.** `S72`'s own
+ * sentence — *"an approved dispatch is the only event that credits a target —
+ * not the request"* — describes one thing at two points of its life, not two
+ * things in two tables. A second table would need a second set of lines and a
+ * copy at approval, and `S120` then has to compare a dispatch's lines to its
+ * version's **and record who made each difference, the rep before submitting or
+ * the coordinator after**, which a copy boundary destroys.
+ *
+ * | | who holds it | what it is |
+ * |---|---|---|
+ * | `draft` | the rep | raised, still theirs to edit `S125` |
+ * | `submitted` | the coordinator | waiting on her `S88`, and hers to edit `S62` |
+ * | `approved` | nobody | the event that credits a target `S72` |
+ * | `refused` | nobody | archived with a reason `S124`, revivable by her `S122` |
+ *
+ * **There is no `cancelled`.** `S73` names it and nothing here would write it,
+ * so it would land as a dead enum value — `record_type.quotation_version` and
+ * `project_end_state.dormant` are already what that looks like (`WORKFLOW §5`).
+ * It arrives with its writer.
+ */
+export const dispatchStatusEnum = pgEnum("dispatch_status", [
+  "draft",
+  "submitted",
+  "approved",
+  "refused",
+]);
+
 /** `[07 B6]` — entry-time matching is the norm, the manager's queue the exception. */
 export const duplicateFlagSourceEnum = pgEnum("duplicate_flag_source", [
   "entry_match",
@@ -1385,10 +1416,15 @@ export const quotationServiceLines = pgTable(
  * ------------------------------------------------------------------ */
 
 /**
- * `09 §6.1` — what the coordinator records as actually having gone out. The
- * one event that credits targets `[04 flow 16]`, `[04 C1]`. One quotation can
- * produce several partial dispatches; quotation quantity ≠ paid quantity ≠
+ * `S72` — **a rep requests a dispatch; the coordinator checks it and approves
+ * it**, and the approval is the one event that credits a target. One quotation
+ * can produce several partial dispatches; quotation quantity ≠ paid quantity ≠
  * dispatched quantity `[04 quantities]`.
+ *
+ * **The request and the dispatch are the same row** — see `dispatchStatusEnum`
+ * for why. `status` is what every figure now reads through, never the row's
+ * existence: a submitted request credits nothing, wins nothing and moves no
+ * chain until it is approved.
  *
  * The quotation link is optional, because customers sometimes buy directly
  * `[07 C6]` — a null thread is exactly what makes a direct dispatch visible as
@@ -1449,9 +1485,43 @@ export const dispatches = pgTable(
     recordedByUserId: uuid("recorded_by_user_id")
       .notNull()
       .references(() => users.id),
-    /** The coordinator's approval, for direct dispatches `[07 C6]`. */
+    /**
+     * `S72` — where this row is in its life, and the column every figure now
+     * reads through.
+     *
+     * **NOT NULL with no default.** A default is a place for a writer to
+     * forget, and each of the six writers in `dispatches.ts` sets it outright.
+     */
+    status: dispatchStatusEnum("status").notNull(),
+    /**
+     * `S72` — when the rep handed it over, which is **not** when the row was
+     * created: a revived request `S122` is submitted again, later.
+     *
+     * Two readers, so it is not a column waiting for one: the coordinator's
+     * oldest-first queue on `/dispatches` today, and `S89`'s age on the waiting
+     * list when that arrives.
+     */
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    /**
+     * The coordinator's approval `S72`, on **both** routes.
+     *
+     * It used to be stamped only on the direct one `[07 C6]`, where it stood in
+     * for the payment gate that had no object there. Now there is a real
+     * approval act and both routes pass through it, so the special case is gone
+     * and this pair means one thing.
+     */
     approvedByUserId: uuid("approved_by_user_id").references(() => users.id),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
+    /**
+     * `S124` — a refusal carries a reason, and `S122` is what archives the
+     * request with it.
+     *
+     * **Cleared on revival**, because a revived request is out of the archive
+     * and *"treated as new"* `S122`. The reason is not lost: the audit row that
+     * recorded the refusal keeps it, which is what `S107` means by nothing
+     * being deleted, and `S128` reads it at refusal time to tell the rep.
+     */
+    refusalReason: text("refusal_reason"),
     createdAt: createdAt(),
   },
   (t) => [
@@ -1470,6 +1540,36 @@ export const dispatches = pgTable(
     check(
       "dispatches_quotation_pair",
       sql`(quotation_thread_id is null) = (quotation_version_id is null)`,
+    ),
+    /**
+     * `S72` — the status and the approval stamps cannot disagree.
+     *
+     * Row-local, so the database holds it, and it is what stops `approved_at`
+     * becoming a second answer to *is this approved?*. Every figure asks the
+     * stamp `[dispatches.ts approvedDispatches]`; this is what makes asking the
+     * stamp the same as asking the status.
+     */
+    check(
+      "dispatches_approval_stamps",
+      sql`(status = 'approved') = (approved_at is not null)
+          and (status = 'approved') = (approved_by_user_id is not null)`,
+    ),
+    /** `S124` — refused, and only refused, carries a reason. */
+    check(
+      "dispatches_refusal_reason",
+      sql`(status = 'refused') = (refusal_reason is not null)`,
+    ),
+    /**
+     * `S72` — a draft has not been handed over and everything else has.
+     *
+     * Written round this way rather than as `status in ('submitted','approved',
+     * 'refused')`: a **refused** request was submitted, and clearing its
+     * `submitted_at` would lose when. Only revival clears it `S122`, and
+     * revival is what puts the row back to `draft`.
+     */
+    check(
+      "dispatches_submitted_at",
+      sql`(status = 'draft') = (submitted_at is null)`,
     ),
   ],
 );

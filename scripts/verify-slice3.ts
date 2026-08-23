@@ -106,26 +106,40 @@ import {
   targets as targetsTable,
   users,
 } from "@/db/schema";
-import {
-  canOpenRecord,
-  canViewRecord,
-  type AuthSession,
-} from "@/lib/authz";
+import { canOpenRecord, canViewRecord, type AuthSession } from "@/lib/authz";
 import { addComment } from "@/lib/comments";
-import { createContact, getContact, listContacts, updateContact } from "@/lib/contacts";
+import {
+  createContact,
+  getContact,
+  listContacts,
+  updateContact,
+} from "@/lib/contacts";
 import {
   creditForDispatches,
   getCreditSplitInForce,
   setCreditSplit,
 } from "@/lib/credit-splits";
-import { PERCENT_SCALE, SQM_SCALE, divideEqually, fromScaled, toScaled } from "@/lib/decimal";
 import {
+  PERCENT_SCALE,
+  SQM_SCALE,
+  divideEqually,
+  fromScaled,
+  toScaled,
+} from "@/lib/decimal";
+import {
+  approveDispatchRequest,
   dispatchesInPeriod,
   getDispatch,
   listDispatchProjectOptions,
   listDispatchableThreads,
   listDispatches,
-  recordDispatch,
+  refuseDispatchRequest,
+  requestDispatch,
+  reviveDispatchRequest,
+  submitDispatchRequest,
+  updateDispatchRequest,
+  type Dispatch,
+  type DispatchInput,
 } from "@/lib/dispatches";
 import { SAUDI_CODE } from "@/lib/enums";
 import { followUpsForRecipient, setNextFollowUp } from "@/lib/follow-ups";
@@ -148,7 +162,11 @@ import {
   listQuotationFormOptions,
   type QuotationVersionInput,
 } from "@/lib/quotations";
-import { achievementForPeriod, listTargetHistory, setTarget } from "@/lib/targets";
+import {
+  achievementForPeriod,
+  listTargetHistory,
+  setTarget,
+} from "@/lib/targets";
 import { projectTimeline } from "@/lib/timeline";
 
 let failures = 0;
@@ -235,10 +253,42 @@ function linesOf(sqm: string, unitPrice = "95.00") {
   ];
 }
 
+/**
+ * Request, submit and approve in one call `S72` — a dispatch that **counts**.
+ *
+ * Every section below that asserts a figure needs an approved dispatch, and
+ * `S72` makes that three acts rather than one. The helper is deliberately
+ * *not* a re-created `recordDispatch`: it is named for what it produces, so a
+ * section that wants a request sitting with the coordinator has to spell out
+ * the two acts it does want and cannot reach approval by accident.
+ *
+ * Run as **one identity throughout**, which is `S127` — the coordinator may
+ * raise a request against her own company and approve it herself, and nothing
+ * blocks the same person from both acts. §21 asserts that on its own rather
+ * than leaning on this helper's convenience.
+ */
+async function approvedDispatch(
+  session: AuthSession,
+  input: DispatchInput,
+): Promise<Dispatch> {
+  const request = await requestDispatch(session, input);
+  await submitDispatchRequest(session, request.id);
+  await approveDispatchRequest(session, request.id);
+  const [row] = await db
+    .select()
+    .from(dispatchesTable)
+    .where(eq(dispatchesTable.id, request.id))
+    .limit(1);
+  return row;
+}
+
 /** Sum a list of scale-4 sqm strings exactly, as a string. */
 function sumSqm(values: string[]): string {
   return fromScaled(
-    values.reduce((total, value) => total + toScaled(value, SQM_SCALE), BigInt(0)),
+    values.reduce(
+      (total, value) => total + toScaled(value, SQM_SCALE),
+      BigInt(0),
+    ),
     SQM_SCALE,
   );
 }
@@ -246,7 +296,7 @@ function sumSqm(values: string[]): string {
 /**
  * A dispatch's square metres, derived `S116` — `sum(dispatch_lines.sqm)`.
  *
- * `recordDispatch` returns the `dispatches` row, which no longer carries the
+ * The write functions return the `dispatches` row, which no longer carries the
  * figure, so every caller that needs it asks the lines. That is the point:
  * there is no second place it could have come from.
  */
@@ -308,11 +358,23 @@ async function main(): Promise<void> {
     .insert(users)
     .values([
       // Names fix the order the credit split divides in — see `18 §5`.
-      { name: `${stamp} Rep A`, email: `${stamp}-a@example.test`, roleId: repRole.id },
-      { name: `${stamp} Rep B`, email: `${stamp}-b@example.test`, roleId: repRole.id },
+      {
+        name: `${stamp} Rep A`,
+        email: `${stamp}-a@example.test`,
+        roleId: repRole.id,
+      },
+      {
+        name: `${stamp} Rep B`,
+        email: `${stamp}-b@example.test`,
+        roleId: repRole.id,
+      },
       // The third member of the three-way split. A run-scoped rep rather than
       // the shared coordinator account, so October's total is this run's alone.
-      { name: `${stamp} Rep C`, email: `${stamp}-c@example.test`, roleId: repRole.id },
+      {
+        name: `${stamp} Rep C`,
+        email: `${stamp}-c@example.test`,
+        roleId: repRole.id,
+      },
     ])
     .returning();
   const asSession = (user: typeof repAUser): AuthSession => {
@@ -426,7 +488,10 @@ async function main(): Promise<void> {
     quotationLineId: null,
   });
 
-  // Thread 2 — never paid. The payment gate's subject.
+  // Thread 2 — issued, never paid. The payment gate's subject, and since
+  // `S72` it has to be ISSUED to be one: the gate now fires at the approval,
+  // and a thread that was never issued is refused earlier, by `S126`. An
+  // unissued thread would prove the wrong refusal.
   const unpaidThread = await createQuotationThread(
     repA,
     { projectId: project.id, companyId: company.id, contactId: null },
@@ -434,10 +499,16 @@ async function main(): Promise<void> {
     [line],
     [],
   );
+  await issueVersion(coordinator, unpaidThread.id, {
+    smacReference: `${stamp}-unpaid`,
+    verification: "unverified",
+  });
 
   /* --- 1. The flags are reachable, on the right roles ------------- */
 
-  console.log("\n1. The flags exist and the seed grants them correctly [12 §1, §3]");
+  console.log(
+    "\n1. The flags exist and the seed grants them correctly [12 §1, §3]",
+  );
   check("coordinator dispatches", coordinator.user.role.canDispatch === true);
   check(
     "coordinator does NOT see all reps — the 16 §8 / 18 §2 shape",
@@ -478,15 +549,46 @@ async function main(): Promise<void> {
     userId: repB.user.id,
     projectId: null,
   };
+
+  // **`S72` inverted the first two of these.** They used to assert that a rep
+  // and a manager could not dispatch at all, with
+  // `dispatches.errors.dispatchOnly` — the key, and the gate behind it, are
+  // both gone. What replaced them is a positive and a negative: a rep may
+  // RAISE one with no flag, and may not APPROVE it. §19 walks the whole of a
+  // rep's path; this is the gate half, beside the other gates it belongs with.
+  const repRequest = await requestDispatch(repA, {
+    lines: linesOf("10.0000"),
+    dispatchDate: "2026-09-10",
+    quotationThreadId: null,
+    companyId: company.id,
+    userId: null,
+    projectId: null,
+  });
+  check(
+    "*** a rep raises a dispatch request with NO flag *** [S72]",
+    repRequest.status === "draft" && repRequest.userId === repA.user.id,
+    `got status ${repRequest.status}`,
+  );
+  await submitDispatchRequest(repA, repRequest.id);
   await refuses(
-    "a rep may not dispatch",
-    "dispatches.errors.dispatchOnly",
-    () => recordDispatch(repA, directInput),
+    "*** but a rep may NOT approve one *** [S72]",
+    "dispatches.errors.approveOnly",
+    () => approveDispatchRequest(repA, repRequest.id),
   );
   await refuses(
-    "the manager may not dispatch [12 §3]",
-    "dispatches.errors.dispatchOnly",
-    () => recordDispatch(manager, directInput),
+    "and neither may the manager — approving is operational [12 §3]",
+    "dispatches.errors.approveOnly",
+    () => approveDispatchRequest(manager, repRequest.id),
+  );
+  await refuses(
+    "a rep may not refuse one either [S124]",
+    "dispatches.errors.refuseOnly",
+    () => refuseDispatchRequest(repA, repRequest.id, "no"),
+  );
+  await refuses(
+    "a rep may not name another rep on a free entry [S108]",
+    "dispatches.errors.repNotSelf",
+    () => requestDispatch(repA, directInput),
   );
   await refuses(
     "a rep may never set his own split [12 §1]",
@@ -510,25 +612,47 @@ async function main(): Promise<void> {
 
   /* --- 3. The payment gate [07 C3], [09 §6.1] -------------------- */
 
-  console.log("\n3. Dispatch against a quotation is blocked until payment [07 C3]");
+  console.log(
+    "\n3. The payment gate fires on the APPROVAL, not the request [S72], [07 C3]",
+  );
+
+  // **The gate moved, and this section is where that is visible.** It used to
+  // refuse at `recordDispatch`; a rep could not even ASK until finance had
+  // confirmed, which sits absurdly beside `S71`, whose *on delivery* method is
+  // by definition not confirmed before the goods move. `S72` puts the half
+  // that deals with finance on the coordinator, so the request goes through
+  // and the approval is what refuses. `S73` replaces the condition itself in
+  // the payment slice; this moved only where it fires.
+  //
+  // An unissued quotation is a different matter and still refuses at the
+  // request: `S126` is about what may be dispatched against at all.
+  const unpaidRequest = await requestDispatch(coordinator, {
+    lines: linesOf("10.0000"),
+    dispatchDate: "2026-09-10",
+    quotationThreadId: unpaidThread.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  check(
+    "*** an unpaid quotation may be REQUESTED against *** [S72]",
+    unpaidRequest.status === "draft",
+  );
+  await submitDispatchRequest(coordinator, unpaidRequest.id);
   await refuses(
-    "an unpaid quotation refuses",
+    "*** and refuses at the approval instead *** [S72], [07 C3]",
     "dispatches.errors.paymentNotConfirmed",
-    () =>
-      recordDispatch(coordinator, {
-        lines: linesOf("10.0000"),
-        dispatchDate: "2026-09-10",
-        quotationThreadId: unpaidThread.id,
-        companyId: null,
-        userId: null,
-        projectId: null,
-      }),
+    () => approveDispatchRequest(coordinator, unpaidRequest.id),
   );
   check(
-    "and it is not offered in the dispatchable list either",
-    (await listDispatchableThreads(coordinator)).every(
-      (thread) => thread.id !== unpaidThread.id,
+    "an unpaid quotation IS offered now — the list matches the write [S72]",
+    (await listDispatchableThreads(coordinator)).some(
+      (thread) => thread.id === unpaidThread.id,
     ),
+  );
+  check(
+    "and the refused approval left the request submitted, not half-approved",
+    (await getDispatch(coordinator, unpaidRequest.id))?.status === "submitted",
   );
 
   await issueVersion(coordinator, paidThread.id, {
@@ -545,7 +669,7 @@ async function main(): Promise<void> {
     ),
   );
 
-  const linked = await recordDispatch(coordinator, {
+  const linked = await approvedDispatch(coordinator, {
     lines: linesOf("100.0000"),
     dispatchDate: "2026-09-10",
     quotationThreadId: paidThread.id,
@@ -553,7 +677,7 @@ async function main(): Promise<void> {
     userId: null,
     projectId: null,
   });
-  check("the dispatch was recorded once payment was confirmed", !!linked.id);
+  check("the dispatch was approved once payment was confirmed", !!linked.id);
   check(
     "company derived from the thread, not asked for [18 §7]",
     linked.companyId === company.id,
@@ -563,14 +687,16 @@ async function main(): Promise<void> {
     linked.userId === repA.user.id,
   );
   check(
-    "a linked dispatch carries NO coordinator approval — the chain is the approval",
-    linked.approvedByUserId === null && linked.approvedAt === null,
+    "*** and BOTH routes now carry the same approval *** [S72]",
+    linked.approvedByUserId === coordinator.user.id &&
+      linked.approvedAt !== null &&
+      linked.status === "approved",
   );
   await refuses(
     "a company disagreeing with the thread is refused",
     "dispatches.errors.companyNotOnThread",
     () =>
-      recordDispatch(coordinator, {
+      approvedDispatch(coordinator, {
         lines: linesOf("1.0000"),
         dispatchDate: "2026-09-10",
         quotationThreadId: paidThread.id,
@@ -580,7 +706,7 @@ async function main(): Promise<void> {
       }),
   );
 
-  const secondPartial = await recordDispatch(coordinator, {
+  const secondPartial = await approvedDispatch(coordinator, {
     lines: linesOf("5000.0000"), // far beyond the 86.3040 m² quoted
     dispatchDate: "2026-09-11",
     quotationThreadId: paidThread.id,
@@ -595,8 +721,10 @@ async function main(): Promise<void> {
 
   /* --- 4. Direct dispatch [07 C6] -------------------------------- */
 
-  console.log("\n4. Direct dispatch — approved by the coordinator, not by payment [07 C6]");
-  const direct = await recordDispatch(coordinator, {
+  console.log(
+    "\n4. Free entry — no quotation, and the same approval as any other [07 C6]",
+  );
+  const direct = await approvedDispatch(coordinator, {
     lines: linesOf("40.0000"),
     dispatchDate: "2026-09-12",
     quotationThreadId: null,
@@ -605,23 +733,35 @@ async function main(): Promise<void> {
     projectId: null,
   });
   check("no quotation, and it was allowed", direct.quotationThreadId === null);
+  // `07 C6` used to stamp the approval on this route ALONE, standing in for a
+  // payment gate that had no object here. `S72` gives every route a real
+  // approval act, so the special case is gone and the stamp means one thing.
   check(
-    "the coordinator's approval is stamped [07 C6]",
-    direct.approvedByUserId === coordinator.user.id && direct.approvedAt !== null,
+    "the approval is stamped, as it is on every route now [S72]",
+    direct.approvedByUserId === coordinator.user.id &&
+      direct.approvedAt !== null,
   );
   const directDetail = await getDispatch(coordinator, direct.id);
   check("it reads back as direct", directDetail?.isDirect === true);
-  const directOnly = await listDispatches(coordinator, { direct: true });
+  // **Scoped to this run's company, because the list is paginated.** Asked
+  // unscoped, both halves decay as the database grows: the row falls off page
+  // one and the positive half fails, while the negative half starts passing
+  // for the wrong reason. This run's company carries exactly these dispatches.
+  const directOnly = await listDispatches(coordinator, {
+    direct: true,
+    companyId: company.id,
+  });
   check(
     "it is visible as such in reporting [07 C6]",
     directOnly.rows.some((row) => row.id === direct.id) &&
       !directOnly.rows.some((row) => row.id === linked.id),
+    `${directOnly.total} direct dispatch(es) against this run's company`,
   );
   await refuses(
-    "a direct dispatch with no company is refused",
+    "a free entry with no company is refused",
     "dispatches.errors.companyRequired",
     () =>
-      recordDispatch(coordinator, {
+      approvedDispatch(coordinator, {
         lines: linesOf("1.0000"),
         dispatchDate: "2026-09-12",
         quotationThreadId: null,
@@ -630,24 +770,28 @@ async function main(): Promise<void> {
         projectId: null,
       }),
   );
-  await refuses(
-    "a direct dispatch with no rep is refused",
-    "dispatches.errors.repRequired",
-    () =>
-      recordDispatch(coordinator, {
-        lines: linesOf("1.0000"),
-        dispatchDate: "2026-09-12",
-        quotationThreadId: null,
-        companyId: company.id,
-        userId: null,
-        projectId: null,
-      }),
+  // **`repRequired` is gone** `S108`: a free entry with no rep named is not a
+  // defect any more, it is the ordinary case — the raiser. Only a
+  // `can_dispatch` holder may name somebody else, which §2 asserts from the
+  // other side.
+  const forSelf = await approvedDispatch(coordinator, {
+    lines: linesOf("1.0000"),
+    dispatchDate: "2026-09-12",
+    quotationThreadId: null,
+    companyId: company.id,
+    userId: null,
+    projectId: null,
+  });
+  check(
+    "a free entry naming no rep credits the raiser [S108]",
+    forSelf.userId === coordinator.user.id,
+    `got ${forSelf.userId}`,
   );
   await refuses(
     "zero square metres is refused",
     "dispatches.errors.sqmPositive",
     () =>
-      recordDispatch(coordinator, {
+      approvedDispatch(coordinator, {
         lines: linesOf("0.0000"),
         dispatchDate: "2026-09-12",
         quotationThreadId: null,
@@ -659,7 +803,9 @@ async function main(): Promise<void> {
 
   /* --- 5. Recording a dispatch never sets a split ---------------- */
 
-  console.log("\n5. Recording a dispatch NEVER sets a credit split [07 D3], [12 §1]");
+  console.log(
+    "\n5. Recording a dispatch NEVER sets a credit split [07 D3], [12 §1]",
+  );
   const [splitCount] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(projectCreditSplits)
@@ -672,7 +818,9 @@ async function main(): Promise<void> {
 
   /* --- 6. No split in force → the dispatch's own rep [18 §1] ----- */
 
-  console.log("\n6. With no split, credit goes to the rep on the dispatch [18 §1]");
+  console.log(
+    "\n6. With no split, credit goes to the rep on the dispatch [18 §1]",
+  );
   const linkedCredit = await creditOf({
     id: linked.id,
     userId: linked.userId,
@@ -705,7 +853,9 @@ async function main(): Promise<void> {
 
   /* --- 7. The split in force on the dispatch's OWN date ---------- */
 
-  console.log("\n7. The split in force on each dispatch's own date [07 D3] — the central claim");
+  console.log(
+    "\n7. The split in force on each dispatch's own date [07 D3] — the central claim",
+  );
   await setCreditSplit(manager, project.id, {
     effectiveFrom: "2026-09-01",
     userIds: [repA.user.id, repB.user.id],
@@ -761,7 +911,7 @@ async function main(): Promise<void> {
     `got ${d1Again.generationEffectiveFrom} ${d1Again.shares.map((s) => s.sqm).join("/")}`,
   );
 
-  const d2Row = await recordDispatch(coordinator, {
+  const d2Row = await approvedDispatch(coordinator, {
     lines: linesOf("100.0000"),
     dispatchDate: "2026-10-05",
     quotationThreadId: paidThread.id,
@@ -837,7 +987,9 @@ async function main(): Promise<void> {
 
   /* --- 9. Equal division loses nothing — pure [18 §5] ------------ */
 
-  console.log("\n9. Equal division never loses a square metre [18 §5] — no database");
+  console.log(
+    "\n9. Equal division never loses a square metre [18 §5] — no database",
+  );
   const cases: [string, number, string][] = [
     ["100.0000", 3, "33.3334/33.3333/33.3333"],
     ["100.0000", 1, "100.0000"],
@@ -854,7 +1006,11 @@ async function main(): Promise<void> {
       shares.join("/") === expected,
       `got ${shares.join("/")}`,
     );
-    check(`  …and sums back to ${total}`, sumSqm(shares) === total, `got ${sumSqm(shares)}`);
+    check(
+      `  …and sums back to ${total}`,
+      sumSqm(shares) === total,
+      `got ${sumSqm(shares)}`,
+    );
   }
   for (const count of [3, 6, 7, 9]) {
     const percents = divideEqually(toScaled("100.00", PERCENT_SCALE), count);
@@ -871,7 +1027,9 @@ async function main(): Promise<void> {
 
   /* --- 10. Targets are rows, never edits [07 D1], [10 §6] -------- */
 
-  console.log("\n10. Targets are superseding rows, never edits [07 D1], [10 §6]");
+  console.log(
+    "\n10. Targets are superseding rows, never edits [07 D1], [10 §6]",
+  );
   await setTarget(manager, repA.user.id, "2026-09", "500.0000");
   await setTarget(manager, repA.user.id, "2026-09", "600.0000");
   const history = await listTargetHistory(manager, repA.user.id, "2026-09");
@@ -901,7 +1059,9 @@ async function main(): Promise<void> {
 
   /* --- 11. Achievement never reads the quotation ----------------- */
 
-  console.log("\n11. Achievement comes from dispatches and nowhere else [04 C1]");
+  console.log(
+    "\n11. Achievement comes from dispatches and nowhere else [04 C1]",
+  );
   // September holds: D1 (100, split 50/50), the 5000 partial (split 50/50),
   // and the direct 40 to repB.
   check(
@@ -982,7 +1142,9 @@ async function main(): Promise<void> {
     "the coordinator may NOT open the company record [16 §8], [18 §2]",
     (await canViewRecord(coordinator, "company", company.id)) === false,
   );
-  const coordinatorRow = coordinatorList.rows.find((row) => row.id === direct.id);
+  const coordinatorRow = coordinatorList.rows.find(
+    (row) => row.id === direct.id,
+  );
   check(
     "…the screen knows not to link it",
     coordinatorRow?.companyViewable === false,
@@ -1052,19 +1214,30 @@ async function main(): Promise<void> {
         eq(auditLog.entityId, linked.id),
       ),
     );
-  check(
-    "dispatch.recorded exists, under the coordinator",
-    dispatchAudit.some(
-      (row) =>
-        row.action === "dispatch.recorded" &&
-        row.actor === coordinator.user.id,
-    ),
-  );
+  // `S72` — one act became three, so one audit action became three. There is
+  // no `dispatch.recorded` any more: nothing records a dispatch, somebody
+  // requests one and somebody approves it, and the log has to say which.
+  for (const action of [
+    "dispatch.requested",
+    "dispatch.submitted",
+    "dispatch.approved",
+  ]) {
+    check(
+      `${action} exists, under the coordinator [S72]`,
+      dispatchAudit.some(
+        (row) => row.action === action && row.actor === coordinator.user.id,
+      ),
+      dispatchAudit.map((row) => row.action).join(", "),
+    );
+  }
   const projectAudit = await db
     .select({ action: auditLog.action, after: auditLog.after })
     .from(auditLog)
     .where(
-      and(eq(auditLog.entityType, "project"), eq(auditLog.entityId, project.id)),
+      and(
+        eq(auditLog.entityType, "project"),
+        eq(auditLog.entityId, project.id),
+      ),
     );
   const splitEntry = projectAudit.find(
     (row) => row.action === "project_credit_split.set",
@@ -1094,7 +1267,10 @@ async function main(): Promise<void> {
     )
     .groupBy(auditLog.action);
   console.log(
-    `        actions seen: ${actions.map((row) => row.action).sort().join(", ")}`,
+    `        actions seen: ${actions
+      .map((row) => row.action)
+      .sort()
+      .join(", ")}`,
   );
 
   /* --- 14. Who bought is derived from dispatches `S26` ------------- */
@@ -1140,7 +1316,9 @@ async function main(): Promise<void> {
   /** This project's figure for one company, or null. */
   async function figureFor(companyId: string): Promise<string | null> {
     const rows = await listProjectCompanies(repA, project.id);
-    return rows.find((row) => row.companyId === companyId)?.dispatchedSqm ?? null;
+    return (
+      rows.find((row) => row.companyId === companyId)?.dispatchedSqm ?? null
+    );
   }
 
   const beforeSecondBuyer = await listProjectCompanies(repA, project.id);
@@ -1161,7 +1339,7 @@ async function main(): Promise<void> {
   // A direct dispatch has no thread, so it reaches no project `S75` — this is
   // the assertion that fails the day someone routes a dispatch to a project by
   // its company instead of by its quotation thread.
-  await recordDispatch(coordinator, {
+  await approvedDispatch(coordinator, {
     lines: linesOf("40.0000"),
     dispatchDate: "2026-09-13",
     quotationThreadId: null,
@@ -1171,12 +1349,12 @@ async function main(): Promise<void> {
   });
   check(
     "*** a DIRECT dispatch moves the project figure not at all *** [S26], [S75]",
-    toScaled(await figureFor(company.id) ?? "0", SQM_SCALE) === baseline,
+    toScaled((await figureFor(company.id)) ?? "0", SQM_SCALE) === baseline,
     `${firstBuyerBefore?.dispatchedSqm} → ${await figureFor(company.id)}`,
   );
 
   // And a linked one moves it by exactly its own square metres.
-  await recordDispatch(coordinator, {
+  await approvedDispatch(coordinator, {
     lines: linesOf("7.0000"),
     dispatchDate: "2026-09-13",
     quotationThreadId: paidThread.id,
@@ -1186,7 +1364,7 @@ async function main(): Promise<void> {
   });
   check(
     "a LINKED dispatch moves it by exactly its own square metres [S26]",
-    toScaled(await figureFor(company.id) ?? "0", SQM_SCALE) ===
+    toScaled((await figureFor(company.id)) ?? "0", SQM_SCALE) ===
       baseline + toScaled("7.0000", SQM_SCALE),
     `expected ${fromScaled(baseline + toScaled("7.0000", SQM_SCALE), SQM_SCALE)}, got ${await figureFor(company.id)}`,
   );
@@ -1231,7 +1409,7 @@ async function main(): Promise<void> {
   });
   await acceptThread(coordinator, secondThread.id);
   await confirmPayment(repA, secondThread.id, "2026-08-02");
-  await recordDispatch(coordinator, {
+  await approvedDispatch(coordinator, {
     lines: linesOf("250.0000"),
     dispatchDate: "2026-09-13",
     quotationThreadId: secondThread.id,
@@ -1277,7 +1455,7 @@ async function main(): Promise<void> {
   // dispatch above already exercised this; what none of them proved is that
   // the column was written, rather than the figure still arriving through the
   // thread. `paidThread` belongs to `project`.
-  const takenFrom = await recordDispatch(coordinator, {
+  const takenFrom = await approvedDispatch(coordinator, {
     lines: linesOf("3.0000"),
     dispatchDate: "2026-09-14",
     quotationThreadId: paidThread.id,
@@ -1311,7 +1489,7 @@ async function main(): Promise<void> {
     "a dispatch whose project differs from its quotation's is refused [S74]",
     "dispatches.errors.projectNotOnThread",
     () =>
-      recordDispatch(coordinator, {
+      approvedDispatch(coordinator, {
         lines: linesOf("1.0000"),
         dispatchDate: "2026-09-14",
         quotationThreadId: paidThread.id,
@@ -1365,7 +1543,7 @@ async function main(): Promise<void> {
     "dispatching it with no project chosen is refused [S74]",
     "dispatches.errors.projectRequired",
     () =>
-      recordDispatch(coordinator, {
+      approvedDispatch(coordinator, {
         lines: linesOf("12.0000"),
         dispatchDate: "2026-09-14",
         quotationThreadId: looseThread.id,
@@ -1375,7 +1553,7 @@ async function main(): Promise<void> {
       }),
   );
 
-  const written = await recordDispatch(coordinator, {
+  const written = await approvedDispatch(coordinator, {
     lines: linesOf("12.0000"),
     dispatchDate: "2026-09-14",
     quotationThreadId: looseThread.id,
@@ -1418,7 +1596,7 @@ async function main(): Promise<void> {
   // link — `S27` keeps one live row per company, and the partial unique index
   // would refuse it anyway. Nothing to write back either: the quotation now
   // has a project, so this is branch one from here on.
-  const again = await recordDispatch(coordinator, {
+  const again = await approvedDispatch(coordinator, {
     lines: linesOf("8.0000"),
     dispatchDate: "2026-09-15",
     quotationThreadId: looseThread.id,
@@ -1484,10 +1662,7 @@ async function main(): Promise<void> {
     "…and an ordinary open project, which a plain <> comparison would drop",
     offered.has(project.id),
   );
-  check(
-    "…and never a lost one [07 C5]",
-    !offered.has(lostProject.id),
-  );
+  check("…and never a lost one [07 C5]", !offered.has(lostProject.id));
 
   /* --- 16. S76 — the coordinator sees projects and contacts ------ */
 
@@ -1616,18 +1791,15 @@ async function main(): Promise<void> {
     "projects.errors.notFound",
     () => addProjectCompany(coordinator, project.id, { companyId: company.id }),
   );
-  await refuses(
-    "…nor edit a contact",
-    "contacts.errors.notFound",
-    () =>
-      updateContact(coordinator, contact.id, {
-        companyId: company.id,
-        name: `${stamp} Renamed By Coordinator`,
-        phone: "0500000000",
-        email: null,
-        position: null,
-        notes: null,
-      }),
+  await refuses("…nor edit a contact", "contacts.errors.notFound", () =>
+    updateContact(coordinator, contact.id, {
+      companyId: company.id,
+      name: `${stamp} Renamed By Coordinator`,
+      phone: "0500000000",
+      email: null,
+      position: null,
+      notes: null,
+    }),
   );
   await refuses(
     "…nor comment on a project they may read",
@@ -1752,7 +1924,7 @@ async function main(): Promise<void> {
     "*** a paid but UNISSUED quotation refuses *** [S126]",
     "dispatches.errors.quotationNotIssued",
     () =>
-      recordDispatch(coordinator, {
+      approvedDispatch(coordinator, {
         lines: linesOf("1.0000"),
         dispatchDate: "2026-09-20",
         quotationThreadId: paidNotIssued.id,
@@ -1785,7 +1957,8 @@ async function main(): Promise<void> {
   );
   check(
     "…and the offered thread names the version its lines come from [S126]",
-    Boolean(nowIssued?.versionId) && nowIssued?.smacReference === `${stamp}-126`,
+    Boolean(nowIssued?.versionId) &&
+      nowIssued?.smacReference === `${stamp}-126`,
     `got ${nowIssued?.smacReference}`,
   );
 
@@ -1810,7 +1983,7 @@ async function main(): Promise<void> {
   );
 
   /* Route one — exactly as a quotation. */
-  const asQuoted = await recordDispatch(coordinator, {
+  const asQuoted = await approvedDispatch(coordinator, {
     lines: prefilled.lines,
     dispatchDate: "2026-09-21",
     quotationThreadId: paidNotIssued.id,
@@ -1835,7 +2008,7 @@ async function main(): Promise<void> {
   );
 
   /* Route two — from a quotation, with edits. The one that did not exist. */
-  const edited = await recordDispatch(coordinator, {
+  const edited = await approvedDispatch(coordinator, {
     lines: [
       // Half the quantity went out, at a renegotiated price…
       { ...prefilled.lines[0], quantityPcs: "6.0000", unitPrice: "110.00" },
@@ -1869,14 +2042,14 @@ async function main(): Promise<void> {
       quotedAfter.live.lines[0].quantityPcs === "12.0000" &&
       quotedAfter.live.lines[0].unitPrice === "120.00",
     JSON.stringify(
-      quotedAfter?.live.lines.map((row: { quantityPcs: string }) =>
-        row.quantityPcs,
+      quotedAfter?.live.lines.map(
+        (row: { quantityPcs: string }) => row.quantityPcs,
       ),
     ),
   );
 
   /* Route three — free entry, no quotation at all. */
-  const freeEntry = await recordDispatch(coordinator, {
+  const freeEntry = await approvedDispatch(coordinator, {
     lines: linesOf("9.0000", "70.00"),
     dispatchDate: "2026-09-23",
     quotationThreadId: null,
@@ -1898,7 +2071,7 @@ async function main(): Promise<void> {
     "*** a line with no price is refused — nothing is dispatched free *** [S116]",
     "dispatches.errors.linePriceRequired",
     () =>
-      recordDispatch(coordinator, {
+      approvedDispatch(coordinator, {
         lines: linesOf("4.0000", ""),
         dispatchDate: "2026-09-24",
         quotationThreadId: null,
@@ -1911,7 +2084,7 @@ async function main(): Promise<void> {
     "a dispatch with no lines at all is refused [S116]",
     "dispatches.errors.atLeastOneLine",
     () =>
-      recordDispatch(coordinator, {
+      approvedDispatch(coordinator, {
         lines: [],
         dispatchDate: "2026-09-24",
         quotationThreadId: null,
@@ -1921,51 +2094,676 @@ async function main(): Promise<void> {
       }),
   );
 
+  /* --- 19. A rep's whole path [S72], [S125] ---------------------- */
+
+  console.log(
+    "\n19. *** A rep raises, edits and submits; after that it is not theirs *** [S72], [S125]",
+  );
+
+  const repPath = await requestDispatch(repA, {
+    lines: linesOf("30.0000", "80.00"),
+    dispatchDate: "2026-09-25",
+    quotationThreadId: paidThread.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  check(
+    "a rep raises one against their own issued quotation, with no flag [S72]",
+    repPath.status === "draft" && repPath.recordedByUserId === repA.user.id,
+    `got ${repPath.status}`,
+  );
+
+  // `S125` — *a rep edits their own request until they submit it.*
+  await updateDispatchRequest(repA, repPath.id, {
+    lines: linesOf("31.0000", "80.00"),
+    dispatchDate: "2026-09-26",
+    projectId: null,
+  });
+  const editedByRep = (await getDispatch(repA, repPath.id))!;
+  check(
+    "…and edits it while it is a draft [S125]",
+    editedByRep.sqm === "31.0000" && editedByRep.dispatchDate === "2026-09-26",
+    `got ${editedByRep.sqm} on ${editedByRep.dispatchDate}`,
+  );
+  check(
+    "…the lines were REPLACED, not added to — one line, not two [S125]",
+    editedByRep.lines.length === 1,
+    `got ${editedByRep.lines.length}`,
+  );
+  // **Visibility answers first, and the key says so.** Another rep cannot
+  // see this request at all, so they are told it cannot be found rather than
+  // that it is not theirs — telling them the second would confirm it exists.
+  await refuses(
+    "another rep cannot even see it, so that is what they are told [S125]",
+    "dispatches.errors.requestNotVisible",
+    () =>
+      updateDispatchRequest(repB, repPath.id, {
+        lines: linesOf("1.0000", "80.00"),
+        dispatchDate: "2026-09-26",
+        projectId: null,
+      }),
+  );
+  await refuses(
+    "and cannot submit somebody else's either [S125]",
+    "dispatches.errors.requestNotVisible",
+    () => submitDispatchRequest(repB, repPath.id),
+  );
+  // **The coordinator is who reaches `notYourRequest`.** She sees every
+  // dispatch `S76`, so visibility does not stop her — and `S125` still does:
+  // a DRAFT is the rep's, and she gets it only once he submits it. This is
+  // the half of the rule a screen would be tempted to skip.
+  await refuses(
+    "*** and the coordinator may not edit a DRAFT — it is not hers yet *** [S125]",
+    "dispatches.errors.notYourRequest",
+    () =>
+      updateDispatchRequest(coordinator, repPath.id, {
+        lines: linesOf("1.0000", "80.00"),
+        dispatchDate: "2026-09-26",
+        projectId: null,
+      }),
+  );
+  await refuses(
+    "…nor approve one that has not been submitted [S72]",
+    "dispatches.errors.notSubmitted",
+    () => approveDispatchRequest(coordinator, repPath.id),
+  );
+
+  await submitDispatchRequest(repA, repPath.id);
+  const submitted = (await getDispatch(repA, repPath.id))!;
+  check(
+    "*** submitting sets submitted_at, which is not created_at *** [S72], [S89]",
+    submitted.status === "submitted" && submitted.submittedAt !== null,
+  );
+
+  // **The hinge of `S125`.** After submitting, the rep loses the request and
+  // the coordinator gains it — *usually after phoning the rep, because that is
+  // faster than refusing and re-raising.*
+  await refuses(
+    "*** after submitting, the rep may no longer edit it *** [S125]",
+    "dispatches.errors.coordinatorEditsSubmitted",
+    () =>
+      updateDispatchRequest(repA, repPath.id, {
+        lines: linesOf("99.0000", "80.00"),
+        dispatchDate: "2026-09-26",
+        projectId: null,
+      }),
+  );
+  await refuses(
+    "…and may not submit it twice",
+    "dispatches.errors.notDraft",
+    () => submitDispatchRequest(repA, repPath.id),
+  );
+  await updateDispatchRequest(coordinator, repPath.id, {
+    lines: linesOf("32.0000", "85.00"),
+    dispatchDate: "2026-09-26",
+    projectId: null,
+  });
+  const editedByCoordinator = (await getDispatch(coordinator, repPath.id))!;
+  check(
+    "*** …but the coordinator may *** [S125], [S62]",
+    editedByCoordinator.sqm === "32.0000",
+    `got ${editedByCoordinator.sqm}`,
+  );
+  // `S123` will count this: *a request the coordinator had to edit before
+  // approving* is one of its two figures, and the audit row is where it reads
+  // it from. No column is landed for it here — `S123` is its own session.
+  const editAudit = await db
+    .select({ action: auditLog.action, actor: auditLog.actorUserId })
+    .from(auditLog)
+    .where(
+      and(
+        eq(auditLog.entityType, "dispatch"),
+        eq(auditLog.entityId, repPath.id),
+      ),
+    );
+  check(
+    "dispatch.edited names WHO edited it, which is what S123 will count [S123]",
+    editAudit.some(
+      (row) =>
+        row.action === "dispatch.edited" && row.actor === coordinator.user.id,
+    ) &&
+      editAudit.some(
+        (row) => row.action === "dispatch.edited" && row.actor === repA.user.id,
+      ),
+    editAudit.map((row) => row.action).join(", "),
+  );
+
+  await approveDispatchRequest(coordinator, repPath.id);
+  await refuses(
+    "an approved dispatch is not editable by anyone — approval is final [S73]",
+    "dispatches.errors.requestNotEditable",
+    () =>
+      updateDispatchRequest(coordinator, repPath.id, {
+        lines: linesOf("1.0000", "80.00"),
+        dispatchDate: "2026-09-26",
+        projectId: null,
+      }),
+  );
+  await refuses(
+    "…and cannot be approved a second time",
+    "dispatches.errors.notSubmitted",
+    () => approveDispatchRequest(coordinator, repPath.id),
+  );
+
+  /* --- 20. Refusal and revival [S124], [S122] -------------------- */
+
+  console.log(
+    "\n20. *** A refusal carries a reason and archives the request *** [S124], [S122]",
+  );
+
+  const doomed = await requestDispatch(repA, {
+    lines: linesOf("7.0000", "60.00"),
+    dispatchDate: "2026-09-27",
+    quotationThreadId: paidThread.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  await refuses(
+    "a draft cannot be refused — there is no decision to make yet",
+    "dispatches.errors.notSubmitted",
+    () => refuseDispatchRequest(coordinator, doomed.id, "too early"),
+  );
+  await submitDispatchRequest(repA, doomed.id);
+  await refuses(
+    "*** a refusal with no reason is refused *** [S124]",
+    "dispatches.errors.refusalReasonRequired",
+    () => refuseDispatchRequest(coordinator, doomed.id, "   "),
+  );
+
+  const REASON = `${stamp} the colour is not in stock`;
+  await refuseDispatchRequest(coordinator, doomed.id, REASON);
+  const refused = (await getDispatch(coordinator, doomed.id))!;
+  check(
+    "*** the reason is STORED on the request *** [S124]",
+    refused.status === "refused" && refused.refusalReason === REASON,
+    `got ${refused.status} / ${refused.refusalReason}`,
+  );
+  check(
+    "…and submitted_at survives it — a refused request WAS submitted",
+    refused.submittedAt !== null,
+  );
+
+  // `S122` — *kept out of the working lists*, and reachable by asking for the
+  // archive. Resolved in SQL by `listDispatches`, never filtered after the
+  // fetch (`CLAUDE.md`), which is why the claim is made against `total` too.
+  // **Scoped to the thread, because the list is paginated.** Absence from
+  // page one of a database with a hundred dispatches in it proves nothing —
+  // it is exactly the shape of assertion that passes for the wrong reason.
+  // Both scopes are asked of the same small set, so both halves are real.
+  const scope = { threadId: paidThread.id };
+  const working = await listDispatches(coordinator, scope);
+  check(
+    "*** a refused request is OUT of the working list *** [S122]",
+    working.total > 0 && !working.rows.some((row) => row.id === doomed.id),
+    `${working.total} row(s) in scope`,
+  );
+  const archive = await listDispatches(coordinator, {
+    ...scope,
+    status: "refused",
+  });
+  check(
+    "…and in the archive, which is the same list asked a question [S122]",
+    archive.rows.some((row) => row.id === doomed.id),
+    `${archive.total} archived in scope`,
+  );
+  check(
+    "*** a rep sees their own refused request *** [S122]",
+    (await getDispatch(repA, doomed.id)) !== null,
+  );
+  check(
+    "…and the manager sees it too — coordinators and managers see all [S122]",
+    (await getDispatch(manager, doomed.id)) !== null,
+  );
+
+  await refuses(
+    "*** only the coordinator may revive one *** [S122]",
+    "dispatches.errors.reviveOnly",
+    () => reviveDispatchRequest(repA, doomed.id),
+  );
+  await reviveDispatchRequest(coordinator, doomed.id);
+  const revived = (await getDispatch(repA, doomed.id))!;
+  check(
+    "*** a revived request returns to the rep, UNSUBMITTED *** [S122], [S125]",
+    revived.status === "draft" &&
+      revived.submittedAt === null &&
+      revived.refusalReason === null,
+    `got ${revived.status}, submittedAt ${revived.submittedAt}`,
+  );
+  check(
+    "…and is back in the working list, treated as new [S122]",
+    (await listDispatches(coordinator, scope)).rows.some(
+      (row) => row.id === doomed.id,
+    ),
+  );
+  // Nothing is lost `S107`: the audit row keeps the reason permanently, which
+  // is what `S128` will read to tell the rep.
+  const refusalAudit = await db
+    .select({ action: auditLog.action, after: auditLog.after })
+    .from(auditLog)
+    .where(
+      and(
+        eq(auditLog.entityType, "dispatch"),
+        eq(auditLog.entityId, doomed.id),
+      ),
+    );
+  check(
+    "*** the reason survives the revival, in the audit log *** [S107], [S112]",
+    refusalAudit.some(
+      (row) =>
+        row.action === "dispatch.refused" &&
+        (row.after as { refusalReason?: string })?.refusalReason === REASON,
+    ),
+  );
+  // The rep edits and submits it as they would a new one `S122`, `S125`.
+  await updateDispatchRequest(repA, doomed.id, {
+    lines: linesOf("8.0000", "60.00"),
+    dispatchDate: "2026-09-28",
+    projectId: null,
+  });
+  await submitDispatchRequest(repA, doomed.id);
+  check(
+    "…and the rep edits and submits it again, as a new one [S122]",
+    (await getDispatch(repA, doomed.id))?.status === "submitted",
+  );
+
+  /* --- 21. S127, as a walk rather than an absence ---------------- */
+
+  console.log(
+    "\n21. *** The coordinator raises against her own company and approves it *** [S127]",
+  );
+
+  // **A run-scoped coordinator, not the shared fixture account.** `S127` is
+  // about the ROLE — *she holds companies like any rep* `S9` — and giving the
+  // shared `coordinator@example.test` a company would be a lasting change to
+  // a fixture other scripts read: `verify:routes` §2 asserts that identity
+  // holds none, which is what makes `/projects/new` a `D53` 404 for her. This
+  // script keeps its rows `[12 §7]`, so that change would never wash out.
+  const [coordRole] = await db
+    .select()
+    .from(roles)
+    .where(eq(roles.nameEn, "Sales Coordinator"))
+    .limit(1);
+  if (!coordRole) {
+    console.error("Roles are not seeded. Run: npm run db:seed");
+    process.exit(1);
+  }
+  const [herUser] = await db
+    .insert(users)
+    .values({
+      name: `${stamp} Coordinator`,
+      email: `${stamp}-coord@example.test`,
+      roleId: coordRole.id,
+    })
+    .returning();
+  const herself: AuthSession = {
+    user: { ...herUser, role: coordRole },
+    realUser: { ...herUser, role: coordRole },
+    isImpersonating: false,
+    actor: { actorUserId: herUser.id, actingAsUserId: null },
+  };
+  check(
+    "she holds can_dispatch, which is what S127 is about [S7]",
+    herself.user.role.canDispatch === true,
+  );
+
+  // **"Her own" means a real membership**, not a company she merely reaches
+  // through `dispatchCompanyLookupFilter` — that filter lets her name any
+  // company at all `[18 §2]`, so naming one would prove nothing about holding
+  // one. `S9` is what puts a company on a coordinator's desk.
+  const [herCompany] = await db
+    .insert(companies)
+    .values({
+      name: `${stamp} Coordinator Co`,
+      nameNormalized: `${stamp}-coord`,
+      phone: `+9665${stamp.slice(-7)}4`,
+      countryId: saudiId,
+      createdBy: herUser.id,
+    })
+    .returning();
+  await db.insert(companyReps).values({
+    companyId: herCompany.id,
+    userId: herUser.id,
+    isPrimary: true,
+    origin: "self_registered",
+  });
+  check(
+    "…and holds a company like any rep [S9], [S127]",
+    (await canViewRecord(herself, "company", herCompany.id)) === true,
+  );
+
+  // **Four acts, one identity throughout.** Nothing in the code checks that
+  // the approver is not the raiser, and that absence is the rule — so it is
+  // walked rather than assumed. A four-eyes check added to approval later
+  // fails HERE, instead of quietly repealing `S127`.
+  const hers = await requestDispatch(herself, {
+    lines: linesOf("55.0000", "90.00"),
+    dispatchDate: "2026-09-29",
+    quotationThreadId: null,
+    companyId: herCompany.id,
+    userId: null,
+    projectId: null,
+  });
+  check(
+    "1. she raises it, against her own company [S127]",
+    hers.status === "draft" &&
+      hers.companyId === herCompany.id &&
+      hers.recordedByUserId === herUser.id,
+  );
+  check(
+    "2. it credits her, because she did not name anyone else [S108]",
+    hers.userId === herUser.id,
+  );
+  await submitDispatchRequest(herself, hers.id);
+  check(
+    "3. she submits it — the same person, the same request",
+    (await getDispatch(herself, hers.id))?.status === "submitted",
+  );
+  await approveDispatchRequest(herself, hers.id);
+  const herApproved = (await getDispatch(herself, hers.id))!;
+  check(
+    "*** 4. and she approves it herself — nothing blocks both acts *** [S127]",
+    herApproved.status === "approved" &&
+      herApproved.approvedByName === herUser.name,
+    `got ${herApproved.status}, approved by ${herApproved.approvedByName}`,
+  );
+  check(
+    "…and it credits her, like any other approved dispatch [S72], [S78]",
+    (await dispatchesInPeriod("2026-09-01", "2026-10-01")).some(
+      (row) => row.id === hers.id && row.userId === herUser.id,
+    ),
+  );
+
+  /* --- 22. Nothing unapproved counts, at the three readers §18's
+       loop cannot reach [S72] ------------------------------------- */
+
+  console.log(
+    "\n22. *** An unapproved request counts for NOTHING *** [S72], [S26], [S31]",
+  );
+
+  // §18's loop covers the list, the detail and `dispatchesInPeriod`. Three
+  // readers it cannot reach are asserted here, each by taking a figure, adding
+  // an unapproved request to the same subject, and taking it again. **The
+  // before-and-after is the assertion** — a fixed expected number would pass
+  // on a reader that was broken in both directions.
+  // `figureFor` is §14's own reader of `S26` — the same function, so the two
+  // sections cannot disagree about what the figure is.
+  const beforeCompany = await figureFor(company.id);
+  const beforeThread = (await listDispatchableThreads(coordinator)).find(
+    (row) => row.id === paidThread.id,
+  );
+  const beforeChain = (
+    await listDispatches(coordinator, {
+      threadId: paidThread.id,
+      status: "approved",
+    })
+  ).total;
+
+  const pending = await requestDispatch(repA, {
+    lines: linesOf("500.0000", "100.00"),
+    dispatchDate: "2026-09-30",
+    quotationThreadId: paidThread.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  await submitDispatchRequest(repA, pending.id);
+
+  const afterCompany = await figureFor(company.id);
+  check(
+    "*** S26's per-participant square metres do not move *** [S26], [S72]",
+    afterCompany === beforeCompany,
+    `${beforeCompany} then ${afterCompany}`,
+  );
+
+  const afterThread = (await listDispatchableThreads(coordinator)).find(
+    (row) => row.id === paidThread.id,
+  );
+  check(
+    "*** dispatched-so-far on the quotation does not move *** [S72], [S77]",
+    afterThread?.dispatchedSqm === beforeThread?.dispatchedSqm,
+    `${beforeThread?.dispatchedSqm} then ${afterThread?.dispatchedSqm}`,
+  );
+
+  check(
+    "*** and the chain's sixth node does not move *** [S72], [D27]",
+    (
+      await listDispatches(coordinator, {
+        threadId: paidThread.id,
+        status: "approved",
+      })
+    ).total === beforeChain,
+  );
+
+  // The other half of the same claim: approving it DOES move all three. A
+  // figure that never moves is not proof that this one is right.
+  await approveDispatchRequest(coordinator, pending.id);
+  check(
+    "…and approving it moves every one of them [S72]",
+    (await figureFor(company.id)) !== beforeCompany &&
+      (await listDispatchableThreads(coordinator)).find(
+        (row) => row.id === paidThread.id,
+      )?.dispatchedSqm !== beforeThread?.dispatchedSqm &&
+      (
+        await listDispatches(coordinator, {
+          threadId: paidThread.id,
+          status: "approved",
+        })
+      ).total ===
+        beforeChain + 1,
+  );
+
+  /* --- 23. S74's write-back fires at the APPROVAL ---------------- */
+
+  console.log(
+    "\n23. *** The project is written back when she approves, not when he asks *** [S74], [S72]",
+  );
+
+  // `S74`'s second branch, timed. The quotation has no project of its own
+  // `S50`, the rep names one on the request, and the quotation must NOT gain
+  // it until the request is approved — a project written onto a quotation by a
+  // request nobody approved would be a decision nobody made.
+  const [loneCompany] = await db
+    .insert(companies)
+    .values({
+      name: `${stamp} Writeback Co`,
+      nameNormalized: `${stamp}-wb`,
+      phone: `+9665${stamp.slice(-7)}5`,
+      countryId: saudiId,
+      createdBy: repA.user.id,
+    })
+    .returning();
+  await db.insert(companyReps).values({
+    companyId: loneCompany.id,
+    userId: repA.user.id,
+    isPrimary: true,
+    origin: "self_registered",
+  });
+  const [target] = await db
+    .insert(projects)
+    .values({
+      nameEn: `${stamp} Writeback Project`,
+      nameNormalized: `${stamp}-wb`,
+      ownerUserId: repA.user.id,
+      createdBy: repA.user.id,
+    })
+    .returning();
+
+  const projectless = await createQuotationThread(
+    repA,
+    { projectId: null, companyId: loneCompany.id, contactId: null },
+    version,
+    [line],
+    [],
+  );
+  await issueVersion(coordinator, projectless.id, {
+    smacReference: `${stamp}-wb`,
+    verification: "unverified",
+  });
+  await acceptThread(coordinator, projectless.id);
+  await confirmPayment(repA, projectless.id, "2026-08-01");
+
+  await refuses(
+    "a projectless quotation refuses a request that names no project [S74]",
+    "dispatches.errors.projectRequired",
+    () =>
+      requestDispatch(repA, {
+        lines: linesOf("6.0000", "60.00"),
+        dispatchDate: "2026-09-30",
+        quotationThreadId: projectless.id,
+        companyId: null,
+        userId: null,
+        projectId: null,
+      }),
+  );
+
+  const writeback = await requestDispatch(repA, {
+    lines: linesOf("6.0000", "60.00"),
+    dispatchDate: "2026-09-30",
+    quotationThreadId: projectless.id,
+    companyId: null,
+    userId: null,
+    projectId: target.id,
+  });
+  check(
+    "*** the request carries the project and the QUOTATION does not, yet *** [S74]",
+    writeback.projectId === target.id &&
+      (await getQuotationThread(repA, projectless.id))?.projectId === null,
+  );
+  check(
+    "…and the company has not joined the project either [S27], [S74]",
+    !(await listProjectCompanies(repA, target.id)).some(
+      (row) => row.companyId === loneCompany.id,
+    ),
+  );
+
+  await submitDispatchRequest(repA, writeback.id);
+  check(
+    "submitting still writes nothing back — asking is not deciding [S74]",
+    (await getQuotationThread(repA, projectless.id))?.projectId === null,
+  );
+
+  await approveDispatchRequest(coordinator, writeback.id);
+  check(
+    "*** approving writes the project onto the quotation *** [S74], [S72]",
+    (await getQuotationThread(repA, projectless.id))?.projectId === target.id,
+  );
+  check(
+    "*** …and adds its company to that project *** [S74], [S27]",
+    (await listProjectCompanies(repA, target.id)).some(
+      (row) => row.companyId === loneCompany.id,
+    ),
+  );
+
+  // A SECOND dispatch on the same thread must not fail on its predecessor's
+  // write-back. The thread already carries the project the request names, so
+  // there is nothing to write and nothing to refuse.
+  const second = await approvedDispatch(coordinator, {
+    lines: linesOf("2.0000", "60.00"),
+    dispatchDate: "2026-10-01",
+    quotationThreadId: projectless.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  check(
+    "*** a second dispatch does not trip on the first one's write-back *** [S74]",
+    second.projectId === target.id && second.status === "approved",
+    `got project ${second.projectId}, status ${second.status}`,
+  );
+
   /*
-   * **The invariant, not the fixture.** Every reader of a dispatch's square
-   * metres derives them from the same lines, so none of them can disagree —
-   * and the claim is made over EVERY dispatch in the database rather than the
-   * ones this run wrote. `verify:schema25` §14 makes the structural half:
-   * there is no `sqm` column left for a second answer to live in.
+   * **The invariant, not the fixture**, and since `S72` it is two invariants
+   * rather than one.
+   *
+   *  1. `S116` — every reader that SHOWS a dispatch derives its square metres
+   *     from the same lines, so none of them can disagree.
+   *  2. `S72` — every reader that COUNTS one reads only the approved. *An
+   *     approved dispatch is the only event that credits a target — not the
+   *     request.* An unapproved request must be **absent** from those readers,
+   *     never present as a zero: a zero is a figure, and a figure that moves
+   *     when somebody asks for something is the defect this rule exists to
+   *     prevent.
+   *
+   * Both are claimed over EVERY dispatch in the database rather than the ones
+   * this run wrote. `verify:schema25` §14 makes `S116`'s structural half —
+   * there is no `sqm` column left for a second answer to live in — and §15
+   * makes `S72`'s.
    */
   const everyDispatch = await db
-    .select({ id: dispatchesTable.id })
+    .select({ id: dispatchesTable.id, status: dispatchesTable.status })
     .from(dispatchesTable);
-  const listed = new Map<string, string>();
-  for (let page = 1; ; page += 1) {
-    const { rows, total } = await listDispatches(coordinator, { page });
-    for (const row of rows) listed.set(row.id, row.sqm);
-    if (listed.size >= total || rows.length === 0) break;
+
+  /** Walk one scope of the list to exhaustion. */
+  async function listedSqm(
+    status?: "draft" | "submitted" | "approved" | "refused",
+  ): Promise<Map<string, string>> {
+    const seen = new Map<string, string>();
+    for (let page = 1; ; page += 1) {
+      const { rows, total } = await listDispatches(coordinator, {
+        page,
+        status,
+      });
+      for (const row of rows) seen.set(row.id, row.sqm);
+      if (seen.size >= total || rows.length === 0) break;
+    }
+    return seen;
   }
-  // `S85`'s reader too, and deliberately: it is the figure a rep is measured
-  // on, and it is the one whose query joins differently from the other two.
-  // A derived figure has to be asserted at EVERY reader — the first version of
-  // this section checked only the two that happened to join a second table,
-  // and a third caller that did not was silently answering zero.
+
+  // The default scope is the WORKING list `S122`: everything but the archive.
+  const listed = await listedSqm();
+  const archived = await listedSqm("refused");
+  // `S85`'s reader, and deliberately: it is the figure a rep is measured on,
+  // and its query joins differently from the other two. A derived figure has to
+  // be asserted at EVERY reader — the first version of this section checked
+  // only the two that happened to join a second table, and a third caller that
+  // did not was silently answering zero.
   const measured = new Map(
     (await dispatchesInPeriod("2000-01-01", "2100-01-01")).map((row) => [
       row.id,
       row.sqm,
     ]),
   );
+
   let disagreeing = 0;
+  let counted = 0;
+  let miscounted = 0;
+  let leaked = 0;
   for (const row of everyDispatch) {
     const fromLines = await sqmOf(row.id);
-    const fromList = listed.get(row.id);
     const fromDetail = (await getDispatch(coordinator, row.id))?.sqm;
+    // `S122` — a refused request is out of the working list and in the
+    // archive. Which list to ask is part of the claim.
+    const fromList = (row.status === "refused" ? archived : listed).get(row.id);
+    if (fromList !== fromLines || fromDetail !== fromLines) disagreeing += 1;
+
     const fromPeriod = measured.get(row.id);
-    if (
-      fromList !== fromLines ||
-      fromDetail !== fromLines ||
-      fromPeriod !== fromLines
-    ) {
-      disagreeing += 1;
+    if (row.status === "approved") {
+      counted += 1;
+      if (fromPeriod !== fromLines) miscounted += 1;
+    } else if (fromPeriod !== undefined) {
+      leaked += 1;
     }
   }
+
   check(
     "*** no dispatch's figure disagrees with its lines, on any reader *** [S116]",
     disagreeing === 0,
     `${disagreeing} of ${everyDispatch.length} disagree`,
+  );
+  console.log(
+    `  --    ${counted} approved of ${everyDispatch.length}, ${everyDispatch.length - counted} not`,
+  );
+  check(
+    "every approved dispatch is counted, at its own figure [S72], [S85]",
+    miscounted === 0,
+    `${miscounted} disagree`,
+  );
+  check(
+    "*** and NOTHING unapproved reaches the figure at all *** [S72]",
+    leaked === 0,
+    `${leaked} unapproved request(s) are being counted`,
   );
 
   // Nothing is cleaned up: FACET does not delete history `[12 §7]`, and this
@@ -1978,7 +2776,9 @@ async function main(): Promise<void> {
 main()
   .then(async () => {
     console.log(
-      failures === 0 ? "\nAll checks passed." : `\n${failures} CHECK(S) FAILED.`,
+      failures === 0
+        ? "\nAll checks passed."
+        : `\n${failures} CHECK(S) FAILED.`,
     );
     await closeDatabase();
     process.exit(failures === 0 ? 0 : 1);

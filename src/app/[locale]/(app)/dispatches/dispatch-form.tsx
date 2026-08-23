@@ -85,6 +85,7 @@ export function DispatchForm({
   threads,
   companies,
   reps,
+  canNameRep,
   projects,
   products,
   locale,
@@ -96,6 +97,16 @@ export function DispatchForm({
   threads: ThreadOption[];
   companies: CompanyOption[];
   reps: RepOption[];
+  /**
+   * `S108` — whether to ask who the dispatch credits at all. A rep raising
+   * their own request is not asked: the system knows who they are, and the
+   * server derives it. Only a `can_dispatch` holder may name somebody else,
+   * which is `S123`'s *"created for a rep by the coordinator"*.
+   *
+   * Presentation only. `requestDispatch` refuses a named rep from anyone
+   * without the flag, so this hides a field rather than being the rule.
+   */
+  canNameRep: boolean;
   projects: ProjectOption[];
   products: ProductOptions;
   locale: string;
@@ -134,7 +145,9 @@ export function DispatchForm({
       actions={
         <>
           <Button type="submit" disabled={pending}>
-            {pending ? t("common.saving") : t("dispatches.actions.record")}
+            {/* `S72` — the act is a REQUEST. Nothing has gone out yet, and the
+                button that said "record" said the opposite. */}
+            {pending ? t("common.saving") : t("dispatches.actions.request")}
           </Button>
           <Button asChild type="button" variant="ghost">
             <Link href="/dispatches">{t("common.cancel")}</Link>
@@ -250,24 +263,28 @@ export function DispatchForm({
             </SelectField>
           </FormField>
 
-          <FormField
-            name="userId"
-            label={t("dispatches.fields.rep")}
-            error={errors.userId}
-            required
-          >
-            <SelectField
+          {/* `S108` — asked only of someone who may name another rep. */}
+          {canNameRep ? (
+            <FormField
               name="userId"
-              placeholder={t("dispatches.fields.repPlaceholder")}
-              invalid={!!errors.userId}
+              label={t("dispatches.fields.rep")}
+              error={errors.userId}
+              hint={t("dispatches.detail.repForHint")}
+              required
             >
-              {reps.map((rep) => (
-                <option key={rep.id} value={rep.id}>
-                  {rep.name}
-                </option>
-              ))}
-            </SelectField>
-          </FormField>
+              <SelectField
+                name="userId"
+                placeholder={t("dispatches.fields.repPlaceholder")}
+                invalid={!!errors.userId}
+              >
+                {reps.map((rep) => (
+                  <option key={rep.id} value={rep.id}>
+                    {rep.name}
+                  </option>
+                ))}
+              </SelectField>
+            </FormField>
+          ) : null}
         </>
       )}
 
@@ -345,6 +362,183 @@ export function DispatchForm({
           dir="ltr"
           className="text-start"
           defaultValue={state.values?.dispatchDate ?? today}
+          aria-invalid={!!errors.dispatchDate || undefined}
+        />
+      </FormField>
+    </FormShell>
+  );
+}
+
+/**
+ * Editing a request `S125` `S62` — the rep's while it is a draft, the
+ * coordinator's once it is submitted.
+ *
+ * **A separate component rather than a third mode on `DispatchForm`.** The two
+ * screens ask different questions: raising one chooses a quotation and what it
+ * carries, editing one changes what is already there and cannot change which
+ * quotation it is against — `S122` says a request nobody wants is refused, not
+ * repointed. Branching the request form three ways to express that would have
+ * hidden the difference rather than stating it.
+ *
+ * What is missing here is the point: no quotation picker, no company, no rep.
+ * They are shown as facts on the screen above and cannot be edited.
+ */
+export function DispatchEditForm({
+  action,
+  lines,
+  dispatchDate,
+  projectLabel,
+  chooseProject,
+  projectId,
+  projects,
+  products,
+  locale,
+  dispatchId,
+}: {
+  action: Action;
+  /** `S116` — the request's lines as they stand, to be kept or changed. */
+  lines: LineDefaults[];
+  dispatchDate: string;
+  /** `S74` — the project it names, when there is one to show. */
+  projectLabel: string | null;
+  /**
+   * `S74` — whether the project is a CHOICE here. True only when the request is
+   * against a quotation that has none of its own `S50`: then whoever is editing
+   * picks, from the projects they hold, and the write-back happens at approval.
+   */
+  chooseProject: boolean;
+  projectId: string | null;
+  projects: ProjectOption[];
+  products: ProductOptions;
+  locale: string;
+  dispatchId: string;
+}) {
+  const t = useTranslations();
+  const [state, formAction, pending] = useActionState(action, emptyFormState);
+  const errors = state.fieldErrors ?? {};
+  // Both directions are real: a line may be added — *a dispatch may add a
+  // product the quotation never had* `S116` — and one may be dropped.
+  const [rowCount, setRowCount] = useState(Math.max(1, lines.length));
+  const lineDefaults = Array.from(
+    { length: rowCount },
+    (_, index): LineDefaults | undefined => lines[index],
+  );
+
+  return (
+    <FormShell
+      action={formAction}
+      error={state.error}
+      wide
+      actions={
+        <>
+          <Button type="submit" disabled={pending}>
+            {pending ? t("common.saving") : t("common.save")}
+          </Button>
+          <Button asChild type="button" variant="ghost">
+            <Link href={`/dispatches/${dispatchId}`}>{t("common.cancel")}</Link>
+          </Button>
+        </>
+      }
+    >
+      {/* `S74` — shown when the quotation carries one, chosen when it does not
+          `S50`. Never both, and never neither on a linked request. */}
+      {projectLabel !== null && !chooseProject ? (
+        <FormField
+          name="project"
+          label={t("dispatches.fields.project")}
+          hint={t("dispatches.detail.projectFromQuotation")}
+        >
+          <p id="project" dir="auto" className="text-sm font-medium">
+            {projectLabel}
+          </p>
+        </FormField>
+      ) : null}
+
+      {chooseProject ? (
+        <FormField
+          name="projectId"
+          label={t("dispatches.fields.project")}
+          error={errors.projectId}
+          hint={t("dispatches.detail.projectWriteBack")}
+          required
+        >
+          <SelectField
+            name="projectId"
+            defaultValue={state.values?.projectId ?? projectId ?? ""}
+            placeholder={t("dispatches.fields.projectPlaceholder")}
+            invalid={!!errors.projectId}
+          >
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.label}
+              </option>
+            ))}
+          </SelectField>
+        </FormField>
+      ) : null}
+
+      {/* `S116` — the same rows the request form writes, so an edit and a
+          raise cannot disagree about what a dispatch line is. No square-metre
+          field: the figure is generated from these. */}
+      <fieldset className="flex flex-col gap-4 rounded-lg border p-4">
+        <legend className="px-1 text-sm font-medium">
+          {t("dispatches.detail.lines")}
+        </legend>
+
+        <p className="text-muted-foreground text-start text-sm">
+          {t("dispatches.detail.linesEdit")}
+        </p>
+
+        {lineDefaults.map((defaults, index) => (
+          <div
+            key={`edit-${index}`}
+            className="border-t pt-4 first:border-t-0 first:pt-0"
+          >
+            <LineFields
+              options={products}
+              locale={locale}
+              idPrefix={`line-${index}`}
+              defaults={defaults}
+              errors={errors}
+            />
+          </div>
+        ))}
+
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            onClick={() => setRowCount((count) => count + 1)}
+          >
+            {t("dispatches.detail.addLine")}
+          </Button>
+          {rowCount > 1 ? (
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              onClick={() => setRowCount((count) => Math.max(1, count - 1))}
+            >
+              {t("common.remove")}
+            </Button>
+          ) : null}
+        </div>
+      </fieldset>
+
+      <FormField
+        name="dispatchDate"
+        label={t("dispatches.fields.dispatchDate")}
+        error={errors.dispatchDate}
+        required
+      >
+        <Input
+          id="dispatchDate"
+          name="dispatchDate"
+          type="date"
+          dir="ltr"
+          className="text-start"
+          defaultValue={state.values?.dispatchDate ?? dispatchDate}
           aria-invalid={!!errors.dispatchDate || undefined}
         />
       </FormField>

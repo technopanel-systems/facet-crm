@@ -100,6 +100,8 @@ import {
   users,
 } from "@/db/schema";
 import { withAudit } from "@/lib/audit";
+/** `S72`'s one predicate `[dispatches.ts]` — a project moves on an approval. */
+import { approvedDispatches } from "@/lib/dispatches";
 import {
   canViewRecord,
   ownProjectsFilter,
@@ -588,6 +590,11 @@ async function projectStageUnchanged(
       quotationThreads,
       eq(quotationThreads.id, dispatches.quotationThreadId),
     )
+    // `S72` — a project has moved when something was APPROVED against it. A
+    // request sitting with the coordinator is the project waiting, not the
+    // project moving, and counting it would take a stalled project off this
+    // list on the day a rep asked for something.
+    .where(approvedDispatches())
     .groupBy(quotationThreads.projectId)
     .as("dispatch_events");
 

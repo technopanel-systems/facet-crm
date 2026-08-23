@@ -97,8 +97,15 @@ export default async function ProjectDetailPage({
         paymentConfirmedAt: only.paymentConfirmedAt,
         // The sixth node, made real. `listDispatches` already filters by
         // thread, and anyone who can see the thread can see its dispatches.
+        // **Approved only** `S72` — the node says goods have moved, and a
+        // request waiting on the coordinator has moved none.
         hasDispatch:
-          (await listDispatches(session, { threadId: only.id })).total > 0,
+          (
+            await listDispatches(session, {
+              threadId: only.id,
+              status: "approved",
+            })
+          ).total > 0,
       })
     : null;
 

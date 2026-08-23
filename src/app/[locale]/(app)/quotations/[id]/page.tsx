@@ -87,7 +87,11 @@ export default async function QuotationDetailPage({
       // Safe by construction — `visibleDispatchesFilter`'s thread-cascade term
       // means whoever can see this thread can see the dispatches against it,
       // so the node cannot read hollow to someone who ought to see it filled.
-      listDispatches(session, { threadId: id }),
+      //
+      // **`status: "approved"`** `S72`. The sixth node means goods have moved,
+      // and a request sitting with the coordinator has moved nothing — without
+      // this scope a rep would advance their own chain by asking.
+      listDispatches(session, { threadId: id, status: "approved" }),
     ]);
 
   // `25 §9` — one thread per record. A quotation has no derived events of its

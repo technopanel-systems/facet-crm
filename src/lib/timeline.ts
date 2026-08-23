@@ -92,6 +92,7 @@ import {
   visibleRepReportsFilter,
   type AuthSession,
 } from "@/lib/authz";
+import { approvedDispatches } from "@/lib/dispatches";
 import type { CommentRecordType } from "@/lib/enums";
 
 /**
@@ -488,6 +489,11 @@ async function dispatchedEvents(
     .where(
       and(
         visibleDispatchesFilter(session),
+        // `S41`'s word is **dispatched**, and `S72` says what that means now:
+        // the approval, not the asking. A request on a company's timeline
+        // would read as goods having moved. What happened to a refused one is
+        // the archive's to say `S122`, and `S128`'s to tell the rep.
+        approvedDispatches(),
         scope.companyId ? eq(dispatches.companyId, scope.companyId) : undefined,
         // A direct dispatch names no project today, so it belongs to the
         // company's timeline and to no project's `[07 C6]`, `S75`.
