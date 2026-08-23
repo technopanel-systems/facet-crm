@@ -779,6 +779,17 @@ after a handover, which is not decided. A dispatch is the one kind where both
 sides are immutable — S103 keeps past dispatches where they are — so its figure
 is permanent, as S120's derived half is.
 
+**S131.** A comment is visible to **whoever can see the record it hangs on**. A
+comment is not a record with a visibility of its own — it follows its anchor,
+the way a report's shared half does (S38).
+
+**S76 is the one exception, and it does not carry the conversation.** The
+coordinator sees a project and a contact because a dispatch names both; she does
+not see what the reps say to each other on them. On those two records her sight
+stops at the record. Everywhere else she reads the comments of records she
+already holds in her own right — every quotation thread (S62) and every dispatch
+(S72) — and a company's conversation was never hers and is not now.
+
 ---
 
 ## 15. The work this implies

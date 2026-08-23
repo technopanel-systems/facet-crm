@@ -527,31 +527,49 @@ export function visibleCompaniesFilter(session: AuthSession): SQL | undefined {
 }
 
 /**
- * Contacts: whatever their company resolves to `[14 §1]`. The terms are the
- * company rule with `contacts.company_id` substituted for `companies.id`.
+ * Contacts a viewer HOLDS — whatever their company resolves to `[14 §1]`, and
+ * nothing else. The terms are the company rule with `contacts.company_id`
+ * substituted for `companies.id`.
  *
  * `record_type` has a `contact` value and `record_shares` could carry one, but
  * nothing writes such a row and no document asks for per-contact sharing, so
  * it is not consulted here. Wiring it up on speculation is what produced v1's
  * dead approval gate.
  *
- * **`S76`'s exception is here too**, on the same terms as
- * `visibleProjectsFilter`: the coordinator sees contacts because a dispatch is
- * made against one. Note what it does NOT grant — `S76` names projects and
- * contacts, not companies, so a coordinator reads a contact while its company
- * stays closed to them `[18 §2]`, and the contact screens render that company
- * as plain text. Sight only, again: `canViewRecord` is not widened, so
- * `updateContact` still refuses.
+ * **This is not the read filter.** `visibleContactsFilter` below is these terms
+ * plus `S76`'s exception, and the pair exists for the reason `ownProjectsFilter`
+ * and `visibleProjectsFilter` exist `[:574]`: whose contact is this, versus who
+ * may read it. `S131` asks the first question of a comment, so this has a reader
+ * of its own and is not a spare half.
  */
-export function visibleContactsFilter(session: AuthSession): SQL | undefined {
+export function ownContactsFilter(session: AuthSession): SQL | undefined {
   if (session.user.role.seesAllReps) return undefined;
-  // `S76`, term for term the project exception above.
-  if (session.user.role.canDispatch) return undefined;
   const userId = session.user.id;
   return or(
     activeMembershipExists(contacts.companyId, userId),
     activeShareExists("company", contacts.companyId, userId),
   );
+}
+
+/**
+ * Contacts a viewer may READ — `ownContactsFilter`'s terms, plus `S76`.
+ *
+ * **`S76`'s exception is here**, on the same terms as `visibleProjectsFilter`:
+ * the coordinator sees contacts because a dispatch is made against one. Note
+ * what it does NOT grant — `S76` names projects and contacts, not companies, so
+ * a coordinator reads a contact while its company stays closed to them
+ * `[18 §2]`, and the contact screens render that company as plain text. Sight
+ * only, again: `canViewRecord` is not widened, so `updateContact` still refuses.
+ *
+ * **And sight of the record is all it is** `S131`. The conversation on a contact
+ * is not part of what `S76` opened, so `visibleCommentsFilter` composes
+ * `ownContactsFilter` rather than this one — the same split the project pair
+ * makes, for the same rule.
+ */
+export function visibleContactsFilter(session: AuthSession): SQL | undefined {
+  // `S76`, checked before falling through to the terms above.
+  if (session.user.role.canDispatch) return undefined;
+  return ownContactsFilter(session);
 }
 
 /**
@@ -567,9 +585,10 @@ export function visibleContactsFilter(session: AuthSession): SQL | undefined {
  * **This is not the read filter.** `visibleProjectsFilter` below is these terms
  * plus `S76`'s exception, and the two answer different questions: whose work is
  * this, versus who may read it. Use this one wherever the answer decides WORK —
- * the waiting list, and a picker whose write path is `canViewRecord`. Folding
- * the two back together reads as removing duplication and silently puts every
- * rep's project on the coordinator's queue.
+ * the waiting list, a picker whose write path is `canViewRecord`, and the
+ * project's conversation `S131`. Folding the two back together reads as
+ * removing duplication and silently puts every rep's project on the
+ * coordinator's queue, and every rep's project talk in front of her.
  */
 export function ownProjectsFilter(session: AuthSession): SQL | undefined {
   if (session.user.role.seesAllReps) return undefined;
@@ -597,6 +616,11 @@ export function ownProjectsFilter(session: AuthSession): SQL | undefined {
  * deliberately NOT widened to match. That divergence is what makes this
  * read-only without a single new gate, and project and contact are the only
  * records where the two disagree.
+ *
+ * **And sight of the record is all it is** `S131`. `S76` opened the project
+ * because a dispatch names one; it opened nothing anybody said about it. So
+ * `visibleCommentsFilter` composes `ownProjectsFilter` and not this — the one
+ * reader of these two that must ask the narrower question.
  */
 export function visibleProjectsFilter(session: AuthSession): SQL | undefined {
   // `S76`, checked before falling through to `S30`'s terms.
@@ -835,27 +859,42 @@ export function readableNoteFilter(session: AuthSession): SQL | undefined {
 }
 
 /**
- * Comments: whatever the record they hang on resolves to `[25 §10]`.
+ * Comments: whatever the record they hang on resolves to `S131`.
  *
- * *"Manager, coordinator, the owning rep, and any shared rep. The same rule
- * reports follow (`20 §10`), for the same reason."* So this states **no new
- * rule**: it is the five filters above, composed, one branch per record type
- * the `comments_record_type` CHECK admits. A sixth branch would mean a sixth
- * kind of commentable record, and the CHECK refuses one until somebody decides.
+ * A comment is not a record with a visibility of its own — it follows its
+ * anchor, the way a report's shared half does `S38`. So this builds no
+ * predicate: it is the filters above, composed, one branch per record type the
+ * `comments_record_type` CHECK admits. A sixth branch would mean a sixth kind
+ * of commentable record, and the CHECK refuses one until somebody decides.
  *
- * The branch shape is `visibleDispatchesFilter`'s own `[:579-592]`: an `exists`
- * over the anchor table, correlated on `comments.record_id`, carrying that
- * table's filter. Two consequences follow from reusing them verbatim, and both
- * are intended rather than discovered:
+ * The branch shape is `visibleDispatchesFilter`'s own: an `exists` over the
+ * anchor table, correlated on `comments.record_id`, carrying that table's
+ * filter.
  *
- *  - **`can_approve_quotation` reads every quotation conversation** `[16 §10]`
- *    and **`can_dispatch` every dispatch conversation** `[18 §2]`. Their
- *    filters return `undefined`, so `and(eq(…), undefined)` degrades to *"the
- *    record exists"*. That is what `25 §10` asks for — the coordinator is on
- *    the thread, and the talk about it is theirs to read.
- *  - **A rep removed from a company loses sight of comments they wrote
- *    themselves**, exactly as they lose their own reports `[:646-650]`. The
- *    conversation belonged to the record `[20 §1]`.
+ * **Two branches deliberately take the HOLDS filter, not the READ one.**
+ * `ownProjectsFilter` and `ownContactsFilter`, never `visibleProjectsFilter`
+ * and `visibleContactsFilter`. This is `S131`'s exception and the reason the
+ * pairs exist at all: `S76` gave the coordinator a project and a contact
+ * because a dispatch names both, and gave her no part of what the reps say to
+ * each other on them. Composing the read filters here is what put every rep's
+ * project and contact conversation in front of her, silently — the read filters
+ * return `undefined` for `can_dispatch`, so `and(eq(…), undefined)` degraded the
+ * branch to *"the record exists"*. If you are about to swap one back in to
+ * "fix" a conversation that will not appear, it is not appearing because `S131`
+ * says it must not.
+ *
+ * **The other three branches keep their own filters, and that is not the same
+ * grant.** `can_approve_quotation` reads every quotation conversation
+ * `[16 §10]` and `can_dispatch` every dispatch conversation `[18 §2]`, by the
+ * same degrade — but those are records the coordinator holds in her own right
+ * `S62`, `S72`, so the conversation on them is hers to read. `S131` says so
+ * outright. A company's was never hers: `visibleCompaniesFilter` carries no
+ * role exception, and the asymmetry between that branch and the two above it is
+ * the whole finding.
+ *
+ * **A rep removed from a company loses sight of comments they wrote
+ * themselves**, exactly as they lose their own reports. The conversation
+ * belonged to the record `[20 §1]`.
  *
  * **The sees-everything case is the early return, never a branch.** Drizzle's
  * `or()` *drops* an `undefined` member rather than treating it as true, so a
@@ -863,13 +902,13 @@ export function readableNoteFilter(session: AuthSession): SQL | undefined {
  * instead of widening it. Only `and()` is safe to feed one, which is what each
  * branch does inside its own `exists`.
  *
- * **One caller, deliberately: `commentEvents` in global mode** — the `/activity`
- * read, where no anchor has been resolved. A detail screen has already proved
- * visibility by loading the record through that record's own filter, so it
- * reads comments with a plain `record_type`/`record_id` equality on
- * `comments_record_idx`. Asking a second time would be five correlated
- * subqueries per row answering a settled question, and a second place the rule
- * could drift.
+ * **Every read of a comment carries this, anchored or not** — `listComments`,
+ * `getComment`, `commentEvents`, and the body of a mention notification. An
+ * anchored read pins the record type by equality, so four branches are
+ * contradicted and never execute; the cost is one `exists` over one row, and
+ * the benefit is that `S131` is a property of the reads rather than of their
+ * callers. `scripts/verify-comments.ts` §2 disproved the callers-know-best
+ * version in one line.
  *
  * Like every builder here it targets `comments` **unaliased** — it renders
  * `"comments"."record_type"` literally, so a caller that aliases the table
@@ -880,8 +919,10 @@ export function visibleCommentsFilter(session: AuthSession): SQL | undefined {
 
   return or(
     commentsOn("company", companies, companies.id, visibleCompaniesFilter(session)),
-    commentsOn("contact", contacts, contacts.id, visibleContactsFilter(session)),
-    commentsOn("project", projects, projects.id, visibleProjectsFilter(session)),
+    // `S131` — the HOLDS filters. `S76`'s sight of the record stops at the
+    // record, and these two branches are where that is enforced.
+    commentsOn("contact", contacts, contacts.id, ownContactsFilter(session)),
+    commentsOn("project", projects, projects.id, ownProjectsFilter(session)),
     commentsOn(
       "quotation_thread",
       quotationThreads,
@@ -899,7 +940,9 @@ export function visibleCommentsFilter(session: AuthSession): SQL | undefined {
 
 /**
  * One branch of `visibleCommentsFilter`: comments of this record type, whose
- * anchor row passes that anchor's own filter.
+ * anchor row passes the filter that branch was handed. Which filter that is, is
+ * the caller's decision and `S131`'s — three branches hand their anchor's read
+ * filter, two hand the narrower HOLDS one.
  *
  * `and(x, undefined)` is `x` in Drizzle, so an identity that sees every record
  * of the kind degrades to *"a row with that id exists"* — which is the correct

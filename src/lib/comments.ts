@@ -20,10 +20,13 @@
  * `[20 §13]`. If you are about to add a permission flag here, the answer is
  * that the question needs no flag — visibility is the whole rule.
  *
- * **Visibility follows the record** `[25 §10]`: manager, coordinator, the
- * owning rep and any shared rep — the same rule reports follow `[20 §10]`. It
- * is stated once, in `visibleCommentsFilter` in `authz.ts`, as the five
- * existing filters composed. Nothing here builds a predicate.
+ * **Visibility follows the record** `S131`: whoever can see the record can see
+ * what was said on it — the same rule a report's shared half follows `S38`. It
+ * is stated once, in `visibleCommentsFilter` in `authz.ts`, as the existing
+ * filters composed. Nothing here builds a predicate. Note the one exception it
+ * encodes: `S76` gave the coordinator a project and a contact, and gave her no
+ * part of the conversation on either, so those two branches compose the HOLDS
+ * filter rather than the read one.
  *
  * **Every read carries the filter**, anchored or not. An anchored read pins the
  * record type by equality, so four of the filter's five branches are
@@ -65,7 +68,6 @@ import {
 } from "@/db/schema";
 import { withAudit, type AuditEntry } from "@/lib/audit";
 import {
-  canOpenRecord,
   canViewRecord,
   visibleCommentsFilter,
   type AuthSession,
@@ -148,7 +150,14 @@ export async function listComments(
   return withMentions(rows);
 }
 
-/** One comment, for the edit screen. Null when it is not this viewer's to see. */
+/**
+ * One comment, for the edit screen. Null when it is not this viewer's to see.
+ *
+ * **The same predicate `listComments` carries**, not a second statement of the
+ * rule. It used to ask `canOpenRecord`, which since `S76` answers a different
+ * question — whether the coordinator may open the RECORD — and so left this
+ * reader wide where `S131` closed the filter. One `where`, one rule, one source.
+ */
 export async function getComment(
   session: AuthSession,
   id: string,
@@ -166,16 +175,9 @@ export async function getComment(
     })
     .from(comments)
     .innerJoin(users, eq(users.id, comments.authorUserId))
-    .where(eq(comments.id, id))
+    .where(and(eq(comments.id, id), visibleCommentsFilter(session)))
     .limit(1);
   if (!row) return null;
-
-  const recordType = row.recordType as CommentRecordType;
-  // A read, so `canOpenRecord` `S76`: a comment follows its record `[25 §10]`,
-  // and the coordinator now reads the projects and contacts they may not write
-  // to. Editing is author-only, checked in `updateComment` and again on the
-  // edit screen, so a wider read grants no wider write.
-  if (!(await canOpenRecord(session, recordType, row.recordId))) return null;
 
   const [decorated] = await withMentions([row]);
   return decorated ?? null;
@@ -288,8 +290,9 @@ export async function insertComment(
  * **A tag on somebody who cannot see the record still notifies them.** `25 §11`
  * attaches no condition to it — *"Tagging a person raises a notification"* — and
  * a gate here would be business logic no document states. Nothing leaks: a
- * notification has no body column, and `mentionPayload` withholds the body, the
- * name and the link unless `canOpenRecord` passes at the moment it is read.
+ * notification has no body column, and `mentionPayload` withholds the link
+ * unless `canOpenRecord` passes at the moment it is read, and the body unless
+ * `visibleCommentsFilter` does `S131`.
  *
  * The notification is raised **anchorless**, which is not cosmetic — see the
  * seed row. Tagging yourself raises nothing: you know.
@@ -344,11 +347,13 @@ async function addMentions(
  * state for lists, which is exactly what it exists for.
  *
  * **Read and act parted company at `S76`**, and this stayed on act. A
- * coordinator reads every project and contact and posts on neither: `S62` lists
- * what they may do and commenting on a customer's project is not on it, so
- * opening this would be inventing a rule inside a visibility slice. The
+ * coordinator sees every project and contact and posts on neither: `S62` lists
+ * what they may do and commenting on a customer's project is not on it. The
  * composer is not rendered for them either `[projects/[id]/page.tsx]`, so the
- * refusal is never reached from a screen.
+ * refusal is never reached from a screen. `S131` closed the other half of the
+ * same asymmetry — she no longer reads the conversation she was never able to
+ * join — so the two gates now agree about a comment even where they disagree
+ * about the record.
  */
 export async function addComment(
   session: AuthSession,

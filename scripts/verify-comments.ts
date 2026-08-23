@@ -11,8 +11,10 @@
  *
  *   1. All five record types take a comment, and the database refuses a sixth
  *      `[25 §9]` — asserted by CONSTRAINT NAME, not by "it threw".
- *   2. Visibility follows the record `[25 §10]`, in both directions. The
- *      negative half matters most.
+ *   2. Visibility follows the record `S131`, in both directions. The negative
+ *      half matters most — including `S76`'s exception, which gives the
+ *      coordinator the project and the contact and none of the conversation on
+ *      either, at all three readers of that rule.
  *   3. Editable by the author, never deleted `[25 §12]`.
  *   4. A mention raises `mention.received`, act-now and NOT persistent
  *      `[25 §11]`, `[21 §4]` — and TWO mentions of the same person on the same
@@ -68,7 +70,7 @@ import {
   roles,
   users,
 } from "@/db/schema";
-import { type AuthSession } from "@/lib/authz";
+import { canOpenRecord, type AuthSession } from "@/lib/authz";
 import {
   addComment,
   getComment,
@@ -388,6 +390,9 @@ async function main(): Promise<void> {
     { type: "dispatch" as const, id: dispatch.id },
   ];
 
+  // Kept by anchor: §2 reads two of them back through `getComment`, which is a
+  // second reader of the same rule and had to be narrowed with the filter.
+  const commentIds = new Map<string, string>();
   for (const anchor of anchors) {
     const created = await addComment(repA, {
       recordType: anchor.type,
@@ -395,6 +400,7 @@ async function main(): Promise<void> {
       body: `${stamp} a note on a ${anchor.type}`,
       mentions: [],
     });
+    commentIds.set(anchor.type, created.id);
     check(
       `a ${anchor.type} takes a comment [25 §9]`,
       created.recordType === anchor.type && created.recordId === anchor.id,
@@ -511,6 +517,103 @@ async function main(): Promise<void> {
       (event) =>
         event.kind === "comment" && event.companyId === company.id,
     ),
+  );
+
+  /* `S131` — her sight of the record stops at the record.
+   *
+   * The finding `AUDIT 1 F2` raised: `visibleCommentsFilter` composed each
+   * anchor's READ filter, and `S76` had widened two of those to `undefined` for
+   * `can_dispatch`, so both branches degraded to *"the record exists"* and the
+   * coordinator read every rep's project and contact conversation. Company
+   * comments stayed shut — `visibleCompaniesFilter` carries no role exception —
+   * which is how the asymmetry showed rather than reading as one uniform grant.
+   *
+   * Both halves, on what the DATA LAYER returns. A narrowing asserted only on
+   * the closed side proves nothing about who is left holding the record. */
+  check(
+    "the coordinator can still OPEN the project and the contact [S76]",
+    (await canOpenRecord(coordinator, "project", project.id)) &&
+      (await canOpenRecord(coordinator, "contact", contact.id)),
+  );
+  check(
+    "*** …and reads NONE of the project's conversation *** [S131]",
+    (await listComments(coordinator, "project", project.id)).length === 0,
+    `saw ${(await listComments(coordinator, "project", project.id)).length}`,
+  );
+  check(
+    "*** …nor the contact's *** [S131]",
+    (await listComments(coordinator, "contact", contact.id)).length === 0,
+    `saw ${(await listComments(coordinator, "contact", contact.id)).length}`,
+  );
+  check(
+    "the rep who could read them still can — one role moved, not the rule [S131]",
+    (await listComments(repA, "project", project.id)).length === 1 &&
+      (await listComments(repA, "contact", contact.id)).length === 1,
+  );
+  check(
+    "the records she holds in her own right are untouched [S62], [S72], [S131]",
+    (await listComments(coordinator, "quotation_thread", thread.id)).length ===
+      2 && (await listComments(coordinator, "dispatch", dispatch.id)).length === 1,
+  );
+
+  // `/activity` and `dailyActivity` read `commentEvents`, which composes the
+  // same filter — so they inherit rather than restating it. Asserted on the
+  // comment ids themselves: a comment event carries no contact id to test.
+  const coordinatorGlobal = await eventsInRange(
+    coordinator,
+    { from: today(), to: today() },
+    [repA.user.id],
+  );
+  check(
+    "…and the global read inherits it, both anchors [S131]",
+    !coordinatorGlobal.some(
+      (event) =>
+        event.key === `comment:${commentIds.get("project")}` ||
+        event.key === `comment:${commentIds.get("contact")}`,
+    ),
+  );
+
+  // The second reader. It asked `canOpenRecord`, which since `S76` answers a
+  // different question, so the filter alone would have left this one wide.
+  check(
+    "getComment refuses her the project comment too [S131]",
+    (await getComment(coordinator, commentIds.get("project")!)) === null,
+  );
+  check(
+    "…and still hands it to the rep who owns the project [S131]",
+    (await getComment(repA, commentIds.get("project")!)) !== null,
+  );
+
+  /* The third reader, and the sharpest statement of the rule: tagging her does
+   * not hand over what the filter withholds. She gets the link, because `S76`
+   * really did give her the project; she does not get the words. */
+  await addComment(repA, {
+    recordType: "project",
+    recordId: project.id,
+    body: `${stamp} tagging the coordinator on a project`,
+    mentions: [coordinator.user.id],
+  });
+  const coordinatorRows = await listNotifications(coordinator, { page: 1 });
+  const coordinatorMention = coordinatorRows.rows.find(
+    (row) =>
+      row.typeKey === NOTIFICATION_TYPES.mentionReceived &&
+      row.payload?.kind === "mention" &&
+      row.payload.recordId === project.id,
+  );
+  check(
+    "a tag on a project comment reaches her — `25 §11` gates nothing [25 §11]",
+    coordinatorMention !== undefined,
+  );
+  check(
+    "*** …carrying the LINK, because S76 gave her the record *** [S76]",
+    coordinatorMention?.payload?.kind === "mention" &&
+      coordinatorMention.payload.recordViewable === true &&
+      coordinatorMention.payload.href !== null,
+  );
+  check(
+    "*** …and NOT the body, because S131 did not give her the words *** [S131]",
+    coordinatorMention?.payload?.kind === "mention" &&
+      coordinatorMention.payload.body === null,
   );
 
   /* --- 3. Editable by the author, never deleted ------------------- */

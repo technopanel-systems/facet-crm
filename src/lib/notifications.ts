@@ -66,6 +66,7 @@ import { withAudit, type AuditActor, type AuditEntry } from "@/lib/audit";
 import {
   canOpenRecord,
   scopeForUser,
+  visibleCommentsFilter,
   type AuthSession,
   type ViewableRecordType,
 } from "@/lib/authz";
@@ -875,6 +876,16 @@ async function handoverPayload(
  * the reader is shown — the same rule the anchor path follows `[20 §8.2]`. The
  * entry still appears, because what happened is not a secret from the person it
  * happened to; it simply carries no body, no name and no link.
+ *
+ * **Two questions, two gates, and they parted at `S76`.** The LINK asks whether
+ * the reader may open the record, which is `canOpenRecord`'s. The BODY asks
+ * whether they may read the conversation, which is `S131`'s and belongs to
+ * `visibleCommentsFilter` — so the body is read through the filter rather than
+ * behind `viewable`. They give the same answer for everyone but the
+ * coordinator on a project or a contact, and there she gets the link and not
+ * the words: `S76` gave her the record, not what was said on it. Tagging her
+ * does not hand over what the filter withholds, any more than tagging a rep who
+ * cannot see the record does.
  */
 async function mentionPayload(
   session: AuthSession,
@@ -905,13 +916,11 @@ async function mentionPayload(
     .where(eq(users.id, authorUserId))
     .limit(1);
 
-  const [comment] = viewable
-    ? await db
-        .select({ body: comments.body })
-        .from(comments)
-        .where(eq(comments.id, commentId))
-        .limit(1)
-    : [];
+  const [comment] = await db
+    .select({ body: comments.body })
+    .from(comments)
+    .where(and(eq(comments.id, commentId), visibleCommentsFilter(session)))
+    .limit(1);
 
   return {
     kind: "mention",
