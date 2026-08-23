@@ -89,6 +89,10 @@ export default async function EditDispatchRequestPage({
           unitPrice: line.unitPrice,
         }))}
         dispatchDate={dispatch.dispatchDate}
+        // `S130` `S119` — the request's own, kept or changed until approval.
+        stock={dispatch.stock}
+        shipment={dispatch.shipment}
+        cargoDestination={dispatch.cargoDestination}
         projectLabel={
           dispatch.projectId
             ? lookupName(

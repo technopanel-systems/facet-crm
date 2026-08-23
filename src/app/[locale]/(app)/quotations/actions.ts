@@ -107,11 +107,9 @@ export async function createQuotationAction(
   // Required: a quotation is drawn from ONE stock and there is no moment in
   // its life with none, which is why the column is NOT NULL.
   const stock = fields.option("stock", STOCKS, { required: true });
-  // `S67` — no validity date and no delivery period. Both are SMAC's.
-  const version = {
-    paymentMethod: fields.text("paymentMethod", { max: 200 }),
-    shipmentTerms: fields.text("shipmentTerms", { max: 200 }),
-  };
+  // `S67` — no validity date and no delivery period. Both are SMAC's. And
+  // since `S70` and `S119` no payment method and no shipment terms either:
+  // both are the dispatch's now, and typed rather than free text.
 
   const lineCount = formData.getAll("supplierId").length;
   const lines: QuotationLineInput[] = [];
@@ -134,7 +132,7 @@ export async function createQuotationAction(
     const thread = await createQuotationThread(
       session,
       { projectId, companyId, contactId },
-      { ...version, stock },
+      { stock },
       lines,
       serviceLines,
     );

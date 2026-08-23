@@ -10,11 +10,17 @@ import {
   refuseDispatchRequest,
   requestDispatch,
   reviveDispatchRequest,
+  setDispatchSmacNumber,
   submitDispatchRequest,
   updateDispatchRequest,
   type DispatchLineInput,
 } from "@/lib/dispatches";
-import { COMMENT_BODY_MAX } from "@/lib/enums";
+import {
+  COMMENT_BODY_MAX,
+  PAYMENT_METHODS,
+  SHIPMENT_METHODS,
+  STOCKS,
+} from "@/lib/enums";
 import { readFields, ruleErrorState, type FormState } from "@/lib/validation";
 
 import { readProductLine } from "../quotations/line-form";
@@ -72,6 +78,26 @@ function readLines(formData: FormData, fields: ReturnType<typeof readFields>) {
 }
 
 /**
+ * The three fields `S130` and `S119` put on a request, read the same way by
+ * both forms so the raise and the edit cannot disagree about their shape.
+ *
+ * Shape only. That South and Dammam force CT, and that a destination belongs
+ * to Cargo alone, are `assertShipment`'s in the data layer and two CHECKs at
+ * the database — neither is a thing a form reader can answer, because both
+ * compare two fields rather than validating one.
+ */
+function readShipment(fields: ReturnType<typeof readFields>) {
+  return {
+    stock: fields.option("stock", STOCKS, { required: true }),
+    shipment: fields.option("shipment", SHIPMENT_METHODS, { required: true }),
+    // `S119` — optional. Read on every shipment, never silently dropped on the
+    // ones that may not carry it: the data layer refuses it against the field
+    // instead, because an input that vanishes is `AUDIT 1 F3`'s defect.
+    cargoDestination: fields.text("cargoDestination", { max: 200 }),
+  };
+}
+
+/**
  * **A rep raises a request** `S72`. No permission check of its own, here or in
  * the data layer — that is the whole of the rule.
  */
@@ -100,8 +126,12 @@ export async function requestDispatchAction(
   const projectId = isFreeEntry ? null : fields.uuid("projectId");
   const dispatchDate = fields.date("dispatchDate", { required: true });
 
+  const shipment = readShipment(fields);
+
   const lines = readLines(formData, fields);
-  if (!fields.ok || !dispatchDate) return fields.state;
+  if (!fields.ok || !dispatchDate || !shipment.stock || !shipment.shipment) {
+    return fields.state;
+  }
 
   let dispatchId: string;
   try {
@@ -112,6 +142,9 @@ export async function requestDispatchAction(
       companyId,
       userId,
       projectId,
+      stock: shipment.stock,
+      shipment: shipment.shipment,
+      cargoDestination: shipment.cargoDestination,
     });
     dispatchId = dispatch.id;
   } catch (error) {
@@ -139,11 +172,21 @@ export async function updateDispatchRequestAction(
 
   const projectId = fields.uuid("projectId");
   const dispatchDate = fields.date("dispatchDate", { required: true });
+  const shipment = readShipment(fields);
   const lines = readLines(formData, fields);
-  if (!fields.ok || !dispatchDate) return fields.state;
+  if (!fields.ok || !dispatchDate || !shipment.stock || !shipment.shipment) {
+    return fields.state;
+  }
 
   try {
-    await updateDispatchRequest(session, id, { lines, dispatchDate, projectId });
+    await updateDispatchRequest(session, id, {
+      lines,
+      dispatchDate,
+      projectId,
+      stock: shipment.stock,
+      shipment: shipment.shipment,
+      cargoDestination: shipment.cargoDestination,
+    });
   } catch (error) {
     return ruleErrorState(error, fields.values);
   }
@@ -173,15 +216,33 @@ export async function submitDispatchRequestAction(
 /**
  * **The coordinator approves** `S72` — the one event that credits a target, and
  * the one that fires `S74`'s write-back. Four screens go stale at once.
+ *
+ * **It carries the payment method** `S70` `S73`, which is why this stopped
+ * being a field-less bound-id act. *A dispatch cannot be approved without a
+ * payment method*, and putting the choice on the approval itself is what makes
+ * that unbreakable rather than merely checked: there is no path to `approved`
+ * that does not pass through this form. The rep never sees the field — `S70`
+ * puts it in the coordinator's head, *because she is the one who confirms it
+ * with finance*.
  */
 export async function approveDispatchRequestAction(
   id: string,
+  _previous: FormState,
+  formData: FormData,
 ): Promise<FormState> {
   const session = await requireSession();
+  const fields = readFields(formData);
+  const method = fields.option("paymentMethod", PAYMENT_METHODS, {
+    required: true,
+  });
+  // `S71` — *an optional note carries anything the list does not*.
+  const note = fields.text("paymentNote", { max: 500 });
+  if (!fields.ok || !method) return fields.state;
+
   try {
-    await approveDispatchRequest(session, id);
+    await approveDispatchRequest(session, id, { method, note });
   } catch (error) {
-    return ruleErrorState(error);
+    return ruleErrorState(error, fields.values);
   }
   revalidatePath("/dispatches");
   revalidatePath(`/dispatches/${id}`);
@@ -227,6 +288,40 @@ export async function reviveDispatchRequestAction(
     await reviveDispatchRequest(session, id);
   } catch (error) {
     return ruleErrorState(error);
+  }
+  revalidatePath("/dispatches");
+  revalidatePath(`/dispatches/${id}`);
+  return {};
+}
+
+/**
+ * **The SMAC dispatch number** `S121` — written after approval, by the
+ * coordinator, when SMAC issues it.
+ *
+ * A seventh act rather than a field on the approval, because the rule is
+ * explicit that *it is not a condition of approval*. Nothing but `/dispatches`
+ * and this record is revalidated: a number moves no square metres, credits
+ * nothing and changes no figure `S72`.
+ */
+export async function setDispatchSmacNumberAction(
+  id: string,
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const session = await requireSession();
+  const fields = readFields(formData);
+  // `S5` — a human types it, so FACET assumes it can be wrong. No format is
+  // checked: SMAC owns the format and there is no integration to ask.
+  const number = fields.text("smacDispatchNumber", {
+    required: true,
+    max: 100,
+  });
+  if (!fields.ok || !number) return fields.state;
+
+  try {
+    await setDispatchSmacNumber(session, id, number);
+  } catch (error) {
+    return ruleErrorState(error, fields.values);
   }
   revalidatePath("/dispatches");
   revalidatePath(`/dispatches/${id}`);

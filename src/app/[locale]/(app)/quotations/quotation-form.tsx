@@ -10,7 +10,6 @@ import {
 } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
-import { Input } from "@/components/ui/input";
 import { Link } from "@/i18n/navigation";
 // A value import from a data module would bundle the Postgres driver here.
 // `enums.ts` imports nothing, on purpose, so a closed set is safe to read.
@@ -236,32 +235,14 @@ export function QuotationForm({
 
         {/* `S67` — the form asks for no validity date and no delivery
             period. Both are SMAC's, and a field FACET still rendered is a
-            field a rep would still fill. */}
-        <FormField
-          name="paymentMethod"
-          label={t("quotations.fields.paymentMethod")}
-          error={errors.paymentMethod}
-        >
-          <Input
-            id="paymentMethod"
-            name="paymentMethod"
-            defaultValue={state.values?.paymentMethod ?? ""}
-            className="text-start"
-          />
-        </FormField>
+            field a rep would still fill.
 
-        <FormField
-          name="shipmentTerms"
-          label={t("quotations.fields.shipmentTerms")}
-          error={errors.shipmentTerms}
-        >
-          <Input
-            id="shipmentTerms"
-            name="shipmentTerms"
-            defaultValue={state.values?.shipmentTerms ?? ""}
-            className="text-start"
-          />
-        </FormField>
+            `S70` and `S119` took the two that were here — how the customer
+            pays and how it ships — onto the DISPATCH, for the same reason.
+            Payment is the coordinator's, recorded when she approves `S73`;
+            shipment is chosen when a dispatch is requested, not when a
+            quotation is. Both are closed lists there, where here they were
+            free text that never agreed with any rule. */}
       </div>
 
       <fieldset className="flex flex-col gap-4 rounded-lg border p-4">

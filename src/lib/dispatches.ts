@@ -126,6 +126,12 @@ import {
   type DispatchCredit,
 } from "@/lib/credit-splits";
 import { SQM_SCALE, ZERO, toScaled } from "@/lib/decimal";
+import {
+  type PaymentMethod,
+  type SameValues,
+  type ShipmentMethod,
+  type Stock,
+} from "@/lib/enums";
 import { ensureProjectParticipant } from "@/lib/projects";
 import { productLineMoney } from "@/lib/quotations";
 import { RuleError } from "@/lib/validation";
@@ -135,6 +141,24 @@ export type Dispatch = typeof dispatches.$inferSelect;
 /** `S72` — the four states of a request. The union comes from the pg enum, so
  *  a value added to the database and forgotten here is a type error. */
 export type DispatchStatus = Dispatch["status"];
+
+/**
+ * The three closed sets a `"use client"` form renders and this module writes.
+ * `enums.ts` holds the tuples — it imports nothing, so a form may read it
+ * without pulling the Postgres driver into the browser — and these prove at
+ * compile time that the tuples still agree with the database. `quotations.ts`
+ * does the same for `Stock` against `quotation_versions`.
+ */
+export type DispatchStockMatchesSchema = SameValues<Stock, Dispatch["stock"]>;
+export type ShipmentMatchesSchema = SameValues<
+  ShipmentMethod,
+  Dispatch["shipment"]
+>;
+/** `NonNullable` because the column is null until approval `S73`. */
+export type PaymentMethodMatchesSchema = SameValues<
+  PaymentMethod,
+  NonNullable<Dispatch["paymentMethod"]>
+>;
 
 /** The states a working list shows `S122` — everything but the archive. */
 export const DISPATCH_STATUSES = dispatchStatusEnum.enumValues;
@@ -252,6 +276,17 @@ export type DispatchInput = {
    * route, which names no project this slice `S75`.
    */
   projectId: string | null;
+  /**
+   * `S130` — **the dispatch's own stock**, which may differ from its
+   * quotation's `S118`, and which a free entry names too `S75`. Not nullable:
+   * there is no moment in a dispatch's life with none.
+   */
+  stock: Stock;
+  /** `S119` — CT, TT or Cargo, chosen by the rep when requesting. */
+  shipment: ShipmentMethod;
+  /** `S119` — Cargo's, and optional. Refused on CT or TT rather than
+   *  discarded, here and again at the database. */
+  cargoDestination: string | null;
 };
 
 /**
@@ -283,6 +318,16 @@ export type DispatchEditInput = {
    * refuses her as it always has.
    */
   projectId: string | null;
+  /**
+   * `S130` — *the coordinator may change it until approval*. So may the rep
+   * while it is theirs `S125`; `assertEditable` is what decides which of them
+   * is asking, and after approval nothing edits a dispatch at all `S73`.
+   */
+  stock: Stock;
+  /** `S119` — the same window as the stock, and `S76` names *shipment* among
+   *  the submitted request's own fields her edit right reaches. */
+  shipment: ShipmentMethod;
+  cargoDestination: string | null;
 };
 
 export type DispatchListRow = {
@@ -315,6 +360,20 @@ export type DispatchListRow = {
   submittedAt: Date | null;
   approvedByName: string | null;
   approvedAt: Date | null;
+  /** `S130` — the dispatch's own, which may differ from its quotation's. */
+  stock: Stock;
+  /** `S119` — CT, TT or Cargo. */
+  shipment: ShipmentMethod;
+  /** `S119` — Cargo's, optional, and null on every other shipment. */
+  cargoDestination: string | null;
+  /** `S70` `S71` — null until approval, the only act that writes it `S73`. */
+  paymentMethod: PaymentMethod | null;
+  paymentNote: string | null;
+  /**
+   * `S121` — written after approval, and **not** a condition of it, so an
+   * approved dispatch reading null here is ordinary rather than incomplete.
+   */
+  smacDispatchNumber: string | null;
   createdAt: Date;
 };
 
@@ -402,6 +461,13 @@ export type DispatchableThread = {
   companyName: string;
   raisedByUserId: string;
   raisedByName: string;
+  /**
+   * `S118` — the stock this quotation is drawn from, offered by the request
+   * form as the **default** for the dispatch's own `S130`. A default and
+   * nothing else: *a dispatch may draw from a different stock*, no writer here
+   * reads it back, and the quotation is not rewritten either way.
+   */
+  stock: Stock;
   /** The issued version's total, for information. Never a cap `[04 quantities]`. */
   quotedSqm: string | null;
   /** Running total **approved** against this thread `S72`. Also not a cap. */
@@ -471,6 +537,44 @@ function assertLines(lines: DispatchLineInput[]): void {
   );
   if (sqmScaled <= ZERO) {
     throw new RuleError("dispatches.errors.sqmPositive", "quantityPcs");
+  }
+}
+
+/**
+ * `S119`'s two invariants, shared by the request and the edit for
+ * `assertLines`' reason: both write the same columns, and a second copy of two
+ * refusals drifts.
+ *
+ * **Both are also CHECKs** — `dispatches_stock_shipment` and
+ * `dispatches_cargo_destination`. That is not a duplicated rule but the two
+ * halves `CLAUDE.md` asks for: the database says what a row may contain, and
+ * this says it against a named field so the form can put the message under the
+ * control the person got wrong. `assertEmailFree` is the same shape.
+ *
+ * **The Cargo note is refused, never discarded.** Writing `null` over a
+ * destination somebody typed is what the project form did with its region
+ * (`AUDIT 1 F3`), where the value vanished with no error at all and 0 of 414
+ * rows carried one.
+ *
+ * **Malham is absent, deliberately.** *TT is discouraged there, never
+ * refused... the coordinator's knowledge, not a rule FACET enforces* `S119`.
+ */
+function assertShipment(input: {
+  stock: Stock;
+  shipment: ShipmentMethod;
+  cargoDestination: string | null;
+}): void {
+  if (
+    (input.stock === "south" || input.stock === "dammam") &&
+    input.shipment !== "ct"
+  ) {
+    throw new RuleError("dispatches.errors.shipmentMustBeCt", "shipment");
+  }
+  if (input.cargoDestination && input.shipment !== "cargo") {
+    throw new RuleError(
+      "dispatches.errors.cargoDestinationOnly",
+      "cargoDestination",
+    );
   }
 }
 
@@ -601,6 +705,7 @@ export async function requestDispatch(
   input: DispatchInput,
 ): Promise<Dispatch> {
   assertLines(input.lines);
+  assertShipment(input);
 
   let companyId = input.companyId;
   let userId = input.userId;
@@ -712,6 +817,14 @@ export async function requestDispatch(
         // until the coordinator approves, and the `dispatches_approval_stamps`
         // CHECK is what stops them being set any other way.
         status: "draft",
+        // `S130` `S119` — the rep's two choices at request. The stock is the
+        // dispatch's own: a quotation's is a default the form offers, never a
+        // value this writer reads back.
+        stock: input.stock,
+        shipment: input.shipment,
+        cargoDestination: input.cargoDestination,
+        // `S70` `S73` — no payment method. It is not the rep's to answer, and
+        // `approveDispatchRequest` is the only writer of the column.
       })
       .returning();
 
@@ -779,6 +892,7 @@ export async function updateDispatchRequest(
   input: DispatchEditInput,
 ): Promise<void> {
   assertLines(input.lines);
+  assertShipment(input);
 
   const request = await loadRequest(session, id);
   assertEditable(session, request);
@@ -799,7 +913,19 @@ export async function updateDispatchRequest(
   await withAudit(session.actor, async (tx, log) => {
     const [after] = await tx
       .update(dispatches)
-      .set({ dispatchDate: input.dispatchDate, projectId })
+      .set({
+        dispatchDate: input.dispatchDate,
+        projectId,
+        // `S130` `S119` — the rep's while it is a draft, the coordinator's
+        // once it is submitted `S125` `S62`, and `S76` names *stock* and
+        // *shipment* among the submitted request's own fields she reaches.
+        // After approval nothing edits a dispatch at all `S73`, which is where
+        // `S130`'s *"after approval the stock cannot change"* is held —
+        // `assertEditable` above, not a second rule here.
+        stock: input.stock,
+        shipment: input.shipment,
+        cargoDestination: input.cargoDestination,
+      })
       .where(eq(dispatches.id, id))
       .returning();
 
@@ -810,8 +936,17 @@ export async function updateDispatchRequest(
       before: {
         dispatchDate: request.dispatchDate,
         projectId: request.projectId,
+        stock: request.stock,
+        shipment: request.shipment,
+        cargoDestination: request.cargoDestination,
       },
-      after: { dispatchDate: after.dispatchDate, projectId: after.projectId },
+      after: {
+        dispatchDate: after.dispatchDate,
+        projectId: after.projectId,
+        stock: after.stock,
+        shipment: after.shipment,
+        cargoDestination: after.cargoDestination,
+      },
     });
 
     const removed = await tx
@@ -886,9 +1021,22 @@ export async function submitDispatchRequest(
  *
  * Three things happen here and nowhere else:
  *
- *  1. **The payment gate** `[07 C3]`, moved off the request by the founder's
- *     decision (module note). A free entry has no thread, so the rule has no
- *     object; `S73` will replace the condition itself with a payment method.
+ *  1. **The payment gate** `S73` — *a dispatch cannot be approved without a
+ *     payment method*, and this is where the method is chosen.
+ *
+ *     It replaces the condition that read `quotation_threads
+ *     .payment_confirmed_at`, and the replacement changes three things rather
+ *     than one. The old gate asked **has money arrived?**, which `on_delivery`
+ *     `S71` answers "no" to and is still legitimate. It read a state on
+ *     **another table**, so it could never be a CHECK. And it sat inside the
+ *     thread branch below, so a **free entry** `S75` — having no thread —
+ *     passed no payment gate at all. A method on this row is row-local, is the
+ *     question `S70` actually asks, and applies to all three routes.
+ *
+ *     `payment_confirmed_at` keeps every other reader it had: it is the chain's
+ *     `paid` rung `D29` `chain.ts`, `markAcceptedForProcessing`'s own gate, two
+ *     follow-up suppressors and a timeline kind. What it stopped being is a
+ *     condition of dispatch.
  *  2. **`S74`'s write-back.** The quotation gains the project the request named
  *     and its company joins that project `S27`, in this transaction, so a
  *     refused request writes nothing back. Guarded on the column still being
@@ -910,6 +1058,7 @@ export async function submitDispatchRequest(
 export async function approveDispatchRequest(
   session: AuthSession,
   id: string,
+  payment: { method: PaymentMethod | null; note: string | null },
 ): Promise<void> {
   if (!can(session, "canDispatch")) {
     throw new RuleError("dispatches.errors.approveOnly");
@@ -920,21 +1069,25 @@ export async function approveDispatchRequest(
     throw new RuleError("dispatches.errors.notSubmitted");
   }
 
+  // `S73` — before anything else, and against the field the coordinator did
+  // not fill. The `dispatches_payment_method` CHECK holds the same rule at the
+  // database; this is what puts the message under the control.
+  if (!payment.method) {
+    throw new RuleError(
+      "dispatches.errors.paymentMethodRequired",
+      "paymentMethod",
+    );
+  }
+
   await withAudit(session.actor, async (tx, log) => {
     if (request.quotationThreadId) {
       const [thread] = await tx
-        .select({
-          projectId: quotationThreads.projectId,
-          paymentConfirmedAt: quotationThreads.paymentConfirmedAt,
-        })
+        .select({ projectId: quotationThreads.projectId })
         .from(quotationThreads)
         .where(eq(quotationThreads.id, request.quotationThreadId))
         .limit(1);
       if (!thread) {
         throw new RuleError("dispatches.errors.threadNotVisible");
-      }
-      if (!thread.paymentConfirmedAt) {
-        throw new RuleError("dispatches.errors.paymentNotConfirmed");
       }
 
       if (!thread.projectId && request.projectId) {
@@ -986,6 +1139,10 @@ export async function approveDispatchRequest(
         status: "approved",
         approvedAt: new Date(),
         approvedByUserId: session.user.id,
+        // `S70` `S71` — she records how the customer is paying, in the same
+        // act. The note carries anything the six do not, and is optional.
+        paymentMethod: payment.method,
+        paymentNote: payment.note,
       })
       .where(eq(dispatches.id, id))
       .returning();
@@ -999,6 +1156,8 @@ export async function approveDispatchRequest(
         status: after.status,
         approvedAt: after.approvedAt,
         approvedByUserId: after.approvedByUserId,
+        paymentMethod: after.paymentMethod,
+        paymentNote: after.paymentNote,
       },
     });
   });
@@ -1091,6 +1250,79 @@ export async function reviveDispatchRequest(
   });
 }
 
+/**
+ * `S121` — **an approved dispatch carries its SMAC dispatch number**, written
+ * by the coordinator when SMAC issues it, usually at once.
+ *
+ * **It is not a condition of approval**: *a dispatch is approved, then
+ * numbered.* So this is its own act rather than a field on the approval, and
+ * the `dispatches_smac_number_after_approval` CHECK is written one way round —
+ * a number implies approval, approval implies nothing. An approved dispatch
+ * with no number is the ordinary state of one for as long as it takes her to
+ * type it, and no figure anywhere waits on it.
+ *
+ * **Unique**, which is the one property the rule claims. Checked here to turn a
+ * collision into a message under the field; `dispatches_smac_number_key` is
+ * what holds when two coordinators race, because a check-then-write is not
+ * atomic. `assertEmailFree` in `authz.ts` is the same pair for the same reason.
+ *
+ * **Not verified against SMAC, and it cannot be** `S5`: there is no
+ * integration, a human retypes it, and FACET must assume the link can be wrong.
+ * The number is stored as typed, and `smac_reference_verification` is the
+ * quotation's mechanism, not this one's — nothing in `S121` asks for it.
+ */
+export async function setDispatchSmacNumber(
+  session: AuthSession,
+  id: string,
+  number: string,
+): Promise<void> {
+  if (!can(session, "canDispatch")) {
+    throw new RuleError("dispatches.errors.smacNumberOnly");
+  }
+  const trimmed = number.trim();
+  if (!trimmed) {
+    throw new RuleError("validation.required", "smacDispatchNumber");
+  }
+
+  const request = await loadRequest(session, id);
+  if (request.status !== "approved") {
+    throw new RuleError("dispatches.errors.notApproved");
+  }
+
+  const [clash] = await db
+    .select({ id: dispatches.id })
+    .from(dispatches)
+    .where(
+      and(
+        eq(dispatches.smacDispatchNumber, trimmed),
+        ne(dispatches.id, id),
+      ),
+    )
+    .limit(1);
+  if (clash) {
+    throw new RuleError(
+      "dispatches.errors.smacNumberTaken",
+      "smacDispatchNumber",
+    );
+  }
+
+  await withAudit(session.actor, async (tx, log) => {
+    const [after] = await tx
+      .update(dispatches)
+      .set({ smacDispatchNumber: trimmed })
+      .where(eq(dispatches.id, id))
+      .returning();
+
+    log({
+      action: "dispatch.smac_number_set",
+      entityType: "dispatch",
+      entityId: id,
+      before: { smacDispatchNumber: request.smacDispatchNumber },
+      after: { smacDispatchNumber: after.smacDispatchNumber },
+    });
+  });
+}
+
 /* ------------------------------------------------------------------ *
  * Reading
  * ------------------------------------------------------------------ */
@@ -1170,6 +1402,14 @@ export async function listDispatches(
       submittedAt: dispatches.submittedAt,
       approvedByName: approvedBy.name,
       approvedAt: dispatches.approvedAt,
+      // `S130` `S119` `S70` `S71` `S121` — the dispatch's own, every one of
+      // them. None is derived and none is read off the quotation.
+      stock: dispatches.stock,
+      shipment: dispatches.shipment,
+      cargoDestination: dispatches.cargoDestination,
+      paymentMethod: dispatches.paymentMethod,
+      paymentNote: dispatches.paymentNote,
+      smacDispatchNumber: dispatches.smacDispatchNumber,
       createdAt: dispatches.createdAt,
     })
     .from(dispatches)
@@ -1223,6 +1463,12 @@ type BareRow = {
   submittedAt: Date | null;
   approvedByName: string | null;
   approvedAt: Date | null;
+  stock: Stock;
+  shipment: ShipmentMethod;
+  cargoDestination: string | null;
+  paymentMethod: PaymentMethod | null;
+  paymentNote: string | null;
+  smacDispatchNumber: string | null;
   createdAt: Date;
 };
 
@@ -1372,6 +1618,14 @@ export async function getDispatch(
       refusalReason: dispatches.refusalReason,
       approvedByName: approvedBy.name,
       approvedAt: dispatches.approvedAt,
+      // `S130` `S119` `S70` `S71` `S121` — the dispatch's own, every one of
+      // them. None is derived and none is read off the quotation.
+      stock: dispatches.stock,
+      shipment: dispatches.shipment,
+      cargoDestination: dispatches.cargoDestination,
+      paymentMethod: dispatches.paymentMethod,
+      paymentNote: dispatches.paymentNote,
+      smacDispatchNumber: dispatches.smacDispatchNumber,
       createdAt: dispatches.createdAt,
       projectId: dispatches.projectId,
       projectNameEn: projects.nameEn,
@@ -1549,6 +1803,11 @@ export async function listDispatchableThreads(
       companyName: companies.name,
       raisedByUserId: quotationThreads.raisedByUserId,
       raisedByName: users.name,
+      // `S118` — the issued version's stock `S126`, which the form offers as
+      // the default for the dispatch's own `S130`. Off the VERSION rather than
+      // the thread, because that is where the column lives and because a
+      // revision `S66` is a different version with a different default.
+      stock: quotationVersions.stock,
       quotedSqm: quotationVersions.totalSqm,
     })
     .from(quotationThreads)

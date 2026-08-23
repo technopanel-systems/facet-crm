@@ -1037,20 +1037,23 @@ export type QuotationThreadInput = {
 };
 
 /**
- * `S67` took `validUntil` and `deliveryPeriod` off this: validity and the
- * delivery period are SMAC's, and FACET carries neither. Two of the three that
- * remain are `S70`'s and `S119`'s to move onto the dispatch, in their own
- * slices.
+ * What a rep chooses about a version beyond its lines — and since `0022` there
+ * is exactly one thing.
+ *
+ * `S67` took `validUntil` and `deliveryPeriod`: validity and the delivery
+ * period are SMAC's. `S70` and `S119` then took `paymentMethod` and
+ * `shipmentTerms` onto the dispatch, where the coordinator records the first
+ * `S70` and the rep chooses the second when requesting a dispatch `S119` —
+ * both as pg enums, where these were free text nobody ever constrained.
  *
  * **`stock` is not nullable** `S118`. A quotation is drawn from one stock and
  * the rep chooses it when raising, so there is no caller with nothing to pass:
  * omitting it is a compile error rather than a row the database refuses at
- * runtime. That is the writer half of the `NOT NULL` on the column.
+ * runtime. That is the writer half of the `NOT NULL` on the column. The
+ * DISPATCH now carries its own `S130`, and this one is only its default.
  */
 export type QuotationVersionInput = {
   stock: Stock;
-  paymentMethod: string | null;
-  shipmentTerms: string | null;
 };
 
 export type QuotationLineInput = {
@@ -1204,8 +1207,6 @@ export async function createQuotationThread(
         status: "requested",
         // `S118` — the rep's choice at raise. The only place it is chosen.
         stock: version.stock,
-        paymentMethod: version.paymentMethod,
-        shipmentTerms: version.shipmentTerms,
         createdBy: session.user.id,
       })
       .returning();
@@ -1650,12 +1651,11 @@ export async function createRevision(
         versionNumber: previous.versionNumber + 1,
         origin,
         status: "requested",
-        // `S118` — carried forward, like the two below it. Nothing on this
-        // path can change the stock: a revision takes no input, so the value
-        // is the one the rep chose at raise until a rule says otherwise.
+        // `S118` — carried forward. Nothing on this path can change the
+        // stock: a revision takes no input, so the value is the one the rep
+        // chose at raise until a rule says otherwise. It was three columns
+        // until `0022`; the other two are the dispatch's now `S70` `S119`.
         stock: previous.stock,
-        paymentMethod: previous.paymentMethod,
-        shipmentTerms: previous.shipmentTerms,
         createdBy: session.user.id,
       })
       .returning();

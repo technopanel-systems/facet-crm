@@ -253,7 +253,6 @@ type ColumnSpec = {
 };
 
 const LANDED: ColumnSpec[] = [
-  { key: "companies.has_credit_terms", type: "boolean", nullable: false, defaultsFalse: true, cite: "25 §7" },
   { key: "companies.next_follow_up_at", type: "date", nullable: true, cite: "25 §18" },
   { key: "projects.next_follow_up_at", type: "date", nullable: true, cite: "25 §18" },
   { key: "quotation_threads.next_follow_up_at", type: "date", nullable: true, cite: "25 §18" },
@@ -277,6 +276,19 @@ const LANDED: ColumnSpec[] = [
   // default is a place for a writer to forget, and each of the six writers in
   // `dispatches.ts` sets it outright.
   { key: "dispatches.status", type: "USER-DEFINED", nullable: false, cite: "S72" },
+  // `S130` `S119` — NOT NULL, and on the DISPATCH. Every dispatch names a
+  // stock, including a free entry, which is what makes `S119`'s CT rule total.
+  { key: "dispatches.stock", type: "USER-DEFINED", nullable: false, cite: "S130" },
+  { key: "dispatches.shipment", type: "USER-DEFINED", nullable: false, cite: "S119" },
+  { key: "dispatches.cargo_destination", type: "text", nullable: true, cite: "S119" },
+  // `S70` `S71` — nullable, because a request is raised, edited and submitted
+  // with none. `dispatches_payment_method` is what makes it required, and only
+  // where `S73` requires it.
+  { key: "dispatches.payment_method", type: "USER-DEFINED", nullable: true, cite: "S71" },
+  { key: "dispatches.payment_note", type: "text", nullable: true, cite: "S71" },
+  // `S121` — nullable for a reason the rule states: *it is not a condition of
+  // approval*, so an approved dispatch reading null is ordinary.
+  { key: "dispatches.smac_dispatch_number", type: "text", nullable: true, cite: "S121" },
   { key: "dispatches.submitted_at", type: "timestamp with time zone", nullable: true, cite: "S72" },
   { key: "dispatches.refusal_reason", type: "text", nullable: true, cite: "S124" },
 ];
@@ -352,14 +364,46 @@ const S57_DROPPED_COLUMNS = ["quotation_lines.vat_rate"];
  *
  * `0014` had already taken the *state* these fed. What `0018` takes is the
  * date itself, and with it `versionIsExpired()`, the "Expired" badge on three
- * screens and the Extend panel. `payment_method` and `shipment_terms` sit on
- * the same table and are deliberately NOT here: `S70` and `S119` move them
- * onto the dispatch in their own slices.
+ * screens and the Extend panel.
  */
 const S67_DROPPED_COLUMNS = [
   "quotation_versions.valid_until",
   "quotation_versions.delivery_period",
 ];
+
+/**
+ * The two columns `S70` and `S119` take off the quotation and onto the
+ * dispatch, in `0022`.
+ *
+ * **This list is the inverse of a claim that used to live here.** Until this
+ * slice the assertion was that both were *still* present — `S70` and `S119`
+ * are later, so a sweep that took them early would be building ahead of the
+ * rule. That was the right check while they waited, and it is the wrong one
+ * now: the rules landed, so the claim flips rather than disappearing.
+ *
+ * Neither was ever constrained. Nullable `text` since `0000`, no enum, no
+ * CHECK, no default, one writer and one reader. What reps typed into them —
+ * *"50% advance"*, *"EX-F"* — is in neither `S71`'s six nor `S119`'s three.
+ * On the dispatch both are pg enums, which is the substance of the move.
+ */
+const S70_S119_MOVED_COLUMNS = [
+  "quotation_versions.payment_method",
+  "quotation_versions.shipment_terms",
+];
+
+/**
+ * `SPEC §15` "Dropped outright", taken in `0022`: a NOT NULL boolean no code
+ * path ever set to true.
+ *
+ * It named an exception to `07 C3`'s payment gate for customers who buy on
+ * credit. `S70` and `S73` were its only citations and both were rewritten:
+ * `S73` asks for a payment METHOD, and `handled_by_finance` `S71` is the
+ * answer a credit customer gives. The exception became one value in a list
+ * rather than a flag beside a gate, so it comes out in the slice that rewrote
+ * its rules — `CLAUDE.md`: when a rule replaces an old mechanism, the old
+ * mechanism comes out in the same slice.
+ */
+const S70_S73_DROPPED_COLUMNS = ["companies.has_credit_terms"];
 
 /**
  * What `SPEC §15` "Dropped outright" removes: structure no rule asks for.
@@ -425,7 +469,6 @@ const SLICE6_DROPPED_TYPES = ["task_origin", "task_status"];
  * merely because one of its three columns had a writer.
  */
 const NEW_COLUMNS: { table: string; column: string; boolean?: true }[] = [
-  { table: "companies", column: "has_credit_terms", boolean: true },
   { table: "quotation_threads", column: "closed_at" },
   { table: "quotation_threads", column: "closed_by_user_id" },
 ];
@@ -513,15 +556,23 @@ async function main(): Promise<void> {
     check(`${key} is gone [S67]`, !columns.has(key));
   }
 
-  // The counterpart claim, and the one worth asserting: the two columns beside
-  // them STAY. `S70` moves payment onto the dispatch and `S119` makes shipment
-  // a dispatch property, both in later Phase 1b slices — a sweep that took
-  // them early would be building ahead of the rule.
-  for (const key of [
-    "quotation_versions.payment_method",
-    "quotation_versions.shipment_terms",
-  ]) {
-    check(`${key} is still here — S70 and S119 are later`, columns.has(key));
+  // **The claim that used to be here has flipped.** It asserted that both
+  // columns were STILL present, because `S70` and `S119` were later and a
+  // sweep that took them early would have been building ahead of the rule.
+  // The rules landed in `0022`, so the assertion inverts rather than going
+  // away — that is what stops a column being dropped in one place and
+  // remembered in another.
+  for (const key of S70_S119_MOVED_COLUMNS) {
+    check(`${key} moved to the dispatch [S70], [S119]`, !columns.has(key));
+  }
+  for (const key of ["dispatches.payment_method", "dispatches.shipment"]) {
+    check(`…and landed there [S70], [S119]`, columns.has(key), key);
+  }
+
+  // `SPEC §15` — and the flag that stood beside the gate `S70` and `S73`
+  // rewrote goes with them.
+  for (const key of S70_S73_DROPPED_COLUMNS) {
+    check(`${key} is gone [SPEC §15], [S70], [S73]`, !columns.has(key));
   }
 
   // `S67` — expiry is not a terminal state, and since `0018` not a fact
@@ -1387,6 +1438,7 @@ async function main(): Promise<void> {
   await vatIsFixed();
   await dispatchLinesHold();
   await requestStatesHold();
+  await paymentAndShipmentHold();
   await repositoryMatchesDatabase();
 }
 
@@ -1892,14 +1944,20 @@ async function requestStatesHold(): Promise<void> {
     console.error("  --    no dispatch to shape a refusal from; skipping");
     return;
   }
+  // `stock` and `shipment` are NOT NULL since `0022` `S130` `S119`, so every
+  // shape below carries them. Without them each insert refuses for a NOT NULL
+  // violation rather than the constraint under test, and `databaseRefuses`
+  // catches that by name — which is exactly what it is for.
   const columns =
-    "(company_id, user_id, recorded_by_user_id, dispatch_date, status";
-  const values = `('${any.company_id}', '${any.user_id}', '${any.recorded_by_user_id}', '${any.dispatch_date}'`;
+    "(company_id, user_id, recorded_by_user_id, dispatch_date, stock, shipment, status";
+  const values = `('${any.company_id}', '${any.user_id}', '${any.recorded_by_user_id}', '${any.dispatch_date}', 'riyadh', 'ct'`;
 
   await databaseRefuses(
     "approved with no approval time is refused [S72]",
     "dispatches_approval_stamps",
-    `insert into dispatches ${columns}, submitted_at) values ${values}, 'approved', now())`,
+    // A payment method too `S73`, or `dispatches_payment_method` refuses this
+    // row first and the assertion would be testing that constraint instead.
+    `insert into dispatches ${columns}, submitted_at, payment_method) values ${values}, 'approved', now(), 'on_delivery')`,
   );
   await databaseRefuses(
     "an approval time on a draft is refused [S72]",
@@ -1969,6 +2027,228 @@ async function requestStatesHold(): Promise<void> {
     "*** and not one of them is a request nobody approved *** [S72]",
     counted.every((row) => approvedIds.has(row.id)),
     `${counted.filter((row) => !approvedIds.has(row.id)).length} leaked`,
+  );
+}
+
+/**
+ * *** Payment, shipment and the number *** `S73` `S119` `S121` `S130` `S71`.
+ *
+ * `requestStatesHold` above is the model and this is its sibling: **asserted
+ * over every row ever written**, not over the rows a script has just made.
+ * `verify:slice3` §3, §3b, §24, §25 and §26 make the behavioural half through
+ * the data layer; this one cannot be satisfied by a writer that happens to be
+ * correct today.
+ *
+ * Five claims, one per CHECK, and each is stated twice — once as a count over
+ * the table, once as a refusal driven at the database. The count says what the
+ * data looks like; the refusal says what the database will do about it
+ * tomorrow, when a new writer forgets.
+ *
+ * **`(status = 'approved') and payment_method is null`, not `is distinct
+ * from`.** These five CHECKs are one-directional by design (see `0022`'s
+ * header), so the two-way form the three above use would report lawful rows as
+ * violations: an unapproved request carrying a method is legal, and so is an
+ * approved dispatch with no number.
+ *
+ * **Counted in SQL and asserted `=== 0`**, never `!count`: `count(*)` comes
+ * back as a string and a truthiness test on `"0"` passes for the wrong reason.
+ */
+async function paymentAndShipmentHold(): Promise<void> {
+  console.log(
+    "\n16. *** Approval carries a payment method, South and Dammam are CT, the number is unique *** [S73], [S119], [S121]",
+  );
+
+  const [rows] = (await db.execute(sql`
+    select
+      count(*)::int as total,
+      count(*) filter (where payment_method is not null)::int as with_method,
+      count(*) filter (where smac_dispatch_number is not null)::int as numbered,
+      count(*) filter (where shipment = 'ct')::int as ct,
+      count(*) filter (where stock in ('south', 'dammam'))::int as far_stock,
+      count(*) filter (
+        where status = 'approved' and payment_method is null
+      )::int as bad_method,
+      count(*) filter (
+        where payment_note is not null and payment_method is null
+      )::int as bad_note,
+      count(*) filter (
+        where stock in ('south', 'dammam') and shipment <> 'ct'
+      )::int as bad_shipment,
+      count(*) filter (
+        where cargo_destination is not null and shipment <> 'cargo'
+      )::int as bad_destination,
+      count(*) filter (
+        where smac_dispatch_number is not null and status <> 'approved'
+      )::int as bad_number
+    from dispatches
+  `)) as unknown as {
+    total: number;
+    with_method: number;
+    numbered: number;
+    ct: number;
+    far_stock: number;
+    bad_method: number;
+    bad_note: number;
+    bad_shipment: number;
+    bad_destination: number;
+    bad_number: number;
+  }[];
+
+  console.log(
+    `  --    ${rows.total} dispatch(es): ${rows.with_method} carry a payment method, ` +
+      `${rows.numbered} a SMAC number, ${rows.ct} ship CT, ${rows.far_stock} draw from South or Dammam`,
+  );
+  check(
+    "*** no approved dispatch carries no payment method *** [S73]",
+    rows.bad_method === 0,
+    `${rows.bad_method} approved with none`,
+  );
+  check(
+    "no payment note annotates a method that is not there [S71]",
+    rows.bad_note === 0,
+    `${rows.bad_note} disagree`,
+  );
+  check(
+    "*** no South or Dammam dispatch ships anything but CT *** [S119], [S130]",
+    rows.bad_shipment === 0,
+    `${rows.bad_shipment} disagree`,
+  );
+  check(
+    "no destination sits on a dispatch that is not Cargo [S119]",
+    rows.bad_destination === 0,
+    `${rows.bad_destination} disagree`,
+  );
+  check(
+    "no SMAC number sits on a dispatch nobody approved [S121]",
+    rows.bad_number === 0,
+    `${rows.bad_number} disagree`,
+  );
+
+  // `S121` — *which is unique*. Asserted as data as well as by the index,
+  // because a unique index created on the wrong column would still be unique.
+  const [dupes] = (await db.execute(sql`
+    select count(*)::int as n from (
+      select smac_dispatch_number
+      from dispatches
+      where smac_dispatch_number is not null
+      group by smac_dispatch_number
+      having count(*) > 1
+    ) t
+  `)) as unknown as { n: number }[];
+  check(
+    "*** no SMAC dispatch number is carried by two dispatches *** [S121]",
+    dupes.n === 0,
+    `${dupes.n} duplicated`,
+  );
+
+  // **The `S73` inversion, read from the database.** The old gate refused an
+  // approval whose thread had no `payment_confirmed_at`. Those rows are legal
+  // now — and the claim worth asserting is not that they exist, which would
+  // only be true when `verify:slice3` has run, but that **every one of them
+  // still answers the question that replaced it**. A row approved against an
+  // unconfirmed quotation and carrying no payment method would mean the old
+  // gate had been removed without the new one arriving.
+  const [linkedUnpaid] = (await db.execute(sql`
+    select
+      count(*)::int as n,
+      count(*) filter (where d.payment_method is null)::int as no_method
+    from dispatches d
+    join quotation_threads t on t.id = d.quotation_thread_id
+    where d.status = 'approved' and t.payment_confirmed_at is null
+  `)) as unknown as { n: number; no_method: number }[];
+  console.log(
+    `  --    ${linkedUnpaid.n} approved dispatch(es) against a quotation with no payment confirmation`,
+  );
+  check(
+    "*** an unconfirmed quotation is no bar, and every one still carries a method *** [S73]",
+    linkedUnpaid.no_method === 0,
+    `${linkedUnpaid.no_method} carry none`,
+  );
+
+  // The five CHECKs, driven. Shaped from a real row so only the column under
+  // test is wrong, as `requestStatesHold` does.
+  const [any] = (await db.execute(sql`
+    select id, company_id, user_id, recorded_by_user_id, dispatch_date
+    from dispatches limit 1
+  `)) as unknown as {
+    id: string;
+    company_id: string;
+    user_id: string;
+    recorded_by_user_id: string;
+    dispatch_date: string;
+  }[];
+  if (!any) {
+    console.error("  --    no dispatch to shape a refusal from; skipping");
+    return;
+  }
+  const columns =
+    "(company_id, user_id, recorded_by_user_id, dispatch_date, stock, shipment, status";
+  const values = `('${any.company_id}', '${any.user_id}', '${any.recorded_by_user_id}', '${any.dispatch_date}'`;
+
+  await databaseRefuses(
+    "*** approved with no payment method is refused *** [S73]",
+    "dispatches_payment_method",
+    `insert into dispatches ${columns}, submitted_at, approved_at, approved_by_user_id)
+     values ${values}, 'riyadh', 'ct', 'approved', now(), now(), '${any.recorded_by_user_id}')`,
+  );
+  await databaseRefuses(
+    "a payment note with no method is refused [S71]",
+    "dispatches_payment_note",
+    `insert into dispatches ${columns}, payment_note) values ${values}, 'riyadh', 'ct', 'draft', 'x')`,
+  );
+  for (const stockName of ["south", "dammam"]) {
+    for (const wrong of ["tt", "cargo"]) {
+      await databaseRefuses(
+        `*** ${stockName} stock as ${wrong.toUpperCase()} is refused *** [S119]`,
+        "dispatches_stock_shipment",
+        `insert into dispatches ${columns}) values ${values}, '${stockName}', '${wrong}', 'draft')`,
+      );
+    }
+  }
+  await databaseRefuses(
+    "a destination on a CT dispatch is refused [S119]",
+    "dispatches_cargo_destination",
+    `insert into dispatches ${columns}, cargo_destination) values ${values}, 'riyadh', 'ct', 'draft', 'Jeddah')`,
+  );
+  await databaseRefuses(
+    "*** a SMAC number before approval is refused *** [S121]",
+    "dispatches_smac_number_after_approval",
+    `insert into dispatches ${columns}, smac_dispatch_number) values ${values}, 'riyadh', 'ct', 'draft', 'DN-schema25')`,
+  );
+
+  // `S119` — **Malham takes TT**, and the ABSENCE of a refusal is the claim:
+  // *TT is discouraged there, never refused... the coordinator's knowledge,
+  // not a rule FACET enforces.* A CHECK that helpfully included Malham would
+  // be breaking the rule rather than enforcing it, so it is driven rather than
+  // assumed — the other five refusals above would all still pass with Malham
+  // wrongly named in `dispatches_stock_shipment`.
+  //
+  // **Rolled back through a transaction that throws**, because this script
+  // asserts and never writes. `begin; …; rollback;` in one `execute` is not
+  // available: postgres.js sends it as a prepared statement and Postgres
+  // refuses multiple commands in one.
+  let malhamTook = false;
+  try {
+    await db.transaction(async (tx) => {
+      await tx.execute(
+        sql.raw(
+          `insert into dispatches ${columns}) values ${values}, 'malham', 'tt', 'draft')`,
+        ),
+      );
+      malhamTook = true;
+      throw new Error("ROLLBACK-ON-PURPOSE");
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message !== "ROLLBACK-ON-PURPOSE") {
+      malhamTook = false;
+      console.error(`  --    malham/TT insert threw: ${message}`);
+    }
+  }
+  check(
+    "*** Malham takes TT — the database does not refuse it *** [S119]",
+    malhamTook,
+    "the CHECK named Malham, which S119 says it must not",
   );
 }
 

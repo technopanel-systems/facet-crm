@@ -11,15 +11,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { SelectField } from "@/components/form-field";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "@/i18n/navigation";
+import { PAYMENT_METHODS } from "@/lib/enums";
 import { emptyFormState, type FormState } from "@/lib/validation";
 
 import {
   approveDispatchRequestAction,
   refuseDispatchRequestAction,
   reviveDispatchRequestAction,
+  setDispatchSmacNumberAction,
   submitDispatchRequestAction,
 } from "../actions";
 
@@ -30,12 +34,17 @@ import {
  * |---|---|---|
  * | `draft` | edit `S125`, submit | — |
  * | `submitted` | — | edit `S125` `S62`, approve, refuse `S124` |
- * | `approved` | — | — (approval is final `S73`) |
+ * | `approved` | — | write the SMAC number `S121` |
  * | `refused` | — | revive `S122` |
  *
  * **An unavailable act is not rendered** `D53` — never a disabled control and
  * never a message. Every action re-checks its rule on the server `S109`, so
  * what is here is a courtesy rather than the gate.
+ *
+ * **Approval is still final** `S73`: writing the SMAC number is not an edit and
+ * changes no figure. *A dispatch is approved, then numbered*, and the number is
+ * explicitly not a condition of the approval — so it is its own control here,
+ * never a field on the approve form.
  *
  * **There is no approve on the list**, deliberately, and it is a rule rather
  * than a layout choice: `S72` says the coordinator *checks it* and approves it,
@@ -135,11 +144,129 @@ function RefuseForm({ action }: { action: ReasonAction }) {
   );
 }
 
+/**
+ * `S73` — **approval carries the payment method**, and that is what makes
+ * *a dispatch cannot be approved without a payment method* unbreakable rather
+ * than merely checked: there is no path to `approved` that does not pass
+ * through this form.
+ *
+ * **A child component owning its own `useActionState`**, for `RefuseForm`'s
+ * reason and with more at stake: this action writes. Every form in this app
+ * whose hook is created in the component that renders it answers a
+ * no-JavaScript POST; the three that hoist it to a parent rendering the form
+ * conditionally never send response headers at all (`WORKFLOW §5`).
+ *
+ * **The rep never sees this.** `S70` puts the method in the coordinator's head
+ * — *because she is the one who confirms it with finance* — so it is not a
+ * field on the request form and not one on the edit form either.
+ *
+ * The note is optional `S71`; the select is `required`, and the action refuses
+ * the placeholder again, and `dispatches_payment_method` refuses it a third
+ * time at the database.
+ */
+function ApproveForm({ action }: { action: ReasonAction }) {
+  const t = useTranslations();
+  const [state, approve, pending] = useActionState(action, emptyFormState);
+  return (
+    <form action={approve} className="flex flex-col gap-2" data-act="approve">
+      <Label htmlFor="paymentMethod" className="text-start text-sm font-medium">
+        {t("dispatches.fields.paymentMethod")}
+      </Label>
+      {/* A native `<select>` `D20`, and `SelectField`'s rather than a second
+          one: six fixed values, no client state, and the browser places the
+          RTL popup itself. `required` makes it refuse the placeholder; the
+          action refuses it again `S109` and the CHECK a third time `S73`. */}
+      <SelectField
+        name="paymentMethod"
+        placeholder={t("common.none")}
+        required
+      >
+        {PAYMENT_METHODS.map((method) => (
+          <option key={method} value={method}>
+            {t(`enums.paymentMethod.${method}`)}
+          </option>
+        ))}
+      </SelectField>
+
+      <Label htmlFor="paymentNote" className="text-start text-sm font-medium">
+        {t("dispatches.fields.paymentNote")}
+      </Label>
+      {/* `S71` — *an optional note carries anything the list does not*. It may
+          hold either script `D62`. */}
+      <Input
+        id="paymentNote"
+        name="paymentNote"
+        dir="auto"
+        className="text-start"
+        placeholder={t("dispatches.fields.paymentNotePlaceholder")}
+      />
+
+      <div>
+        <Button type="submit" size="sm" variant="default" disabled={pending}>
+          {pending ? t("common.saving") : t("dispatches.actions.approve")}
+        </Button>
+      </div>
+      <Feedback state={state} />
+    </form>
+  );
+}
+
+/**
+ * `S121` — **the SMAC dispatch number**, written after approval.
+ *
+ * *It is not a condition of approval; a dispatch is approved, then numbered.*
+ * So this is a control on an approved dispatch rather than a field on the
+ * approve form, and nothing anywhere waits on it: an approved dispatch with no
+ * number credits its target exactly as one with a number does `S72`.
+ *
+ * Rendered for the coordinator whether or not one is already written — *usually
+ * at once* is not always, and a mistyped number `S5` is hers to correct. The
+ * unique index refuses a collision and `setDispatchSmacNumber` turns it into a
+ * message under the field.
+ */
+function SmacNumberForm({
+  action,
+  current,
+}: {
+  action: ReasonAction;
+  current: string | null;
+}) {
+  const t = useTranslations();
+  const [state, save, pending] = useActionState(action, emptyFormState);
+  return (
+    <form action={save} className="flex flex-col gap-2" data-act="smac-number">
+      <Label
+        htmlFor="smacDispatchNumber"
+        className="text-start text-sm font-medium"
+      >
+        {t("dispatches.fields.smacDispatchNumber")}
+      </Label>
+      {/* A reference, so `dir="ltr"` and `num` — LTR content inside Arabic. */}
+      <Input
+        id="smacDispatchNumber"
+        name="smacDispatchNumber"
+        dir="ltr"
+        defaultValue={current ?? ""}
+        className="num text-start"
+        placeholder={t("dispatches.fields.smacDispatchNumberPlaceholder")}
+        required
+      />
+      <div>
+        <Button type="submit" size="sm" variant="outline" disabled={pending}>
+          {pending ? t("common.saving") : t("common.save")}
+        </Button>
+      </div>
+      <Feedback state={state} />
+    </form>
+  );
+}
+
 export function RequestActions({
   dispatchId,
   status,
   isRaiser,
   isCoordinator,
+  smacDispatchNumber,
 }: {
   dispatchId: string;
   status: "draft" | "submitted" | "approved" | "refused";
@@ -147,6 +274,8 @@ export function RequestActions({
   isRaiser: boolean;
   /** Presentation only — every action re-checks the flag on the server. */
   isCoordinator: boolean;
+  /** `S121` — what is written, so the field opens on it rather than empty. */
+  smacDispatchNumber: string | null;
 }) {
   const t = useTranslations();
 
@@ -154,10 +283,16 @@ export function RequestActions({
     (status === "draft" && isRaiser) ||
     (status === "submitted" && isCoordinator);
 
-  // Approved is final `S73`, and a refused request offers nothing to anyone but
-  // the coordinator who may revive it `S122`. Rendering an empty panel would
-  // say there is something to do here.
-  if (!canEdit && !(status === "refused" && isCoordinator)) return null;
+  // `S121` — an approved dispatch is not editable `S73`, and this is not an
+  // edit: the number is written after approval and gates nothing.
+  const canNumber = status === "approved" && isCoordinator;
+
+  // A refused request offers nothing to anyone but the coordinator who may
+  // revive it `S122`. Rendering an empty panel would say there is something to
+  // do here.
+  if (!canEdit && !canNumber && !(status === "refused" && isCoordinator)) {
+    return null;
+  }
 
   return (
     <Card data-slot="request-actions">
@@ -170,7 +305,9 @@ export function RequestActions({
             ? t("dispatches.detail.actionsCoordinator")
             : status === "refused"
               ? t("dispatches.detail.actionsRefused")
-              : t("dispatches.detail.actionsDraft")}
+              : status === "approved"
+                ? t("dispatches.detail.actionsApproved")
+                : t("dispatches.detail.actionsDraft")}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -202,11 +339,10 @@ export function RequestActions({
 
         {status === "submitted" && isCoordinator ? (
           <>
-            <PlainButton
+            {/* `S73` — the approval carries the payment method, so it is a
+                form rather than the bare button it was. */}
+            <ApproveForm
               action={approveDispatchRequestAction.bind(null, dispatchId)}
-              name="approve"
-              variant="default"
-              label={t("dispatches.actions.approve")}
             />
 
             {/* `S124` — a refusal carries a reason, and `S122` archives the
@@ -216,6 +352,14 @@ export function RequestActions({
               action={refuseDispatchRequestAction.bind(null, dispatchId)}
             />
           </>
+        ) : null}
+
+        {/* `S121` — approved, then numbered. */}
+        {canNumber ? (
+          <SmacNumberForm
+            action={setDispatchSmacNumberAction.bind(null, dispatchId)}
+            current={smacDispatchNumber}
+          />
         ) : null}
 
         {status === "refused" && isCoordinator ? (

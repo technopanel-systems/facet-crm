@@ -398,8 +398,6 @@ async function main(): Promise<void> {
     { projectId: project.id, companyId: company.id, contactId: null },
     {
       stock: "riyadh",
-      paymentMethod: "50% advance",
-      shipmentTerms: "EX-F",
     },
     [
       {
@@ -441,6 +439,13 @@ async function main(): Promise<void> {
   const [dispatch] = await db
     .insert(dispatchesTable)
     .values({
+      // `S130` `S119` `S70` — a hand-written dispatch names all three, as
+      // every dispatch does. Riyadh and CT are the unconstrained pair
+      // (`dispatches_stock_shipment`), and an APPROVED row must carry a
+      // payment method or `dispatches_payment_method` refuses it `S73`.
+      stock: "riyadh" as const,
+      shipment: "ct" as const,
+      paymentMethod: "bank_transfer_full" as const,
       companyId: company.id,
       userId: repA.user.id,
       quotationThreadId: thread.id,
@@ -762,8 +767,6 @@ async function main(): Promise<void> {
     { projectId: project.id, companyId: company.id, contactId: null },
     {
       stock: "riyadh",
-      paymentMethod: "50% advance",
-      shipmentTerms: "EX-F",
     },
     [
       {

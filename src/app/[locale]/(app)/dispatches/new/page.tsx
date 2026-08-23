@@ -172,6 +172,12 @@ export default async function NewDispatchPage({
             quotedSqm: thread.quotedSqm,
             dispatchedSqm: thread.dispatchedSqm,
             projectLabel,
+            // `S118` — the quotation's stock, which the form offers as the
+            // DEFAULT for the dispatch's own `S130`. It travels with the
+            // option for the lines' reason: choosing a quotation is what makes
+            // the right default knowable, and a second navigation to fetch it
+            // would be a round trip for one enum value.
+            stock: thread.stock,
             // `S116` — the issued version's lines, which fill the rows the
             // moment this option is chosen.
             lines: thread.lines,

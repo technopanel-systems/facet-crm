@@ -247,8 +247,6 @@ async function main(): Promise<void> {
     { projectId: project.id, companyId: company.id, contactId: null },
     {
       stock: "dammam",
-      paymentMethod: "50% advance",
-      shipmentTerms: "EX-F",
     },
     [
       {
@@ -562,7 +560,7 @@ async function main(): Promise<void> {
       createQuotationThread(
         repA,
         { projectId: project.id, companyId: other.id, contactId: null },
-        { stock: "riyadh", paymentMethod: null, shipmentTerms: null },
+        { stock: "riyadh" },
         [
           {
             supplierId: supplier.id,

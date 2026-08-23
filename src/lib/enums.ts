@@ -117,6 +117,53 @@ export type SmacVerification = (typeof SMAC_VERIFICATIONS)[number];
 export const STOCKS = ["riyadh", "malham", "south", "dammam"] as const;
 export type Stock = (typeof STOCKS)[number];
 
+/**
+ * `S71` — the six ways a customer pays, recorded on the **dispatch** `S70`,
+ * because the coordinator is the one who confirms it with finance.
+ *
+ * A pg enum rather than free text, and that is the whole change `S70` makes.
+ * `quotation_versions.payment_method` was nullable `text` with no vocabulary at
+ * all, and what reps typed into it — *"50% advance"* — is not one of these six.
+ * A closed set fixed by a rule is an enum `[schema.ts]`; a seventh way to pay
+ * earns a migration.
+ *
+ * **`handled_by_finance` is the escape hatch the rule names**, not a gap in the
+ * list: credit, تساهيل, or a company contract, all settled in SMAC `S3`, where
+ * FACET carries the reference only. `payment_note` carries anything the six do
+ * not `S71`, and it is optional.
+ *
+ * The display names live in `messages/*.json`, so rewording one costs no
+ * migration.
+ */
+export const PAYMENT_METHODS = [
+  "on_delivery",
+  "card_in_office",
+  "cash_in_office",
+  "bank_transfer_full",
+  "bank_transfer_downpayment",
+  "handled_by_finance",
+] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+/**
+ * `S119` — CT (the customer's own truck), TT (a Technopanel truck), Cargo (a
+ * third party). The rep chooses when requesting.
+ *
+ * **This list branches on identity, which is why it is an enum**: *a dispatch
+ * from South or Dammam stock is CT*, and that is a row-local CHECK naming the
+ * token `'ct'` outright. `stockEnum` carries the same argument for the same
+ * reason `S118`.
+ *
+ * **`Cargo` alone carries a destination note**, and it is optional `S119`. The
+ * database refuses one on a CT or TT dispatch rather than discarding it — a
+ * silently dropped input is the defect `AUDIT 1 F3` recorded.
+ *
+ * That TT is discouraged at Malham is **the coordinator's knowledge, not a rule
+ * FACET enforces** `S119`. Nothing here refuses it, and nothing should.
+ */
+export const SHIPMENT_METHODS = ["ct", "tt", "cargo"] as const;
+export type ShipmentMethod = (typeof SHIPMENT_METHODS)[number];
+
 /** `[20 §2]` — an interaction has a company; a field note has nobody. */
 export const REPORT_ENTRY_TYPES = ["interaction", "field_note"] as const;
 export type ReportEntryType = (typeof REPORT_ENTRY_TYPES)[number];

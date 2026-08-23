@@ -100,6 +100,7 @@ import {
   projectCreditSplits,
   projects,
   quotationThreads,
+  quotationVersions,
   recordShares,
   roles,
   serviceTypes,
@@ -136,6 +137,7 @@ import {
   refuseDispatchRequest,
   requestDispatch,
   reviveDispatchRequest,
+  setDispatchSmacNumber,
   submitDispatchRequest,
   updateDispatchRequest,
   type Dispatch,
@@ -168,6 +170,21 @@ import {
   setTarget,
 } from "@/lib/targets";
 import { projectTimeline } from "@/lib/timeline";
+
+/**
+ * `S130` `S119` — the three fields every request now carries. Riyadh and CT
+ * because they are the unconstrained pair: `dispatches_stock_shipment` binds
+ * South and Dammam, so a fixture using either would be asserting `S119` by
+ * accident everywhere rather than where the sections that mean to do it are.
+ */
+const SHIP = { stock: "riyadh", shipment: "ct", cargoDestination: null } as const;
+
+/**
+ * `S70` `S71` `S73` — what the coordinator records when she approves. The
+ * method is required and the note is not; sections that mean to assert either
+ * pass their own rather than this.
+ */
+const PAID = { method: "bank_transfer_full", note: null } as const;
 
 let failures = 0;
 
@@ -273,7 +290,7 @@ async function approvedDispatch(
 ): Promise<Dispatch> {
   const request = await requestDispatch(session, input);
   await submitDispatchRequest(session, request.id);
-  await approveDispatchRequest(session, request.id);
+  await approveDispatchRequest(session, request.id, PAID);
   const [row] = await db
     .select()
     .from(dispatchesTable)
@@ -468,8 +485,6 @@ async function main(): Promise<void> {
   // `string` and would never satisfy `Stock` `S118`.
   const version: QuotationVersionInput = {
     stock: "south",
-    paymentMethod: "50% advance",
-    shipmentTerms: "EX-F",
   };
 
   // Thread 1 — will be paid, and is what the linked dispatches go against.
@@ -542,6 +557,7 @@ async function main(): Promise<void> {
 
   console.log("\n2. Every gate refuses with its own key");
   const directInput = {
+    ...SHIP,
     lines: linesOf("10.0000"),
     dispatchDate: "2026-09-10",
     quotationThreadId: null,
@@ -557,6 +573,7 @@ async function main(): Promise<void> {
   // RAISE one with no flag, and may not APPROVE it. §19 walks the whole of a
   // rep's path; this is the gate half, beside the other gates it belongs with.
   const repRequest = await requestDispatch(repA, {
+    ...SHIP,
     lines: linesOf("10.0000"),
     dispatchDate: "2026-09-10",
     quotationThreadId: null,
@@ -573,12 +590,12 @@ async function main(): Promise<void> {
   await refuses(
     "*** but a rep may NOT approve one *** [S72]",
     "dispatches.errors.approveOnly",
-    () => approveDispatchRequest(repA, repRequest.id),
+    () => approveDispatchRequest(repA, repRequest.id, PAID),
   );
   await refuses(
     "and neither may the manager — approving is operational [12 §3]",
     "dispatches.errors.approveOnly",
-    () => approveDispatchRequest(manager, repRequest.id),
+    () => approveDispatchRequest(manager, repRequest.id, PAID),
   );
   await refuses(
     "a rep may not refuse one either [S124]",
@@ -610,25 +627,38 @@ async function main(): Promise<void> {
     () => setTarget(coordinator, repA.user.id, "2026-09", "500.0000"),
   );
 
-  /* --- 3. The payment gate [07 C3], [09 §6.1] -------------------- */
+  /* --- 3. Approval needs a payment METHOD [S73], [S70], [S71] ----- */
 
   console.log(
-    "\n3. The payment gate fires on the APPROVAL, not the request [S72], [07 C3]",
+    "\n3. Approval needs a payment METHOD, not a confirmed payment [S73], [S70]",
   );
 
-  // **The gate moved, and this section is where that is visible.** It used to
-  // refuse at `recordDispatch`; a rep could not even ASK until finance had
-  // confirmed, which sits absurdly beside `S71`, whose *on delivery* method is
-  // by definition not confirmed before the goods move. `S72` puts the half
-  // that deals with finance on the coordinator, so the request goes through
-  // and the approval is what refuses. `S73` replaces the condition itself in
-  // the payment slice; this moved only where it fires.
+  // **This section inverted with `S73`, and the inversion is the rule.**
+  //
+  // `07 C3` gated dispatch on `quotation_threads.payment_confirmed_at`. `S72`
+  // moved that gate from the request to the approval; `S73` replaces the
+  // CONDITION. Three things changed rather than one:
+  //
+  //   * The old gate asked *has money arrived?*. `on_delivery` `S71` answers
+  //     "no" and is still a legitimate way to buy — which is why a rule that
+  //     names it cannot also require money first.
+  //   * It read a state on ANOTHER table, so it could never be a CHECK. The
+  //     method is on the dispatch row, so `dispatches_payment_method` holds
+  //     it, and `verify:schema25` §16 asserts that over every row.
+  //   * It sat inside the thread branch, so a FREE ENTRY `S75` passed no
+  //     payment gate at all. §3b below is that half, and it is new.
   //
   // An unissued quotation is a different matter and still refuses at the
   // request: `S126` is about what may be dispatched against at all.
+  // **December, and the date is load-bearing.** This request used to be
+  // refused and never approved, so its date did not matter. `S73` makes the
+  // approval succeed, and §10-§11 below assert September's achievement as an
+  // exact worked example — a proof that quietly added five square metres to
+  // two reps' targets would be failing those checks for the wrong reason.
   const unpaidRequest = await requestDispatch(coordinator, {
+    ...SHIP,
     lines: linesOf("10.0000"),
-    dispatchDate: "2026-09-10",
+    dispatchDate: "2026-12-10",
     quotationThreadId: unpaidThread.id,
     companyId: null,
     userId: null,
@@ -640,19 +670,108 @@ async function main(): Promise<void> {
   );
   await submitDispatchRequest(coordinator, unpaidRequest.id);
   await refuses(
-    "*** and refuses at the approval instead *** [S72], [07 C3]",
-    "dispatches.errors.paymentNotConfirmed",
-    () => approveDispatchRequest(coordinator, unpaidRequest.id),
-  );
-  check(
-    "an unpaid quotation IS offered now — the list matches the write [S72]",
-    (await listDispatchableThreads(coordinator)).some(
-      (thread) => thread.id === unpaidThread.id,
-    ),
+    "*** approval refuses with NO payment method *** [S73]",
+    "dispatches.errors.paymentMethodRequired",
+    () =>
+      approveDispatchRequest(coordinator, unpaidRequest.id, {
+        method: null,
+        note: null,
+      }),
   );
   check(
     "and the refused approval left the request submitted, not half-approved",
     (await getDispatch(coordinator, unpaidRequest.id))?.status === "submitted",
+  );
+  // **The inversion.** This quotation carries no `payment_confirmed_at` and
+  // never will in this run. Before `S73` the same call refused with
+  // `dispatches.errors.paymentNotConfirmed` — a key that no longer exists.
+  await approveDispatchRequest(coordinator, unpaidRequest.id, {
+    method: "on_delivery",
+    note: null,
+  });
+  const unpaidApproved = await getDispatch(coordinator, unpaidRequest.id);
+  check(
+    "*** an UNCONFIRMED quotation approves, on delivery *** [S73], [S71]",
+    unpaidApproved?.status === "approved" &&
+      unpaidApproved.paymentMethod === "on_delivery",
+    `got status ${unpaidApproved?.status}, method ${unpaidApproved?.paymentMethod}`,
+  );
+  check(
+    "the thread it came from still carries no payment confirmation [S73]",
+    (
+      await db
+        .select({ at: quotationThreads.paymentConfirmedAt })
+        .from(quotationThreads)
+        .where(eq(quotationThreads.id, unpaidThread.id))
+        .limit(1)
+    )[0]?.at === null,
+  );
+  check(
+    "an unpaid quotation IS offered — the list matches the write [S72]",
+    (await listDispatchableThreads(coordinator)).some(
+      (thread) => thread.id === unpaidThread.id,
+    ),
+  );
+
+  /* --- 3b. The method on the FREE-ENTRY route, which had no gate --- */
+
+  console.log(
+    "\n3b. The method is required on every route of S75, not the linked one alone [S73]",
+  );
+
+  // Before `S73` this call succeeded. The gate lived inside
+  // `if (request.quotationThreadId)`, so a free entry — having no thread —
+  // reached `approved` with the payment question never asked at all.
+  const freeRequest = await requestDispatch(coordinator, {
+    ...SHIP,
+    lines: linesOf("7.0000"),
+    // December, for the reason above §3's first request.
+    dispatchDate: "2026-12-10",
+    quotationThreadId: null,
+    companyId: company.id,
+    userId: null,
+    projectId: null,
+  });
+  await submitDispatchRequest(coordinator, freeRequest.id);
+  await refuses(
+    "*** a FREE ENTRY cannot be approved without a method either *** [S73], [S75]",
+    "dispatches.errors.paymentMethodRequired",
+    () =>
+      approveDispatchRequest(coordinator, freeRequest.id, {
+        method: null,
+        note: null,
+      }),
+  );
+  // `S71` — *handled by finance* is credit, تساهيل or a company contract,
+  // settled in SMAC. It is also what `companies.has_credit_terms` was reaching
+  // for as a flag nothing ever set: `0022` dropped it, because `S70` and `S73`
+  // were its only citations and both were rewritten into this list.
+  await approveDispatchRequest(coordinator, freeRequest.id, {
+    method: "handled_by_finance",
+    note: "credit terms, settled in SMAC",
+  });
+  const freeApproved = await getDispatch(coordinator, freeRequest.id);
+  check(
+    "*** and approves with one, note and all *** [S71], [S70]",
+    freeApproved?.paymentMethod === "handled_by_finance" &&
+      freeApproved.paymentNote === "credit terms, settled in SMAC",
+    `got ${freeApproved?.paymentMethod} / ${freeApproved?.paymentNote}`,
+  );
+  // *An optional note carries anything the list does not* `S71` — optional
+  // being the half a required field would quietly break.
+  const noNote = await approvedDispatch(coordinator, {
+    ...SHIP,
+    lines: linesOf("5.0000"),
+    // December, for the reason above §3's first request.
+    dispatchDate: "2026-12-10",
+    quotationThreadId: null,
+    companyId: company.id,
+    userId: null,
+    projectId: null,
+  });
+  check(
+    "the note is optional [S71]",
+    (await getDispatch(coordinator, noNote.id))?.paymentNote === null,
   );
 
   await issueVersion(coordinator, paidThread.id, {
@@ -670,6 +789,7 @@ async function main(): Promise<void> {
   );
 
   const linked = await approvedDispatch(coordinator, {
+    ...SHIP,
     lines: linesOf("100.0000"),
     dispatchDate: "2026-09-10",
     quotationThreadId: paidThread.id,
@@ -697,6 +817,7 @@ async function main(): Promise<void> {
     "dispatches.errors.companyNotOnThread",
     () =>
       approvedDispatch(coordinator, {
+    ...SHIP,
         lines: linesOf("1.0000"),
         dispatchDate: "2026-09-10",
         quotationThreadId: paidThread.id,
@@ -707,6 +828,7 @@ async function main(): Promise<void> {
   );
 
   const secondPartial = await approvedDispatch(coordinator, {
+    ...SHIP,
     lines: linesOf("5000.0000"), // far beyond the 86.3040 m² quoted
     dispatchDate: "2026-09-11",
     quotationThreadId: paidThread.id,
@@ -725,6 +847,7 @@ async function main(): Promise<void> {
     "\n4. Free entry — no quotation, and the same approval as any other [07 C6]",
   );
   const direct = await approvedDispatch(coordinator, {
+    ...SHIP,
     lines: linesOf("40.0000"),
     dispatchDate: "2026-09-12",
     quotationThreadId: null,
@@ -762,6 +885,7 @@ async function main(): Promise<void> {
     "dispatches.errors.companyRequired",
     () =>
       approvedDispatch(coordinator, {
+    ...SHIP,
         lines: linesOf("1.0000"),
         dispatchDate: "2026-09-12",
         quotationThreadId: null,
@@ -775,6 +899,7 @@ async function main(): Promise<void> {
   // `can_dispatch` holder may name somebody else, which §2 asserts from the
   // other side.
   const forSelf = await approvedDispatch(coordinator, {
+    ...SHIP,
     lines: linesOf("1.0000"),
     dispatchDate: "2026-09-12",
     quotationThreadId: null,
@@ -792,6 +917,7 @@ async function main(): Promise<void> {
     "dispatches.errors.sqmPositive",
     () =>
       approvedDispatch(coordinator, {
+    ...SHIP,
         lines: linesOf("0.0000"),
         dispatchDate: "2026-09-12",
         quotationThreadId: null,
@@ -912,6 +1038,7 @@ async function main(): Promise<void> {
   );
 
   const d2Row = await approvedDispatch(coordinator, {
+    ...SHIP,
     lines: linesOf("100.0000"),
     dispatchDate: "2026-10-05",
     quotationThreadId: paidThread.id,
@@ -1340,6 +1467,7 @@ async function main(): Promise<void> {
   // the assertion that fails the day someone routes a dispatch to a project by
   // its company instead of by its quotation thread.
   await approvedDispatch(coordinator, {
+    ...SHIP,
     lines: linesOf("40.0000"),
     dispatchDate: "2026-09-13",
     quotationThreadId: null,
@@ -1355,6 +1483,7 @@ async function main(): Promise<void> {
 
   // And a linked one moves it by exactly its own square metres.
   await approvedDispatch(coordinator, {
+    ...SHIP,
     lines: linesOf("7.0000"),
     dispatchDate: "2026-09-13",
     quotationThreadId: paidThread.id,
@@ -1410,6 +1539,7 @@ async function main(): Promise<void> {
   await acceptThread(coordinator, secondThread.id);
   await confirmPayment(repA, secondThread.id, "2026-08-02");
   await approvedDispatch(coordinator, {
+    ...SHIP,
     lines: linesOf("250.0000"),
     dispatchDate: "2026-09-13",
     quotationThreadId: secondThread.id,
@@ -1456,6 +1586,7 @@ async function main(): Promise<void> {
   // the column was written, rather than the figure still arriving through the
   // thread. `paidThread` belongs to `project`.
   const takenFrom = await approvedDispatch(coordinator, {
+    ...SHIP,
     lines: linesOf("3.0000"),
     dispatchDate: "2026-09-14",
     quotationThreadId: paidThread.id,
@@ -1490,6 +1621,7 @@ async function main(): Promise<void> {
     "dispatches.errors.projectNotOnThread",
     () =>
       approvedDispatch(coordinator, {
+    ...SHIP,
         lines: linesOf("1.0000"),
         dispatchDate: "2026-09-14",
         quotationThreadId: paidThread.id,
@@ -1544,6 +1676,7 @@ async function main(): Promise<void> {
     "dispatches.errors.projectRequired",
     () =>
       approvedDispatch(coordinator, {
+    ...SHIP,
         lines: linesOf("12.0000"),
         dispatchDate: "2026-09-14",
         quotationThreadId: looseThread.id,
@@ -1554,6 +1687,7 @@ async function main(): Promise<void> {
   );
 
   const written = await approvedDispatch(coordinator, {
+    ...SHIP,
     lines: linesOf("12.0000"),
     dispatchDate: "2026-09-14",
     quotationThreadId: looseThread.id,
@@ -1597,6 +1731,7 @@ async function main(): Promise<void> {
   // would refuse it anyway. Nothing to write back either: the quotation now
   // has a project, so this is branch one from here on.
   const again = await approvedDispatch(coordinator, {
+    ...SHIP,
     lines: linesOf("8.0000"),
     dispatchDate: "2026-09-15",
     quotationThreadId: looseThread.id,
@@ -1925,6 +2060,7 @@ async function main(): Promise<void> {
     "dispatches.errors.quotationNotIssued",
     () =>
       approvedDispatch(coordinator, {
+    ...SHIP,
         lines: linesOf("1.0000"),
         dispatchDate: "2026-09-20",
         quotationThreadId: paidNotIssued.id,
@@ -1984,6 +2120,7 @@ async function main(): Promise<void> {
 
   /* Route one — exactly as a quotation. */
   const asQuoted = await approvedDispatch(coordinator, {
+    ...SHIP,
     lines: prefilled.lines,
     dispatchDate: "2026-09-21",
     quotationThreadId: paidNotIssued.id,
@@ -2009,6 +2146,7 @@ async function main(): Promise<void> {
 
   /* Route two — from a quotation, with edits. The one that did not exist. */
   const edited = await approvedDispatch(coordinator, {
+    ...SHIP,
     lines: [
       // Half the quantity went out, at a renegotiated price…
       { ...prefilled.lines[0], quantityPcs: "6.0000", unitPrice: "110.00" },
@@ -2050,6 +2188,7 @@ async function main(): Promise<void> {
 
   /* Route three — free entry, no quotation at all. */
   const freeEntry = await approvedDispatch(coordinator, {
+    ...SHIP,
     lines: linesOf("9.0000", "70.00"),
     dispatchDate: "2026-09-23",
     quotationThreadId: null,
@@ -2072,6 +2211,7 @@ async function main(): Promise<void> {
     "dispatches.errors.linePriceRequired",
     () =>
       approvedDispatch(coordinator, {
+    ...SHIP,
         lines: linesOf("4.0000", ""),
         dispatchDate: "2026-09-24",
         quotationThreadId: null,
@@ -2085,6 +2225,7 @@ async function main(): Promise<void> {
     "dispatches.errors.atLeastOneLine",
     () =>
       approvedDispatch(coordinator, {
+    ...SHIP,
         lines: [],
         dispatchDate: "2026-09-24",
         quotationThreadId: null,
@@ -2101,6 +2242,7 @@ async function main(): Promise<void> {
   );
 
   const repPath = await requestDispatch(repA, {
+    ...SHIP,
     lines: linesOf("30.0000", "80.00"),
     dispatchDate: "2026-09-25",
     quotationThreadId: paidThread.id,
@@ -2116,6 +2258,7 @@ async function main(): Promise<void> {
 
   // `S125` — *a rep edits their own request until they submit it.*
   await updateDispatchRequest(repA, repPath.id, {
+    ...SHIP,
     lines: linesOf("31.0000", "80.00"),
     dispatchDate: "2026-09-26",
     projectId: null,
@@ -2139,6 +2282,7 @@ async function main(): Promise<void> {
     "dispatches.errors.requestNotVisible",
     () =>
       updateDispatchRequest(repB, repPath.id, {
+    ...SHIP,
         lines: linesOf("1.0000", "80.00"),
         dispatchDate: "2026-09-26",
         projectId: null,
@@ -2158,6 +2302,7 @@ async function main(): Promise<void> {
     "dispatches.errors.notYourRequest",
     () =>
       updateDispatchRequest(coordinator, repPath.id, {
+    ...SHIP,
         lines: linesOf("1.0000", "80.00"),
         dispatchDate: "2026-09-26",
         projectId: null,
@@ -2166,7 +2311,7 @@ async function main(): Promise<void> {
   await refuses(
     "…nor approve one that has not been submitted [S72]",
     "dispatches.errors.notSubmitted",
-    () => approveDispatchRequest(coordinator, repPath.id),
+    () => approveDispatchRequest(coordinator, repPath.id, PAID),
   );
 
   await submitDispatchRequest(repA, repPath.id);
@@ -2184,6 +2329,7 @@ async function main(): Promise<void> {
     "dispatches.errors.coordinatorEditsSubmitted",
     () =>
       updateDispatchRequest(repA, repPath.id, {
+    ...SHIP,
         lines: linesOf("99.0000", "80.00"),
         dispatchDate: "2026-09-26",
         projectId: null,
@@ -2195,6 +2341,7 @@ async function main(): Promise<void> {
     () => submitDispatchRequest(repA, repPath.id),
   );
   await updateDispatchRequest(coordinator, repPath.id, {
+    ...SHIP,
     lines: linesOf("32.0000", "85.00"),
     dispatchDate: "2026-09-26",
     projectId: null,
@@ -2229,12 +2376,13 @@ async function main(): Promise<void> {
     editAudit.map((row) => row.action).join(", "),
   );
 
-  await approveDispatchRequest(coordinator, repPath.id);
+  await approveDispatchRequest(coordinator, repPath.id, PAID);
   await refuses(
     "an approved dispatch is not editable by anyone — approval is final [S73]",
     "dispatches.errors.requestNotEditable",
     () =>
       updateDispatchRequest(coordinator, repPath.id, {
+    ...SHIP,
         lines: linesOf("1.0000", "80.00"),
         dispatchDate: "2026-09-26",
         projectId: null,
@@ -2243,7 +2391,7 @@ async function main(): Promise<void> {
   await refuses(
     "…and cannot be approved a second time",
     "dispatches.errors.notSubmitted",
-    () => approveDispatchRequest(coordinator, repPath.id),
+    () => approveDispatchRequest(coordinator, repPath.id, PAID),
   );
 
   /* --- 20. Refusal and revival [S124], [S122] -------------------- */
@@ -2253,6 +2401,7 @@ async function main(): Promise<void> {
   );
 
   const doomed = await requestDispatch(repA, {
+    ...SHIP,
     lines: linesOf("7.0000", "60.00"),
     dispatchDate: "2026-09-27",
     quotationThreadId: paidThread.id,
@@ -2358,6 +2507,7 @@ async function main(): Promise<void> {
   );
   // The rep edits and submits it as they would a new one `S122`, `S125`.
   await updateDispatchRequest(repA, doomed.id, {
+    ...SHIP,
     lines: linesOf("8.0000", "60.00"),
     dispatchDate: "2026-09-28",
     projectId: null,
@@ -2438,6 +2588,7 @@ async function main(): Promise<void> {
   // walked rather than assumed. A four-eyes check added to approval later
   // fails HERE, instead of quietly repealing `S127`.
   const hers = await requestDispatch(herself, {
+    ...SHIP,
     lines: linesOf("55.0000", "90.00"),
     dispatchDate: "2026-09-29",
     quotationThreadId: null,
@@ -2460,7 +2611,7 @@ async function main(): Promise<void> {
     "3. she submits it — the same person, the same request",
     (await getDispatch(herself, hers.id))?.status === "submitted",
   );
-  await approveDispatchRequest(herself, hers.id);
+  await approveDispatchRequest(herself, hers.id, PAID);
   const herApproved = (await getDispatch(herself, hers.id))!;
   check(
     "*** 4. and she approves it herself — nothing blocks both acts *** [S127]",
@@ -2501,6 +2652,7 @@ async function main(): Promise<void> {
   ).total;
 
   const pending = await requestDispatch(repA, {
+    ...SHIP,
     lines: linesOf("500.0000", "100.00"),
     dispatchDate: "2026-09-30",
     quotationThreadId: paidThread.id,
@@ -2538,7 +2690,7 @@ async function main(): Promise<void> {
 
   // The other half of the same claim: approving it DOES move all three. A
   // figure that never moves is not proof that this one is right.
-  await approveDispatchRequest(coordinator, pending.id);
+  await approveDispatchRequest(coordinator, pending.id, PAID);
   check(
     "…and approving it moves every one of them [S72]",
     (await figureFor(company.id)) !== beforeCompany &&
@@ -2609,6 +2761,7 @@ async function main(): Promise<void> {
     "dispatches.errors.projectRequired",
     () =>
       requestDispatch(repA, {
+    ...SHIP,
         lines: linesOf("6.0000", "60.00"),
         dispatchDate: "2026-09-30",
         quotationThreadId: projectless.id,
@@ -2619,6 +2772,7 @@ async function main(): Promise<void> {
   );
 
   const writeback = await requestDispatch(repA, {
+    ...SHIP,
     lines: linesOf("6.0000", "60.00"),
     dispatchDate: "2026-09-30",
     quotationThreadId: projectless.id,
@@ -2644,7 +2798,7 @@ async function main(): Promise<void> {
     (await getQuotationThread(repA, projectless.id))?.projectId === null,
   );
 
-  await approveDispatchRequest(coordinator, writeback.id);
+  await approveDispatchRequest(coordinator, writeback.id, PAID);
   check(
     "*** approving writes the project onto the quotation *** [S74], [S72]",
     (await getQuotationThread(repA, projectless.id))?.projectId === target.id,
@@ -2660,6 +2814,7 @@ async function main(): Promise<void> {
   // write-back. The thread already carries the project the request names, so
   // there is nothing to write and nothing to refuse.
   const second = await approvedDispatch(coordinator, {
+    ...SHIP,
     lines: linesOf("2.0000", "60.00"),
     dispatchDate: "2026-10-01",
     quotationThreadId: projectless.id,
@@ -2671,6 +2826,274 @@ async function main(): Promise<void> {
     "*** a second dispatch does not trip on the first one's write-back *** [S74]",
     second.projectId === target.id && second.status === "approved",
     `got project ${second.projectId}, status ${second.status}`,
+  );
+
+  /* --- 24. Shipment, and the CT rule [S119], [S130] --------------- */
+
+  console.log(
+    "\n24. *** South and Dammam stock have no trucks, so a dispatch from either is CT *** [S119], [S130]",
+  );
+
+  // **`S130` is what makes this rule assertable at all.** The stock used to be
+  // on `quotation_versions` alone `S118`, and read from there the rule spans
+  // two rows: it could never be a CHECK, it could not reach a free entry, and
+  // a revision `S66` could move the value underneath a dispatch that had
+  // already been raised. On the dispatch it is `dispatches_stock_shipment`.
+  const ctInput = {
+    lines: linesOf("3.0000"),
+    dispatchDate: "2026-09-12",
+    quotationThreadId: null,
+    companyId: company.id,
+    userId: null,
+    projectId: null,
+    cargoDestination: null,
+  };
+  for (const forced of ["south", "dammam"] as const) {
+    for (const wrong of ["tt", "cargo"] as const) {
+      await refuses(
+        `*** ${forced} stock cannot be ${wrong.toUpperCase()} *** [S119]`,
+        "dispatches.errors.shipmentMustBeCt",
+        () =>
+          requestDispatch(coordinator, {
+            ...ctInput,
+            stock: forced,
+            shipment: wrong,
+          }),
+      );
+    }
+    const ok = await requestDispatch(coordinator, {
+      ...ctInput,
+      stock: forced,
+      shipment: "ct",
+    });
+    check(
+      `${forced} stock is fine as CT [S119]`,
+      ok.stock === forced && ok.shipment === "ct",
+      `got ${ok.stock} / ${ok.shipment}`,
+    );
+  }
+
+  // **Riyadh and Malham take all three**, and Malham is the point: *TT is
+  // discouraged there, never refused — the coordinator's knowledge, not a rule
+  // FACET enforces* `S119`. An implementation that helpfully blocked it would
+  // be breaking the rule rather than enforcing it, so the absence is asserted
+  // rather than assumed.
+  for (const stockName of ["riyadh", "malham"] as const) {
+    for (const method of ["ct", "tt", "cargo"] as const) {
+      const raised = await requestDispatch(coordinator, {
+        ...ctInput,
+        stock: stockName,
+        shipment: method,
+        cargoDestination: method === "cargo" ? "Jeddah" : null,
+      });
+      check(
+        `${stockName} stock takes ${method.toUpperCase()} [S119]`,
+        raised.stock === stockName && raised.shipment === method,
+        `got ${raised.stock} / ${raised.shipment}`,
+      );
+    }
+  }
+
+  // `S119` — *Cargo carries a destination note*, and it is **optional**. The
+  // pairing is what is refused, never the absence, and it is refused rather
+  // than discarded: an input that vanishes is `AUDIT 1 F3`'s defect.
+  const cargoNoNote = await requestDispatch(coordinator, {
+    ...ctInput,
+    stock: "riyadh",
+    shipment: "cargo",
+  });
+  check(
+    "a Cargo destination is OPTIONAL [S119]",
+    cargoNoNote.cargoDestination === null,
+  );
+  for (const method of ["ct", "tt"] as const) {
+    await refuses(
+      `*** a destination on a ${method.toUpperCase()} dispatch is REFUSED, not dropped *** [S119]`,
+      "dispatches.errors.cargoDestinationOnly",
+      () =>
+        requestDispatch(coordinator, {
+          ...ctInput,
+          stock: "riyadh",
+          shipment: method,
+          cargoDestination: "Jeddah",
+        }),
+    );
+  }
+
+  // **The same two refusals on the EDIT** `S125` `S62`. The rule holds in the
+  // coordinator's window as well as the rep's, which is what one shared
+  // `assertShipment` is for — two copies of it would drift.
+  const editable = await requestDispatch(coordinator, {
+    ...ctInput,
+    stock: "riyadh",
+    shipment: "tt",
+  });
+  await refuses(
+    "*** and editing cannot move it to a stock its shipment forbids *** [S119], [S130]",
+    "dispatches.errors.shipmentMustBeCt",
+    () =>
+      updateDispatchRequest(coordinator, editable.id, {
+        lines: linesOf("3.0000"),
+        dispatchDate: "2026-09-12",
+        projectId: null,
+        stock: "dammam",
+        shipment: "tt",
+        cargoDestination: null,
+      }),
+  );
+  await updateDispatchRequest(coordinator, editable.id, {
+    lines: linesOf("3.0000"),
+    dispatchDate: "2026-09-12",
+    projectId: null,
+    stock: "dammam",
+    shipment: "ct",
+    cargoDestination: null,
+  });
+  check(
+    "*** the coordinator may change the stock until approval *** [S130]",
+    (await getDispatch(coordinator, editable.id))?.stock === "dammam",
+  );
+
+  /* --- 25. The dispatch's stock is its own [S130] ----------------- */
+
+  console.log(
+    "\n25. *** A dispatch may draw from a different stock than its quotation, and the quotation is not rewritten *** [S130]",
+  );
+
+  // `paidThread` was raised from Dammam by the fixture at the head of this
+  // script. The dispatch takes Riyadh, which is the whole of `S130`'s first
+  // sentence — and `S119` then lets it be TT, which the quotation's own stock
+  // would have forbidden. That is why the column had to move.
+  const [quotedStock] = await db
+    .select({ stock: quotationVersions.stock })
+    .from(quotationVersions)
+    .where(eq(quotationVersions.threadId, paidThread.id))
+    .orderBy(quotationVersions.versionNumber)
+    .limit(1);
+  const elsewhere = await approvedDispatch(coordinator, {
+    lines: linesOf("4.0000"),
+    dispatchDate: "2026-09-13",
+    quotationThreadId: paidThread.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+    stock: "riyadh",
+    shipment: "tt",
+    cargoDestination: null,
+  });
+  check(
+    "*** the dispatch carries its OWN stock, not the quotation's *** [S130]",
+    elsewhere.stock === "riyadh" && quotedStock?.stock !== "riyadh",
+    `dispatch ${elsewhere.stock}, quotation ${quotedStock?.stock}`,
+  );
+  const [afterwards] = await db
+    .select({ stock: quotationVersions.stock })
+    .from(quotationVersions)
+    .where(eq(quotationVersions.threadId, paidThread.id))
+    .orderBy(quotationVersions.versionNumber)
+    .limit(1);
+  check(
+    "*** and the quotation is NOT rewritten *** [S130]",
+    afterwards?.stock === quotedStock?.stock,
+    `was ${quotedStock?.stock}, now ${afterwards?.stock}`,
+  );
+  await refuses(
+    "*** after approval the stock cannot change *** [S130], [S73]",
+    "dispatches.errors.requestNotEditable",
+    () =>
+      updateDispatchRequest(coordinator, elsewhere.id, {
+        lines: linesOf("4.0000"),
+        dispatchDate: "2026-09-13",
+        projectId: null,
+        stock: "malham",
+        shipment: "tt",
+        cargoDestination: null,
+      }),
+  );
+
+  /* --- 26. The SMAC dispatch number [S121] ------------------------ */
+
+  console.log(
+    "\n26. *** Approved, then numbered — and the number is not a condition of approval *** [S121]",
+  );
+
+  // The negative half first, because it is the one a later writer could break
+  // by "helpfully" requiring the number at approval.
+  const numbering = await requestDispatch(coordinator, {
+    ...SHIP,
+    lines: linesOf("6.0000"),
+    dispatchDate: "2026-09-14",
+    quotationThreadId: null,
+    companyId: company.id,
+    userId: null,
+    projectId: null,
+  });
+  await refuses(
+    "*** a number cannot be written before approval *** [S121]",
+    "dispatches.errors.notApproved",
+    () => setDispatchSmacNumber(coordinator, numbering.id, `${stamp}-DN-1`),
+  );
+  await submitDispatchRequest(coordinator, numbering.id);
+  await refuses(
+    "nor while it sits with the coordinator [S121]",
+    "dispatches.errors.notApproved",
+    () => setDispatchSmacNumber(coordinator, numbering.id, `${stamp}-DN-1`),
+  );
+
+  await approveDispatchRequest(coordinator, numbering.id, PAID);
+  const unnumbered = await getDispatch(coordinator, numbering.id);
+  check(
+    "*** it approved with NO number — the number is not a condition *** [S121]",
+    unnumbered?.status === "approved" && unnumbered.smacDispatchNumber === null,
+    `got ${unnumbered?.status} / ${unnumbered?.smacDispatchNumber}`,
+  );
+  check(
+    "and an unnumbered approved dispatch still credits its target [S72], [S121]",
+    (await dispatchesInPeriod("2026-09-01", "2026-10-01")).some(
+      (row) => row.id === numbering.id,
+    ),
+  );
+
+  await setDispatchSmacNumber(coordinator, numbering.id, `${stamp}-DN-1`);
+  check(
+    "*** approved, THEN numbered *** [S121]",
+    (await getDispatch(coordinator, numbering.id))?.smacDispatchNumber ===
+      `${stamp}-DN-1`,
+  );
+
+  // `S121` — *which is unique*. Checked in the data layer so it lands as a
+  // field message; `dispatches_smac_number_key` is what holds under a race,
+  // and `verify:schema25` §16 asserts that over every row.
+  const otherNumbered = await approvedDispatch(coordinator, {
+    ...SHIP,
+    lines: linesOf("6.0000"),
+    dispatchDate: "2026-09-14",
+    quotationThreadId: null,
+    companyId: company.id,
+    userId: null,
+    projectId: null,
+  });
+  await refuses(
+    "*** and it is unique *** [S121]",
+    "dispatches.errors.smacNumberTaken",
+    () => setDispatchSmacNumber(coordinator, otherNumbered.id, `${stamp}-DN-1`),
+  );
+  await setDispatchSmacNumber(coordinator, numbering.id, `${stamp}-DN-1`);
+  check(
+    "re-writing the SAME number on the SAME dispatch is not a collision [S5]",
+    (await getDispatch(coordinator, numbering.id))?.smacDispatchNumber ===
+      `${stamp}-DN-1`,
+  );
+  await setDispatchSmacNumber(coordinator, numbering.id, `${stamp}-DN-2`);
+  check(
+    "*** a mistyped number is hers to correct *** [S5], [S121]",
+    (await getDispatch(coordinator, numbering.id))?.smacDispatchNumber ===
+      `${stamp}-DN-2`,
+  );
+  await refuses(
+    "*** only the coordinator may write it *** [S121], [S62]",
+    "dispatches.errors.smacNumberOnly",
+    () => setDispatchSmacNumber(repA, numbering.id, `${stamp}-DN-3`),
   );
 
   /*

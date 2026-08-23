@@ -214,6 +214,55 @@ export const stockEnum = pgEnum("stock", [
   "dammam",
 ]);
 
+/**
+ * `S71` — the six ways a customer pays, on the **dispatch** and not the
+ * quotation `S70`. The coordinator records it, because she is the one who
+ * confirms it with finance.
+ *
+ * **This is what replaced free text.** `quotation_versions.payment_method` was
+ * nullable `text` with no vocabulary, and the values reps actually typed into
+ * it — `'50% advance'` — are none of these six. A closed set fixed by a rule is
+ * an enum, on the test at the head of this block; a seventh way to pay is a
+ * new commercial arrangement and earns a migration.
+ *
+ * `handled_by_finance` is the escape hatch `S71` names — credit, تساهيل or a
+ * company contract, settled in SMAC `S3`, where FACET carries the reference
+ * only — and `payment_note` beside it carries anything the six do not.
+ *
+ * **Nullable on the column, and `S73` is why.** A request is raised, edited and
+ * submitted with no payment method at all: it is not the rep's to answer. The
+ * `dispatches_payment_method` CHECK is what makes it required, and only at the
+ * moment it is required — approval.
+ */
+export const paymentMethodEnum = pgEnum("payment_method", [
+  "on_delivery",
+  "card_in_office",
+  "cash_in_office",
+  "bank_transfer_full",
+  "bank_transfer_downpayment",
+  "handled_by_finance",
+]);
+
+/**
+ * `S119` — CT (the customer's own truck), TT (a Technopanel truck), Cargo (a
+ * third party). The rep chooses when requesting.
+ *
+ * **An enum because the rule branches on identity**, exactly as `stockEnum`'s
+ * header argues for the four stocks: *a dispatch from South or Dammam stock is
+ * CT*. That is `dispatches_stock_shipment`, a row-local CHECK naming both
+ * tokens outright, and a uuid into an editable table could not carry it.
+ *
+ * **That TT is discouraged at Malham is the coordinator's knowledge, not a rule
+ * FACET enforces** `S119`. Nothing refuses it and nothing should — the rule
+ * says so in its own last sentence, so an implementation that helpfully blocked
+ * it would be breaking the rule rather than enforcing it.
+ */
+export const shipmentMethodEnum = pgEnum("shipment_method", [
+  "ct",
+  "tt",
+  "cargo",
+]);
+
 /** `[08 B2]` */
 export const formFactorEnum = pgEnum("form_factor", ["sheet", "coil"]);
 
@@ -647,17 +696,15 @@ export const companies = pgTable(
     leadSourceId: uuid("lead_source_id").references(() => leadSources.id),
     /** What the customer needs, entered at registration `[04 Q19]`, `[07 B4]`. */
     notes: text("notes"),
-    /**
-     * `[25 §7]` — the exception to `07 C3`'s payment gate. Some customers buy
-     * on credit, so a dispatch against them is allowed and **flagged as such**,
-     * the way a direct dispatch already is. Set by the manager.
-     *
-     * A property of the **company**, deliberately, not a per-dispatch override
-     * tick: an override would let anyone bypass the gate case by case, whereas
-     * this says some customers simply have different terms. Nobody skips a
-     * gate.
+    /*
+     * `has_credit_terms` was here until `0022`. It named an exception to `07
+     * C3`'s payment gate — some customers buy on credit, so a dispatch against
+     * them is allowed — and `SPEC §15` lists it under *Dropped outright*: `S70`
+     * and `S73` were its only citations and both were rewritten. `S73` now
+     * asks for a payment **method**, and `handled_by_finance` is the answer a
+     * credit customer gives `S71`, so the exception has become one value in a
+     * list rather than a flag beside a gate. No writer ever set it true.
      */
-    hasCreditTerms: boolean("has_credit_terms").notNull().default(false),
     /**
      * `[25 §18]` — the rep's own date, which **outranks the automatic clock**:
      * it suppresses `07 D5`'s chase until it arrives, and then becomes the
@@ -1187,14 +1234,14 @@ export const quotationVersions = pgTable(
      * what a row may contain, which the database holds `[CLAUDE.md]`.
      */
     stock: stockEnum("stock").notNull(),
-    /**
-     * `S67` took `valid_until` and `delivery_period` off this table: validity
-     * and the delivery period are SMAC's, and FACET carries neither. The two
-     * below are per-version fields `[08 D9]` and stay until `S70` moves
-     * payment to the dispatch and `S119` makes shipment a dispatch property.
+    /*
+     * `payment_method` and `shipment_terms` were here until `0022`. `S70` moves
+     * payment onto the dispatch and `S119` makes shipment a dispatch property,
+     * so both are `dispatches` columns now — and typed, where these were
+     * nullable `text` with no vocabulary at all. `S67` had already taken
+     * `valid_until` and `delivery_period` in `0018`, for the neighbouring
+     * reason: validity and the delivery period are SMAC's.
      */
-    paymentMethod: text("payment_method"),
-    shipmentTerms: text("shipment_terms"),
     /** Totals mirror SMAC. Where they disagree, SMAC is correct `[08 D5]`. */
     totalSqm: numeric("total_sqm", SQM),
     totalExclVat: numeric("total_excl_vat", MONEY),
@@ -1522,6 +1569,74 @@ export const dispatches = pgTable(
      * being deleted, and `S128` reads it at refusal time to tell the rep.
      */
     refusalReason: text("refusal_reason"),
+    /**
+     * `S130` — **the dispatch's own stock**, which may differ from its
+     * quotation's `S118`. The rep chooses it when requesting, as they choose
+     * the shipment method `S119`; the coordinator may change it until approval,
+     * after which nothing edits a dispatch at all `S73`. The quotation is not
+     * rewritten — that is the point of the column existing.
+     *
+     * **NOT NULL, including on a free entry**: *a free-entry dispatch names a
+     * stock too* `S130` `S75`. There is no legitimate moment with none, so the
+     * database holds it `[CLAUDE.md]`.
+     *
+     * It is also what makes `S119`'s rule enforceable. Reading the stock off
+     * `quotation_versions` would put the CT rule across two rows — application
+     * code only, unreachable for a free entry, and readable through a value a
+     * revision `S66` can move underneath it. Here it is row-local.
+     */
+    stock: stockEnum("stock").notNull(),
+    /**
+     * `S119` — CT, TT or Cargo, chosen by the rep when requesting. NOT NULL for
+     * `stock`'s reason: a dispatch always goes out somehow.
+     *
+     * There is no default. No rule picks one, and the two stocks that force a
+     * value are handled by the CHECK rather than by a prefill nobody reads.
+     */
+    shipment: shipmentMethodEnum("shipment").notNull(),
+    /**
+     * `S119` — *Cargo carries a destination note*, and it is **optional**.
+     *
+     * The `dispatches_cargo_destination` CHECK refuses one on a CT or TT
+     * dispatch rather than the writer quietly dropping it. A discarded input is
+     * the defect `AUDIT 1 F3` records against the project form's region select,
+     * where what a rep typed vanished with no error at all.
+     */
+    cargoDestination: text("cargo_destination"),
+    /**
+     * `S70` `S71` — **how the customer is paying**, recorded here rather than on
+     * the quotation, because the coordinator confirms it with finance.
+     *
+     * **Nullable, and written at approval.** A rep raises, edits and submits a
+     * request with none: `S70` puts this in her head, not theirs. What makes it
+     * required is `dispatches_payment_method`, and only where `S73` requires it.
+     *
+     * It replaces the gate that read `quotation_threads.payment_confirmed_at`,
+     * which asked *has money arrived?* — a question `on_delivery` answers "no"
+     * to and is still legitimate — and which a free entry, having no thread,
+     * never faced at all. That column stays and still means what it meant: it
+     * is the chain's `paid` rung `D29`. It no longer gates a dispatch.
+     */
+    paymentMethod: paymentMethodEnum("payment_method"),
+    /** `S71` — *an optional note carries anything the list does not*. Guarded
+     *  by `dispatches_payment_note`: a note with no method annotates nothing. */
+    paymentNote: text("payment_note"),
+    /**
+     * `S121` — **the SMAC dispatch number, which is unique**. The coordinator
+     * writes it when SMAC issues it, usually at once.
+     *
+     * **It is not a condition of approval** — *a dispatch is approved, then
+     * numbered* — so the CHECK beside it is one-directional: a number implies
+     * approval, approval implies nothing. An approved dispatch with no number
+     * yet is the ordinary state of one for as long as it takes her to type it.
+     *
+     * `text`, not a number: it is SMAC's format, and `S5` says a human retypes
+     * every such reference, so FACET must assume it can be wrong. Unique is the
+     * one thing `S121` does claim, and `dispatches_smac_number_key` holds it —
+     * a plain unique index, since Postgres treats nulls as distinct and every
+     * unapproved dispatch carries one.
+     */
+    smacDispatchNumber: text("smac_dispatch_number"),
     createdAt: createdAt(),
   },
   (t) => [
@@ -1571,6 +1686,79 @@ export const dispatches = pgTable(
       "dispatches_submitted_at",
       sql`(status = 'draft') = (submitted_at is null)`,
     ),
+    /**
+     * `S119` — *only Riyadh and Malham stock have trucks, so a dispatch from
+     * South or Dammam stock is CT*. Row-local since `S130` put the stock on
+     * this table, so the database holds it.
+     *
+     * **Named negatively, matching the rule's own words.** `stock in
+     * ('riyadh','malham') or shipment = 'ct'` is equivalent across today's four
+     * values, but it would silently constrain a fifth stock to CT the moment
+     * one is added. This form names exactly the two stocks `S119` names, so a
+     * reader matches the constraint to the sentence, and a new warehouse
+     * arrives unconstrained until a rule says otherwise.
+     *
+     * **Malham is deliberately absent.** *TT is discouraged there, never
+     * refused* — *the coordinator's knowledge, not a rule FACET enforces*.
+     */
+    check(
+      "dispatches_stock_shipment",
+      sql`stock not in ('south', 'dammam') or shipment = 'ct'`,
+    ),
+    /**
+     * `S119` — a destination note belongs to Cargo and to nothing else.
+     *
+     * One-directional: Cargo's note is **optional**, so a cargo dispatch with
+     * none is legal. What this refuses is a note that would annotate a truck
+     * that has no third-party destination — refuses it, rather than the writer
+     * discarding it, which is the `AUDIT 1 F3` failure.
+     */
+    check(
+      "dispatches_cargo_destination",
+      sql`cargo_destination is null or shipment = 'cargo'`,
+    ),
+    /**
+     * `S73` — **a dispatch cannot be approved without a payment method.**
+     *
+     * **One-directional, and that is deliberate.** The `= ` form used by
+     * `dispatches_approval_stamps` and `dispatches_refusal_reason` would also
+     * forbid a method on an unapproved row, which reads tighter but claims
+     * something no rule says: `S76` puts *payment* among the fields the
+     * coordinator's edit right reaches on a submitted request. More
+     * importantly, `S73`'s own second half — *approval is final; anything wrong
+     * afterwards is a cancellation* — arrives with a `cancelled` state that
+     * still carries the method it was approved with. Written this way that
+     * slice adds an enum value and amends nothing here.
+     */
+    check(
+      "dispatches_payment_method",
+      sql`payment_method is not null or status <> 'approved'`,
+    ),
+    /** `S71` — *an optional note carries anything the list does not*, so it
+     *  needs a list entry to carry anything for. */
+    check(
+      "dispatches_payment_note",
+      sql`payment_note is null or payment_method is not null`,
+    ),
+    /**
+     * `S121` — *a dispatch is approved, then numbered*.
+     *
+     * One-directional for `dispatches_payment_method`'s second reason and one
+     * of its own: **the number is not a condition of approval**, so an approved
+     * dispatch with none is the ordinary state of one, and the `=` form would
+     * make `S121` gate the very act the rule says it does not.
+     */
+    check(
+      "dispatches_smac_number_after_approval",
+      sql`smac_dispatch_number is null or status = 'approved'`,
+    ),
+    /**
+     * `S121` — *which is unique*. Nulls are distinct in Postgres, so every
+     * dispatch still waiting for its number shares the gap without colliding.
+     * `setDispatchSmacNumber` checks first to turn a collision into a field
+     * message; this is what holds when two coordinators race.
+     */
+    uniqueIndex("dispatches_smac_number_key").on(t.smacDispatchNumber),
   ],
 );
 

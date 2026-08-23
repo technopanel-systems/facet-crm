@@ -508,6 +508,13 @@ async function main(): Promise<void> {
   const [dispatchA] = await db
     .insert(dispatches)
     .values({
+      // `S130` `S119` `S70` — a hand-written dispatch names all three, as
+      // every dispatch does. Riyadh and CT are the unconstrained pair
+      // (`dispatches_stock_shipment`), and an APPROVED row must carry a
+      // payment method or `dispatches_payment_method` refuses it `S73`.
+      stock: "riyadh" as const,
+      shipment: "ct" as const,
+      paymentMethod: "bank_transfer_full" as const,
       companyId: companyA.id,
       userId: authorUser.id,
       quotationThreadId: threadA.id,

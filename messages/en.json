@@ -186,6 +186,19 @@
       "reincluded": "Re-included",
       "reassigned": "Reassigned",
       "archived": "Archived"
+    },
+    "paymentMethod": {
+      "on_delivery": "On delivery",
+      "card_in_office": "In the office, by card",
+      "cash_in_office": "Cash in the office",
+      "bank_transfer_full": "Bank transfer, full",
+      "bank_transfer_downpayment": "Bank transfer, downpayment",
+      "handled_by_finance": "Handled by finance"
+    },
+    "shipmentMethod": {
+      "ct": "CT — the customer's own truck",
+      "tt": "TT — a Technopanel truck",
+      "cargo": "Cargo — a third party"
     }
   },
   "chain": {
@@ -228,8 +241,8 @@
     "explain": {
       "title": "How this works.",
       "body": {
-        "rep": "You raise the request; the coordinator builds the real quotation in SMAC and gets it signed, then accepts it here and sends you the PDF. When the customer pays, you confirm the payment — that is what unlocks dispatch. The coordinator records what actually left the warehouse.",
-        "coordinator": "The rep raises the request; you build the real quotation in SMAC and get it signed, then accept it here and send the PDF back. The rep confirms the payment — that is what unlocks dispatch. You record what actually left the warehouse."
+        "rep": "You raise the request; the coordinator builds the real quotation in SMAC and gets it signed, then accepts it here and sends you the PDF. When the customer pays, you confirm the payment. The coordinator approves what actually leaves the warehouse.",
+        "coordinator": "The rep raises the request; you build the real quotation in SMAC and get it signed, then accept it here and send the PDF back. The rep confirms the payment. You approve what actually leaves the warehouse, and record how the customer is paying for it."
       },
       "target": "Only dispatched square metres count toward a target."
     }
@@ -362,13 +375,10 @@
       "versionStatus": "Version",
       "endState": "State",
       "endStateOpen": "Open",
-      "paymentMethod": "Method of payment",
-      "shipmentTerms": "Terms of shipment",
       "origin": "Origin",
       "stock": "Stock",
       "verification": "Reference checked",
       "grandTotal": "Total",
-      "payment": "Payment",
       "projectNone": "No project"
     },
     "detail": {
@@ -378,7 +388,6 @@
       "lines": "Product lines",
       "serviceLines": "Services",
       "noServiceLines": "No services on this quotation.",
-      "terms": "Terms",
       "supplier": "Supplier",
       "productClass": "Class",
       "fireRating": "Fire rating",
@@ -505,7 +514,15 @@
       "raisedBy": "Raised by",
       "turn": "Whose move",
       "refusalReason": "Why it is being refused",
-      "refusalReasonPlaceholder": "Say what is wrong, so the rep can fix it"
+      "refusalReasonPlaceholder": "Say what is wrong, so the rep can fix it",
+      "stock": "Stock",
+      "shipment": "Shipment",
+      "cargoDestination": "Destination",
+      "paymentMethod": "How the customer is paying",
+      "paymentNote": "Note (optional)",
+      "paymentNotePlaceholder": "Anything the list above does not cover",
+      "smacDispatchNumber": "SMAC dispatch number",
+      "smacDispatchNumberPlaceholder": "As SMAC issued it"
     },
     "detail": {
       "title": "Dispatch",
@@ -514,7 +531,7 @@
       "derivedHint": "The company and the rep come from the quotation — they are not asked for.",
       "companySearchHint": "You may search company names here. Opening the company record is a separate permission.",
       "directNotice": "A free entry has no quotation, and is reported as a direct sale.",
-      "linkedNotice": "Raised against an issued quotation. Internal sales confirms payment before approving it.",
+      "linkedNotice": "Raised against an issued quotation. Internal sales checks it and approves it.",
       "noneDispatchable": "No quotation has been issued yet, so there is nothing to raise a request against.",
       "partialHint": "One quotation can produce several partial dispatches. Quoted, paid and dispatched quantities are three different numbers.",
       "creditBySplit": "Divided equally by the credit split in force since {date}.",
@@ -537,7 +554,11 @@
       "editByRep": "Your request, before you submit it.",
       "editByCoordinator": "The rep has submitted this. You are editing it on their behalf.",
       "linesEdit": "Change what this request carries. Every line needs a price.",
-      "repForHint": "The rep this dispatch credits, which need not be you."
+      "repForHint": "The rep this dispatch credits, which need not be you.",
+      "stockHint": "Where this is drawn from. It may differ from the quotation's.",
+      "shipmentHint": "South and Dammam have no trucks, so a dispatch from either goes on the customer's own truck.",
+      "cargoDestinationHint": "Where the third party is taking it. Optional.",
+      "actionsApproved": "This dispatch is approved and credits its target. Add the SMAC number when SMAC issues it."
     },
     "actions": {
       "request": "Request dispatch",
@@ -548,7 +569,6 @@
       "revive": "Revive"
     },
     "errors": {
-      "paymentNotConfirmed": "Payment has not been confirmed on this quotation, so it cannot be approved yet.",
       "companyNotOnThread": "The company does not match the quotation.",
       "threadNotVisible": "That quotation cannot be found.",
       "companyNotVisible": "That company cannot be found.",
@@ -573,7 +593,13 @@
       "refuseOnly": "Only internal sales may refuse a dispatch request.",
       "reviveOnly": "Only internal sales may revive a refused request.",
       "repNotSelf": "You may only raise a request for yourself.",
-      "refusalReasonRequired": "Say why you are refusing it. The rep needs to know what to fix."
+      "refusalReasonRequired": "Say why you are refusing it. The rep needs to know what to fix.",
+      "paymentMethodRequired": "Choose how the customer is paying. A dispatch cannot be approved without it.",
+      "shipmentMustBeCt": "South and Dammam stock have no trucks, so this can only go on the customer's own truck.",
+      "cargoDestinationOnly": "Only a Cargo shipment carries a destination.",
+      "smacNumberTaken": "Another dispatch already carries that SMAC number.",
+      "smacNumberOnly": "Only internal sales may write the SMAC dispatch number.",
+      "notApproved": "The SMAC number is written after approval, not before."
     },
     "request": "Request a dispatch",
     "requestTitle": "Request a dispatch",

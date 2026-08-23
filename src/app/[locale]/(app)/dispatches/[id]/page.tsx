@@ -84,10 +84,18 @@ export default async function DispatchPage({
       {/* The COMPANY is the record's name `[22 §3]`. A quantity as a
           title told a rep nothing about which dispatch they had opened; the
           square metres are a fact below, where a quantity belongs. */}
+      {/* `S121` — **the dispatch's OWN SMAC number**, which is what a
+          reference on this screen should be. It used to render the QUOTATION's
+          `smac_reference`: a number belonging to a different record, absent
+          entirely on a free entry `S75`, and shared by every dispatch raised
+          against the same thread `S77`. The quotation's stays below, as the
+          source card's link label, where it says what it means. Undefined
+          until she types it, which is ordinary — the number is not a condition
+          of approval. */}
       <DetailHeader
         name={dispatch.companyName}
         state={`${day(dispatch.dispatchDate)} · ${dispatch.sqm} ${t("common.sqm")}`}
-        reference={dispatch.smacReference ?? undefined}
+        reference={dispatch.smacDispatchNumber ?? undefined}
       />
 
       {/* `22 §4` — whose move it is, not what the status is. Two states own a
@@ -222,6 +230,43 @@ export default async function DispatchPage({
             <Fact label={t("dispatches.fields.raisedBy")}>
               {dispatch.recordedByName}
             </Fact>
+            {/* `S130` — the dispatch's own stock, which may differ from its
+                quotation's `S118`. Shown on every route, including a free
+                entry, because every dispatch names one. */}
+            <Fact label={t("dispatches.fields.stock")} name="stock">
+              {t(`enums.stock.${dispatch.stock}`)}
+            </Fact>
+            {/* `S119` — CT, TT or Cargo, with Cargo's optional destination
+                beside it rather than as a second row nobody would read. */}
+            <Fact label={t("dispatches.fields.shipment")} name="shipment">
+              <span data-shipment={dispatch.shipment}>
+                {t(`enums.shipmentMethod.${dispatch.shipment}`)}
+              </span>
+              {dispatch.cargoDestination ? (
+                <>
+                  {" · "}
+                  <span dir="auto">{dispatch.cargoDestination}</span>
+                </>
+              ) : null}
+            </Fact>
+            {/* `S70` `S71` — how the customer is paying, recorded by the
+                coordinator at approval `S73`. Absent until then, which is what
+                a request not yet approved means: nobody has answered it. */}
+            <Fact label={t("dispatches.fields.paymentMethod")} name="payment">
+              {dispatch.paymentMethod ? (
+                <span data-payment={dispatch.paymentMethod}>
+                  {t(`enums.paymentMethod.${dispatch.paymentMethod}`)}
+                  {dispatch.paymentNote ? (
+                    <>
+                      {" · "}
+                      <span dir="auto">{dispatch.paymentNote}</span>
+                    </>
+                  ) : null}
+                </span>
+              ) : (
+                dash
+              )}
+            </Fact>
           </Facts>
         </CardContent>
       </Card>
@@ -354,14 +399,17 @@ export default async function DispatchPage({
         </CardContent>
       </Card>
 
-      {/* The acts `S72` `S124` `S125` `S122`. `RequestActions` renders nothing
-          at all when this identity has none available `D53`, so an approved
-          dispatch — where approval is final `S73` — carries no card. */}
+      {/* The acts `S72` `S124` `S125` `S122` `S121`. `RequestActions` renders
+          nothing at all when this identity has none available `D53`. An
+          approved dispatch now carries one for the coordinator — the SMAC
+          number `S121`, written after approval — and still none for anyone
+          else, because approval is final `S73` and a number is not an edit. */}
       <RequestActions
         dispatchId={dispatch.id}
         status={dispatch.status}
         isRaiser={isRaiser}
         isCoordinator={isCoordinator}
+        smacDispatchNumber={dispatch.smacDispatchNumber}
       />
 
       {/* Credit `[07 D3]`, `[18 §1]`, `[18 §5]`. The shares always add back to

@@ -316,12 +316,11 @@ export default async function QuotationDetailPage({
             <Fact label={t("quotations.fields.stock")} name="stock">
               {t(`enums.stock.${live.stock}`)}
             </Fact>
-            <Fact label={t("quotations.fields.paymentMethod")}>
-              {live.paymentMethod ?? dash}
-            </Fact>
-            <Fact label={t("quotations.fields.shipmentTerms")}>
-              {live.shipmentTerms ?? dash}
-            </Fact>
+            {/* Payment and shipment are the DISPATCH's `S70` `S119`, and the
+                two Facts that used to sit here are gone with their columns.
+                Nothing replaces them on a quotation: a quotation is not what
+                either is a property of, and a derived echo of some dispatch's
+                choice would be a figure this screen had to keep true. */}
           </Facts>
 
           <ThreadLines

@@ -301,9 +301,9 @@ thread is open.
 cancel** a quotation, and only she may **edit a submitted dispatch request**
 (S125) or **park a dispatch request** (S90). Returning, rejecting or cancelling
 requires a written reason, which becomes a comment on the thread. Everything but
-the two dispatch clauses ships today — coordinator-only issue, return, accept,
-reject and cancel, and the written reason becoming a comment. Editing and
-parking a submitted dispatch request do not.
+parking ships today — coordinator-only issue, return, accept, reject and
+cancel, the written reason becoming a comment, and **editing a submitted
+dispatch request**. **Parking one (S90) does not.**
 
 **S63.** The coordinator creates the real quotation in SMAC and types the SMAC
 number back into FACET. Status becomes `issued`.
@@ -332,11 +332,11 @@ latest live version of one thread.
 
 ## 9. Payment
 
-**S70. [CHANGE]** **Payment is recorded on the dispatch, not on the
+**S70.** **Payment is recorded on the dispatch, not on the
 quotation.** The coordinator records how the customer is paying, because she is
 the one who confirms it with finance.
 
-**S71. [BUILD]** The payment method is one of: **on delivery** · **in the office
+**S71.** The payment method is one of: **on delivery** · **in the office
 by card** · **cash in the office** · **bank transfer, full** · **bank transfer,
 downpayment** · **handled by finance** — credit, تساهيل, or a company contract,
 settled in SMAC, where FACET carries the reference only. An optional note
@@ -356,7 +356,13 @@ SMAC number that follows.
 customer changes — the dispatch is **cancelled**, never un-approved. A
 cancelled dispatch stays visible on the record it belonged to, carries a
 reason, and is **never revived**: a new dispatch is raised instead. It credits
-nothing and wins nothing (S31).
+nothing and wins nothing (S31). The **first sentence ships**: the coordinator
+records the method as part of approving, and no route to `approved` bypasses
+it — the request form never asks, the database refuses a row without one, and
+that is true of a free entry as much as of one raised from a quotation.
+Approval is also already final, because nothing un-approves. **Cancellation
+does not exist** — no state, no reason, no act — so a dispatch that must be
+undone today cannot be.
 
 **S74.** **The project is recorded on the dispatch itself.** When the
 quotation has a project, the dispatch takes it. When the quotation has none, the
@@ -414,7 +420,7 @@ Dammam. The stock is on the quotation because SMAC's inventory needs it — FACE
 holds no inventory, only the name. The rep chooses it when raising, from a fixed
 list.
 
-**S119. [BUILD]** Shipment is one of: **CT** (customer's own truck) · **TT**
+**S119.** Shipment is one of: **CT** (customer's own truck) · **TT**
 (Technopanel truck) · **Cargo** (third party). Only Riyadh and Malham stock have
 trucks, so a dispatch from **South or Dammam stock is CT**. Malham has fewer
 trucks than Riyadh; TT is discouraged there, never refused. Cargo carries a
@@ -434,7 +440,7 @@ against **the version the dispatch was raised from**, not the latest one (S68).
 A later revision changes what is quoted; it does not retroactively create a gap
 on a dispatch that never moved.
 
-**S121. [BUILD]** An approved dispatch carries its **SMAC dispatch number**,
+**S121.** An approved dispatch carries its **SMAC dispatch number**,
 which is unique. The coordinator writes it when SMAC issues it — usually at
 once. **It is not a condition of approval**; a dispatch is approved, then
 numbered.
@@ -469,7 +475,7 @@ rather than altering it (S66).
 own company and approve it herself**. She holds companies like any rep (S9),
 and nothing blocks the same person from both acts.
 
-**S130. [BUILD]** A dispatch may draw from a **different stock** than its
+**S130.** A dispatch may draw from a **different stock** than its
 quotation (S118). The rep chooses it when requesting, as they choose the
 shipment method (S119); the coordinator may change it until approval, after
 which it is fixed. The change is recorded on the dispatch and the quotation is
@@ -744,7 +750,9 @@ Ordered by what unblocks what.
 - Notification tiers, persistence flags, per-anchor resolution, digest
   machinery — S91
 - `companies.has_credit_terms` — S70 and S73 were its only citations and both
-  were rewritten. No rule stands behind it.
+  were rewritten. No rule stands behind it. **Dropped**, in the slice that
+  rewrote them: a credit customer is the `handled by finance` payment method
+  (S71), not a flag beside a gate.
 
 ---
 

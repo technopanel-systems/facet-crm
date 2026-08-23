@@ -11,6 +11,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "@/i18n/navigation";
+import {
+  SHIPMENT_METHODS,
+  STOCKS,
+  type ShipmentMethod,
+  type Stock,
+} from "@/lib/enums";
 import { emptyFormState, type FormState } from "@/lib/validation";
 
 import {
@@ -38,6 +44,12 @@ export type ThreadOption = {
    *  has none `S50`, which is what puts the picker on this form. */
   projectLabel: string | null;
   /**
+   * `S118` — the quotation's own stock, offered as the **default** for the
+   * dispatch's `S130`. A default and nothing more: *a dispatch may draw from a
+   * different stock*, so the select stays a select.
+   */
+  stock: Stock;
+  /**
    * `S116` — the issued version's lines `S126`, which is what *"arrives
    * pre-filled with its lines"* means on a screen. An unpriced quotation line
    * `S58` arrives with an empty price, which is the box the rep must fill.
@@ -48,6 +60,117 @@ export type ThreadOption = {
 export type CompanyOption = { id: string; label: string };
 export type RepOption = { id: string; name: string };
 export type ProjectOption = { id: string; label: string };
+
+/**
+ * `S130` and `S119`'s three fields, rendered identically by the request form
+ * and the edit form.
+ *
+ * **One component rather than two copies**, for the reason `assertShipment`
+ * exists in the data layer: the raise and the edit write the same three
+ * columns, and a second copy of the layout drifts.
+ *
+ * **The CT rule is a hint, not a filtered list.** *South or Dammam stock is
+ * CT* `S119`, and the shipment select still offers all three: removing options
+ * when the stock changes would silently rewrite a choice the rep had already
+ * made, and the browser gives no way to say why an option vanished. The hint
+ * states the rule before the click and the data layer refuses it against the
+ * field after — `assertShipment` and `dispatches_stock_shipment`.
+ *
+ * **The destination appears only for Cargo**, which is the one place this
+ * needs client state. Rendering it always and dropping what it holds on a CT
+ * dispatch is exactly the project form's region defect (`AUDIT 1 F3`): the
+ * value vanished with no error at all. Here the field is not offered, and if a
+ * hand-made POST sends one anyway the server refuses rather than discards.
+ */
+function ShipmentFields({
+  stock,
+  shipment,
+  cargoDestination,
+  errors,
+}: {
+  stock: Stock | "";
+  shipment: ShipmentMethod | "";
+  cargoDestination: string;
+  errors: Record<string, string>;
+}) {
+  const t = useTranslations();
+  // The only new client state on this screen. `stock` needs none: nothing
+  // renders differently for it, because the CT rule is a hint.
+  const [chosen, setChosen] = useState<string>(shipment);
+
+  return (
+    <>
+      {/* `S130` — the dispatch's own stock, which may differ from its
+          quotation's `S118`. A fixed list of four, so a native `<select>`
+          `D20`; the city combobox exception is scoped to two hundred items. */}
+      <FormField
+        name="stock"
+        label={t("dispatches.fields.stock")}
+        error={errors.stock}
+        hint={t("dispatches.detail.stockHint")}
+        required
+      >
+        <SelectField
+          name="stock"
+          defaultValue={stock}
+          placeholder={t("common.none")}
+          required
+          invalid={Boolean(errors.stock)}
+        >
+          {STOCKS.map((value) => (
+            <option key={value} value={value}>
+              {t(`enums.stock.${value}`)}
+            </option>
+          ))}
+        </SelectField>
+      </FormField>
+
+      {/* `S119` — CT, TT or Cargo, chosen by the rep when requesting. */}
+      <FormField
+        name="shipment"
+        label={t("dispatches.fields.shipment")}
+        error={errors.shipment}
+        hint={t("dispatches.detail.shipmentHint")}
+        required
+      >
+        <SelectField
+          name="shipment"
+          defaultValue={shipment}
+          onChange={setChosen}
+          placeholder={t("common.none")}
+          required
+          invalid={Boolean(errors.shipment)}
+        >
+          {SHIPMENT_METHODS.map((value) => (
+            <option key={value} value={value}>
+              {t(`enums.shipmentMethod.${value}`)}
+            </option>
+          ))}
+        </SelectField>
+      </FormField>
+
+      {/* `S119` — *Cargo carries a destination note*, and it is optional. */}
+      {chosen === "cargo" ? (
+        <FormField
+          name="cargoDestination"
+          label={t("dispatches.fields.cargoDestination")}
+          error={errors.cargoDestination}
+          hint={t("dispatches.detail.cargoDestinationHint")}
+        >
+          <Input
+            id="cargoDestination"
+            name="cargoDestination"
+            defaultValue={cargoDestination}
+            // A place name may be written in either script `D62`.
+            dir="auto"
+            className="text-start"
+            aria-invalid={Boolean(errors.cargoDestination) || undefined}
+          />
+        </FormField>
+      ) : null}
+    </>
+  );
+}
 
 /**
  * Recording a dispatch. Two modes, and the difference between them is the
@@ -288,6 +411,18 @@ export function DispatchForm({
         </>
       )}
 
+      {/* `S130` `S119` — the rep's three choices, and the stock defaults to the
+          quotation's `S118` on the linked route. `linesKey` re-mounts them for
+          the lines' own reason: React would otherwise keep the previous
+          quotation's stock in a select now describing a different one. */}
+      <ShipmentFields
+        key={`shipment-${linesKey}`}
+        stock={(state.values?.stock as Stock) ?? thread?.stock ?? ""}
+        shipment={(state.values?.shipment as ShipmentMethod) ?? ""}
+        cargoDestination={state.values?.cargoDestination ?? ""}
+        errors={errors}
+      />
+
       {/* `S116` — what actually went out. **There is no square-metre field**:
           the figure is the lines' own, generated by the database, so a box to
           type it into would be a second number that could disagree with them.
@@ -387,6 +522,9 @@ export function DispatchEditForm({
   action,
   lines,
   dispatchDate,
+  stock,
+  shipment,
+  cargoDestination,
   projectLabel,
   chooseProject,
   projectId,
@@ -399,6 +537,11 @@ export function DispatchEditForm({
   /** `S116` — the request's lines as they stand, to be kept or changed. */
   lines: LineDefaults[];
   dispatchDate: string;
+  /** `S130` `S119` — as they stand, to be kept or changed. Not defaults from
+   *  a quotation: this request already has its own. */
+  stock: Stock;
+  shipment: ShipmentMethod;
+  cargoDestination: string | null;
   /** `S74` — the project it names, when there is one to show. */
   projectLabel: string | null;
   /**
@@ -476,6 +619,16 @@ export function DispatchEditForm({
           </SelectField>
         </FormField>
       ) : null}
+
+      {/* `S130` `S119` — *the coordinator may change it until approval*, and
+          so may the rep while it is theirs `S125`. The same component the
+          request form renders, so the two cannot disagree about the fields. */}
+      <ShipmentFields
+        stock={(state.values?.stock as Stock) ?? stock}
+        shipment={(state.values?.shipment as ShipmentMethod) ?? shipment}
+        cargoDestination={state.values?.cargoDestination ?? cargoDestination ?? ""}
+        errors={errors}
+      />
 
       {/* `S116` — the same rows the request form writes, so an edit and a
           raise cannot disagree about what a dispatch line is. No square-metre
