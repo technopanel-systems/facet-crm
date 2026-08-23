@@ -183,6 +183,12 @@ export function ProjectForm({
         </p>
       </FormField>
 
+      {/* Two options and the placeholder — *Open · Lost* — because `S31` took
+          `won` out of the vocabulary and nothing here may claim it. A project
+          is won when a dispatch against it is approved, which is derived
+          `[projects.ts:projectIsWon]`. This select is the whole of what a rep
+          may say about a project ending, and the only thing left to say is
+          that it was lost `S29`. */}
       <FormField
         name="endState"
         label={t("projects.fields.endState")}
@@ -191,7 +197,8 @@ export function ProjectForm({
         <SelectField
           name="endState"
           defaultValue={value("endState")}
-          placeholder={t("projects.fields.endStateOpen")}
+          placeholder={t("projects.state.open")}
+
           invalid={Boolean(errors.endState)}
           onChange={setEndState}
         >
@@ -265,6 +272,19 @@ export function ProjectForm({
             never wired to the production module: production sometimes
             changes and stock sometimes covers an order. */}
         <Label htmlFor="inProduction">{t("projects.fields.inProduction")}</Label>
+      </div>
+
+      <div className="flex h-9 items-center gap-2">
+        <Checkbox
+          id="committed"
+          name="committed"
+          defaultChecked={defaults?.committed ?? false}
+        />
+        {/* `S29`'s fifth item — the customer has agreed, ahead of any
+            dispatch `S31`. The rep's own judgement, and unticking it is how
+            they take it back. It is deliberately NOT in the end-state select
+            beside it: a committed project is still moving. */}
+        <Label htmlFor="committed">{t("projects.fields.committed")}</Label>
       </div>
 
       {withCompanies ? (

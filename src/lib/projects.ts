@@ -22,6 +22,11 @@
  * project-less quotation is dispatched. One path, so `S27`'s rules — soft
  * removal, re-linkable, the partial unique index — cannot hold for one caller
  * and not the other.
+ *
+ * **Won is derived and never stored** `S31`, from the same approved-dispatch
+ * predicate that credits a target `S72`. `projectIsWon` is the one definition
+ * and `projectState` the one precedence; between them no screen decides what a
+ * project's state is.
  */
 
 import {
@@ -29,14 +34,17 @@ import {
   count,
   desc,
   eq,
+  exists,
   ilike,
   inArray,
   isNull,
+  sql,
   sum,
   type SQL,
 } from "drizzle-orm";
 
 import { db } from "@/db";
+
 import {
   cities,
   companies,
@@ -112,6 +120,15 @@ export type ProjectInput = {
    * production sometimes changes and stock sometimes covers an order.
    */
   inProduction: boolean;
+  /**
+   * `S29`'s fifth item — the customer has agreed, ahead of any dispatch
+   * `S31`. The rep's own judgement, and they clear it the same way.
+   *
+   * **Not an end state**, so not in `endState`: a committed project is still
+   * moving. And never won — that is derived from an approved dispatch, and
+   * `projectState` ranks it above this.
+   */
+  committed: boolean;
 };
 
 /**
@@ -126,14 +143,101 @@ export type ProjectCompanyLink = {
   companyId: string;
 };
 
+/**
+ * **Is this project won?** `S31` — a project is won when a dispatch against it
+ * is approved.
+ *
+ * The one definition. Two readers today, `listProjects` and `getProject`, and
+ * both select it rather than asking a second way; `projectState` below is what
+ * turns it into something a screen prints.
+ *
+ * **Derived, never stored, and that is what makes cancellation free.** `S31`
+ * pairs un-winning a project with taking back its credit, and credit is
+ * already derived through `approvedDispatches()` — so when `S73`'s second half
+ * builds cancellation, a dispatch leaving `approved` un-wins the project and
+ * removes the square metres as one act. Nothing here is amended, and nothing
+ * can drift: a stored flag would need a second writer and could disagree with
+ * the dispatches it claims to summarise.
+ *
+ * **A submitted request wins nothing** `S72`, and neither does a refused one —
+ * `approvedDispatches()` is the whole predicate, which is why this reuses it
+ * rather than writing `status = 'approved'` an eighth time.
+ *
+ * A dispatch reaches a project by its own `project_id` `S74`, as
+ * `dispatchedSqmByCompany` does. A free entry naming no project wins none
+ * `S75`.
+ *
+ * **Drizzle's `exists()` rather than a `sql` template**, which is the shape
+ * `visibleDispatchesFilter` already uses `[authz.ts]`. A Drizzle column
+ * interpolated into a `sql` template loses its table qualifier when the outer
+ * query joins nothing, and `projects.id` rendering bare inside this subquery
+ * would resolve to `dispatches.id` — `where project_id = id`, never true,
+ * zero rows, no error. The builder writes both qualifiers itself, so the trap
+ * cannot reach this. `verify:schema25` holds it to raw SQL over every row
+ * anyway, because that trap has shipped wrong numbers before.
+ *
+ * No visibility term: the caller has already proved the project visible and a
+ * project's figures follow it — `dispatchedSqmByCompany`'s argument, and
+ * `dispatchesInPeriod`'s.
+ */
+export function projectIsWon(): SQL<boolean> {
+  return exists(
+    db
+      .select({ one: sql`1` })
+      .from(dispatches)
+      .where(and(eq(dispatches.projectId, projects.id), approvedDispatches())),
+  ) as SQL<boolean>;
+}
+
+/**
+ * What a project's state is, in one word, for the one place a screen prints it.
+ *
+ * `S28` — a project's state is derived from real events, and `S29` lists what
+ * the rep sets on top of that. This is the whole precedence, and it is here so
+ * that the list, the detail screen and the company page cannot each invent a
+ * different one.
+ *
+ * **Won outranks lost.** Won is a real event that cannot be manufactured
+ * `S31`; lost is the rep's judgement `S29`. Where a project carries both, the
+ * dispatch is the harder fact, so no writer has to refuse the combination and
+ * no CHECK has to forbid it.
+ *
+ * **Committed ranks below both, and is never won** `S31`. It is the customer's
+ * agreement ahead of any dispatch, so a project that has since dispatched
+ * reads as won and a closed one reads as lost — committed is behind it either
+ * way. Nothing clears the column; this ordering is what makes clearing it
+ * unnecessary.
+ *
+ * `open` is the fifth answer and the commonest: nothing has happened yet.
+ */
+export const PROJECT_STATES = ["won", "lost", "committed", "open"] as const;
+export type ProjectState = (typeof PROJECT_STATES)[number];
+
+export function projectState(row: {
+  won: boolean;
+  endState: ProjectEndState | null;
+  committed: boolean;
+}): ProjectState {
+  if (row.won) return "won";
+  if (row.endState) return row.endState;
+  if (row.committed) return "committed";
+  return "open";
+}
+
 export type ProjectListRow = {
+
   id: string;
   nameEn: string;
   nameAr: string | null;
   ownerName: string;
   sqmExpected: string | null;
   endState: ProjectEndState | null;
+  /** Derived, never stored `S31` — see `projectIsWon`. */
+  won: boolean;
+  /** `S29`'s fifth item, the rep's own judgement `S31`. */
+  committed: boolean;
   region: Region | null;
+
   cityNameEn: string | null;
   cityNameAr: string | null;
   createdAt: Date;
@@ -194,7 +298,13 @@ export async function listProjects(
       ownerName: users.name,
       sqmExpected: projects.sqmExpected,
       endState: projects.endState,
+      // Resolved in SQL, before the LIMIT — a derived condition filtered or
+      // computed after the page is fetched returns silently wrong screens
+      // (`CLAUDE.md`).
+      won: projectIsWon(),
+      committed: projects.committed,
       region: projects.region,
+
       cityNameEn: cities.nameEn,
       cityNameAr: cities.nameAr,
       createdAt: projects.createdAt,
@@ -240,7 +350,11 @@ export type ProjectCompanyRow = {
 };
 
 export type ProjectDetail = Project & {
+  /** Derived, never stored `S31` — see `projectIsWon`. `committed` arrives
+   *  with the row, because that one IS a column. */
+  won: boolean;
   ownerName: string;
+
   cityNameEn: string | null;
   cityNameAr: string | null;
   /** The picked reason's own name `[25 §5]` — null unless the project is lost. */
@@ -257,12 +371,14 @@ export async function getProject(
   const [row] = await db
     .select({
       project: projects,
+      won: projectIsWon(),
       ownerName: users.name,
       cityNameEn: cities.nameEn,
       cityNameAr: cities.nameAr,
       lostReasonNameEn: lossReasons.nameEn,
       lostReasonNameAr: lossReasons.nameAr,
     })
+
     .from(projects)
     .innerJoin(users, eq(projects.ownerUserId, users.id))
     .leftJoin(cities, eq(projects.cityId, cities.id))
@@ -284,7 +400,9 @@ export async function getProject(
 
   return {
     ...row.project,
+    won: row.won,
     ownerName: row.ownerName,
+
     cityNameEn: row.cityNameEn,
     cityNameAr: row.cityNameAr,
     lostReasonNameEn: row.lostReasonNameEn,
@@ -612,6 +730,7 @@ const EDITABLE = [
   "lostAt",
   "lossReason",
   "inProduction",
+  "committed",
 ] as const;
 
 export async function updateProject(

@@ -2288,8 +2288,18 @@ export async function listDispatchProjectOptions(
     .where(
       and(
         visibleProjectsFilter(session),
+        // **`end_state` carries only `'lost'` since `S31`**, so this and
+        // `is null` are now the same test. It stays written this way because
+        // it says what it means: a lost project is not something to dispatch
+        // against.
+        //
+        // **A won project stays in the picker.** `S77` — one quotation
+        // produces any number of dispatches, and `S31` wins the project on
+        // the first approved one. Excluding won projects here would make the
+        // second dispatch against a project impossible to raise.
         sql`${projects.endState} is distinct from 'lost'`,
       ),
+
     )
     .orderBy(projects.nameEn);
 }

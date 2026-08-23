@@ -30,14 +30,22 @@ function readProjectForm(formData: FormData) {
     // one would be accepting input nothing stores `D51`. The column is written
     // from the city.
     cityId: fields.uuid("cityId"),
+    // One value since `S31` took `won` out of the vocabulary, so this reads
+    // "lost, or open". Nothing may post `won` — it is derived from an approved
+    // dispatch, and `verify:routes` asserts the select never offers it.
     endState: fields.option("endState", PROJECT_END_STATES),
+
     // Shape only — "required when lost, one of the nine, and only 'other'
     // takes the detail" is `assertLossReason`/`assertLossReasonDetail`'s job.
     lostReasonId: fields.uuid("lostReasonId"),
     lossReason: fields.text("lossReason", { max: 2000 }),
     inProduction: fields.checkbox("inProduction"),
+    // `S29`'s fifth item. An unchecked box posts nothing, so clearing it is
+    // the same act as never setting it `[validation.ts]`.
+    committed: fields.checkbox("committed"),
   };
   return { fields, input };
+
 }
 
 /**

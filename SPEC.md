@@ -140,11 +140,12 @@ per participant.
 **S27.** A project keeps at least one participant. A participant can be removed;
 it is hidden, not deleted, and can be re-linked.
 
-**S28. [CHANGE]** A project's **state is never reported — it is derived** from
+**S28.** A project's **state is never reported — it is derived** from
 real events: quotation raised, issued, accepted, dispatched. **S29** lists what
 the rep sets on top of that; of those, **committed** is the only one a
-conversion figure could mistake for won, and it never is (S31). The derivation
-ships. Only the committed half is pending (S29).
+conversion figure could mistake for won, and it never is (S31). One precedence
+answers what a project's state is — won, lost, committed, open — and every
+screen reads it rather than ranking the fields itself.
 
 **S29. [CHANGE]** The rep sets exactly **five things** on a project and nothing
 else:
@@ -153,9 +154,13 @@ else:
 2. **In production** — a plain label, deliberately unverified, never checked
    against the production module
 3. **On hold until** — a date, which parks it
+
 4. **Lost, with a reason** — which closes it
 5. **Committed** — the customer has agreed, ahead of any dispatch (S31)
-   **[BUILD]**
+
+Four of the five ship. **On hold until is the one that does not** — a project
+carries no such column, and the only `on_hold_until` in the system belongs to a
+report (S37), which parks a company rather than a project.
 
 **S30.** A project is visible **only to its owner or someone explicitly shared on
 it**. Seeing a company does not reveal its projects.
@@ -172,8 +177,20 @@ know. The cancelled dispatch stays visible on its record with its reason —
 nothing is ever deleted (S107) — and its difference flag stays with it, but
 **it is excluded from every figure**, including the quoted-versus-dispatched
 comparison (S77). Visible as history, counted nowhere.
-The Arabic term for the customer's commitment is **OPEN — not chosen**, and it
-must not reuse اعتماد, which already labels the coordinator's internal accept.
+The Arabic term for the customer's commitment is **ملتزم**, from التزام, which
+is the word the accept hint already uses to say what an internal accept is not.
+It does not reuse اعتماد, which labels the coordinator's accept.
+
+**Won and committed ship.** Won is derived at read time from the same
+approved-dispatch predicate that credits a target (S72) and is stored nowhere,
+so the column that used to claim it by hand is gone from the vocabulary
+entirely — no route can set it. Committed is the rep's own flag, set and
+cleared by them, and is ranked below won and lost wherever a state is printed.
+**Cancellation does not ship**: it is S73's second half, and until it exists
+nothing un-wins a project or takes credit back. When it does, it amends nothing
+here — a dispatch leaving `approved` un-wins and de-credits in one act, which
+is why the derivation is not stored.
+
 
 ---
 
@@ -379,8 +396,12 @@ dispatch that names a project wins it on approval (S31); one that names none
 wins nothing**, which is why the project is asked for even when it is not
 refused. All three routes exist today: a dispatch raised from a quotation
 arrives with its lines and is kept or edited (S116), and a free entry types
-them. The approval act exists too (S72). **Winning on approval does not** —
-nothing derives a won project (S31).
+them. The approval act exists too (S72), and **so does winning on approval**
+(S31). What does not is the free entry's project: that route names none — it is
+never asked, and the column is written null — so it wins nothing, which is the
+rule's own answer for a dispatch naming no project but not yet its answer for
+one that would.
+
 
 **S76. [CHANGE]** The coordinator **sees projects and contacts**, because both
 are part of the dispatch. The name-only restriction is removed. This is a

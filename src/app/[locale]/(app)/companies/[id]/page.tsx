@@ -29,7 +29,10 @@ import {
 } from "../actions";
 import { CommentBox } from "../../_components/comment-box";
 import { NextFollowUpPanel } from "../../_components/next-follow-up-panel";
+import { projectStateKey } from "../../_components/project-state";
+
 import { SharingPanel } from "../../_components/sharing-panel";
+
 import {
   TurnPanel,
   daysSince,
@@ -212,7 +215,6 @@ export default async function CompanyDetailPage({
           </Facts>
         </CardContent>
       </Card>
-
 
       {/* `07 E6` — rendered only when there is a decision to take: the company
           has gone quiet, or somebody has already taken one. A panel that showed
@@ -422,11 +424,11 @@ export default async function CompanyDetailPage({
                       key={project.id}
                       href={`/projects/${project.id}`}
                       title={lookupName(project, locale)}
-                      meta={
-                        project.endState
-                          ? t(`enums.projectEndState.${project.endState}`)
-                          : t("projects.fields.endStateOpen")
-                      }
+                      // The same answer the projects list and the project's
+                      // own screen give — one precedence `[projectState]`, so
+                      // a project cannot read as won here and open there.
+                      meta={t(projectStateKey(project))}
+
                       when={project.sqmExpected ?? undefined}
                     />
                   ))}

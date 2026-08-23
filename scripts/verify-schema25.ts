@@ -112,7 +112,7 @@ import {
   SAUDI_CODE,
 } from "@/lib/enums";
 import { listCountries } from "@/lib/lookups";
-import { createProject, updateProject } from "@/lib/projects";
+import { createProject, listProjects, updateProject } from "@/lib/projects";
 
 import { seedLookups } from "./seed-lookups";
 import { seedRoles } from "./seed-roles";
@@ -738,6 +738,7 @@ async function main(): Promise<void> {
       lostReasonId: null,
       lossReason: null,
       inProduction: false,
+      committed: false,
     },
     [{ companyId: company.id }],
   );
@@ -785,15 +786,21 @@ async function main(): Promise<void> {
     "projects_loss_detail",
     `update projects set loss_reason = 'why' where id = '${openProject.id}'`,
   );
+  // `end_state = 'won'` was the not-lost state this used until `S31` took the
+  // value out of the vocabulary. `null` is the stronger case anyway, and the
+  // one `schema.ts` wrote `is not distinct from` for: a plain
+  // `end_state = 'lost'` would evaluate to null here and the constraint would
+  // pass on anything.
   await databaseRefuses(
     "a reason on a project that is not lost is refused",
     "projects_loss_state",
     `update projects
-       set end_state = 'won',
+       set end_state = null,
            lost_reason_id = '${otherReason.id}',
            lost_at = now()
      where id = '${openProject.id}'`,
   );
+
   await databaseRefuses(
     "a close date with no closer is refused",
     "quotation_threads_closed",
@@ -1054,6 +1061,7 @@ async function main(): Promise<void> {
       lostReasonId: otherReason.id,
       lossReason: "The customer chose a cheaper supplier.",
       inProduction: false,
+      committed: false,
     },
     [{ companyId: company.id }],
   );
@@ -1088,6 +1096,7 @@ async function main(): Promise<void> {
       lostReasonId: otherReason.id,
       lossReason: "Delivery time was too long.",
       inProduction: false,
+      committed: false,
     });
     if (updated.lostReasonId !== otherReason.id || updated.lostAt === null) {
       throw new Error(
@@ -1112,6 +1121,7 @@ async function main(): Promise<void> {
     lostReasonId: otherReason.id,
     lossReason: "Delivery time was too long.",
     inProduction: false,
+    committed: false,
   });
   check(
     "re-saving a lost project does not restamp lost_at [25 §5]",
@@ -1131,6 +1141,7 @@ async function main(): Promise<void> {
       lostReasonId: nonOtherReason.id,
       lossReason: null,
       inProduction: false,
+      committed: false,
     });
     if (corrected.lostReasonId !== nonOtherReason.id) {
       throw new Error(`still carries ${corrected.lostReasonId}`);
@@ -1158,6 +1169,7 @@ async function main(): Promise<void> {
         lostReasonId: otherReason.id,
         lossReason: null,
         inProduction: false,
+        committed: false,
       }),
   );
 
@@ -1174,6 +1186,7 @@ async function main(): Promise<void> {
         lostReasonId: nonOtherReason.id,
         lossReason: "This should not be allowed.",
         inProduction: false,
+        committed: false,
       }),
   );
 
@@ -1187,6 +1200,7 @@ async function main(): Promise<void> {
       lostReasonId: nonOtherReason.id,
       lossReason: null,
       inProduction: false,
+      committed: false,
     }),
   );
 
@@ -1203,25 +1217,36 @@ async function main(): Promise<void> {
         lostReasonId: null,
         lossReason: null,
         inProduction: false,
+        committed: false,
       }),
   );
 
   // And moving off `lost` must clear all three, or projects_loss_state refuses
   // the row — the case a screen will hit the first time a rep changes his mind.
-  await allows("moving a lost project to won clears the loss [25 §5]", async () => {
-    const won = await updateProject(rep, openProject.id, {
+  //
+  // **Re-opening, not winning.** This case moved to `won` until `S31` took
+  // that value out of the vocabulary: a project is won when a dispatch against
+  // it is approved, which no call to `updateProject` can manufacture. `null`
+  // is the only place left to move to, and it exercises the same clause.
+  await allows("re-opening a lost project clears the loss [25 §5]", async () => {
+    const reopened = await updateProject(rep, openProject.id, {
       nameEn: openProject.nameEn,
       nameAr: null,
       sqmExpected: null,
       cityId: null,
-      endState: "won",
+      endState: null,
       lostReasonId: null,
       lossReason: null,
       inProduction: false,
+      committed: false,
     });
-    if (won.lostReasonId !== null || won.lostAt !== null || won.lossReason !== null) {
+    if (
+      reopened.lostReasonId !== null ||
+      reopened.lostAt !== null ||
+      reopened.lossReason !== null
+    ) {
       throw new Error(
-        `left lost_reason_id=${won.lostReasonId} lost_at=${won.lostAt} loss_reason=${won.lossReason}`,
+        `left lost_reason_id=${reopened.lostReasonId} lost_at=${reopened.lostAt} loss_reason=${reopened.lossReason}`,
       );
     }
   });
@@ -1234,10 +1259,12 @@ async function main(): Promise<void> {
       nameAr: null,
       sqmExpected: null,
       cityId: null,
-      endState: "won",
+      endState: null,
       lostReasonId: null,
       lossReason: null,
       inProduction: true,
+      committed: false,
+
     });
     if (updated.inProduction !== true) {
       throw new Error(`got inProduction=${updated.inProduction}`);
@@ -2396,6 +2423,74 @@ async function repositoryMatchesDatabase(): Promise<void> {
     "*** and none that is issued or superseded, where no line could be added *** [S60], [S61]",
     empties.frozen_lineless === 0,
     `${empties.frozen_lineless} frozen with none`,
+  );
+
+  /* --- 19. Won is derived, over every row [S31], [S28] ------------- */
+
+  console.log(
+    "\n19. *** No project claims a win its dispatches do not *** [S31], [S28]",
+  );
+
+  // **The module's derivation against a hand-written truth, over every
+  // project.** `projectIsWon` is a correlated subquery, and `CLAUDE.md` names
+  // that shape as the one that fails silently: a Drizzle column that loses its
+  // table qualifier renders bare, resolves inside the inner table, and the
+  // subquery returns nothing for every row without raising anything. A slice
+  // that asserted only the project it had just won would have passed on that.
+  //
+  // So this asks the question twice in two languages — the module's, through
+  // `listProjects`, and raw SQL naming both tables outright — and compares.
+  // Same reasoning as §14's for `S116`, and the same reason: it has already
+  // shipped wrong numbers once.
+  //
+  // Read as the manager, who sees every rep `S30`: a per-rep session would
+  // make an invisible project look un-won rather than unseen.
+  const everyProjectRow = (await db.execute(sql`
+    select
+      p.id::text as id,
+      exists (
+        select 1 from dispatches d
+        where d.project_id = p.id and d.status = 'approved'
+      ) as truly_won
+    from projects p
+  `)) as unknown as { id: string; truly_won: boolean }[];
+  const truth = new Map(everyProjectRow.map((row) => [row.id, row.truly_won]));
+
+  const manager = await sessionFor("manager@example.test");
+  const derived = new Map<string, boolean>();
+
+  for (let page = 1; ; page += 1) {
+    const { rows, total } = await listProjects(manager, { page });
+    for (const row of rows) derived.set(row.id, row.won);
+    if (rows.length === 0 || derived.size >= total) break;
+  }
+
+  const unseen = [...truth.keys()].filter((id) => !derived.has(id)).length;
+  const disagreeingWins = [...derived].filter(
+    ([id, won]) => won !== truth.get(id),
+  ).length;
+  const wonCount = [...truth.values()].filter(Boolean).length;
+
+  console.log(
+    `  --    ${truth.size} project(s), ${wonCount} won by an approved dispatch`,
+  );
+  check(
+    "the manager's list reaches every project, so the claim below is whole [S30]",
+    unseen === 0,
+    `${unseen} project(s) never appeared on any page`,
+  );
+  check(
+    "*** no project's derived win disagrees with its dispatches, on any row *** [S31]",
+    disagreeingWins === 0,
+    `${disagreeingWins} of ${derived.size} disagree`,
+  );
+  // The negative half, and the one a broken correlation would pass: if the
+  // subquery returned false for everything, the check above would still hold
+  // on a database where nothing is won. It must find some.
+  check(
+    "…and something IS won, so a subquery returning false for everything fails here [S31]",
+    wonCount > 0,
+    `${wonCount} won`,
   );
 
   console.log("\n13. *** The repository and the database agree ***");

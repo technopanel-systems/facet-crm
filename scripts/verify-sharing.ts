@@ -760,6 +760,7 @@ async function main(): Promise<void> {
     lostReasonId: shared!.lostReasonId,
     lossReason: shared!.lossReason,
     inProduction: shared!.inProduction,
+    committed: shared!.committed,
   });
   check(
     "the shared rep EDITED the project too [14 §2]",

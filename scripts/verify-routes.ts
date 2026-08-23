@@ -816,14 +816,37 @@ async function main(): Promise<void> {
         `${locale}: …and still offers a city, which is stored`,
         form.includes('name="cityId"'),
       );
+
+      // **Nothing hand-sets won, at the boundary a rep actually reaches**
+      // `S31`. A project is won when a dispatch against it is approved — a
+      // real event — so the end-state select must not offer it. The data layer
+      // and the enum both refuse it too; this is the assertion that would
+      // catch a screen putting the option back by hand.
+      check(
+        `${locale}: *** the end-state select offers NO way to claim a win *** [S31]`,
+        !form.includes('value="won"'),
+      );
+      // And the rep's own judgement IS offered, beside it rather than in it
+      // `S29` — a committed project is still moving, so it is not an end state.
+      check(
+        `${locale}: …while committed is offered as its own control [S29]`,
+        form.includes('name="committed"'),
+      );
+
       if (!otherReasonId || !nonOtherReasonId) continue;
 
-      /** The action envelope plus the fields a browser would send. */
+      /** The action envelope plus the fields a browser would send.
+       *
+       *  `committed` is a checkbox, so it is appended only when set — an
+       *  unchecked box sends nothing, which is how a rep withdraws it `S29`.
+       */
       const fieldsFor = (
         endState: string,
         lostReasonId: string,
         lossReason: string,
+        committed = false,
       ): FormData => {
+
         const fields = new FormData();
         for (const input of form.matchAll(/<input[^>]*>/g)) {
           const name = input[0].match(/name="([^"]+)"/)?.[1];
@@ -852,6 +875,7 @@ async function main(): Promise<void> {
         fields.set("endState", endState);
         fields.set("lostReasonId", lostReasonId);
         fields.set("lossReason", lossReason);
+        if (committed) fields.set("committed", "on");
         return fields;
       };
 
@@ -904,6 +928,42 @@ async function main(): Promise<void> {
         `${locale}: re-opening it answers 303, so all three columns cleared`,
         reopened === 303,
         `got ${reopened}`,
+      );
+
+      // **The rep's own judgement, over HTTP** `S29` `S31`. Set it, then read
+      // it back off the detail screen — the assertion is the DOM marker the
+      // Fact renders, never the translated word, so this passes in both
+      // locales without either catalogue being repeated here.
+      const marked = await post(fieldsFor("", "", "", true));
+      check(
+        `${locale}: *** POSTing committed answers 303, not 500 *** [S29]`,
+        marked === 303,
+        `got ${marked}`,
+      );
+      const afterCommit = await get(jar, `/${locale}/projects/${id}`);
+      check(
+        `${locale}: …and the edit form comes back with the box checked [S29]`,
+        (
+          await get(jar, `/${locale}/projects/${id}/edit`)
+        ).body.match(/name="committed"[^>]*/)?.[0].includes("checked") === true,
+      );
+      // The project is still its owner's move, which is `D2`: a commitment is
+      // a status beside the turn line and never the turn line itself. The turn
+      // panel is the marker, and it is still there.
+      check(
+        `${locale}: a committed project still owes its owner the next move [D2]`,
+        afterCommit.status === 200 &&
+          afterCommit.body.includes('data-slot="turn-panel"'),
+
+        `got ${afterCommit.status}`,
+      );
+
+      // And withdrawn, leaving the fixture as it was found.
+      const withdrawn = await post(fieldsFor("", "", ""));
+      check(
+        `${locale}: the rep clears their own commitment [S29]`,
+        withdrawn === 303,
+        `got ${withdrawn}`,
       );
     }
   }
@@ -1934,7 +1994,6 @@ async function main(): Promise<void> {
       // **No VAT field is posted, because the form offers none** `S57`.
       // This used to scrape the form's own default. Section 12 below
       // asserts the input is gone rather than trusting that it is.
-
 
       // `S118` — the same POST with the stock cleared, sent BEFORE the good
       // one so it cannot be mistaken for a duplicate-submission refusal.

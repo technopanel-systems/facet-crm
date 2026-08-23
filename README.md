@@ -132,6 +132,15 @@ To see the actual Postgres error, pipe the migration's .sql through psql
 directly. The transaction rolls back atomically either way, ledger included,
 so a failed migration leaves nothing half-applied.
 
+**Removing an enum value that a CHECK constraint mentions needs two extra
+statements drizzle-kit does not generate.** Postgres has no `ALTER TYPE … DROP
+VALUE`, so the type is rebuilt by casting the column to `text` and back — but a
+CHECK stores its literals already resolved to the old type, and the cast then
+fails with `operator does not exist: text = <the enum>`. Drop the constraint
+before the swap and add it back after, while the column is an enum again.
+Migration `0024` is the worked example.
+
+
 ### Getting a clean database
 
 **Nothing in FACET deletes** (`docs/12-closing-open-items.md` §7), and the

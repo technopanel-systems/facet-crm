@@ -619,8 +619,20 @@ async function projectStageUnchanged(
         // project on their waiting list and in their digest. No rule asks for
         // that. The two are asserted as a pair in `verify:slice3` §16.
         ownProjectsFilter(session),
+        // **`end_state` carries only `'lost'` since `S31`**, so this reads
+        // "not lost" where it used to read "not closed". The predicate is
+        // unchanged and still right; what changed is underneath it.
+        //
+        // **A won project is deliberately still chased.** Winning is an
+        // approved dispatch `S31`, not an exit: `S90`'s three ways off the
+        // list are moved, parked and closed with a reason, and `S77` has one
+        // quotation producing any number of dispatches — so a project that
+        // has shipped part of what it quoted is still moving. The approved
+        // dispatch resets the clock below as the event it is, and nothing
+        // more.
         isNull(projects.endState),
         sql`coalesce(
+
           greatest(${threadEvents.at}, ${dispatchEvents.at}),
           ${riyadhDay(projects.createdAt)}
         ) <= ${cutoff}`,
@@ -812,9 +824,11 @@ async function manualDateDue(session: AuthSession): Promise<FollowUpRow[]> {
       .where(
         and(
           // Whose desk, not who may read — `projectStageUnchanged`'s note
-          // `S76`.
+          // `S76`. And "not lost" rather than "not closed" since `S31`, with
+          // a won project still chased for the same reason recorded there.
           ownProjectsFilter(session),
           isNull(projects.endState),
+
           isNotNull(projects.nextFollowUpAt),
           lte(projects.nextFollowUpAt, now),
         ),

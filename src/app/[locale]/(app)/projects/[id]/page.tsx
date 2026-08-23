@@ -7,9 +7,9 @@ import {
   Facts,
 } from "@/components/page-header";
 import { Timeline } from "@/components/timeline";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { Link } from "@/i18n/navigation";
 import {
   can,
@@ -31,6 +31,11 @@ import { setCreditSplitAction } from "../actions";
 import { ChainStrip } from "../../_components/chain-strip";
 import { CommentBox } from "../../_components/comment-box";
 import { NextFollowUpPanel } from "../../_components/next-follow-up-panel";
+import {
+  ProjectStateBadge,
+  projectStateKey,
+} from "../../_components/project-state";
+
 import { SharingPanel } from "../../_components/sharing-panel";
 import {
   TurnPanel,
@@ -147,19 +152,20 @@ export default async function ProjectDetailPage({
     ? daysSince(new Date(`${lastEventDay}T00:00:00Z`))
     : 0;
 
+  // Nobody owes the next action on a project that has been won or lost. A
+  // committed one is deliberately not settled — see the turn panel below.
+  const settled = project.won || project.endState !== null;
+
   const dash = t("common.none");
 
   return (
     <div className="flex flex-col gap-6">
       <DetailHeader
         name={lookupName(project, locale)}
-        state={[
-          project.ownerName,
-          project.endState
-            ? t(`enums.projectEndState.${project.endState}`)
-            : t("projects.fields.endStateOpen"),
-        ]
+        state={[project.ownerName, t(projectStateKey(project))]
+
           .filter(Boolean)
+
           .join(" · ")}
         action={
           mayEdit ? (
@@ -175,16 +181,26 @@ export default async function ProjectDetailPage({
       {/* `22 §3`'s turn panel. A resolved project owes nobody the next action;
           an open one is its owner's, and the elapsed figure is the timeline
           this page already loaded. No threshold is derived here — `25 §4`'s
-          "in production", "on hold until" and "lost" are the rep's own inputs
-          and none of them is built yet, so this says only what is known. */}
+          "on hold until" is the one of `S29`'s five with no column behind it,
+          so this says only what is known.
+
+          **Won and lost end it; committed does not.** A won project has had a
+          dispatch approved against it `S31` and a lost one is closed `S29`, so
+          neither owes anybody the next action. A committed project is still
+          moving — the customer has agreed and nothing has shipped — so the
+          line stays its owner's and the commitment reads as a pill in the
+          header instead. That is `D2` exactly: a status may sit beside the
+          line that says whose move it is, and is never that line. */}
       <TurnPanel
         who={initials(project.ownerName)}
-        tone={project.endState ? "calm" : "soon"}
+        tone={settled ? "calm" : "soon"}
         line={
-          project.endState
-            ? t(`enums.projectEndState.${project.endState}`)
+          settled
+            ? t(projectStateKey(project))
             : t("projects.detail.turnOwner", { name: project.ownerName })
+
         }
+
         detail={
           lastEventDay === null
             ? t("coverage.fields.neverLogged")
@@ -286,19 +302,20 @@ export default async function ProjectDetailPage({
             <Fact label={t("common.city")}>
               {pickName(locale, project.cityNameEn, project.cityNameAr) ?? dash}
             </Fact>
-            <Fact label={t("projects.fields.endState")}>
-              {project.endState ? (
-                <Badge
-                  variant={
-                    project.endState === "lost" ? "destructive" : "secondary"
-                  }
-                >
-                  {t(`enums.projectEndState.${project.endState}`)}
-                </Badge>
-              ) : (
-                t("projects.fields.endStateOpen")
-              )}
+            {/* Won is derived from an approved dispatch against this project
+                `S31` — `getProject` resolves it in SQL, and cancelling that
+                dispatch will un-win it with nothing here to amend `S73`. */}
+            <Fact label={t("projects.fields.state")}>
+              <ProjectStateBadge row={project} />
             </Fact>
+            {/* `S29`'s fifth item, shown as its own fact rather than only
+                through the state above: once a project is won or lost the
+                state says so, and the rep's own judgement is still worth
+                reading beside it. */}
+            <Fact label={t("projects.fields.committed")}>
+              {project.committed ? t("common.yes") : t("common.no")}
+            </Fact>
+
             {project.endState === "lost" ? (
               <Fact label={t("projects.fields.lossReason")}>
                 {pickName(locale, project.lostReasonNameEn, project.lostReasonNameAr) ??

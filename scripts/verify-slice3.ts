@@ -154,8 +154,11 @@ import {
   getProject,
   listProjectCompanies,
   listProjects,
+  PROJECT_END_STATES,
+  projectState,
   updateProject,
 } from "@/lib/projects";
+
 import {
   acceptThread,
   addServiceLine,
@@ -1618,6 +1621,7 @@ async function main(): Promise<void> {
       lostReasonId: null,
       lossReason: null,
       inProduction: false,
+      committed: false,
     },
     [{ companyId: company.id }],
   );
@@ -1762,22 +1766,16 @@ async function main(): Promise<void> {
     `got ${JSON.stringify(afterSecond.find((row) => row.companyId === outsider.id)?.dispatchedSqm)}`,
   );
 
-  // **What the coordinator may pick from** `S74`. Two ways to get this wrong,
-  // and both were nearly shipped: filtering on `end_state is null` hides every
-  // WON project — and `S31` makes a project won when the payment arrives,
-  // which is the moment before the dispatch — while `<> 'lost'` on a nullable
-  // column is null for every ordinary project and hides all of them.
-  const wonProject = await updateProject(repA, otherProject.id, {
-    nameEn: otherProject.nameEn,
-    nameAr: null,
-    sqmExpected: null,
-    cityId: null,
-    endState: "won",
-    lostReasonId: null,
-    lossReason: null,
-    inProduction: false,
-  });
+  // **What the coordinator may pick from** `S74`. The trap this was written
+  // for: `<> 'lost'` on a nullable column is null for every ordinary project,
+  // which hides all of them.
+  //
+  // The other half of it used to be asserted here with a hand-set `won`
+  // project. `S31` took that value out of the vocabulary — a project is won
+  // when a dispatch against it is approved, and nothing can set it — so the
+  // claim moved to §28, where a genuinely won project exists to make it.
   const lostProject = await createProject(
+
     repA,
     {
       nameEn: `${stamp} Lost Project`,
@@ -1788,20 +1786,18 @@ async function main(): Promise<void> {
       lostReasonId: (await listLossReasons())[0].id,
       lossReason: null,
       inProduction: false,
+      committed: false,
     },
     [{ companyId: company.id }],
   );
   const pickable = await listDispatchProjectOptions(coordinator);
   const offered = new Set(pickable.map((row) => row.id));
   check(
-    "*** the picker offers a WON project — that is when dispatch happens *** [S31], [S74]",
-    offered.has(wonProject.id),
+    "the picker offers an ordinary open project, which a plain <> comparison would drop",
+    offered.has(project.id),
     `${pickable.length} offered`,
   );
-  check(
-    "…and an ordinary open project, which a plain <> comparison would drop",
-    offered.has(project.id),
-  );
+
   check("…and never a lost one [07 C5]", !offered.has(lostProject.id));
 
   /* --- 16. S76 — the coordinator sees projects and contacts ------ */
@@ -1835,6 +1831,7 @@ async function main(): Promise<void> {
       lostReasonId: null,
       lossReason: null,
       inProduction: false,
+      committed: false,
     },
     [{ companyId: company.id }],
   );
@@ -1924,6 +1921,7 @@ async function main(): Promise<void> {
         lostReasonId: null,
         lossReason: null,
         inProduction: false,
+        committed: false,
       }),
   );
   await refuses(
@@ -3676,6 +3674,233 @@ async function main(): Promise<void> {
     "*** and NOTHING unapproved reaches the figure at all *** [S72]",
     leaked === 0,
     `${leaked} unapproved request(s) are being counted`,
+  );
+
+  /* --- 28. Won is derived; committed is the rep's [S31], [S28], [S29] --- */
+
+  console.log(
+    "\n28. *** A project is won when a dispatch against it is approved *** [S31]",
+  );
+
+  // A project of its own, so the three states below are this section's and not
+  // a leftover from §15's write-back.
+  const winnable = await createProject(
+    repA,
+    {
+      nameEn: `${stamp} Winnable Project`,
+      nameAr: null,
+      sqmExpected: null,
+      cityId: null,
+      endState: null,
+      lostReasonId: null,
+      lossReason: null,
+      inProduction: false,
+      committed: false,
+    },
+    [{ companyId: company.id }],
+  );
+
+  /**
+   * `won`, from both readers.
+   *
+   * **Two readers, not one.** A derived figure is asserted at every reader
+   * (`CLAUDE.md`): `getProject` selects `projectIsWon()` into a single-row
+   * query and `listProjects` selects it into a paginated one, and the
+   * correlated-subquery trap the rule exists for bites exactly one of those
+   * shapes at a time. Reading only the detail would have passed with the list
+   * silently returning `false` for everything.
+   */
+  async function wonBoth(id: string): Promise<{ detail: boolean; list: boolean }> {
+    const detail = await getProject(repA, id);
+    if (!detail) throw new Error(`project ${id} not visible`);
+    const page = await listProjects(repA, { q: stamp });
+    const row = page.rows.find((candidate) => candidate.id === id);
+    if (!row) throw new Error(`project ${id} not on the list of ${page.total}`);
+    return { detail: detail.won, list: row.won };
+  }
+
+  const beforeAnything = await wonBoth(winnable.id);
+  check(
+    "a project with no dispatch at all is not won [S31]",
+    beforeAnything.detail === false && beforeAnything.list === false,
+    `detail=${beforeAnything.detail} list=${beforeAnything.list}`,
+  );
+
+  // **A dispatch reaches a project through a quotation today** `S74`. The free
+  // route names none — `requestDispatch` writes `project_id` null on it
+  // deliberately, and neither `/dispatches/new?mode=direct` nor its page ever
+  // asks. That is `S75`'s remaining half and it is not this rule's to build,
+  // so the win below is proved on the route that can carry a project.
+  const winnableThread = await createQuotationThread(
+    repA,
+    { projectId: winnable.id, companyId: company.id, contactId: null },
+    version,
+    [{ ...line, quantityPcs: "40.0000" }],
+    [],
+  );
+  await issueVersion(coordinator, winnableThread.id, {
+    smacReference: `${stamp}-win`,
+    verification: "unverified",
+  });
+
+  // **A request is not an approval** `S72`. Raised and submitted, so it is
+  // sitting on the coordinator's desk — the state `S86` calls waiting, and the
+  // one a stored flag written at request time would have got wrong.
+  const awaitingHer = await requestDispatch(repA, {
+    ...SHIP,
+    lines: linesOf("40.0000"),
+    dispatchDate: "2026-09-20",
+    quotationThreadId: winnableThread.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  await submitDispatchRequest(repA, awaitingHer.id);
+  check(
+    "the request carries the project its quotation names [S74]",
+    (await getDispatch(coordinator, awaitingHer.id))?.projectId === winnable.id,
+  );
+
+  const whileSubmitted = await wonBoth(winnable.id);
+  check(
+    "*** a project with only a SUBMITTED request is not won *** [S31], [S72]",
+    whileSubmitted.detail === false && whileSubmitted.list === false,
+    `detail=${whileSubmitted.detail} list=${whileSubmitted.list}`,
+  );
+
+  await approveDispatchRequest(coordinator, awaitingHer.id, PAID);
+
+  const afterApproval = await wonBoth(winnable.id);
+  check(
+    "*** approving it wins the project, on the detail AND on the list *** [S31]",
+    afterApproval.detail === true && afterApproval.list === true,
+    `detail=${afterApproval.detail} list=${afterApproval.list}`,
+  );
+
+  // `S77` — one quotation produces any number of dispatches, so a won project
+  // must stay dispatchable. §15's picker assertion, made where a real win is.
+  check(
+    "…and the picker still offers it, so a second dispatch can be raised [S77], [S74]",
+    new Set(
+      (await listDispatchProjectOptions(coordinator)).map((row) => row.id),
+    ).has(winnable.id),
+  );
+
+  // **Nothing hand-sets it.** `end_state` carries one value now, so the type
+  // itself refuses `won` — this asserts the vocabulary rather than a guard,
+  // which is the point: there is no guard to forget.
+  check(
+    "the end-state vocabulary offers no way to claim a win [S31], [S28]",
+    PROJECT_END_STATES.length === 1 && PROJECT_END_STATES[0] === "lost",
+    PROJECT_END_STATES.join(","),
+  );
+
+  // **And the half that is NOT built, asserted so it cannot be forgotten**
+  // `S75`. A free entry names no project, so it wins none. `S31` is true as
+  // written — a dispatch that names no project wins nothing — but the route
+  // cannot name one at all, which is what `S75`'s marker still stands for.
+  const unlinkedWin = await approvedDispatch(coordinator, {
+    ...SHIP,
+    lines: linesOf("11.0000"),
+    dispatchDate: "2026-09-21",
+    quotationThreadId: null,
+    companyId: company.id,
+    userId: repA.user.id,
+    projectId: winnable.id,
+  });
+  check(
+    "a FREE ENTRY still names no project, so it wins none [S75], [S31]",
+    unlinkedWin.projectId === null,
+    `got ${unlinkedWin.projectId}`,
+  );
+
+  console.log("\n   Committed is the rep's, and is never a win [S29], [S31]");
+
+  // `S29`'s fifth item, on a project that has dispatched nothing.
+  const promised = await createProject(
+    repA,
+    {
+      nameEn: `${stamp} Promised Project`,
+      nameAr: null,
+      sqmExpected: null,
+      cityId: null,
+      endState: null,
+      lostReasonId: null,
+      lossReason: null,
+      inProduction: false,
+      committed: true,
+    },
+    [{ companyId: company.id }],
+  );
+
+  const committedState = await wonBoth(promised.id);
+  check(
+    "*** committed is NEVER counted as won *** [S31], [S65]",
+    committedState.detail === false && committedState.list === false,
+    `detail=${committedState.detail} list=${committedState.list}`,
+  );
+  check(
+    "…and the state a screen prints says committed, not won [S28]",
+    projectState({ won: false, endState: null, committed: true }) ===
+      "committed",
+  );
+  check(
+    "…while a won project that is ALSO committed reads as won [S31]",
+    projectState({ won: true, endState: null, committed: true }) === "won",
+  );
+  check(
+    "…and a lost one reads as lost, so nothing clears the column [S29]",
+    projectState({ won: false, endState: "lost", committed: true }) === "lost",
+  );
+
+  // The rep clears it the same way they set it — `S29` says they set it, and
+  // a judgement that cannot be withdrawn is not a judgement.
+  const withdrawn = await updateProject(repA, promised.id, {
+    nameEn: promised.nameEn,
+    nameAr: null,
+    sqmExpected: null,
+    cityId: null,
+    endState: null,
+    lostReasonId: null,
+    lossReason: null,
+    inProduction: false,
+    committed: false,
+  });
+  check(
+    "a rep clears their own commitment [S29]",
+    withdrawn.committed === false,
+    `committed=${withdrawn.committed}`,
+  );
+
+  /**
+   * **The invariant, over every project in the database**, not the four this
+   * section made. The module's derivation against a hand-written truth: if
+   * `projectIsWon`'s subquery ever loses a table qualifier and correlates
+   * against itself, it returns `false` everywhere and every check above still
+   * passes on the row it just created. This is the reader that would not.
+   */
+  const everyProject = await db
+    .select({ id: projects.id, endState: projects.endState })
+    .from(projects);
+  const trulyWon = new Set(
+    (
+      (await db.execute(sql`
+        select distinct d.project_id::text as id
+        from dispatches d
+        where d.project_id is not null and d.status = 'approved'
+      `)) as unknown as { id: string }[]
+    ).map((row) => row.id),
+  );
+  let wrongWin = 0;
+  for (const row of everyProject) {
+    const seen = await getProject(manager, row.id);
+    if (!seen) continue;
+    if (seen.won !== trulyWon.has(row.id)) wrongWin += 1;
+  }
+  check(
+    "*** no project's derived win disagrees with its dispatches, on any row *** [S31]",
+    wrongWin === 0,
+    `${wrongWin} of ${everyProject.length} disagree (${trulyWon.size} genuinely won)`,
   );
 
   // Nothing is cleaned up: FACET does not delete history `[12 §7]`, and this

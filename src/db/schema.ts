@@ -129,12 +129,20 @@ export const dormancyOutcomeEnum = pgEnum("dormancy_outcome", [
   "archived",
 ]);
 
-/** `[07 C5]` */
-export const projectEndStateEnum = pgEnum("project_end_state", [
-  "won",
-  "lost",
-  "dormant",
-]);
+/**
+ * `[07 C5]` — **one value, and it is the rep's judgement.**
+ *
+ * `won` came out with `S31`: a project is won when a dispatch against it is
+ * approved, which is a real event this column could only ever have claimed by
+ * hand. It is derived now — `projectIsWon` in `src/lib/projects.ts` — so no
+ * value here may name it. `dormant` came out beside it because no rule ever
+ * defined it and nothing had written one (`AUDIT 1`, `WORKFLOW §5`).
+ *
+ * What is left is `S29`'s fourth item, and only that: **lost, with a reason**,
+ * which closes the project. The three CHECKs on `projects` below pair it with
+ * its reason from both directions.
+ */
+export const projectEndStateEnum = pgEnum("project_end_state", ["lost"]);
 
 /** `[04 Q8]` — deletion is a request to the manager. */
 export const deleteRequestStatusEnum = pgEnum("delete_request_status", [
@@ -286,9 +294,11 @@ export const formFactorEnum = pgEnum("form_factor", ["sheet", "coil"]);
  * | `refused` | nobody | archived with a reason `S124`, revivable by her `S122` |
  *
  * **There is no `cancelled`.** `S73` names it and nothing here would write it,
- * so it would land as a dead enum value — `record_type.quotation_version` and
- * `project_end_state.dormant` are already what that looks like (`WORKFLOW §5`).
+ * so it would land as a dead enum value — `record_type.quotation_version` is
+ * what that looks like (`WORKFLOW §5`). `project_end_state.dormant` stood
+ * beside it in this sentence until `S31` dropped it for exactly this reason.
  * It arrives with its writer.
+
  */
 export const dispatchStatusEnum = pgEnum("dispatch_status", [
   "draft",
@@ -925,6 +935,25 @@ export const projects = pgTable(
      * when, as it does for every other field.
      */
     inProduction: boolean("in_production").notNull().default(false),
+    /**
+     * `S29`'s fifth item — **the customer has agreed, ahead of any dispatch**
+     * `S31`. The rep's own judgement, set and cleared by them.
+     *
+     * **Not an end state, which is why it is not in `end_state`**: a committed
+     * project is still moving. And never a conversion figure — `S31` says so
+     * outright, and `S65` says the same of an accepted quotation. What *is*
+     * won is derived from an approved dispatch and never stored.
+     *
+     * A boolean rather than a stamp: the audit log already carries who set it
+     * and when, exactly as it does for `in_production` above.
+     *
+     * Nothing clears it when the project closes, and no CHECK forbids the
+     * pair. `projectState` in `src/lib/projects.ts` ranks won and lost above
+     * it, so a closed project never reads as committed — one precedence
+     * instead of a constraint plus a writer that has to honour it.
+     */
+    committed: boolean("committed").notNull().default(false),
+
     /** `[25 §18]` — the rep's date, outranking the automatic clock. See
      *  `companies.next_follow_up_at`. */
     nextFollowUpAt: date("next_follow_up_at"),

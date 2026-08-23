@@ -84,10 +84,9 @@
       "west": "West"
     },
     "projectEndState": {
-      "won": "Won",
-      "lost": "Lost",
-      "dormant": "Dormant"
+      "lost": "Lost"
     },
+
     "companyRepOrigin": {
       "self_registered": "Registered",
       "assigned": "Assigned"
@@ -322,12 +321,20 @@
     "fields": {
       "owner": "Owner",
       "sqmExpected": "Expected m²",
+      "state": "State",
       "endState": "End state",
-      "endStateOpen": "Open",
       "lossReason": "Reason for loss",
       "lossReasonDetail": "Details",
-      "inProduction": "In production"
+      "inProduction": "In production",
+      "committed": "Committed"
     },
+    "state": {
+      "won": "Won",
+      "lost": "Lost",
+      "committed": "Committed",
+      "open": "Open"
+    },
+
     "detail": {
       "details": "Details",
       "companies": "Companies",

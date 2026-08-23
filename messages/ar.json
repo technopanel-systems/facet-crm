@@ -84,10 +84,9 @@
       "west": "الغربية"
     },
     "projectEndState": {
-      "won": "مكتسب",
-      "lost": "خاسر",
-      "dormant": "خامل"
+      "lost": "خاسر"
     },
+
     "companyRepOrigin": {
       "self_registered": "تسجيل ذاتي",
       "assigned": "مُسنَد"
@@ -322,12 +321,20 @@
     "fields": {
       "owner": "المالك",
       "sqmExpected": "المساحة المتوقعة (م²)",
+      "state": "الحالة",
       "endState": "الحالة النهائية",
-      "endStateOpen": "مفتوح",
       "lossReason": "سبب الخسارة",
       "lossReasonDetail": "التفاصيل",
-      "inProduction": "قيد التصنيع"
+      "inProduction": "قيد التصنيع",
+      "committed": "ملتزم"
     },
+    "state": {
+      "won": "مكتسب",
+      "lost": "خاسر",
+      "committed": "ملتزم",
+      "open": "مفتوح"
+    },
+
     "detail": {
       "details": "التفاصيل",
       "companies": "الشركات",

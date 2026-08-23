@@ -1,8 +1,8 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { PageHeader } from "@/components/page-header";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+
 import {
   Table,
   TableBody,
@@ -18,6 +18,7 @@ import { lookupName, pickName } from "@/lib/lookups";
 import { listProjects } from "@/lib/projects";
 
 import { ListCard, SearchForm } from "../_components/list-controls";
+import { ProjectStateBadge } from "../_components/project-state";
 
 export const dynamic = "force-dynamic";
 
@@ -87,7 +88,7 @@ export default async function ProjectsPage({
                   {t("common.city")}
                 </TableHead>
                 <TableHead className="text-start">
-                  {t("projects.fields.endState")}
+                  {t("projects.fields.state")}
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -110,20 +111,14 @@ export default async function ProjectsPage({
                     {pickName(locale, row.cityNameEn, row.cityNameAr) ??
                       t("common.none")}
                   </TableCell>
+                  {/* Won is derived from an approved dispatch `S31` and
+                      resolved in SQL by `listProjects`, so this column costs
+                      no query of its own and cannot disagree with the
+                      dispatches behind it. `D2` is not answered here: this
+                      list still has no whose-move column, which is `D25`'s
+                      slice and not this rule's. */}
                   <TableCell className="text-start">
-                    {row.endState ? (
-                      <Badge
-                        variant={
-                          row.endState === "lost" ? "destructive" : "secondary"
-                        }
-                      >
-                        {t(`enums.projectEndState.${row.endState}`)}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">
-                        {t("projects.fields.endStateOpen")}
-                      </span>
-                    )}
+                    <ProjectStateBadge row={row} />
                   </TableCell>
                 </TableRow>
               ))}

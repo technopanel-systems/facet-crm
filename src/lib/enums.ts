@@ -33,8 +33,16 @@ export const SAUDI_CODE = "SA";
  * does not recognise the term. Qualification is the founder's own word and the
  * thing warmth was reaching for — see `25 §16`, and `companyIsQualified`. */
 
-/** `[07 C5]` — loss belongs to the project, rejection to the quotation. */
-export const PROJECT_END_STATES = ["won", "lost", "dormant"] as const;
+/**
+ * `[07 C5]` — loss belongs to the project, rejection to the quotation.
+ *
+ * **One value on purpose.** `S31` derives `won` from an approved dispatch, so
+ * nothing may set it here, and `dormant` had no rule behind it. This is the
+ * list the project form offers, so it is also the reason that select now reads
+ * *Open · Lost* and nothing else.
+ */
+export const PROJECT_END_STATES = ["lost"] as const;
+
 export type ProjectEndState = (typeof PROJECT_END_STATES)[number];
 
 /**
