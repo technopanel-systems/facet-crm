@@ -13,6 +13,12 @@ import { Input } from "@/components/ui/input";
 import { Link } from "@/i18n/navigation";
 import { emptyFormState, type FormState } from "@/lib/validation";
 
+import {
+  LineFields,
+  type LineDefaults,
+  type ProductOptions,
+} from "../quotations/line-fields";
+
 type Action = (state: FormState, formData: FormData) => Promise<FormState>;
 
 /**
@@ -31,6 +37,12 @@ export type ThreadOption = {
   /** `S74` — the quotation's own project, already translated. Null when it
    *  has none `S50`, which is what puts the picker on this form. */
   projectLabel: string | null;
+  /**
+   * `S116` — the issued version's lines `S126`, which is what *"arrives
+   * pre-filled with its lines"* means on a screen. An unpriced quotation line
+   * `S58` arrives with an empty price, which is the box the rep must fill.
+   */
+  lines: LineDefaults[];
 };
 
 export type CompanyOption = { id: string; label: string };
@@ -46,12 +58,26 @@ export type ProjectOption = { id: string; label: string };
  * survives a reload and needs no JavaScript — the same reasoning `SearchForm`
  * already follows. Only the submit path is a client action.
  *
- * **The project follows the chosen quotation** `S74`, which is the one thing
- * here that IS client state: the quotation carrying a project shows it and
- * offers nothing to change, and the quotation with none `S50` shows a picker.
- * The server decides either way — it derives the project from the thread and
- * refuses a disagreeing one — so this only spares the coordinator a field
- * they may not answer.
+ * **The project and the LINES follow the chosen quotation** `S74` `S116`,
+ * which is the one thing here that IS client state: the quotation carrying a
+ * project shows it and offers nothing to change, the quotation with none `S50`
+ * shows a picker, and the rows fill with the issued version's lines. The server
+ * decides the project either way — it derives it from the thread and refuses a
+ * disagreeing one — so that half only spares the coordinator a field they may
+ * not answer.
+ *
+ * **The three routes of `S75` are two entry points here.** Keeping the
+ * prefilled rows is *exactly as a quotation*; changing, adding or removing one
+ * is *from a quotation, with edits*; the direct mode starts on one empty row
+ * and is *a free entry*. Nothing marks which happened, and nothing should:
+ * `S120` flags a dispatch whose VALUES differ from its quotation, not one
+ * somebody typed in.
+ *
+ * Each thread's lines travel with its option rather than through a second
+ * navigation — the same client state the project field already uses. The row
+ * count follows the chosen quotation, so `linesKey` re-mounts the rows when it
+ * changes: React would otherwise keep the previous quotation's typed values in
+ * inputs that are now describing a different one.
  */
 export function DispatchForm({
   action,
@@ -60,6 +86,8 @@ export function DispatchForm({
   companies,
   reps,
   projects,
+  products,
+  locale,
   companyQuery,
   today,
 }: {
@@ -69,6 +97,8 @@ export function DispatchForm({
   companies: CompanyOption[];
   reps: RepOption[];
   projects: ProjectOption[];
+  products: ProductOptions;
+  locale: string;
   companyQuery: string;
   today: string;
 }) {
@@ -80,10 +110,27 @@ export function DispatchForm({
   );
   const thread = threads.find((row) => row.id === threadId);
 
+  // `S116` — the chosen quotation's lines, or one empty row to type into.
+  // `rowCount` is state rather than a derived length because both directions
+  // are real: *a dispatch may add a product the quotation never had*, and a
+  // partial dispatch may carry fewer lines than were quoted `[04 quantities]`.
+  // It is reset where the quotation is chosen, which is the only place the
+  // right number is known.
+  const prefilled = mode === "linked" && thread ? thread.lines : [];
+  const [rowCount, setRowCount] = useState(Math.max(1, prefilled.length));
+  const lineDefaults = Array.from(
+    { length: rowCount },
+    (_, index): LineDefaults | undefined => prefilled[index],
+  );
+  // Re-mounts the rows when the quotation changes: React would otherwise keep
+  // the previous quotation's values in inputs now describing a different one.
+  const linesKey = `${mode}-${threadId}`;
+
   return (
     <FormShell
       action={formAction}
       error={state.error}
+      wide
       actions={
         <>
           <Button type="submit" disabled={pending}>
@@ -110,7 +157,12 @@ export function DispatchForm({
             <SelectField
               name="quotationThreadId"
               defaultValue={threadId}
-              onChange={setThreadId}
+              onChange={(value) => {
+                setThreadId(value);
+                // `S116` — the new quotation's lines replace the old rows.
+                const picked = threads.find((row) => row.id === value);
+                setRowCount(Math.max(1, picked?.lines.length ?? 1));
+              }}
               placeholder={t("dispatches.fields.quotationPlaceholder")}
               invalid={!!errors.quotationThreadId}
             >
@@ -219,25 +271,66 @@ export function DispatchForm({
         </>
       )}
 
-      <FormField
-        name="sqm"
-        label={t("dispatches.fields.sqm")}
-        error={errors.sqm}
-        required
-      >
-        <Input
-          id="sqm"
-          name="sqm"
-          type="number"
-          inputMode="decimal"
-          min="0"
-          step="0.0001"
-          dir="ltr"
-          className="text-start"
-          defaultValue={state.values?.sqm}
-          aria-invalid={!!errors.sqm || undefined}
-        />
-      </FormField>
+      {/* `S116` — what actually went out. **There is no square-metre field**:
+          the figure is the lines' own, generated by the database, so a box to
+          type it into would be a second number that could disagree with them.
+          `D63`'s repeating row, and `LineFields` is the one that shipped on
+          quotation lines rather than a second shape — `S116` says outright
+          that a dispatch line IS a quotation line's shape. No service rows:
+          a dispatch never carries one. */}
+      <fieldset className="flex flex-col gap-4 rounded-lg border p-4">
+        <legend className="px-1 text-sm font-medium">
+          {t("dispatches.detail.lines")}
+        </legend>
+
+        {products.suppliers.length === 0 ? (
+          <p role="alert" className="text-destructive text-start text-sm">
+            {t("quotations.errors.noSuppliers")}
+          </p>
+        ) : null}
+
+        <p className="text-muted-foreground text-start text-sm">
+          {mode === "linked" && thread
+            ? t("dispatches.detail.linesPrefilled")
+            : t("dispatches.detail.linesTyped")}
+        </p>
+
+        {lineDefaults.map((defaults, index) => (
+          <div
+            key={`${linesKey}-${index}`}
+            className="border-t pt-4 first:border-t-0 first:pt-0"
+          >
+            <LineFields
+              options={products}
+              locale={locale}
+              idPrefix={`line-${index}`}
+              defaults={defaults}
+              errors={errors}
+            />
+          </div>
+        ))}
+
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            onClick={() => setRowCount((count) => count + 1)}
+          >
+            {t("dispatches.detail.addLine")}
+          </Button>
+          {rowCount > 1 ? (
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              onClick={() => setRowCount((count) => Math.max(1, count - 1))}
+            >
+              {t("common.remove")}
+            </Button>
+          ) : null}
+        </div>
+      </fieldset>
 
       <FormField
         name="dispatchDate"

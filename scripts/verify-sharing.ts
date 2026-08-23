@@ -69,6 +69,7 @@ import {
   productThicknesses,
   projectCompanies,
   projects,
+  quotationVersions,
   recordShares,
   roles,
   users,
@@ -96,12 +97,14 @@ import { getProject, listProjects, updateProject } from "@/lib/projects";
 import {
   createQuotationThread,
   getQuotationThread,
+  issueVersion,
   listQuotationThreads,
 } from "@/lib/quotations";
 import { createReport, getReport, listReports, today } from "@/lib/reports";
 import { addComment } from "@/lib/comments";
 import { grantShare, listShares, revokeShare, shareableUsers } from "@/lib/sharing";
 
+import { addDispatchLine } from "./dispatch-fixture";
 import { ROLE_SEED } from "./seed/roles";
 
 let failures = 0;
@@ -417,13 +420,31 @@ async function main(): Promise<void> {
   // A dispatch against the thread, so §5 can follow a PROJECT share all the way
   // down the cascade `11 §2` → `18 §2` that `verify-slice3` proves from a hand
   // row. It credits rep A, so rep B reaches it only through the share.
+  // `S126` — a dispatch may only be raised from an ISSUED quotation, so the
+  // fixture issues it. A hand-written row is not exempt: `verify:schema25` §14
+  // holds every dispatch ever written to the rule, and a fixture that broke it
+  // would fail that check for a reason that has nothing to do with sharing.
+  await issueVersion(coordinator, thread.id, {
+    smacReference: `${stamp}-share`,
+    verification: "unverified",
+  });
+
+  // And the version it names. A hand-written row still has to satisfy the
+  // `dispatches_quotation_pair` CHECK: the thread and the version are null
+  // together or set together.
+  const [liveVersion] = await db
+    .select({ id: quotationVersions.id })
+    .from(quotationVersions)
+    .where(eq(quotationVersions.threadId, thread.id))
+    .limit(1);
+
   const [dispatch] = await db
     .insert(dispatchesTable)
     .values({
       companyId: company.id,
       userId: repA.user.id,
-      sqm: "86.3040",
       quotationThreadId: thread.id,
+      quotationVersionId: liveVersion.id,
       // `S74` — see the same note in `verify-phase9`: a hand-written dispatch
       // still carries its quotation's project.
       projectId: project.id,
@@ -431,6 +452,8 @@ async function main(): Promise<void> {
       recordedByUserId: coordinator.user.id,
     })
     .returning();
+  // `S116` — the line, without which this reads as 0 m².
+  await addDispatchLine(dispatch.id, "86.3040");
 
   // A company-level report and a project-level one, for the two halves of
   // `visibleRepReportsFilter` `[20 §10]`.

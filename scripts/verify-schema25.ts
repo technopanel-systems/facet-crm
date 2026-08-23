@@ -55,6 +55,12 @@
  *      of that kind, and the first to span two rows, so not even a CHECK could
  *      hold it. Asserted over every row in the table rather than over rows
  *      this script wrote.
+ *  14. *** A dispatch's lines and its figure cannot disagree *** `S116`
+ *      `S126` — no dispatch has zero lines, none was raised from a version
+ *      still `requested`, every dispatch line's VAT and total are the same
+ *      arithmetic §12 asserts of a quotation line, and there is no `sqm`
+ *      column left on `dispatches` for a second answer to live in. Over every
+ *      row ever written.
  *  13. *** The repository and the database agree *** — CHECK constraints, enum
  *      types and their values, and indexes, as set differences both ways. This
  *      is the one claim `drizzle-kit generate` structurally cannot make: it
@@ -1372,6 +1378,7 @@ async function main(): Promise<void> {
   await regionIsAlwaysDerived();
   await projectMatchesThread();
   await vatIsFixed();
+  await dispatchLinesHold();
   await repositoryMatchesDatabase();
 }
 
@@ -1525,6 +1532,119 @@ async function projectMatchesThread(): Promise<void> {
  * back as a string and a truthiness test on `"0"` would pass for the wrong
  * reason and keep passing on `"1"`.
  */
+/**
+ * `S116` `S126` — **what a dispatch may contain**, over every row ever written.
+ *
+ * Three claims no CHECK can make, for three different reasons.
+ *
+ * **No dispatch has zero lines.** A dispatch's square metres are the sum of
+ * its lines, so a lineless row does not fail — it reads as 0 m², and `S26`'s
+ * per-participant figure, `S85`'s achievement and every credit split quietly
+ * shrink by exactly that dispatch. That is the silent failure this section
+ * exists for. It spans two tables, so `recordDispatch` is the only writer that
+ * can hold it and this is the only thing that can say it held.
+ *
+ * **No linked dispatch was raised from a version that is still `requested`**
+ * `S126`. Asserted through `quotation_version_id` rather than through the
+ * thread, and that is the whole reason the column exists: a revision
+ * supersedes the issued version `S66`, so a thread that was lawfully
+ * dispatched against can end up with no issued version at all, and the same
+ * claim made through the thread would start failing on a lawful historical
+ * row. Through the version it is permanent — `issued`, later `superseded`,
+ * never `requested`.
+ *
+ * **Every dispatch line's VAT is 15% of its total** `S57`, which is §12's
+ * claim about quotation lines made about the table that now shares their
+ * arithmetic. Both are written by `productLineMoney`; a second copy appearing
+ * anywhere would show up here first.
+ *
+ * **There is no `sqm` column on `dispatches`** — the structural half. §2 makes
+ * the same kind of claim about everything else that has been withdrawn: a
+ * derived figure with a column still beside it is a place for a second answer
+ * to live, and the invariant above would be a comparison rather than an
+ * identity.
+ *
+ * **Counted in SQL and asserted `=== 0`**, never `!count`: `count(*)` comes
+ * back as a string and a truthiness test on `"0"` passes for the wrong reason.
+ */
+async function dispatchLinesHold(): Promise<void> {
+  console.log(
+    "\n14. *** A dispatch's lines and its figure cannot disagree *** [S116], [S126]",
+  );
+
+  const [rows] = (await db.execute(sql`
+    select
+      count(*)::int as dispatches,
+      count(*) filter (
+        where not exists (
+          select 1 from dispatch_lines l where l.dispatch_id = d.id
+        )
+      )::int as lineless,
+      count(*) filter (where d.quotation_version_id is not null)::int as linked,
+      count(*) filter (
+        where v.status = 'requested'
+      )::int as unissued
+    from dispatches d
+    left join quotation_versions v on v.id = d.quotation_version_id
+  `)) as unknown as {
+    dispatches: number;
+    lineless: number;
+    linked: number;
+    unissued: number;
+  }[];
+
+  console.log(
+    `  --    ${rows.dispatches} dispatch(es), ${rows.linked} raised from a quotation`,
+  );
+  check(
+    "*** no dispatch has zero lines — one would read as 0 m2 *** [S116]",
+    rows.lineless === 0,
+    `${rows.lineless} carry none`,
+  );
+  check(
+    "*** no dispatch was raised from a version still being edited *** [S126]",
+    rows.unissued === 0,
+    `${rows.unissued} name a requested version`,
+  );
+
+  const [lines] = (await db.execute(sql`
+    select
+      count(*)::int as total,
+      count(*) filter (
+        where vat_amount is distinct from round(line_total * 0.15, 2)
+      )::int as wrong_vat,
+      count(*) filter (
+        where line_total is distinct from round(unit_price * sqm, 2)
+      )::int as wrong_total
+    from dispatch_lines
+  `)) as unknown as { total: number; wrong_vat: number; wrong_total: number }[];
+
+  console.log(`  --    ${lines.total} dispatch line(s)`);
+  check(
+    "no dispatch line's VAT differs from 15% of its total [S57]",
+    lines.wrong_vat === 0,
+    `${lines.wrong_vat} disagree`,
+  );
+  check(
+    "no dispatch line's total differs from its price times its square metres [S56]",
+    lines.wrong_total === 0,
+    `${lines.wrong_total} disagree`,
+  );
+
+  const [column] = (await db.execute(sql`
+    select count(*)::int as present
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'dispatches'
+      and column_name = 'sqm'
+  `)) as unknown as { present: number }[];
+  check(
+    "*** and there is no sqm column left for a second answer to live in *** [S116]",
+    column.present === 0,
+    "dispatches.sqm is still there",
+  );
+}
+
 async function vatIsFixed(): Promise<void> {
   console.log("\n12. *** Every priced line's VAT is 15% of its total *** [S57]");
 

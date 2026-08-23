@@ -1405,6 +1405,11 @@ export const quotationServiceLines = pgTable(
  * still name no project `S75`.
  *
  * Achieved SQM and pipeline metrics derive from these rows and nowhere else.
+ *
+ * **There is no `sqm` column** since `0020`. A dispatch carries its own lines
+ * `S116` and its square metres are the sum of `dispatch_lines.sqm`, which is
+ * itself generated — so the figure exists once and cannot disagree with the
+ * lines it is made of. Every reader sums it in SQL.
  */
 export const dispatches = pgTable(
   "dispatches",
@@ -1416,9 +1421,27 @@ export const dispatches = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id),
-    sqm: numeric("sqm", SQM).notNull(),
     quotationThreadId: uuid("quotation_thread_id").references(
       () => quotationThreads.id,
+    ),
+    /**
+     * `S126` — the version this dispatch was raised from, which is the thing
+     * the rule is about: the coordinator issues a *version*, not a thread.
+     *
+     * It is also what keeps the rule assertable. A revision supersedes the
+     * issued version `S66`, so a thread that was legitimately dispatched
+     * against can end up with no issued version at all — and an invariant
+     * checked through the thread would start reporting a lawful historical
+     * dispatch as a violation. Through this column the claim is permanent:
+     * the status is `issued` or, later, `superseded`, and never `requested`.
+     *
+     * `S120` needs the same column for the opposite reason — its comparison is
+     * against *the version the dispatch was raised from*, never the latest one
+     * — but that is a later slice, and this one already reads it three ways:
+     * the prefill, the SMAC reference shown on the dispatch, and the invariant.
+     */
+    quotationVersionId: uuid("quotation_version_id").references(
+      () => quotationVersions.id,
     ),
     /** `S74` — the thread's project whenever there is a thread, never another. */
     projectId: uuid("project_id").references(() => projects.id),
@@ -1437,7 +1460,85 @@ export const dispatches = pgTable(
     index("dispatches_thread_idx").on(t.quotationThreadId),
     /** `S26` groups by it, per project, on every project detail screen. */
     index("dispatches_project_idx").on(t.projectId),
+    /**
+     * `S126` — the two quotation columns are null together or set together. A
+     * free-entry dispatch `S75` names no version, and one raised from a
+     * quotation cannot lack it. Row-local, so the database holds it; which
+     * THREAD the version belongs to spans two rows and stays in
+     * `recordDispatch`, beside the company and project pairs it already holds.
+     */
+    check(
+      "dispatches_quotation_pair",
+      sql`(quotation_thread_id is null) = (quotation_version_id is null)`,
+    ),
   ],
+);
+
+/**
+ * `S116` — **a dispatch carries its own lines**, the same shape as a
+ * quotation's product lines, but never service lines: `S59`'s fabrication is
+ * excluded from square metres, and what is dispatched is cladding.
+ *
+ * Any line may differ from the quotation's, including price, and a dispatch may
+ * add a product the quotation never had — which is why these are **copied
+ * rows, never a reference** to `quotation_lines`. The invoice is made from
+ * them. It also means a dispatch that matched its quotation and one that was
+ * never edited are the same row, deliberately: `S120` flags a difference in
+ * *values*, not an editing act, so there is no mode column and no edited flag.
+ *
+ * **`sqm` is generated here and stored nowhere else.** `dispatches` has no
+ * `sqm` column since `0020`: a dispatch's square metres are the sum of these,
+ * resolved in SQL at every reader. One number, computed by the database, so
+ * the total cannot disagree with the lines it is made of — the alternative,
+ * a stored total in `quotation_versions.total_sqm`'s shape, would oblige every
+ * future writer to remember to recompute it.
+ *
+ * **The three money columns are NOT NULL** `S116`: *every line carries a
+ * price; nothing is dispatched free*. That is the database half of the rule,
+ * and it is the one difference in nullability from `quotation_lines`, where an
+ * unpriced line is legal `S58`. The rate behind `vat_amount` is `VAT_RATE`
+ * and no column holds it `S57`.
+ *
+ * **No `form_factor`**, unlike `quotation_lines`: that column is always written
+ * `'sheet'`, nothing reads it and nothing sets `coil` (`WORKFLOW §5`), so
+ * copying it into a new table would be landing dead structure. **No
+ * `quotation_line_id`** either — the line-to-line comparison is `S120`'s, and
+ * a column with a writer and no reader is a defect.
+ */
+export const dispatchLines = pgTable(
+  "dispatch_lines",
+  {
+    id: pk(),
+    dispatchId: uuid("dispatch_id")
+      .notNull()
+      .references(() => dispatches.id),
+    supplierId: uuid("supplier_id")
+      .notNull()
+      .references(() => productSuppliers.id),
+    classId: uuid("class_id")
+      .notNull()
+      .references(() => productClasses.id),
+    fireRatingId: uuid("fire_rating_id")
+      .notNull()
+      .references(() => productFireRatings.id),
+    /** Typed, a code or a RAL/Pantone special, and required `S54`. */
+    customColour: text("custom_colour").notNull(),
+    thicknessId: uuid("thickness_id")
+      .notNull()
+      .references(() => productThicknesses.id),
+    widthM: numeric("width_m", SQM).notNull(),
+    lengthM: numeric("length_m", SQM).notNull(),
+    quantityPcs: numeric("quantity_pcs", SQM).notNull(),
+    /** Never hand-entered `S55` — the same expression `quotation_lines` uses. */
+    sqm: numeric("sqm", SQM).generatedAlwaysAs(
+      sql`quantity_pcs * width_m * length_m`,
+    ),
+    unitPrice: numeric("unit_price", MONEY).notNull(),
+    lineTotal: numeric("line_total", MONEY).notNull(),
+    vatAmount: numeric("vat_amount", MONEY).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("dispatch_lines_dispatch_idx").on(t.dispatchId)],
 );
 
 /* ------------------------------------------------------------------ *

@@ -371,8 +371,10 @@ quotation** · **from a quotation, with edits** · **as a free entry with no
 quotation at all**. The second is the normal case after negotiation. **A
 dispatch that names a project wins it on approval (S31); one that names none
 wins nothing**, which is why the project is asked for even when it is not
-refused. Two of the three routes exist today — exactly as a quotation, and free
-entry. The middle one, and winning on approval, do not.
+refused. All three routes exist today: a dispatch raised from a quotation
+arrives with its lines and is kept or edited (S116), and a free entry types
+them. **Winning on approval does not** — there is no approval act yet (S72),
+and nothing derives a won project (S31).
 
 **S76. [CHANGE]** The coordinator **sees projects and contacts**, because both
 are part of the dispatch. The name-only restriction is removed. This is a
@@ -396,7 +398,12 @@ invoice is made from these lines. A dispatch raised from a quotation arrives
 **pre-filled with its lines**; the rep keeps them or edits them. **Every line
 carries a price**; nothing is dispatched free. A quotation line with no price
 (S58) arrives unpriced and **the rep prices it before submitting**. A dispatch
-request with an unpriced line cannot be submitted.
+request with an unpriced line cannot be submitted. The lines, the pre-fill, the
+edits and the refusal of an unpriced line all ship today, and a dispatch's
+square metres are the sum of its lines rather than a figure anybody types. What
+does not is **submitting**: there is no request to submit until S72, so today
+the refusal lands when the dispatch is recorded, and it is the coordinator who
+prices the line rather than the rep.
 
 **S117. [BUILD]** FACET **mirrors** the dispatch's money for comparison. SMAC
 issues the invoice and remains the system of record; a disagreement is SMAC's to
@@ -451,7 +458,7 @@ that the coordinator edits it, usually after phoning the rep — that is faster
 than refusing and re-raising. A quotation is different: **S61** keeps its lines
 editable until the coordinator issues it, so the rep edits throughout.
 
-**S126. [BUILD]** A dispatch may only be raised from a quotation the coordinator
+**S126.** A dispatch may only be raised from a quotation the coordinator
 has **issued**. A requested version is still being edited (S61) and is not
 something to dispatch against. This is what makes S120's comparison stable: an
 issued version does not change, and a later revision creates a new version

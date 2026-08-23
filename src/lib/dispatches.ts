@@ -38,12 +38,25 @@
  *  7. **Recording a dispatch NEVER sets a credit split** `[07 D3]`, `[12 §1]`.
  *     This module does not import `setCreditSplit`, and `verify-slice3`
  *     counts rows to prove it.
+ *  8. **Only from an ISSUED quotation** `S126`. A requested version is still
+ *     being edited `S61` and is not something to dispatch against. The
+ *     dispatch records the version, not only the thread, because issuing is a
+ *     version act — and because a later revision supersedes that version
+ *     `S66`, so a rule checked through the thread would start reporting a
+ *     lawful historical dispatch as a violation.
+ *  9. **A dispatch carries its own lines** `S116`, priced, never service
+ *     lines. They are COPIED from the issued version when there is one, and
+ *     typed from nothing on the free-entry route `S75`. Any of them may differ
+ *     from the quotation's; the dispatch may add a product it never had.
  *
- * **`sqm` is typed, and that is not a violation.** CLAUDE.md's "square metres
- * are always generated, never hand-entered" is scoped to quotation lines —
- * `quantity_pcs × width_m × length_m` `[13 §2]`. `dispatches` has no dimension
- * columns, and `04 quantities` makes dispatched sqm independent of quoted sqm.
- * There is nothing to generate it from.
+ * **`sqm` is derived, not stored.** It is `sum(dispatch_lines.sqm)`, resolved
+ * in SQL at every reader here and in `projects.ts`, `targets.ts` and
+ * `timeline.ts`. `dispatch_lines.sqm` is itself generated —
+ * `quantity_pcs × width_m × length_m`, the same expression `quotation_lines`
+ * uses `[08 D2]` — so the figure exists once, is computed by the database, and
+ * cannot disagree with the lines it is made of. This column WAS typed, and the
+ * note defending that is gone with it: `04 quantities` still makes dispatched
+ * sqm independent of QUOTED sqm, which is a different claim.
  *
  * Every read composes a filter from `authz`; every write goes through
  * `withAudit`, which owns the transaction `[07 E1]`.
@@ -51,6 +64,7 @@
 
 import {
   and,
+  asc,
   count,
   desc,
   eq,
@@ -60,7 +74,6 @@ import {
   isNull,
   lt,
   lte,
-  ne,
   or,
   sql,
 } from "drizzle-orm";
@@ -69,8 +82,14 @@ import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import {
   companies,
+  dispatchLines,
   dispatches,
+  productClasses,
+  productFireRatings,
+  productSuppliers,
+  productThicknesses,
   projects,
+  quotationLines,
   quotationThreads,
   quotationVersions,
   users,
@@ -93,15 +112,64 @@ import {
 } from "@/lib/credit-splits";
 import { SQM_SCALE, ZERO, toScaled } from "@/lib/decimal";
 import { ensureProjectParticipant } from "@/lib/projects";
+import { productLineMoney } from "@/lib/quotations";
 import { RuleError } from "@/lib/validation";
 
 export type Dispatch = typeof dispatches.$inferSelect;
 
 const PAGE_SIZE = 25;
 
+/**
+ * A dispatch's square metres `S116` — the sum of its lines, in SQL.
+ *
+ * Correlated rather than joined, so it composes into a paginated `select`
+ * without a `group by` that would have to name every other column, and so it
+ * is resolved **before** pagination (`CLAUDE.md`). Cast back to the line's own
+ * `numeric(14,4)` so a dispatch reads `"12.0000"` and not `"12"` — every
+ * comparison against this figure is a string comparison.
+ *
+ * **Written out, with no interpolated columns, and that is load-bearing.**
+ * A Drizzle column interpolated into a `sql` template in the SELECT list loses
+ * its table qualifier whenever the outer query joins nothing — `dispatch_id`
+ * and `id` both then resolve inside the subquery, against `dispatch_lines`,
+ * and the comparison is `dispatch_lines.dispatch_id = dispatch_lines.id`.
+ * That is never true, so every row reads `0.0000` and no error is raised. It
+ * happened to be correct in the joined callers here and silently wrong in the
+ * one without a join, which is the worst possible way for it to behave.
+ * Naming both tables outright is the fix; the alias `dl` keeps the inner
+ * `sqm` unambiguous.
+ */
+const dispatchSqm = sql<string>`(
+  select coalesce(sum(dl.sqm), 0)::numeric(14, 4)
+  from dispatch_lines dl
+  where dl.dispatch_id = dispatches.id
+)`;
+
+/**
+ * One product line on a dispatch `S116` — the same shape as a quotation's,
+ * with one difference the type itself states: **`unitPrice` is not nullable.**
+ * *Every line carries a price; nothing is dispatched free.* An unpriced
+ * quotation line `S58` arrives on the form with an empty price box, and the
+ * caller fills it before this type can be built.
+ *
+ * No service line `S116`, no `formFactor` (dead on `quotation_lines`, and not
+ * copied into a new table), and no `sqm` — the column is generated.
+ */
+export type DispatchLineInput = {
+  supplierId: string;
+  classId: string;
+  fireRatingId: string;
+  customColour: string;
+  thicknessId: string;
+  widthM: string;
+  lengthM: string;
+  quantityPcs: string;
+  unitPrice: string;
+};
+
 export type DispatchInput = {
-  /** `numeric(14,4)`, typed — see the module note above. */
-  sqm: string;
+  /** At least one `S116`. Their generated square metres ARE the dispatch's. */
+  lines: DispatchLineInput[];
   /** `YYYY-MM-DD`. */
   dispatchDate: string;
   /** Optional `[07 C6]`. When set, company and rep are derived from it. */
@@ -122,6 +190,7 @@ export type DispatchInput = {
 export type DispatchListRow = {
   id: string;
   dispatchDate: string;
+  /** Derived — `sum(dispatch_lines.sqm)`, never a column `S116`. */
   sqm: string;
   companyId: string;
   companyName: string;
@@ -142,18 +211,48 @@ export type DispatchListRow = {
   createdAt: Date;
 };
 
+/** One line as a screen reads it — the lookup names resolved, as `S53` asks. */
+export type DispatchLineRow = {
+  id: string;
+  supplierNameEn: string;
+  supplierNameAr: string;
+  classNameEn: string;
+  classNameAr: string;
+  fireRatingNameEn: string;
+  fireRatingNameAr: string;
+  customColour: string;
+  /** Trailing zeros off a `numeric(5,2)`: `"4.00"` reads as `4`, not `4.00`. */
+  thicknessMm: string;
+  widthM: string;
+  lengthM: string;
+  quantityPcs: string;
+  sqm: string;
+  unitPrice: string;
+  lineTotal: string;
+  /** At `VAT_RATE`, always `S57`. The rate itself is stored nowhere. */
+  vatAmount: string;
+};
+
 export type DispatchDetail = DispatchListRow & {
   projectId: string | null;
   projectNameEn: string | null;
   projectNameAr: string | null;
   projectViewable: boolean;
+  lines: DispatchLineRow[];
   credit: DispatchCredit;
 };
 
-/** A thread a dispatch may actually be recorded against: visible, and paid. */
+/**
+ * A thread a dispatch may actually be recorded against: visible, **issued**
+ * `S126` and paid `[07 C3]`.
+ */
 export type DispatchableThread = {
   id: string;
-  smacReference: string | null;
+  /** `S126` — the issued version, which is the one the lines come from. */
+  versionId: string;
+  /** Never null: `issueVersion` is what writes it, and only issued threads
+   *  reach this list `S126`. */
+  smacReference: string;
   /** Null when the quotation has no project `S50` — the coordinator picks one
    *  as part of dispatching it `S74`. */
   projectId: string | null;
@@ -163,10 +262,20 @@ export type DispatchableThread = {
   companyName: string;
   raisedByUserId: string;
   raisedByName: string;
-  /** The live version's total, for information. Never a cap `[04 quantities]`. */
+  /** The issued version's total, for information. Never a cap `[04 quantities]`. */
   quotedSqm: string | null;
   /** Running total already dispatched against this thread. Also not a cap. */
   dispatchedSqm: string;
+  /**
+   * The issued version's product lines, as line INPUTS `S116` — *"a dispatch
+   * raised from a quotation arrives pre-filled with its lines"*. Service lines
+   * are not among them `S116`.
+   *
+   * A quotation line with no price `S58` arrives with `unitPrice` empty, which
+   * is the one value here the form must not simply keep: `recordDispatch`
+   * refuses it, because every dispatched line carries a price `S116`.
+   */
+  lines: DispatchLineInput[];
 };
 
 /* ------------------------------------------------------------------ *
@@ -185,6 +294,14 @@ export type DispatchableThread = {
  *
  * And two ways the project arrives `S74`, which is the whole of that rule:
  * taken from the thread, or chosen and written back onto it.
+ *
+ * **Three ways the lines arrive** `S75`, which are the same two modes seen from
+ * the other side: exactly as the quotation, from the quotation with edits, or
+ * typed from nothing. Only the third is distinguishable HERE — the first two
+ * arrive as the same array of values, and that is deliberate. `S120` flags a
+ * dispatch that *differs* from its quotation, and a difference is a property of
+ * the values, not of whether anybody touched the form. So nothing records which
+ * of the three this was, and there is no mode column to get wrong.
  */
 export async function recordDispatch(
   session: AuthSession,
@@ -194,18 +311,50 @@ export async function recordDispatch(
     throw new RuleError("dispatches.errors.dispatchOnly");
   }
 
-  const sqmScaled = toScaled(input.sqm, SQM_SCALE);
+  // `S116` — the lines ARE the dispatch. Nothing went out is not a dispatch,
+  // and with no lines every derived figure would read zero rather than fail.
+  if (input.lines.length === 0) {
+    throw new RuleError("dispatches.errors.atLeastOneLine");
+  }
+  // **Every line carries a price; nothing is dispatched free** `S116`. An
+  // unpriced quotation line `S58` is exactly what arrives here empty, and this
+  // is the refusal that makes the rep price it.
+  for (const line of input.lines) {
+    if (!line.unitPrice.trim()) {
+      throw new RuleError("dispatches.errors.linePriceRequired", "unitPrice");
+    }
+    if (!line.customColour.trim()) {
+      throw new RuleError("dispatches.errors.lineColourRequired", "customColour");
+    }
+  }
+  // The square metres are the lines' own `S116`, so this is no longer a typed
+  // field to validate — it is arithmetic on what was entered, and the only
+  // thing left to refuse is a dispatch that adds up to nothing.
+  const sqmScaled = input.lines.reduce(
+    (total, line) =>
+      total +
+      toScaled(line.quantityPcs, SQM_SCALE) *
+        toScaled(line.widthM, SQM_SCALE) *
+        toScaled(line.lengthM, SQM_SCALE),
+    ZERO,
+  );
   if (sqmScaled <= ZERO) {
-    throw new RuleError("dispatches.errors.sqmPositive", "sqm");
+    throw new RuleError("dispatches.errors.sqmPositive", "quantityPcs");
   }
 
   let companyId = input.companyId;
   let userId = input.userId;
   let projectId = input.projectId;
+  /** `S126` — the issued version this is raised from. Null on the free route. */
+  let versionId: string | null = null;
   /** `S74`'s second branch: the project is new to the quotation. */
   let writeBackProject = false;
 
   if (input.quotationThreadId) {
+    // The field name below is the FORM's, not the column's: `ruleErrorState`
+    // keys `fieldErrors` by it, so `threadId` — which no screen renders —
+    // meant these three refusals were shown to nobody.
+    //
     // Visibility first — a thread the actor cannot see does not exist to them.
     if (
       !(await canViewRecord(
@@ -214,7 +363,7 @@ export async function recordDispatch(
         input.quotationThreadId,
       ))
     ) {
-      throw new RuleError("dispatches.errors.threadNotVisible", "threadId");
+      throw new RuleError("dispatches.errors.threadNotVisible", "quotationThreadId");
     }
 
     const [thread] = await db
@@ -228,13 +377,35 @@ export async function recordDispatch(
       .where(eq(quotationThreads.id, input.quotationThreadId))
       .limit(1);
     if (!thread) {
-      throw new RuleError("dispatches.errors.threadNotVisible", "threadId");
+      throw new RuleError("dispatches.errors.threadNotVisible", "quotationThreadId");
     }
 
-    // `07 C3` — the gate this whole slice exists to enforce.
+    // `07 C3` — the gate slice 3 existed to enforce.
     if (!thread.paymentConfirmedAt) {
-      throw new RuleError("dispatches.errors.paymentNotConfirmed", "threadId");
+      throw new RuleError("dispatches.errors.paymentNotConfirmed", "quotationThreadId");
     }
+
+    // `S126` — **and the coordinator must have issued it.** A `requested`
+    // version is still being edited `S61`; a revision creates the next one and
+    // supersedes this `S66`, so at most one version of a thread is not
+    // superseded and `issued` is the only status that may be dispatched
+    // against. Nothing enforced this before: `confirmPayment` never reads a
+    // version's status, so a rep could confirm payment on a version still
+    // being edited and the dispatch went through.
+    const [issued] = await db
+      .select({ id: quotationVersions.id })
+      .from(quotationVersions)
+      .where(
+        and(
+          eq(quotationVersions.threadId, input.quotationThreadId),
+          eq(quotationVersions.status, "issued"),
+        ),
+      )
+      .limit(1);
+    if (!issued) {
+      throw new RuleError("dispatches.errors.quotationNotIssued", "quotationThreadId");
+    }
+    versionId = issued.id;
 
     // `18 §7` — derived, not asked for. A caller that supplies a different
     // company is refused rather than silently corrected: a dispatch that
@@ -343,8 +514,10 @@ export async function recordDispatch(
       .values({
         companyId: companyId as string,
         userId: userId as string,
-        sqm: input.sqm,
         quotationThreadId: input.quotationThreadId,
+        // `S126` — null together with the thread, which the
+        // `dispatches_quotation_pair` CHECK holds at the database.
+        quotationVersionId: versionId,
         projectId,
         dispatchDate: input.dispatchDate,
         recordedByUserId: session.user.id,
@@ -361,6 +534,44 @@ export async function recordDispatch(
       entityId: created.id,
       after: created,
     });
+
+    // `S116` — the lines, in the same transaction as the dispatch. A dispatch
+    // row without them is a dispatch that reads as zero square metres, which
+    // is worse than one that never landed.
+    //
+    // `productLineMoney` is `quotations.ts`'s own, imported rather than
+    // repeated: a second copy of the arithmetic could drift on rounding or on
+    // `S57`'s rate, and `S120`'s comparison would then measure the drift.
+    for (const line of input.lines) {
+      const money = productLineMoney(line);
+      const [row] = await tx
+        .insert(dispatchLines)
+        .values({
+          dispatchId: created.id,
+          supplierId: line.supplierId,
+          classId: line.classId,
+          fireRatingId: line.fireRatingId,
+          customColour: line.customColour.trim(),
+          thicknessId: line.thicknessId,
+          widthM: line.widthM,
+          lengthM: line.lengthM,
+          quantityPcs: line.quantityPcs,
+          unitPrice: line.unitPrice,
+          // Both non-null above: the price was refused if empty, so
+          // `productLineMoney` cannot have returned nulls here.
+          lineTotal: money.lineTotal as string,
+          vatAmount: money.vatAmount as string,
+        })
+        .returning();
+
+      log({
+        action: "dispatch_line.added",
+        entityType: "dispatch_line",
+        entityId: row.id,
+        after: row,
+      });
+    }
+
     return created;
   });
 }
@@ -417,13 +628,14 @@ export async function listDispatches(
     .select({
       id: dispatches.id,
       dispatchDate: dispatches.dispatchDate,
-      sqm: dispatches.sqm,
+      sqm: dispatchSqm,
       companyId: dispatches.companyId,
       companyName: companies.name,
       userId: dispatches.userId,
       userName: users.name,
       recordedByName: recordedBy.name,
       quotationThreadId: dispatches.quotationThreadId,
+      smacReference: quotationVersions.smacReference,
       approvedByName: approvedBy.name,
       approvedAt: dispatches.approvedAt,
       createdAt: dispatches.createdAt,
@@ -433,6 +645,12 @@ export async function listDispatches(
     .innerJoin(users, eq(users.id, dispatches.userId))
     .innerJoin(recordedBy, eq(recordedBy.id, dispatches.recordedByUserId))
     .leftJoin(approvedBy, eq(approvedBy.id, dispatches.approvedByUserId))
+    // `S126` — the version this dispatch was RAISED FROM, so the reference is
+    // the one it was dispatched against. LEFT, for the free-entry route `S75`.
+    .leftJoin(
+      quotationVersions,
+      eq(quotationVersions.id, dispatches.quotationVersionId),
+    )
     .where(where)
     .orderBy(desc(dispatches.dispatchDate), desc(dispatches.createdAt))
     .limit(PAGE_SIZE)
@@ -459,17 +677,26 @@ type BareRow = {
   userName: string;
   recordedByName: string;
   quotationThreadId: string | null;
+  smacReference: string | null;
   approvedByName: string | null;
   approvedAt: Date | null;
   createdAt: Date;
 };
 
 /**
- * Add the SMAC reference and the two "may I open this?" flags.
+ * Add the two "may I open this?" flags.
  *
  * `16 §10` / `18 §2`: a coordinator sees the company NAME but may not open the
  * record, so the screen needs to know which to render. The name is already in
  * the row; only the link is in question.
+ *
+ * **The SMAC reference is no longer looked up here.** It used to be a second
+ * query taking each thread's HIGHEST version number, which answered with
+ * today's value rather than the dispatched one: the moment a rep revised, that
+ * version was `requested` with a null reference and every dispatch already
+ * recorded against the issued one silently lost its reference on screen. Since
+ * `S126` the dispatch names the version it was raised from, so the caller
+ * joins it and the lookup is gone.
  */
 async function decorate(
   session: AuthSession,
@@ -482,24 +709,6 @@ async function decorate(
         .filter((id): id is string => id !== null),
     ),
   ];
-
-  const references = new Map<string, string | null>();
-  if (threadIds.length > 0) {
-    const versions = await db
-      .select({
-        threadId: quotationVersions.threadId,
-        smacReference: quotationVersions.smacReference,
-        versionNumber: quotationVersions.versionNumber,
-      })
-      .from(quotationVersions)
-      .where(inArray(quotationVersions.threadId, threadIds))
-      .orderBy(desc(quotationVersions.versionNumber));
-    for (const version of versions) {
-      if (!references.has(version.threadId)) {
-        references.set(version.threadId, version.smacReference);
-      }
-    }
-  }
 
   // `canOpenRecord`, not `canViewRecord`: both of these decide whether the
   // screen draws a link, which since `S76` is a different question from
@@ -524,13 +733,70 @@ async function decorate(
   return rows.map((row) => ({
     ...row,
     companyViewable: companyViewable.get(row.companyId) ?? false,
-    smacReference: row.quotationThreadId
-      ? (references.get(row.quotationThreadId) ?? null)
-      : null,
     threadViewable: row.quotationThreadId
       ? (threadViewable.get(row.quotationThreadId) ?? false)
       : false,
     isDirect: row.quotationThreadId === null,
+  }));
+}
+
+/**
+ * A dispatch's lines, with the four lookup names resolved `S53`.
+ *
+ * The same joins `loadLines` makes for a quotation version, against the same
+ * four tables — the shape is the same shape `S116` says it is. `unitPrice`,
+ * `lineTotal` and `vatAmount` are non-null columns here, so no screen has to
+ * decide what an unpriced dispatch line would mean: there is no such thing.
+ */
+async function loadDispatchLines(
+  dispatchId: string,
+): Promise<DispatchLineRow[]> {
+  const rows = await db
+    .select({
+      line: dispatchLines,
+      supplierNameEn: productSuppliers.nameEn,
+      supplierNameAr: productSuppliers.nameAr,
+      classNameEn: productClasses.nameEn,
+      classNameAr: productClasses.nameAr,
+      fireRatingNameEn: productFireRatings.nameEn,
+      fireRatingNameAr: productFireRatings.nameAr,
+      thicknessMm: productThicknesses.thicknessMm,
+    })
+    .from(dispatchLines)
+    .innerJoin(
+      productSuppliers,
+      eq(dispatchLines.supplierId, productSuppliers.id),
+    )
+    .innerJoin(productClasses, eq(dispatchLines.classId, productClasses.id))
+    .innerJoin(
+      productFireRatings,
+      eq(dispatchLines.fireRatingId, productFireRatings.id),
+    )
+    .innerJoin(
+      productThicknesses,
+      eq(dispatchLines.thicknessId, productThicknesses.id),
+    )
+    .where(eq(dispatchLines.dispatchId, dispatchId))
+    .orderBy(asc(dispatchLines.createdAt));
+
+  return rows.map(({ line, ...parts }) => ({
+    id: line.id,
+    supplierNameEn: parts.supplierNameEn,
+    supplierNameAr: parts.supplierNameAr,
+    classNameEn: parts.classNameEn,
+    classNameAr: parts.classNameAr,
+    fireRatingNameEn: parts.fireRatingNameEn,
+    fireRatingNameAr: parts.fireRatingNameAr,
+    customColour: line.customColour,
+    thicknessMm: parts.thicknessMm.replace(/\.?0+$/, ""),
+    widthM: line.widthM,
+    lengthM: line.lengthM,
+    quantityPcs: line.quantityPcs,
+    // Generated, so it is null in the insert type and never null in a row.
+    sqm: line.sqm as string,
+    unitPrice: line.unitPrice,
+    lineTotal: line.lineTotal,
+    vatAmount: line.vatAmount,
   }));
 }
 
@@ -545,13 +811,14 @@ export async function getDispatch(
     .select({
       id: dispatches.id,
       dispatchDate: dispatches.dispatchDate,
-      sqm: dispatches.sqm,
+      sqm: dispatchSqm,
       companyId: dispatches.companyId,
       companyName: companies.name,
       userId: dispatches.userId,
       userName: users.name,
       recordedByName: recordedBy.name,
       quotationThreadId: dispatches.quotationThreadId,
+      smacReference: quotationVersions.smacReference,
       approvedByName: approvedBy.name,
       approvedAt: dispatches.approvedAt,
       createdAt: dispatches.createdAt,
@@ -564,6 +831,11 @@ export async function getDispatch(
     .innerJoin(users, eq(users.id, dispatches.userId))
     .innerJoin(recordedBy, eq(recordedBy.id, dispatches.recordedByUserId))
     .leftJoin(approvedBy, eq(approvedBy.id, dispatches.approvedByUserId))
+    // `S126` — the version it was raised from, never the thread's latest.
+    .leftJoin(
+      quotationVersions,
+      eq(quotationVersions.id, dispatches.quotationVersionId),
+    )
     // `S74` — the dispatch's OWN project, not its thread's. The two agree
     // whenever there is a thread, and this is the column that says so.
     .leftJoin(projects, eq(projects.id, dispatches.projectId))
@@ -573,7 +845,10 @@ export async function getDispatch(
 
   if (!row) return null;
 
-  const [decorated] = await decorate(session, [row]);
+  const [decorated, lines] = await Promise.all([
+    decorate(session, [row]).then(([only]) => only),
+    loadDispatchLines(row.id),
+  ]);
   const credits = await creditForDispatches([
     {
       id: row.id,
@@ -595,29 +870,99 @@ export async function getDispatch(
     projectViewable: row.projectId
       ? await canOpenRecord(session, "project", row.projectId)
       : false,
+    // `S116` — what actually went out, which is what the invoice is made from.
+    lines,
     credit: credits.get(row.id) as DispatchCredit,
   };
 }
 
 /**
- * Threads a dispatch may be recorded against: visible to this identity, and
- * **payment confirmed** `[07 C3]`.
+ * Threads a dispatch may be recorded against: visible to this identity,
+ * **issued** `S126` and **payment confirmed** `[07 C3]`.
  *
  * The dropdown never offers what the action refuses — the same principle
- * `listQuotationFormOptions` follows. An unpaid quotation is simply not in
- * the list, and the screen says why rather than letting someone pick it and be
- * told no.
+ * `listQuotationFormOptions` follows. An unpaid or unissued quotation is simply
+ * not in the list, and the screen says why rather than letting someone pick it
+ * and be told no.
+ *
+ * **`status = 'issued'`, not `<> 'superseded'`** `S126`. It used to take the
+ * live version whatever its status, which offered threads whose version was
+ * still `requested` and being edited `S61`. The narrowing has a second effect
+ * worth naming: a thread mid-revision has no issued version at all `S66`, so it
+ * leaves this list until the coordinator issues the new one. That is the rule,
+ * not a gap — there is nothing stable to dispatch against in between.
+ *
+ * It also makes `smacReference` non-null: `issueVersion` is what writes it, and
+ * writing it is what makes a version issued.
  *
  * **The project join is LEFT** `S50`: a quotation with no project is precisely
  * the one `S74`'s second branch exists for, and an inner join would hide it
  * from the only screen that can resolve it.
+ *
+ * **Each thread carries its issued version's lines** `S116` — a dispatch
+ * raised from a quotation arrives pre-filled with them. They travel to the form
+ * with the option, so choosing a quotation fills the rows without a second
+ * navigation. Service lines are not among them `S116`.
  */
+/**
+ * The issued versions' product lines, keyed by version `S116`.
+ *
+ * One query for every offered thread rather than one per thread, and service
+ * lines are not among them: `S116` says a dispatch never carries one.
+ */
+async function prefillByVersion(
+  versionIds: string[],
+): Promise<Map<string, DispatchLineInput[]>> {
+  const prefill = new Map<string, DispatchLineInput[]>();
+  if (versionIds.length === 0) return prefill;
+
+  const lines = await db
+    .select({
+      versionId: quotationLines.versionId,
+      supplierId: quotationLines.supplierId,
+      classId: quotationLines.classId,
+      fireRatingId: quotationLines.fireRatingId,
+      customColour: quotationLines.customColour,
+      thicknessId: quotationLines.thicknessId,
+      widthM: quotationLines.widthM,
+      lengthM: quotationLines.lengthM,
+      quantityPcs: quotationLines.quantityPcs,
+      unitPrice: quotationLines.unitPrice,
+    })
+    .from(quotationLines)
+    .where(inArray(quotationLines.versionId, versionIds))
+    // The order the quotation lists them in, so the prefilled rows read the
+    // same way round as the quotation the coordinator is holding.
+    .orderBy(asc(quotationLines.createdAt));
+
+  for (const line of lines) {
+    const bucket = prefill.get(line.versionId) ?? [];
+    bucket.push({
+      supplierId: line.supplierId,
+      classId: line.classId,
+      fireRatingId: line.fireRatingId,
+      customColour: line.customColour,
+      thicknessId: line.thicknessId,
+      widthM: line.widthM,
+      lengthM: line.lengthM,
+      quantityPcs: line.quantityPcs,
+      // `S58` — an unpriced quotation line arrives unpriced, and the empty box
+      // is the point: `S116` makes the rep price it before this is a dispatch,
+      // and `recordDispatch` refuses it if they do not.
+      unitPrice: line.unitPrice ?? "",
+    });
+    prefill.set(line.versionId, bucket);
+  }
+  return prefill;
+}
+
 export async function listDispatchableThreads(
   session: AuthSession,
 ): Promise<DispatchableThread[]> {
   const rows = await db
     .select({
       id: quotationThreads.id,
+      versionId: quotationVersions.id,
       smacReference: quotationVersions.smacReference,
       projectId: quotationThreads.projectId,
       projectNameEn: projects.nameEn,
@@ -633,8 +978,9 @@ export async function listDispatchableThreads(
       quotationVersions,
       and(
         eq(quotationVersions.threadId, quotationThreads.id),
-        // The live version — the one that is not superseded.
-        ne(quotationVersions.status, "superseded"),
+        // `S126` — issued, which is the only status that may be dispatched
+        // against. At most one version of a thread ever holds it.
+        eq(quotationVersions.status, "issued"),
       ),
     )
     .leftJoin(projects, eq(projects.id, quotationThreads.projectId))
@@ -650,12 +996,17 @@ export async function listDispatchableThreads(
 
   if (rows.length === 0) return [];
 
+  // The running total, summed from the LINES `S116` — an inner join, because a
+  // dispatch always has at least one and one with none would be a defect this
+  // figure should not paper over with a zero.
   const dispatched = await db
     .select({
       threadId: dispatches.quotationThreadId,
-      total: sql<string>`coalesce(sum(${dispatches.sqm}), 0)`,
+      // Written out for the reason `dispatchSqm` carries above.
+      total: sql<string>`coalesce(sum(dispatch_lines.sqm), 0)::numeric(14, 4)`,
     })
     .from(dispatches)
+    .innerJoin(dispatchLines, eq(dispatchLines.dispatchId, dispatches.id))
     .where(
       inArray(
         dispatches.quotationThreadId,
@@ -668,9 +1019,15 @@ export async function listDispatchableThreads(
     dispatched.map((row) => [row.threadId as string, row.total]),
   );
 
+  const prefill = await prefillByVersion(rows.map((row) => row.versionId));
+
   return rows.map((row) => ({
     ...row,
-    dispatchedSqm: totals.get(row.id) ?? "0",
+    // Non-null by `S126`: only an issued version reaches this list, and
+    // issuing is the act that writes the reference.
+    smacReference: row.smacReference as string,
+    dispatchedSqm: totals.get(row.id) ?? "0.0000",
+    lines: prefill.get(row.versionId) ?? [],
   }));
 }
 
@@ -770,7 +1127,9 @@ export async function dispatchesInPeriod(
       id: dispatches.id,
       userId: dispatches.userId,
       userName: users.name,
-      sqm: dispatches.sqm,
+      // `S116` — summed from the lines, in SQL, like every other reader of
+      // this figure. The correlated form composes here as it does on the list.
+      sqm: dispatchSqm,
       dispatchDate: dispatches.dispatchDate,
       quotationThreadId: dispatches.quotationThreadId,
       // `S74` — the dispatch's own project. A credit split is a fact about a

@@ -40,6 +40,7 @@ import { db } from "@/db";
 import {
   cities,
   companies,
+  dispatchLines,
   dispatches,
   lossReasons,
   projectCompanies,
@@ -308,10 +309,16 @@ export async function getProject(
  * only one of them is worth a number on a screen.
  *
  * `sum()` rather than a `sql` template: a Drizzle column interpolated into a
- * `sql` template in the SELECT list **loses its table qualifier**. That is no
- * longer load-bearing here now the join is gone, and it stays because the next
- * join added to this query would make it load-bearing again. It returns
+ * `sql` template in the SELECT list **loses its table qualifier**, and `S116`
+ * has just made that load-bearing again — the sum is over `dispatch_lines`
+ * while the grouping is over `dispatches`, so the join is back. It returns
  * `string | null`, so the decimal stays a string end to end `[22 §2]`.
+ *
+ * **Summed from the LINES since `S116`**, because `dispatches.sqm` is gone: a
+ * dispatch's square metres are its lines' generated ones. An INNER join, so a
+ * dispatch with no lines contributes nothing rather than a zero — there is no
+ * such dispatch (`recordDispatch` refuses one, and `verify:schema25` §14 holds
+ * every row to it), and a figure that quietly absorbed one would hide it.
  *
  * No visibility term of its own: the caller has already proved the project
  * visible, and a project's figures follow it `[20 §13]` — the same terms
@@ -321,8 +328,9 @@ async function dispatchedSqmByCompany(
   projectId: string,
 ): Promise<Map<string, string>> {
   const rows = await db
-    .select({ companyId: dispatches.companyId, total: sum(dispatches.sqm) })
+    .select({ companyId: dispatches.companyId, total: sum(dispatchLines.sqm) })
     .from(dispatches)
+    .innerJoin(dispatchLines, eq(dispatchLines.dispatchId, dispatches.id))
     .where(eq(dispatches.projectId, projectId))
     .groupBy(dispatches.companyId);
 

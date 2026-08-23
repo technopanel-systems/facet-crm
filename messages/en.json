@@ -520,7 +520,12 @@
       "creditBySplit": "Divided equally by the credit split in force since {date}.",
       "creditByRep": "No credit split is in force, so the whole amount credits the rep on this dispatch.",
       "projectFromQuotation": "The project comes from the quotation. It is not chosen here.",
-      "projectWriteBack": "This quotation has no project. The one you choose is recorded on the quotation too, and its company joins that project."
+      "projectWriteBack": "This quotation has no project. The one you choose is recorded on the quotation too, and its company joins that project.",
+      "lines": "What went out",
+      "linesPrefilled": "These lines come from the quotation. Change them, add to them or remove them — what you leave here is what went out.",
+      "linesTyped": "Type what actually went out. Every line needs a price.",
+      "linesFromQuotation": "The lines this dispatch was raised with. They may differ from the quotation they came from.",
+      "addLine": "Add line"
     },
     "actions": {
       "record": "Record dispatch"
@@ -533,11 +538,15 @@
       "companyNotVisible": "That company cannot be found.",
       "companyRequired": "A direct sale needs a company.",
       "repRequired": "A direct sale needs a rep.",
-      "sqmPositive": "Enter the square metres that actually went out.",
+      "sqmPositive": "A dispatch must add up to some square metres. Check the pieces and dimensions on each line.",
       "projectRequired": "This quotation has no project. Choose the project this dispatch belongs to.",
       "projectNotOnThread": "The project does not match the quotation.",
       "projectNotVisible": "That project cannot be found.",
-      "projectAlreadySet": "This quotation gained a project a moment ago. Open the form again."
+      "projectAlreadySet": "This quotation gained a project a moment ago. Open the form again.",
+      "quotationNotIssued": "That quotation has not been issued yet, so nothing can be dispatched against it.",
+      "atLeastOneLine": "A dispatch needs at least one line.",
+      "linePriceRequired": "Every dispatched line needs a price.",
+      "lineColourRequired": "Every dispatched line needs a colour."
     }
   },
   "credit": {

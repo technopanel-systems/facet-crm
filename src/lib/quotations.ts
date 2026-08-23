@@ -952,7 +952,7 @@ async function recomputeVersionTotals(tx: Tx, versionId: string): Promise<void> 
   // Services carry no VAT columns of their own `[09 §5.5]`, but they are line
   // items on the same SMAC quotation and that form taxes every line `[08 A]`.
   // The same fixed rate applies `S57` — the one constant, read here and in
-  // `lineMoney`, so a service and a product line can never disagree.
+  // `productLineMoney`, so a service and a product line can never disagree.
   const serviceVatRate = toScaled(VAT_RATE, MONEY_SCALE);
   for (const service of services) {
     if (!service.unitPrice) continue;
@@ -985,8 +985,21 @@ async function recomputeVersionTotals(tx: Tx, versionId: string): Promise<void> 
  *
  * **An unpriced line is not a zero-priced line** `[16 §1]`: with no unit price
  * both money columns stay null and the line contributes nothing to the totals.
+ *
+ * **Exported, and read by `src/lib/dispatches.ts` too** `S116`. A dispatch line
+ * is the same shape as a quotation's product line, so its money must be the
+ * same arithmetic — a second copy of this could drift on rounding or on `S57`'s
+ * rate and the disagreement would be invisible, permanent, and exactly what
+ * `S120`'s comparison would then measure. Its parameter is structural rather
+ * than `QuotationLineInput` for that reason: a dispatch line's own input type
+ * satisfies it without either module importing the other's shape.
  */
-function lineMoney(input: QuotationLineInput): {
+export function productLineMoney(input: {
+  quantityPcs: string;
+  widthM: string;
+  lengthM: string;
+  unitPrice: string | null;
+}): {
   lineTotal: string | null;
   vatAmount: string | null;
 } {
@@ -1089,7 +1102,7 @@ async function insertLine(
       lengthM: input.lengthM,
       quantityPcs: input.quantityPcs,
       unitPrice: input.unitPrice,
-      ...lineMoney(input),
+      ...productLineMoney(input),
     })
     .returning();
 
@@ -1258,7 +1271,11 @@ export async function updateQuotationLine(
     const [after] = await tx
       .update(quotationLines)
       // `assertColourChoice` above has already refused a blank colour.
-      .set({ ...input, customColour: input.customColour!, ...lineMoney(input) })
+      .set({
+        ...input,
+        customColour: input.customColour!,
+        ...productLineMoney(input),
+      })
       .where(eq(quotationLines.id, lineId))
       .returning();
 

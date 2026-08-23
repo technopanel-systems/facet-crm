@@ -27,6 +27,8 @@ import {
 } from "@/lib/quotations";
 import { readFields, ruleErrorState, type FormState } from "@/lib/validation";
 
+import { readProductLine } from "./line-form";
+
 /**
  * Every action calls `requireSession()` itself. A server action is a
  * separately reachable POST endpoint; no layout wraps it, so the gate cannot
@@ -45,57 +47,17 @@ import { readFields, ruleErrorState, type FormState } from "@/lib/validation";
  * a RAL or Pantone special, into `custom_colour`. The lookup half and
  * `colour_id` with it are gone since feature slice 6 `[26 §2]`.
  *
- * `sqm`, `line_total` and `vat_amount` are not read from the form at all —
- * FACET computes them `[16 §1]`. **Nor is the VAT rate**, which the form no
- * longer offers and no column holds: it is fixed at 15% `S57`.
+ * The reading itself moved to `./line-form` when `S116` gave a dispatch the
+ * same shape: this is now the quotation's half of it, which is the price being
+ * optional `S58`. `QuotationLineInput` and `ProductLineFields` are the same
+ * fields, so the cast is a name, not a conversion.
  */
 function readLine(
   fields: ReturnType<typeof readFields>,
   index: number,
   formData: FormData,
 ): QuotationLineInput | null {
-  const at = (name: string) => {
-    const value = formData.getAll(name)[index];
-    return typeof value === "string" ? value.trim() : "";
-  };
-
-  const supplierId = at("supplierId");
-  if (!supplierId) return null; // an untouched spare row
-
-  const line: QuotationLineInput = {
-    supplierId,
-    classId: at("classId"),
-    fireRatingId: at("fireRatingId"),
-    customColour: at("customColour") || null,
-    thicknessId: at("thicknessId"),
-    widthM: at("widthM"),
-    lengthM: at("lengthM"),
-    quantityPcs: at("quantityPcs"),
-    unitPrice: at("unitPrice") || null,
-  };
-
-  // Shape only. Whether the ids exist, and whether this identity may use them,
-  // is the data layer's job and cannot be answered here.
-  for (const [name, value] of [
-    ["classId", line.classId],
-    ["fireRatingId", line.fireRatingId],
-    ["thicknessId", line.thicknessId],
-  ] as const) {
-    if (!value) fields.fail(name, "validation.required");
-  }
-  for (const [name, value] of [
-    ["widthM", line.widthM],
-    ["lengthM", line.lengthM],
-    ["quantityPcs", line.quantityPcs],
-  ] as const) {
-    if (!value) fields.fail(name, "validation.required");
-    else if (!/^\d+(\.\d+)?$/.test(value)) fields.fail(name, "validation.notANumber");
-  }
-  if (line.unitPrice && !/^\d+(\.\d+)?$/.test(line.unitPrice)) {
-    fields.fail("unitPrice", "validation.notANumber");
-  }
-
-  return line;
+  return readProductLine(fields, index, formData);
 }
 
 function readServiceLine(

@@ -113,6 +113,8 @@ import {
   TIMELINE_CARD_LIMIT,
 } from "@/lib/timeline";
 
+import { addDispatchLine } from "./dispatch-fixture";
+
 let failures = 0;
 
 function check(label: string, condition: boolean, detail = ""): void {
@@ -508,8 +510,10 @@ async function main(): Promise<void> {
     .values({
       companyId: companyA.id,
       userId: authorUser.id,
-      sqm: "12.5000",
       quotationThreadId: threadA.id,
+      // `S126` — the issued version it is raised from. The
+      // `dispatches_quotation_pair` CHECK requires it beside the thread.
+      quotationVersionId: versionA.id,
       // `S74` — a dispatch carries its quotation's project, and this row is
       // written by hand rather than through `recordDispatch`, so it has to
       // say so itself. `verify:schema25` §11 holds every row to it.
@@ -520,6 +524,8 @@ async function main(): Promise<void> {
       approvedAt: new Date(),
     })
     .returning();
+  // `S116` — its one line. Without it the dispatch reads as 0 m².
+  await addDispatchLine(dispatchA.id, "12.5000");
 
   /* --- 2. Every gate refuses, with its own key --------------------- */
 

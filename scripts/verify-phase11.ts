@@ -55,7 +55,7 @@
 
 process.loadEnvFile(".env");
 
-import { and, count, eq, inArray, isNull, like } from "drizzle-orm";
+import { and, count, eq, inArray, isNull, like, sql } from "drizzle-orm";
 
 import { closeDatabase, db } from "@/db";
 import {
@@ -95,6 +95,8 @@ import {
   reassignHandover,
   type HandoverSelection,
 } from "@/lib/team";
+
+import { addDispatchLine } from "./dispatch-fixture";
 
 let failures = 0;
 
@@ -635,13 +637,14 @@ async function main(): Promise<void> {
     .values({
       companyId: companyA.id,
       userId: departing.user.id,
-      sqm: "42.0000",
       dispatchDate: period,
       recordedByUserId: coordinator.user.id,
       approvedByUserId: coordinator.user.id,
       approvedAt: new Date(),
     })
     .returning();
+  // `S116` — its one line, and the 42 m² every assertion below reads.
+  await addDispatchLine(dispatch.id, "42.0000");
 
   /* --- 9. Handover is shut while active; deactivation moves nothing  */
 
@@ -929,8 +932,23 @@ async function main(): Promise<void> {
   // Asserted against `creditForDispatches` rather than the achievement report,
   // because that report lists only ACTIVE people — a deactivated rep drops out
   // of it by design, which would mask the very thing under test.
+  // `S116` — the square metres are the lines' sum, not a column, so the row is
+  // read with the same derivation every reader uses.
   const [dispatchNow] = await db
-    .select()
+    .select({
+      id: dispatches.id,
+      userId: dispatches.userId,
+      dispatchDate: dispatches.dispatchDate,
+      // Both tables named outright, never interpolated: a Drizzle column in a
+      // SELECT-list template loses its qualifier when the outer query joins
+      // nothing, and this subquery then answers `0.0000` for every row without
+      // raising anything. It did, once, and this check is what caught it.
+      sqm: sql<string>`(
+        select coalesce(sum(dl.sqm), 0)::numeric(14, 4)
+        from dispatch_lines dl
+        where dl.dispatch_id = dispatches.id
+      )`,
+    })
     .from(dispatches)
     .where(eq(dispatches.id, dispatch.id))
     .limit(1);

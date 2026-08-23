@@ -471,7 +471,17 @@ async function dispatchedEvents(
       // `S74` — the dispatch's own project. The join through the thread that
       // used to reach it is gone: it was this query's only use for it.
       projectId: dispatches.projectId,
-      sqm: dispatches.sqm,
+      // `S116` — the sum of the dispatch's lines, since `dispatches.sqm` is
+      // gone. Correlated rather than joined so the row shape is unchanged and
+      // no `group by` has to name every column this select already carries.
+      // Both tables named outright: see the note on `dispatchSqm` in
+      // `dispatches.ts` — an interpolated column loses its qualifier here and
+      // the subquery then silently answers zero.
+      sqm: sql<string>`(
+        select coalesce(sum(dl.sqm), 0)::numeric(14, 4)
+        from dispatch_lines dl
+        where dl.dispatch_id = dispatches.id
+      )`,
     })
     .from(dispatches)
     .innerJoin(recorder, eq(recorder.id, dispatches.recordedByUserId))

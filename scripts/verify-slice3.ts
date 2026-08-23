@@ -40,6 +40,18 @@
  *      the two refusals, and the derived figure `S26` reaching a project it
  *      could not have reached before this slice.
  *
+ *  17. **Only from an ISSUED quotation** `S126`. A paid but unissued thread is
+ *      refused and not offered, and issuing it makes the same call go through
+ *      — the pair, because a refusal on its own could be the payment gate.
+ *
+ *  18. **A dispatch carries its own lines, raised three ways** `S116` `S75`.
+ *      Exactly as a quotation, from a quotation with edits, and free entry;
+ *      the quotation is untouched by the edit `S77`; a line with no price and
+ *      a dispatch with no line are both refused. Then the invariant, over
+ *      every dispatch in the database rather than the ones this run wrote:
+ *      **no reader's figure disagrees with the lines**, because the figure is
+ *      derived from them and there is no column left to hold a second answer.
+ *
  *  16. **The coordinator sees projects and contacts** `S76`, in three
  *      directions rather than one. They reach both records and the dispatch
  *      screen may link the project; every write on either is still refused,
@@ -78,6 +90,7 @@ import {
   auditLog,
   companies,
   companyReps,
+  dispatchLines,
   dispatches as dispatchesTable,
   productClasses,
   productFireRatings,
@@ -107,6 +120,7 @@ import {
 } from "@/lib/credit-splits";
 import { PERCENT_SCALE, SQM_SCALE, divideEqually, fromScaled, toScaled } from "@/lib/decimal";
 import {
+  dispatchesInPeriod,
   getDispatch,
   listDispatchProjectOptions,
   listDispatchableThreads,
@@ -129,6 +143,7 @@ import {
   addServiceLine,
   confirmPayment,
   createQuotationThread,
+  getQuotationThread,
   issueVersion,
   listQuotationFormOptions,
   type QuotationVersionInput,
@@ -188,12 +203,61 @@ async function sessionFor(email: string): Promise<AuthSession> {
   };
 }
 
+/**
+ * One dispatch line adding up to exactly `sqm` `S116`.
+ *
+ * **Width and length are 1**, so `quantity_pcs × 1 × 1` is the figure asked
+ * for. Every square-metre assertion in this script predates the lines and is
+ * about credit, targets and `S26` rather than about panels, so shaping the
+ * line to the number keeps those claims exactly as they were rather than
+ * rewriting thirty expected values. §17 drives real dimensions.
+ *
+ * Set by `main` once the lookups are read, because a line needs four seeded
+ * ids and this file's helpers are declared above them.
+ */
+let lookups: {
+  supplierId: string;
+  classId: string;
+  fireRatingId: string;
+  thicknessId: string;
+};
+
+function linesOf(sqm: string, unitPrice = "95.00") {
+  return [
+    {
+      ...lookups,
+      customColour: "168",
+      widthM: "1.0000",
+      lengthM: "1.0000",
+      quantityPcs: sqm,
+      unitPrice,
+    },
+  ];
+}
+
 /** Sum a list of scale-4 sqm strings exactly, as a string. */
 function sumSqm(values: string[]): string {
   return fromScaled(
     values.reduce((total, value) => total + toScaled(value, SQM_SCALE), BigInt(0)),
     SQM_SCALE,
   );
+}
+
+/**
+ * A dispatch's square metres, derived `S116` — `sum(dispatch_lines.sqm)`.
+ *
+ * `recordDispatch` returns the `dispatches` row, which no longer carries the
+ * figure, so every caller that needs it asks the lines. That is the point:
+ * there is no second place it could have come from.
+ */
+async function sqmOf(dispatchId: string): Promise<string> {
+  const [row] = await db
+    .select({
+      total: sql<string>`coalesce(sum(dispatch_lines.sqm), 0)::numeric(14, 4)`,
+    })
+    .from(dispatchLines)
+    .where(eq(dispatchLines.dispatchId, dispatchId));
+  return row?.total ?? "0.0000";
 }
 
 /** The credit shares for one dispatch, by user id. */
@@ -281,6 +345,12 @@ async function main(): Promise<void> {
     console.error("The lookups are not seeded. Run: npm run db:seed");
     process.exit(1);
   }
+  lookups = {
+    supplierId: supplier.id,
+    classId: productClass.id,
+    fireRatingId: fireRating.id,
+    thicknessId: thickness.id,
+  };
 
   /* --- Fixtures: a company and a project owned by rep A ----------- */
 
@@ -401,7 +471,7 @@ async function main(): Promise<void> {
 
   console.log("\n2. Every gate refuses with its own key");
   const directInput = {
-    sqm: "10.0000",
+    lines: linesOf("10.0000"),
     dispatchDate: "2026-09-10",
     quotationThreadId: null,
     companyId: company.id,
@@ -446,7 +516,7 @@ async function main(): Promise<void> {
     "dispatches.errors.paymentNotConfirmed",
     () =>
       recordDispatch(coordinator, {
-        sqm: "10.0000",
+        lines: linesOf("10.0000"),
         dispatchDate: "2026-09-10",
         quotationThreadId: unpaidThread.id,
         companyId: null,
@@ -476,7 +546,7 @@ async function main(): Promise<void> {
   );
 
   const linked = await recordDispatch(coordinator, {
-    sqm: "100.0000",
+    lines: linesOf("100.0000"),
     dispatchDate: "2026-09-10",
     quotationThreadId: paidThread.id,
     companyId: null,
@@ -501,7 +571,7 @@ async function main(): Promise<void> {
     "dispatches.errors.companyNotOnThread",
     () =>
       recordDispatch(coordinator, {
-        sqm: "1.0000",
+        lines: linesOf("1.0000"),
         dispatchDate: "2026-09-10",
         quotationThreadId: paidThread.id,
         companyId: project.id, // any id that is not the thread's company
@@ -511,7 +581,7 @@ async function main(): Promise<void> {
   );
 
   const secondPartial = await recordDispatch(coordinator, {
-    sqm: "5000.0000", // far beyond the 86.3040 m² quoted
+    lines: linesOf("5000.0000"), // far beyond the 86.3040 m² quoted
     dispatchDate: "2026-09-11",
     quotationThreadId: paidThread.id,
     companyId: null,
@@ -527,7 +597,7 @@ async function main(): Promise<void> {
 
   console.log("\n4. Direct dispatch — approved by the coordinator, not by payment [07 C6]");
   const direct = await recordDispatch(coordinator, {
-    sqm: "40.0000",
+    lines: linesOf("40.0000"),
     dispatchDate: "2026-09-12",
     quotationThreadId: null,
     companyId: company.id,
@@ -552,7 +622,7 @@ async function main(): Promise<void> {
     "dispatches.errors.companyRequired",
     () =>
       recordDispatch(coordinator, {
-        sqm: "1.0000",
+        lines: linesOf("1.0000"),
         dispatchDate: "2026-09-12",
         quotationThreadId: null,
         companyId: null,
@@ -565,7 +635,7 @@ async function main(): Promise<void> {
     "dispatches.errors.repRequired",
     () =>
       recordDispatch(coordinator, {
-        sqm: "1.0000",
+        lines: linesOf("1.0000"),
         dispatchDate: "2026-09-12",
         quotationThreadId: null,
         companyId: company.id,
@@ -578,7 +648,7 @@ async function main(): Promise<void> {
     "dispatches.errors.sqmPositive",
     () =>
       recordDispatch(coordinator, {
-        sqm: "0.0000",
+        lines: linesOf("0.0000"),
         dispatchDate: "2026-09-12",
         quotationThreadId: null,
         companyId: company.id,
@@ -607,7 +677,7 @@ async function main(): Promise<void> {
     id: linked.id,
     userId: linked.userId,
     userName: "rep A",
-    sqm: linked.sqm,
+    sqm: await sqmOf(linked.id),
     dispatchDate: linked.dispatchDate,
     projectId: project.id,
   });
@@ -622,7 +692,7 @@ async function main(): Promise<void> {
     id: direct.id,
     userId: direct.userId,
     userName: "rep B",
-    sqm: direct.sqm,
+    sqm: await sqmOf(direct.id),
     dispatchDate: direct.dispatchDate,
     projectId: null, // a direct dispatch has no project at all
   });
@@ -651,7 +721,7 @@ async function main(): Promise<void> {
     id: linked.id,
     userId: linked.userId,
     userName: "rep A",
-    sqm: linked.sqm,
+    sqm: await sqmOf(linked.id),
     dispatchDate: linked.dispatchDate, // 2026-09-10
     projectId: project.id,
   };
@@ -692,7 +762,7 @@ async function main(): Promise<void> {
   );
 
   const d2Row = await recordDispatch(coordinator, {
-    sqm: "100.0000",
+    lines: linesOf("100.0000"),
     dispatchDate: "2026-10-05",
     quotationThreadId: paidThread.id,
     companyId: null,
@@ -703,7 +773,7 @@ async function main(): Promise<void> {
     id: d2Row.id,
     userId: d2Row.userId,
     userName: "rep A",
-    sqm: d2Row.sqm,
+    sqm: await sqmOf(d2Row.id),
     dispatchDate: d2Row.dispatchDate,
     projectId: project.id,
   });
@@ -1092,7 +1162,7 @@ async function main(): Promise<void> {
   // the assertion that fails the day someone routes a dispatch to a project by
   // its company instead of by its quotation thread.
   await recordDispatch(coordinator, {
-    sqm: "40.0000",
+    lines: linesOf("40.0000"),
     dispatchDate: "2026-09-13",
     quotationThreadId: null,
     companyId: company.id,
@@ -1107,7 +1177,7 @@ async function main(): Promise<void> {
 
   // And a linked one moves it by exactly its own square metres.
   await recordDispatch(coordinator, {
-    sqm: "7.0000",
+    lines: linesOf("7.0000"),
     dispatchDate: "2026-09-13",
     quotationThreadId: paidThread.id,
     companyId: null,
@@ -1162,7 +1232,7 @@ async function main(): Promise<void> {
   await acceptThread(coordinator, secondThread.id);
   await confirmPayment(repA, secondThread.id, "2026-08-02");
   await recordDispatch(coordinator, {
-    sqm: "250.0000",
+    lines: linesOf("250.0000"),
     dispatchDate: "2026-09-13",
     quotationThreadId: secondThread.id,
     companyId: null,
@@ -1208,7 +1278,7 @@ async function main(): Promise<void> {
   // the column was written, rather than the figure still arriving through the
   // thread. `paidThread` belongs to `project`.
   const takenFrom = await recordDispatch(coordinator, {
-    sqm: "3.0000",
+    lines: linesOf("3.0000"),
     dispatchDate: "2026-09-14",
     quotationThreadId: paidThread.id,
     companyId: null,
@@ -1242,7 +1312,7 @@ async function main(): Promise<void> {
     "dispatches.errors.projectNotOnThread",
     () =>
       recordDispatch(coordinator, {
-        sqm: "1.0000",
+        lines: linesOf("1.0000"),
         dispatchDate: "2026-09-14",
         quotationThreadId: paidThread.id,
         companyId: null,
@@ -1296,7 +1366,7 @@ async function main(): Promise<void> {
     "dispatches.errors.projectRequired",
     () =>
       recordDispatch(coordinator, {
-        sqm: "12.0000",
+        lines: linesOf("12.0000"),
         dispatchDate: "2026-09-14",
         quotationThreadId: looseThread.id,
         companyId: null,
@@ -1306,7 +1376,7 @@ async function main(): Promise<void> {
   );
 
   const written = await recordDispatch(coordinator, {
-    sqm: "12.0000",
+    lines: linesOf("12.0000"),
     dispatchDate: "2026-09-14",
     quotationThreadId: looseThread.id,
     companyId: null,
@@ -1349,7 +1419,7 @@ async function main(): Promise<void> {
   // would refuse it anyway. Nothing to write back either: the quotation now
   // has a project, so this is branch one from here on.
   const again = await recordDispatch(coordinator, {
-    sqm: "8.0000",
+    lines: linesOf("8.0000"),
     dispatchDate: "2026-09-15",
     quotationThreadId: looseThread.id,
     companyId: null,
@@ -1658,6 +1728,245 @@ async function main(): Promise<void> {
     `saw ${repBProjects.rows.length}`,
   );
   check("…nor open the contact", (await getContact(repB, contact.id)) === null);
+
+  /* --- 17. Only from an ISSUED quotation [S126] ------------------- */
+
+  console.log(
+    "\n17. *** A dispatch may only be raised from an ISSUED quotation *** [S126]",
+  );
+
+  // **Paid, deliberately not issued.** That combination was dispatchable until
+  // this slice: `confirmPayment` never reads a version's status, so a rep could
+  // confirm payment on a version still being edited `S61` and the coordinator
+  // could dispatch against it. The pairing is the assertion — the payment gate
+  // passes and the new one refuses — so a refusal cannot be `07 C3`'s.
+  const paidNotIssued = await createQuotationThread(
+    repA,
+    { projectId: project.id, companyId: company.id, contactId: null },
+    version,
+    [line],
+    [],
+  );
+  await confirmPayment(repA, paidNotIssued.id, "2026-08-05");
+  await refuses(
+    "*** a paid but UNISSUED quotation refuses *** [S126]",
+    "dispatches.errors.quotationNotIssued",
+    () =>
+      recordDispatch(coordinator, {
+        lines: linesOf("1.0000"),
+        dispatchDate: "2026-09-20",
+        quotationThreadId: paidNotIssued.id,
+        companyId: null,
+        userId: null,
+        projectId: null,
+      }),
+  );
+  check(
+    "…and it is not offered in the dispatchable list either [S126]",
+    (await listDispatchableThreads(coordinator)).every(
+      (thread) => thread.id !== paidNotIssued.id,
+    ),
+    "the form would offer what the action refuses",
+  );
+
+  // The other half of the same rule, which is what makes it a rule rather than
+  // a gate: issue it and the same call goes through.
+  await issueVersion(coordinator, paidNotIssued.id, {
+    smacReference: `${stamp}-126`,
+    verification: "unverified",
+  });
+  const nowIssued = (await listDispatchableThreads(coordinator)).find(
+    (thread) => thread.id === paidNotIssued.id,
+  );
+  check(
+    "*** issuing it makes it dispatchable, and nothing else changed *** [S126]",
+    Boolean(nowIssued),
+    "still not offered after issue",
+  );
+  check(
+    "…and the offered thread names the version its lines come from [S126]",
+    Boolean(nowIssued?.versionId) && nowIssued?.smacReference === `${stamp}-126`,
+    `got ${nowIssued?.smacReference}`,
+  );
+
+  /* --- 18. The three routes, and the lines [S75], [S116] ---------- */
+
+  console.log(
+    "\n18. *** A dispatch carries its own lines, raised three ways *** [S116], [S75]",
+  );
+
+  // The prefill IS the route. `listDispatchableThreads` is what the form reads,
+  // so taking its lines untouched is *exactly as a quotation* and editing them
+  // is *from a quotation, with edits* — the same two calls the screen makes.
+  const prefilled = (await listDispatchableThreads(coordinator)).find(
+    (thread) => thread.id === paidNotIssued.id,
+  )!;
+  check(
+    "the issued version arrives pre-filled with its lines [S116]",
+    prefilled.lines.length === 1 &&
+      prefilled.lines[0].quantityPcs === "12.0000" &&
+      prefilled.lines[0].unitPrice === "120.00",
+    `got ${JSON.stringify(prefilled.lines)}`,
+  );
+
+  /* Route one — exactly as a quotation. */
+  const asQuoted = await recordDispatch(coordinator, {
+    lines: prefilled.lines,
+    dispatchDate: "2026-09-21",
+    quotationThreadId: paidNotIssued.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  const asQuotedDetail = (await getDispatch(coordinator, asQuoted.id))!;
+  check(
+    "*** route one: the dispatch's lines are the quotation's *** [S75]",
+    asQuotedDetail.lines.length === 1 &&
+      asQuotedDetail.lines[0].quantityPcs === "12.0000" &&
+      asQuotedDetail.lines[0].unitPrice === "120.00",
+    JSON.stringify(asQuotedDetail.lines.map((row) => row.quantityPcs)),
+  );
+  // 12 × 1.24 × 5.8 — the same generated expression a quotation line uses, so
+  // an untouched dispatch and its quotation agree without either copying a sum.
+  check(
+    "…and its square metres are the lines', generated [S116], [S55]",
+    asQuotedDetail.sqm === "86.3040",
+    `got ${asQuotedDetail.sqm}`,
+  );
+
+  /* Route two — from a quotation, with edits. The one that did not exist. */
+  const edited = await recordDispatch(coordinator, {
+    lines: [
+      // Half the quantity went out, at a renegotiated price…
+      { ...prefilled.lines[0], quantityPcs: "6.0000", unitPrice: "110.00" },
+      // …plus a product the quotation never had `S116`.
+      ...linesOf("10.0000", "80.00"),
+    ],
+    dispatchDate: "2026-09-22",
+    quotationThreadId: paidNotIssued.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  const editedDetail = (await getDispatch(coordinator, edited.id))!;
+  check(
+    "*** route two: a dispatch may differ from its quotation, and add to it *** [S75], [S116]",
+    editedDetail.lines.length === 2 &&
+      editedDetail.lines[0].unitPrice === "110.00",
+    JSON.stringify(editedDetail.lines.map((row) => row.unitPrice)),
+  );
+  // 6 × 1.24 × 5.8 = 43.1520, plus 10 × 1 × 1.
+  check(
+    "…and the figure follows the edit, not the quotation [04 quantities]",
+    editedDetail.sqm === "53.1520",
+    `got ${editedDetail.sqm}`,
+  );
+  // `S77` — the gap is the point. Editing a dispatch rewrites nothing upstream.
+  const quotedAfter = await getQuotationThread(coordinator, paidNotIssued.id);
+  check(
+    "*** …and the QUOTATION is untouched — the gap is measured, not prevented *** [S77]",
+    quotedAfter?.live.lines.length === 1 &&
+      quotedAfter.live.lines[0].quantityPcs === "12.0000" &&
+      quotedAfter.live.lines[0].unitPrice === "120.00",
+    JSON.stringify(
+      quotedAfter?.live.lines.map((row: { quantityPcs: string }) =>
+        row.quantityPcs,
+      ),
+    ),
+  );
+
+  /* Route three — free entry, no quotation at all. */
+  const freeEntry = await recordDispatch(coordinator, {
+    lines: linesOf("9.0000", "70.00"),
+    dispatchDate: "2026-09-23",
+    quotationThreadId: null,
+    companyId: company.id,
+    userId: repB.user.id,
+    projectId: null,
+  });
+  const freeDetail = (await getDispatch(coordinator, freeEntry.id))!;
+  check(
+    "*** route three: a free entry carries typed lines and no version *** [S75], [S126]",
+    freeDetail.lines.length === 1 &&
+      freeDetail.sqm === "9.0000" &&
+      freeEntry.quotationVersionId === null,
+    `got ${freeDetail.sqm}, version ${freeEntry.quotationVersionId}`,
+  );
+
+  /* The two refusals `S116` puts on a line. */
+  await refuses(
+    "*** a line with no price is refused — nothing is dispatched free *** [S116]",
+    "dispatches.errors.linePriceRequired",
+    () =>
+      recordDispatch(coordinator, {
+        lines: linesOf("4.0000", ""),
+        dispatchDate: "2026-09-24",
+        quotationThreadId: null,
+        companyId: company.id,
+        userId: repB.user.id,
+        projectId: null,
+      }),
+  );
+  await refuses(
+    "a dispatch with no lines at all is refused [S116]",
+    "dispatches.errors.atLeastOneLine",
+    () =>
+      recordDispatch(coordinator, {
+        lines: [],
+        dispatchDate: "2026-09-24",
+        quotationThreadId: null,
+        companyId: company.id,
+        userId: repB.user.id,
+        projectId: null,
+      }),
+  );
+
+  /*
+   * **The invariant, not the fixture.** Every reader of a dispatch's square
+   * metres derives them from the same lines, so none of them can disagree —
+   * and the claim is made over EVERY dispatch in the database rather than the
+   * ones this run wrote. `verify:schema25` §14 makes the structural half:
+   * there is no `sqm` column left for a second answer to live in.
+   */
+  const everyDispatch = await db
+    .select({ id: dispatchesTable.id })
+    .from(dispatchesTable);
+  const listed = new Map<string, string>();
+  for (let page = 1; ; page += 1) {
+    const { rows, total } = await listDispatches(coordinator, { page });
+    for (const row of rows) listed.set(row.id, row.sqm);
+    if (listed.size >= total || rows.length === 0) break;
+  }
+  // `S85`'s reader too, and deliberately: it is the figure a rep is measured
+  // on, and it is the one whose query joins differently from the other two.
+  // A derived figure has to be asserted at EVERY reader — the first version of
+  // this section checked only the two that happened to join a second table,
+  // and a third caller that did not was silently answering zero.
+  const measured = new Map(
+    (await dispatchesInPeriod("2000-01-01", "2100-01-01")).map((row) => [
+      row.id,
+      row.sqm,
+    ]),
+  );
+  let disagreeing = 0;
+  for (const row of everyDispatch) {
+    const fromLines = await sqmOf(row.id);
+    const fromList = listed.get(row.id);
+    const fromDetail = (await getDispatch(coordinator, row.id))?.sqm;
+    const fromPeriod = measured.get(row.id);
+    if (
+      fromList !== fromLines ||
+      fromDetail !== fromLines ||
+      fromPeriod !== fromLines
+    ) {
+      disagreeing += 1;
+    }
+  }
+  check(
+    "*** no dispatch's figure disagrees with its lines, on any reader *** [S116]",
+    disagreeing === 0,
+    `${disagreeing} of ${everyDispatch.length} disagree`,
+  );
 
   // Nothing is cleaned up: FACET does not delete history `[12 §7]`, and this
   // script does not get an exception. Every row it writes is prefixed with the

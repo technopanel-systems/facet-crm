@@ -87,6 +87,8 @@ import {
 import { createReport, today } from "@/lib/reports";
 import { recordTimeline, companyTimeline, eventsInRange } from "@/lib/timeline";
 
+import { addDispatchLine } from "./dispatch-fixture";
+
 let failures = 0;
 
 function check(label: string, condition: boolean, detail = ""): void {
@@ -351,12 +353,14 @@ async function main(): Promise<void> {
     .values({
       companyId: company.id,
       userId: repA.user.id,
-      sqm: "86.3040",
       quotationThreadId: null,
       dispatchDate: today(),
       recordedByUserId: coordinator.user.id,
     })
     .returning();
+  // `S116` — a dispatch carries its own lines and its square metres are their
+  // sum, so a hand-written row needs one or it reads as 0 m².
+  await addDispatchLine(dispatch.id, "86.3040");
 
   /* --- 1. All five record types, and the database refuses a sixth -- */
 

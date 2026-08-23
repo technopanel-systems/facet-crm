@@ -11,7 +11,13 @@ import {
   listDispatchableThreads,
   searchDispatchCompanies,
 } from "@/lib/dispatches";
-import { lookupName } from "@/lib/lookups";
+import {
+  listProductClasses,
+  listProductFireRatings,
+  listProductSuppliers,
+  listProductThicknesses,
+  lookupName,
+} from "@/lib/lookups";
 
 import { recordDispatchAction } from "../actions";
 import { DispatchForm } from "../dispatch-form";
@@ -47,17 +53,33 @@ export default async function NewDispatchPage({
   const mode = rawMode === "direct" ? "direct" : "linked";
   const query = companyQ?.trim() ?? "";
 
-  const [threads, companies, reps, projects] = await Promise.all([
+  // The four product lookups are loaded on both routes `S116`: the linked form
+  // prefills its rows from the quotation and the free-entry form types them,
+  // and both render the same selects. No colour list `[17 §2]`.
+  const [
+    threads,
+    companies,
+    reps,
+    projects,
+    suppliers,
+    classes,
+    fireRatings,
+    thicknesses,
+  ] = await Promise.all([
     mode === "linked" ? listDispatchableThreads(session) : [],
     mode === "direct" ? searchDispatchCompanies(session, query) : [],
     mode === "direct" ? listActiveUsers() : [],
     // `S74` — only the linked form ever picks one: a direct dispatch names no
     // project this slice `S75`.
     mode === "linked" ? listDispatchProjectOptions(session) : [],
+    listProductSuppliers(),
+    listProductClasses(),
+    listProductFireRatings(),
+    listProductThicknesses(),
   ]);
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title={t("dispatches.newTitle")}
         description={
@@ -141,6 +163,9 @@ export default async function NewDispatchPage({
             quotedSqm: thread.quotedSqm,
             dispatchedSqm: thread.dispatchedSqm,
             projectLabel,
+            // `S116` — the issued version's lines, which fill the rows the
+            // moment this option is chosen.
+            lines: thread.lines,
           };
         })}
         companies={companies.map((company) => ({
@@ -152,6 +177,8 @@ export default async function NewDispatchPage({
           id: project.id,
           label: lookupName(project, locale),
         }))}
+        products={{ suppliers, classes, fireRatings, thicknesses }}
+        locale={locale}
         companyQuery={query}
         today={today()}
       />

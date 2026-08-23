@@ -29,6 +29,7 @@ import { getDispatch } from "@/lib/dispatches";
 import { lookupName } from "@/lib/lookups";
 import { recordTimeline } from "@/lib/timeline";
 
+import { lineParts } from "../../quotations/line-display";
 import { CommentBox } from "../../_components/comment-box";
 import { ListPagination } from "../../_components/list-controls";
 
@@ -102,7 +103,9 @@ export default async function DispatchPage({
             <Fact label={t("dispatches.fields.rep")}>
               {dispatch.userName}
             </Fact>
-            <Fact label={t("dispatches.fields.sqm")}>
+            {/* `S116` — the sum of the lines below, never a typed figure.
+                A magnitude, so mono and end-aligned together `D11` `D24`. */}
+            <Fact label={t("dispatches.fields.sqm")} name="sqm" numeric>
               <span dir="ltr">
                 {dispatch.sqm} {t("common.sqm")}
               </span>
@@ -145,6 +148,82 @@ export default async function DispatchPage({
               {dispatch.recordedByName}
             </Fact>
           </Facts>
+        </CardContent>
+      </Card>
+
+      {/* `S116` — **what actually went out**, and what the invoice is made
+          from. Read-only: a rep edits a request until they submit it and the
+          coordinator after `S125`, and neither act exists yet, so no control
+          is rendered `D53`.
+
+          Every figure is `num` and end-aligned `D11` `D24`. The money sits
+          BELOW the square metres in prominence `S117` — smaller type, second
+          row — because square metres are what a rep is measured on `S83`. */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-start">
+            {t("dispatches.detail.lines")}
+          </CardTitle>
+          <CardDescription className="text-start">
+            {dispatch.isDirect
+              ? t("dispatches.detail.linesTyped")
+              : t("dispatches.detail.linesFromQuotation")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col" data-slot="dispatch-lines">
+            {dispatch.lines.map((line) => (
+              <div
+                key={line.id}
+                data-line={line.id}
+                className="flex flex-col gap-2 border-t py-4 first:border-t-0 first:pt-0"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  {/* Supplier, class, fire rating, thickness, colour — set out
+                      as words `S53`, never a reassembled SMAC code. */}
+                  <p className="flex flex-wrap items-baseline gap-x-2 text-start text-sm font-medium">
+                    {lineParts(line, locale).map((part, index) => (
+                      <span key={part + index} dir="auto">
+                        {index > 0 ? (
+                          <span aria-hidden className="text-faint me-2 font-normal">
+                            ·
+                          </span>
+                        ) : null}
+                        {part}
+                      </span>
+                    ))}
+                  </p>
+                  <p className="text-start text-sm" dir="ltr">
+                    <span className="num">{line.quantityPcs}</span> ×{" "}
+                    <span className="num">{line.widthM}</span> ×{" "}
+                    <span className="num">{line.lengthM}</span> ={" "}
+                    <span className="num font-medium">{line.sqm}</span>{" "}
+                    {t("common.sqm")}
+                  </p>
+                </div>
+
+                {/* No rate beside the amount: VAT is fixed at 15% and never
+                    editable `S57`, so only the figure varies. */}
+                <div className="text-muted-foreground flex flex-wrap gap-x-6 gap-y-1 text-start text-xs">
+                  <span dir="ltr">
+                    {t("quotations.detail.unitPrice")}:{" "}
+                    <span className="num">{line.unitPrice}</span>{" "}
+                    {t("common.sar")}
+                  </span>
+                  <span dir="ltr">
+                    {t("quotations.detail.lineTotal")}:{" "}
+                    <span className="num">{line.lineTotal}</span>{" "}
+                    {t("common.sar")}
+                  </span>
+                  <span dir="ltr">
+                    {t("quotations.detail.vatAmount")}:{" "}
+                    <span className="num">{line.vatAmount}</span>{" "}
+                    {t("common.sar")}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 

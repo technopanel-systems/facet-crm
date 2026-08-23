@@ -41,6 +41,13 @@
  *      `S118` rides along on the same form: the stock is posted, refused when
  *      cleared, and read back off the detail screen in both locales.
  *
+ *      Since `S126` the thread is **issued** in the middle of that chain, and
+ *      the POST that used to work before it is driven as a refusal instead —
+ *      a paid but unissued quotation is not offered, and a hand-made POST
+ *      naming it comes back as a message on the quotation field. `S116` rides
+ *      along too: the form posts real product lines and offers no square-metre
+ *      input at all, and the dispatch screen renders the lines it landed.
+ *
  *  15. `S76` on the screens: the coordinator's `/projects` and `/contacts` are
  *      no longer empty, and neither carries a control they may not use — no
  *      New button, no edit link, no composer, no follow-up panel. Every one of
@@ -1699,9 +1706,12 @@ async function main(): Promise<void> {
     // has never been asserted over HTTP, because no route-suite identity owned
     // a project with a participant that had dispatched. This gives rep-a one.
     //
-    // **The thread is never issued.** Nothing in `S73` or `S74` depends on a
-    // SMAC reference — the gate is payment — and section 8 already drives the
-    // issue form. Fewer POSTs, and the null-reference label gets driven too.
+    // **The thread IS issued here, and that is `S126`.** It deliberately was
+    // not until this slice — nothing in `S73` or `S74` depends on a SMAC
+    // reference, so the walk saved a POST and drove the null-reference label
+    // on the way past. `S126` makes an issued version the condition of
+    // dispatching at all, so the issue form is now part of this chain, and the
+    // POST that used to work before it is asserted as a refusal instead.
     const leakedBefore = leaked.size;
     const stamp = `${Date.now()}`.slice(-7);
     let phoneSeq = 0;
@@ -1869,6 +1879,22 @@ async function main(): Promise<void> {
         continue;
       }
 
+      // `S116` — one dispatch line, posted through the same repeated inputs
+      // `LineFields` renders on both forms. **Different from the quotation's**
+      // on purpose: half the pieces at a different price, which is `S75`'s
+      // middle route and what `S120` will later have to see as a gap.
+      const dispatchLine: Record<string, string> = {
+        supplierId: line.supplierId as string,
+        classId: line.classId as string,
+        fireRatingId: line.fireRatingId as string,
+        thicknessId: line.thicknessId as string,
+        customColour: "168",
+        widthM: "1.2",
+        lengthM: "2.4",
+        quantityPcs: "5",
+        unitPrice: "88",
+      };
+
       // `S57` — the input is gone from the markup, not merely ignored by
       // the action. A field the form still renders is a field a rep can still
       // fill. It moved here when `S67` took the section that used to carry it:
@@ -2002,6 +2028,70 @@ async function main(): Promise<void> {
         `chain reads ${stripOf(paid.body)?.position ?? "nothing"}`,
       );
 
+      /* --- 3b. paid is not enough: it must be ISSUED [S126] ------------- */
+
+      // The picker is the first half of the rule: what the action refuses is
+      // never offered. `S126` narrowed `listDispatchableThreads` from the live
+      // version to the issued one, so a paid thread still being edited `S61`
+      // drops out of it.
+      const beforeIssue = await get(coordJar, `/${locale}/dispatches/new`);
+      check(
+        `${locale}: *** a paid but UNISSUED quotation is not offered *** [S126]`,
+        !new RegExp(`<option[^>]*value="${threadId}"`).test(beforeIssue.body),
+        "the form offers what the action refuses",
+      );
+
+      // And the second half, past the picker. A hand-made POST is the only way
+      // to reach it, which is the point: the rule lives in the data layer, not
+      // in the dropdown. **The lines are sent in full** so the refusal is
+      // `S126`'s and not the line reader's — "it did not 303" is not the
+      // assertion, the error landing ON the quotation field is.
+      const earlyForm = beforeIssue.body.match(
+        /<form[^>]*data-slot="form-shell"[\s\S]*?<\/form>/,
+      )?.[0];
+      if (earlyForm) {
+        const early = envelope(earlyForm);
+        early.set("quotationThreadId", threadId);
+        early.set("projectId", "");
+        early.set("dispatchDate", "2026-08-18");
+        for (const [name, value] of Object.entries(dispatchLine)) {
+          early.set(name, value as string);
+        }
+        const refusedUnissued = await post(
+          coordJar,
+          `/${locale}/dispatches/new`,
+          early,
+        );
+        check(
+          `${locale}: *** dispatching an unissued quotation answers 200, not 303 *** [S126]`,
+          refusedUnissued.status === 200,
+          `got ${refusedUnissued.status} ${refusedUnissued.location}`,
+        );
+        check(
+          `${locale}: …and the error comes back ON the quotation field [S126]`,
+          refusedUnissued.body.includes('id="quotationThreadId-error"'),
+          "no quotationThreadId-error marker in the re-rendered form",
+        );
+      } else {
+        check(`${locale}: the dispatch form renders before issue`, false);
+      }
+
+      /* --- 3c. the coordinator issues it [S126] ------------------------- */
+
+      const beforeIssueThread = await get(coordJar, threadPath);
+      const issueForm = beforeIssueThread.body.match(
+        /<form[^>]*>(?:(?!<\/form>)[\s\S])*?name="smacReference"[\s\S]*?<\/form>/,
+      )?.[0];
+      check(
+        `${locale}: the issue form is on the coordinator's screen`,
+        Boolean(issueForm),
+      );
+      if (!issueForm) continue;
+      const issueFields = envelope(issueForm);
+      issueFields.set("smacReference", `${stamp}-${locale}`);
+      issueFields.set("verification", "unverified");
+      await fireAndForget(coordJar, threadPath, issueFields);
+
       /* --- 4. the coordinator's form marks it as having no project ------ */
 
       const dispatchNew = await get(coordJar, `/${locale}/dispatches/new`);
@@ -2050,8 +2140,13 @@ async function main(): Promise<void> {
         const fields = envelope(dispatchForm);
         fields.set("quotationThreadId", threadId);
         fields.set("projectId", project);
-        fields.set("sqm", "40");
+        // `S116` — **no `sqm` field is posted, because the form offers none.**
+        // The square metres are the lines', generated by the database. Section
+        // 12 asserts the input is gone rather than trusting that it is.
         fields.set("dispatchDate", "2026-08-18");
+        for (const [name, value] of Object.entries(dispatchLine)) {
+          fields.set(name, value);
+        }
         return fields;
       };
 
@@ -2069,6 +2164,33 @@ async function main(): Promise<void> {
 
       const dispatchPath = dispatched.location.replace(BASE, "");
       const dispatchPage = await get(coordJar, dispatchPath);
+
+      // `S116` — the lines landed and the screen shows them. A DOM marker,
+      // never the rendered numbers: what is asserted is that the dispatch
+      // carries its own lines, and one row is one line.
+      const lineRows = [
+        ...dispatchPage.body.matchAll(/data-line="[0-9a-f-]{36}"/g),
+      ];
+      check(
+        `${locale}: *** the dispatch carries its own lines *** [S116]`,
+        dispatchPage.body.includes('data-slot="dispatch-lines"') &&
+          lineRows.length === 1,
+        `${lineRows.length} line row(s)`,
+      );
+      // The figure is the lines', so it cannot be blank and cannot be the
+      // em-dash an absent value takes.
+      check(
+        `${locale}: …and its square metres are derived from them [S116]`,
+        factOf(dispatchPage.body, "sqm").length > 0 &&
+          factOf(dispatchPage.body, "sqm") !== DASH,
+        factOf(dispatchPage.body, "sqm"),
+      );
+      // `S116` — the input is gone from the markup, not merely ignored, which
+      // is the same claim section 12 makes of the VAT rate on a quotation line.
+      check(
+        `${locale}: and the dispatch form offers NO square-metre input [S116]`,
+        !dispatchForm.includes('name="sqm"'),
+      );
       check(
         `${locale}: the dispatch names a project of its own [S74]`,
         factOf(dispatchPage.body, "project") !== DASH &&
