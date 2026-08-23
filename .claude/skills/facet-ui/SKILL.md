@@ -11,6 +11,8 @@ behaviour, visibility or what a record may contain: where the two appear to conf
 of those, **`SPEC.md` wins**. `docs/design/facet-concept-v5-premium.html` is the visual
 target, not authority — a screen that pixel-matches the concept against a `D` rule is wrong.
 A line here with no `D`, `S` or `CLAUDE.md` behind it is a repo mechanic.
+**An enumeration or a number copied from a rule goes stale silently** — when a `D` rule's
+list or cap changes, this file changes in the same commit.
 
 ## Non-negotiable
 
@@ -124,15 +126,9 @@ borders on the cells `D61`.
 
 ## Rows and views
 
-Each object type has its own **first column** — same table, different lead cell `D26`:
-
-| Object | Lead cell | The question it answers |
-|---|---|---|
-| Company | a silence meter — small bar and day count, coloured by lateness | have I neglected this? |
-| Project | a six-dot mini-chain, plus a quoted-vs-dispatched bar | where is this? |
-| Quotation | an avatar and whose move it is | who does this wait on? |
-| Dispatch | the square metres, mono, large | how much went out? |
-| Contact | name and position | who is this? |
+Each object type has its own **first column** — same table component, different lead cell.
+The object-to-lead-cell mapping is `D26`'s: read it there. A copy of it lived here and had
+already dropped a clause `D26` gained — do not put it back.
 
 The mini-chain draws from `chainState()` in `src/lib/chain.ts` and nothing else, and
 **derives nothing** `D27`; that file is the one definition of the six chain positions the
