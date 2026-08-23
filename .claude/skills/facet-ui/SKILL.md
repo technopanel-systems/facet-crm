@@ -113,8 +113,8 @@ list leads with reads as a magnitude.
 **A row says whose move it is, not what the status is** `D2`, and the boolean behind
 `turnTone({ overdue })` must come from a derivation the data layer already made — **never
 derive a threshold in a screen** (`CLAUDE.md`: derived conditions are resolved in SQL,
-before pagination). Where no rule decides whose move it is, do not invent one: a dispatch, a
-contact and a filed report owe nobody `D26`.
+before pagination). Where no rule decides whose move it is, do not invent one — `D26` settles
+it per object, and a dispatch's turns on its state `S72`.
 
 **An empty list** says what would make it non-empty and offers the action `D52`, takes a
 different key when a search filtered it away, and sits **outside** `ListCard`, where a
