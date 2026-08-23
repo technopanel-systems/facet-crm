@@ -1122,6 +1122,16 @@
       "targets": "Target attainment",
       "coverage": "Coverage",
       "viewReports": "View reports"
+    },
+    "origin": {
+      "title": "How requests arrived",
+      "noteActs": "Counts acts performed in this month, not dispatch dates — so a request raised in July and edited in August is an August edit.",
+      "noteWindow": "Edited by someone else counts requests edited this month whenever they were raised, so it is not a share of Raised.",
+      "noteNoArithmetic": "The three figures do not add or subtract. Nothing is derived by combining them.",
+      "raised": "Raised",
+      "raisedForThem": "Raised for them",
+      "editedByAnother": "Edited by someone else",
+      "empty": "Nobody is measured this month."
     }
   }
 }

@@ -6,11 +6,18 @@ import { Input } from "@/components/ui/input";
 import { Link } from "@/i18n/navigation";
 import { can, requireSession } from "@/lib/authz";
 import { coverage, coverageRepOptions } from "@/lib/coverage";
-import { achievementForPeriod, currentPeriod, periodStart } from "@/lib/targets";
+import { requestOriginForPeriod } from "@/lib/dispatches";
+import {
+  achievementForPeriod,
+  currentPeriod,
+  nextPeriodStart,
+  periodStart,
+} from "@/lib/targets";
 
 import { AttainmentTable } from "../_components/attainment-table";
 import { CoverageTable } from "../_components/coverage-table";
 import { FilterNav, ListCard, SearchForm } from "../_components/list-controls";
+import { RequestOriginTable } from "../_components/request-origin-table";
 
 export const dynamic = "force-dynamic";
 
@@ -66,8 +73,11 @@ export default async function PerformancePage({
   const currentPage = Number(page) || 1;
   const quietOnly = quiet === "1";
 
-  const [attainment, cover, repOptions] = await Promise.all([
+  const [attainment, origin, cover, repOptions] = await Promise.all([
     achievementForPeriod(session, period),
+    // `S123` — the same month, bounded by the ACT rather than by the dispatch
+    // date the two tables around it use. The section says so; see the note.
+    requestOriginForPeriod(session, period, nextPeriodStart(period)),
     coverage(session, { q, page: currentPage, userId: rep, quietOnly }),
     coverageRepOptions(session),
   ]);
@@ -123,6 +133,43 @@ export default async function PerformancePage({
               period={period}
               maySetTargets={can(session, "canSetTargets")}
             />
+          </ListCard>
+        )}
+      </section>
+
+      {/* `S123` — **who created a record is a measure.** Third section rather
+          than a fourth screen: it is a measure, and `/performance` is where
+          measures live and where `visibleMeasuredUsersFilter` already decides
+          whose. No permission gate — *a number to look at, never an
+          enforcement* — so a rep reads their own row here as they read their
+          own attainment above. */}
+      <section data-slot="request-origin" className="flex flex-col gap-4">
+        <h2 className="text-start text-base font-semibold tracking-tight">
+          {t("performance.origin.title")}
+        </h2>
+
+        {/* Three sentences, and each one closes a way of misreading the table.
+            The first because the attainment table above is dispatch-dated and
+            this one counts acts — two clocks on one screen with nothing saying
+            so is how somebody reads the wrong number. The second because the
+            third column is not a share of the first. The third because three
+            numbers in a row invite subtraction, and no fourth number here is
+            true. */}
+        <p className="text-muted-foreground text-start text-sm">
+          {t("performance.origin.noteActs")}{" "}
+          {t("performance.origin.noteWindow")}{" "}
+          {t("performance.origin.noteNoArithmetic")}
+        </p>
+
+        {origin.length === 0 ? (
+          <p className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
+            {t("performance.origin.empty")}
+          </p>
+        ) : (
+          // No pager, for `AttainmentTable`'s reason: `requestOriginForPeriod`
+          // returns the whole measured set, so the footer is a count.
+          <ListCard basePath="/performance" page={1} total={origin.length}>
+            <RequestOriginTable rows={origin} />
           </ListCard>
         )}
       </section>

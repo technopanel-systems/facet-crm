@@ -61,6 +61,17 @@
  *      list holds a stale project and the coordinator's does not, which is what
  *      proves the read filter did not leak into the queue.
  *
+ *  30. **Who created a record is a measure** `S123`, and `S127` costs her
+ *      nothing. Both figures over every dispatch in the database rather than
+ *      this run's: the SQL is checked against the same two questions counted
+ *      in TypeScript from a whole read of `dispatches` and `audit_log`, with
+ *      the month rebuilt from the Riyadh offset rather than from `at time
+ *      zone`, so the derivation is what is trusted and not the fixtures.
+ *      Then the three claims the rule turns on: an edit that moved only the
+ *      date is counted though `lines_changed_after_submission` says `false`
+ *      `S120`; an impersonated edit is read through `acting_as_user_id` and
+ *      so is NOT counted; and `S127`'s own request scores zero in both.
+ *
  * Usage: `npm run verify:slice3`
  *
  * That needs `NODE_ENV=development` in `.env`. `--env-file` is not optional and
@@ -140,6 +151,7 @@ import {
   listDispatches,
   refuseDispatchRequest,
   requestDispatch,
+  requestOriginForPeriod,
   reviveDispatchRequest,
   setDispatchSmacNumber,
   submitDispatchRequest,
@@ -177,7 +189,9 @@ import {
 } from "@/lib/quotations";
 import {
   achievementForPeriod,
+  currentPeriod,
   listTargetHistory,
+  nextPeriodStart,
   setTarget,
 } from "@/lib/targets";
 import { projectTimeline } from "@/lib/timeline";
@@ -4262,6 +4276,358 @@ async function main(): Promise<void> {
     "*** no project's derived win disagrees with its dispatches, on any row *** [S31]",
     wrongWin === 0,
     `${wrongWin} of ${everyProject.length} disagree (${trulyWon.size} genuinely won)`,
+  );
+
+
+  /* --- 30. S123 — who created a record is a measure [S123], [S127] ---- */
+
+  console.log(
+    "\n30. *** Who created a record is a measure *** [S123], [S127]",
+  );
+
+  // **The month bounds the ACT**, so it is the month this run is happening in,
+  // not a fixture date. `dispatch_date` on the rows below is November; their
+  // `created_at` is now, and `created_at` is what `S123` counts.
+  const s123From = currentPeriod();
+  const s123To = nextPeriodStart(s123From);
+
+  // Deltas, not absolutes. This script keeps its rows `[12 §7]`, so an earlier
+  // section's dispatch is already in these figures and a run in the same month
+  // as the last one sees both. What each act below must move is exact; what the
+  // database happened to contain before it is not this section's claim.
+  const before = await requestOriginForPeriod(manager, s123From, s123To);
+  const beforeA = before.find((row) => row.userId === repA.user.id);
+  check(
+    "the rep is measured at all, so the deltas below have something to move",
+    beforeA !== undefined,
+  );
+
+  /* --- Figure one: a request raised FOR a rep [S123] ------------------ */
+
+  // The path `71af2a3` built: `S108` never asks a rep who they are, and only a
+  // `can_dispatch` holder may name somebody else. `herself` is `S127`'s
+  // run-scoped coordinator, and the company is hers — which is `S127` again,
+  // and keeps this out of the shared fixtures.
+  const forRep = await requestDispatch(herself, {
+    ...SHIP,
+    lines: linesOf("21.0000", "70.00"),
+    dispatchDate: "2026-11-04",
+    quotationThreadId: null,
+    companyId: herCompany.id,
+    userId: repA.user.id,
+    projectId: null,
+  });
+  check(
+    "*** the coordinator raises a request FOR a rep *** [S123]",
+    forRep.recordedByUserId === herUser.id && forRep.userId === repA.user.id,
+    `recorded by ${forRep.recordedByUserId}, credits ${forRep.userId}`,
+  );
+
+  /* --- Figure two: an edit S120's column does not record [S123] ------- */
+
+  // A quotation-linked request, deliberately: `S120` says *a free-entry
+  // dispatch is outside the question entirely*, so contrasting the two figures
+  // on a free entry would prove nothing. Here the column exists and is `false`,
+  // and `S123` still counts the edit.
+  const [s123Company] = await db
+    .insert(companies)
+    .values({
+      name: `${stamp} Origin Co`,
+      nameNormalized: `${stamp}-origin`,
+      phone: `+9665${stamp.slice(-7)}5`,
+      countryId: saudiId,
+      createdBy: repA.user.id,
+    })
+    .returning();
+  await db.insert(companyReps).values({
+    companyId: s123Company.id,
+    userId: repA.user.id,
+    isPrimary: true,
+    origin: "self_registered",
+  });
+  const [s123Project] = await db
+    .insert(projects)
+    .values({
+      nameEn: `${stamp} Origin Project`,
+      nameNormalized: `${stamp}-origin`,
+      ownerUserId: repA.user.id,
+      createdBy: repA.user.id,
+    })
+    .returning();
+  // `S27` — a thread may only name a project its company takes part in,
+  // which `assertCompanyOnProject` holds. The link is what lets the request
+  // below derive its project `S74` instead of naming one on every edit.
+  await addProjectCompany(repA, s123Project.id, {
+    companyId: s123Company.id,
+  });
+  const s123Thread = await createQuotationThread(
+    repA,
+    {
+      projectId: s123Project.id,
+      companyId: s123Company.id,
+      contactId: null,
+    },
+    version,
+    [line],
+    [],
+  );
+  await issueVersion(coordinator, s123Thread.id, {
+    smacReference: `${stamp}-origin`,
+    verification: "unverified",
+  });
+
+  const dateMoved = await requestDispatch(repA, {
+    ...SHIP,
+    lines: linesOf("9.0000", "65.00"),
+    dispatchDate: "2026-11-05",
+    quotationThreadId: s123Thread.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  await submitDispatchRequest(repA, dateMoved.id);
+  check(
+    "a submitted request starts with the lines UNMOVED [S120]",
+    (await getDispatch(repA, dateMoved.id))?.linesChangedAfterSubmission ===
+      false,
+  );
+
+  // **The same lines, a different date.** `linesOf` is a pure function of its
+  // two arguments, so this hands back exactly the set the rep submitted and
+  // `linesDigestFor` sees no change.
+  await updateDispatchRequest(coordinator, dateMoved.id, {
+    ...SHIP,
+    lines: linesOf("9.0000", "65.00"),
+    dispatchDate: "2026-11-06",
+    projectId: null,
+  });
+  const afterDateEdit = (await getDispatch(coordinator, dateMoved.id))!;
+  check(
+    "*** the coordinator edited it, and S120's column still says false *** [S120]",
+    afterDateEdit.dispatchDate === "2026-11-06" &&
+      afterDateEdit.linesChangedAfterSubmission === false,
+    `${afterDateEdit.dispatchDate}, linesChanged ${afterDateEdit.linesChangedAfterSubmission}`,
+  );
+
+  /* --- Impersonation: coalesce, never the raw actor [S123], [07 A6] --- */
+
+  // A real edit through the real writer, rather than a hand-inserted audit row.
+  // The manager is at the keyboard **acting as** the coordinator who raised
+  // `forRep`, so `actor_user_id` and `acting_as_user_id` disagree — which is
+  // exactly the row that separates the two readings. `session.user.id` was the
+  // coordinator, so this is her editing her own draft and `S123` must not count
+  // it; reading the raw actor would.
+  const asHer: AuthSession = {
+    user: { ...herUser, role: coordRole },
+    realUser: manager.user,
+    isImpersonating: true,
+    actor: { actorUserId: manager.user.id, actingAsUserId: herUser.id },
+  };
+  await updateDispatchRequest(asHer, forRep.id, {
+    ...SHIP,
+    lines: linesOf("21.0000", "70.00"),
+    dispatchDate: "2026-11-07",
+    projectId: null,
+  });
+  const [impersonated] = await db
+    .select({
+      actorUserId: auditLog.actorUserId,
+      actingAsUserId: auditLog.actingAsUserId,
+    })
+    .from(auditLog)
+    .where(
+      and(
+        eq(auditLog.entityType, "dispatch"),
+        eq(auditLog.entityId, forRep.id),
+        eq(auditLog.action, "dispatch.edited"),
+      ),
+    );
+  check(
+    "the impersonated edit is a row where the two readings DISAGREE [07 A6]",
+    impersonated?.actorUserId === manager.user.id &&
+      impersonated?.actingAsUserId === herUser.id,
+    `actor ${impersonated?.actorUserId}, acting as ${impersonated?.actingAsUserId}`,
+  );
+
+  /* --- Recomputed over EVERY row, not this run's [S123] --------------- */
+
+  // The same two questions asked a different way: read both tables whole and
+  // count in TypeScript. Not a second call to the same SQL — the window is
+  // rebuilt from the Riyadh offset rather than from `at time zone`, and the
+  // grouping is a Map rather than a `filter` clause. Where the two agree over
+  // every dispatch in the database, the derivation is the thing being trusted
+  // rather than the fixtures.
+  const originDispatches = await db
+    .select({
+      id: dispatchesTable.id,
+      userId: dispatchesTable.userId,
+      recordedByUserId: dispatchesTable.recordedByUserId,
+      createdAt: dispatchesTable.createdAt,
+    })
+    .from(dispatchesTable);
+  const originEdits = await db
+    .select({
+      entityId: auditLog.entityId,
+      actorUserId: auditLog.actorUserId,
+      actingAsUserId: auditLog.actingAsUserId,
+      createdAt: auditLog.createdAt,
+    })
+    .from(auditLog)
+    .where(eq(auditLog.action, "dispatch.edited"));
+
+  // Riyadh is UTC+3 and keeps no daylight saving, so midnight there is the
+  // offset written out. Built this way on purpose: reusing `at time zone` would
+  // be asserting the SQL against itself.
+  const windowStart = new Date(`${s123From}T00:00:00+03:00`);
+  const windowEnd = new Date(`${s123To}T00:00:00+03:00`);
+  const inOriginWindow = (at: Date) => at >= windowStart && at < windowEnd;
+
+  const bump = (into: Map<string, number>, key: string) =>
+    into.set(key, (into.get(key) ?? 0) + 1);
+
+  const raisedTally = new Map<string, number>();
+  const forThemTally = new Map<string, number>();
+  const raiserOf = new Map<string, string>();
+  const repOf = new Map<string, string>();
+  for (const row of originDispatches) {
+    raiserOf.set(row.id, row.recordedByUserId);
+    repOf.set(row.id, row.userId);
+    if (!inOriginWindow(row.createdAt)) continue;
+    bump(raisedTally, row.userId);
+    if (row.recordedByUserId !== row.userId) bump(forThemTally, row.userId);
+  }
+
+  // One request, however many times she touched it: `S123` counts *a request
+  // the coordinator had to edit*, not the edits.
+  const editedIds = new Set<string>();
+  for (const row of originEdits) {
+    if (!row.entityId || !inOriginWindow(row.createdAt)) continue;
+    const raiser = raiserOf.get(row.entityId);
+    if (raiser === undefined) continue;
+    if ((row.actingAsUserId ?? row.actorUserId) !== raiser) {
+      editedIds.add(row.entityId);
+    }
+  }
+  const editedTally = new Map<string, number>();
+  for (const id of editedIds) bump(editedTally, repOf.get(id) as string);
+
+  const after = await requestOriginForPeriod(manager, s123From, s123To);
+  check(
+    "the manager reads every measured person, so 'every row' means it [S123]",
+    manager.user.role.seesAllReps === true && after.length > 0,
+    `seesAllReps ${manager.user.role.seesAllReps}, ${after.length} rows`,
+  );
+
+  const disagreements = after.filter(
+    (row) =>
+      row.raised !== (raisedTally.get(row.userId) ?? 0) ||
+      row.raisedForThem !== (forThemTally.get(row.userId) ?? 0) ||
+      row.editedByAnother !== (editedTally.get(row.userId) ?? 0),
+  );
+  console.log(
+    `  --    ${after.length} measured, over ${originDispatches.length} dispatches and ${originEdits.length} edit rows`,
+  );
+  check(
+    "*** the SQL agrees with the recomputation, for every measured person *** [S123]",
+    disagreements.length === 0,
+    disagreements
+      .map(
+        (row) =>
+          `${row.userName}: sql ${row.raised}/${row.raisedForThem}/${row.editedByAnother}` +
+          ` vs ts ${raisedTally.get(row.userId) ?? 0}/${forThemTally.get(row.userId) ?? 0}/${editedTally.get(row.userId) ?? 0}`,
+      )
+      .join("; "),
+  );
+
+  // The other direction. The check above compares the rows the SQL returned; a
+  // figure the SQL never emitted a row for would pass it silently, so every
+  // person the recomputation found is required to be either inactive or present.
+  const measuredIds = new Set(after.map((row) => row.userId));
+  const activeUsers = new Set(
+    (
+      await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.isActive, true))
+    ).map((row) => row.id),
+  );
+  const missing = [...raisedTally.keys(), ...editedTally.keys()].filter(
+    (id) => activeUsers.has(id) && !measuredIds.has(id),
+  );
+  check(
+    "…and no active person with a figure is missing from the table [S123]",
+    missing.length === 0,
+    `${missing.length} missing`,
+  );
+
+  /* --- The deltas each act had to move [S123] ------------------------- */
+
+  const afterA = after.find((row) => row.userId === repA.user.id);
+  check(
+    "*** the request raised FOR the rep moved figure one, and only it *** [S123]",
+    afterA !== undefined &&
+      beforeA !== undefined &&
+      afterA.raisedForThem === beforeA.raisedForThem + 1,
+    `raisedForThem ${beforeA?.raisedForThem} → ${afterA?.raisedForThem}`,
+  );
+  check(
+    "…and both requests moved the denominator they are read against [S123]",
+    afterA !== undefined && beforeA !== undefined &&
+      afterA.raised === beforeA.raised + 2,
+    `raised ${beforeA?.raised} → ${afterA?.raised}`,
+  );
+  check(
+    "*** S123 counts an edit S120's column does not record *** [S123], [S120]",
+    afterA !== undefined &&
+      beforeA !== undefined &&
+      afterA.editedByAnother === beforeA.editedByAnother + 1 &&
+      editedIds.has(dateMoved.id) &&
+      afterDateEdit.linesChangedAfterSubmission === false,
+    `editedByAnother ${beforeA?.editedByAnother} → ${afterA?.editedByAnother}`,
+  );
+  check(
+    "*** and the impersonated edit is NOT counted — coalesce, not the raw actor *** [S123]",
+    !editedIds.has(forRep.id),
+    "the raw actor_user_id reading would have counted it",
+  );
+
+  /* --- S127 scores zero in both figures [S127], [S123] ---------------- */
+
+  // *The coordinator may raise a dispatch request against her own company and
+  // approve it herself.* §21 walked that; this is what it must cost her in
+  // `S123`'s terms, which is nothing. Asserted on the row rather than on her
+  // total, so no later section can perturb it.
+  check(
+    "*** S127's own request is created for nobody *** [S127], [S123]",
+    raiserOf.get(hers.id) === repOf.get(hers.id),
+    `raised by ${raiserOf.get(hers.id)}, credits ${repOf.get(hers.id)}`,
+  );
+  check(
+    "*** …and nobody else edited it, so it counts in NEITHER figure *** [S127], [S123]",
+    !editedIds.has(hers.id),
+  );
+  const herRow = after.find((row) => row.userId === herUser.id);
+  check(
+    "…while she is in the table with the request she did raise [S127], [S123]",
+    herRow !== undefined && herRow.raised >= 1 && herRow.raisedForThem === 0,
+    `raised ${herRow?.raised}, for her ${herRow?.raisedForThem}`,
+  );
+
+  // **Never an enforcement** `S123`. Nothing above refused anything, and the
+  // rep whose figures moved can still raise, submit and be approved exactly as
+  // before — the number is looked at, and that is all it does.
+  const unblocked = await requestDispatch(repA, {
+    ...SHIP,
+    lines: linesOf("3.0000", "50.00"),
+    dispatchDate: "2026-11-08",
+    quotationThreadId: null,
+    companyId: s123Company.id,
+    userId: null,
+    projectId: null,
+  });
+  check(
+    "*** a rep with a figure against them is not blocked by it *** [S123]",
+    unblocked.status === "draft" && unblocked.userId === repA.user.id,
   );
 
   // Nothing is cleaned up: FACET does not delete history `[12 §7]`, and this

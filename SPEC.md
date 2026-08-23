@@ -755,8 +755,27 @@ coordinator's edit of a submitted one is an audit row naming her. S120's second
 column is **not** this figure and must not be read as one: it records only that
 the dispatch's *lines* moved after submission, which is what stops a gap she
 introduced being counted as the rep's — this rule counts every edit she had to
-make, lines or not. **The two figures do not exist** — nothing counts either,
-and no screen says which is which.
+make, lines or not.
+
+**Both figures exist, over dispatch requests, and nothing else is counted.**
+`/performance` carries them per rep for a month, beside target attainment:
+requests raised, of those the ones somebody else raised, and requests a
+`can_dispatch` holder other than the raiser edited. The month bounds the **act**
+rather than the dispatch date the tables around them use, because that is what
+this rule measures and because an edit has no other date; the screen says so,
+and says the three figures do not add or subtract.
+
+**The other four kinds are not counted, and two of them cannot be.** A company
+and a project are created by their own owner — `createCompany` and
+`createProject` write `created_by` and the owner as the same person, so the
+comparison is zero by construction and only a create-for path no rule asks for
+would change that. A quotation version and a contact **do** differ at creation
+today, and are still not counted: a handover rewrites `raised_by_user_id` and
+moves `company_reps`, so the comparison would read a handover as somebody doing
+the rep's work. A contact would additionally rest on what "primary rep" means
+after a handover, which is not decided. A dispatch is the one kind where both
+sides are immutable — S103 keeps past dispatches where they are — so its figure
+is permanent, as S120's derived half is.
 
 ---
 

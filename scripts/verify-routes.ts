@@ -369,7 +369,15 @@ const MARKERS: Record<string, readonly string[]> = {
   "/reports/new": ['data-slot="form-shell"'],
   // `/coverage` carried this marker until feature slice 6 moved the table
   // it comes from onto `/performance` and deleted the route `[26 §2]`.
-  "/performance": ['data-slot="turn"'],
+  //
+  // `S123`'s section is the third on the screen. The `border-s` is asserted
+  // with it and is not decoration: it is the half of the no-arithmetic guard
+  // a translated note cannot carry, so a sweep that drops it must fail here.
+  "/performance": [
+    'data-slot="turn"',
+    'data-slot="request-origin"',
+    "border-line border-s",
+  ],
 };
 
 const MARKER_IDENTITY = "manager@example.test";

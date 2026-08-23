@@ -75,8 +75,16 @@ export function periodStart(period: string): string {
   return `${year}-${month}-01`;
 }
 
-/** The first day of the following month — the exclusive upper bound. */
-function nextPeriodStart(period: string): string {
+/**
+ * The first day of the following month — the exclusive upper bound.
+ *
+ * **Exported for `/performance`**, which needs both bounds to hand to
+ * `requestOriginForPeriod` `S123`. That function lives in `dispatches.ts` and
+ * takes the pair as strings, exactly as `dispatchesInPeriod` beside it does, so
+ * neither module imports the other and there is one definition of where a month
+ * ends.
+ */
+export function nextPeriodStart(period: string): string {
   const [year, month] = periodStart(period).split("-").map(Number);
   const rolls = month === 12;
   const nextYear = rolls ? year + 1 : year;

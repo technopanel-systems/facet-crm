@@ -143,6 +143,7 @@ import {
   canViewRecord,
   dispatchCompanyLookupFilter,
   visibleDispatchesFilter,
+  visibleMeasuredUsersFilter,
   visibleProjectsFilter,
   visibleQuotationThreadsFilter,
   type AuthSession,
@@ -2549,4 +2550,177 @@ export async function dispatchesInPeriod(
     projectId: row.projectId,
     isDirect: row.quotationThreadId === null,
   }));
+}
+
+/* ------------------------------------------------------------------ *
+ * `S123` — who created a record is a measure
+ * ------------------------------------------------------------------ */
+
+/**
+ * `S123`'s two figures for one rep, in one month, plus the denominator the
+ * first of them is read against.
+ *
+ * **Two questions, two figures** — *and a screen showing both must say which is
+ * which.* `raisedForThem` answers *did somebody else create this rep's record*;
+ * `editedByAnother` answers *did the coordinator have to fix the request before
+ * approving it*. They are never summed, and nothing here combines them into a
+ * score: `SPEC §16` leaves the performance formula open, and `S123` is *a
+ * number to look at, never an enforcement*.
+ */
+export type RequestOriginRow = {
+  userId: string;
+  userName: string;
+  /** Requests credited to this rep that were CREATED in the month. The
+   *  denominator `raisedForThem` is a subset of, and of nothing else. */
+  raised: number;
+  /** `S123` figure one — of those, the ones somebody else created. */
+  raisedForThem: number;
+  /**
+   * `S123` figure two — requests a `can_dispatch` holder other than the raiser
+   * edited in the month, raised **whenever**. Not a subset of `raised`.
+   */
+  editedByAnother: number;
+};
+
+/**
+ * `S123` — **who created a record is a measure**, for everyone this identity
+ * may read.
+ *
+ * *A record created for a rep by the coordinator or a manager, and a request
+ * the coordinator had to edit before approving, are both recorded and counted.*
+ * Both are here, over **dispatch requests** — which is the whole of what this
+ * rule counts today, and `S123`'s own text says so.
+ *
+ * **Why only dispatch requests.** The rule names five kinds. `companies` and
+ * `projects` cannot differ: `createCompany` and `createProject` write
+ * `created_by` and the owner as the same person, so the comparison is zero by
+ * construction. `quotation_versions` and `contacts` *do* differ at creation —
+ * `createRevision('coordinator_direct_edit')`, and a manager creating a contact
+ * on a company they do not rep — but neither can be counted honestly, because a
+ * handover rewrites the owner side: `team.ts` moves
+ * `quotation_threads.raised_by_user_id` and `company_reps`, so every record the
+ * departing rep created would retroactively read as created FOR whoever
+ * received the desk. A figure that reads a handover as somebody doing a rep's
+ * work is worse than no figure.
+ *
+ * A dispatch is the one kind where **both sides are immutable**: nothing
+ * updates `user_id` or `recorded_by_user_id` after the insert, and `S103` is
+ * why — *past dispatches, payment confirmations, version authorship and credit
+ * never move*. So this comparison is permanent, as `S120`'s derived half is.
+ *
+ * **Scoped, never gated** — `visibleMeasuredUsersFilter`, the same predicate
+ * `achievementForPeriod` asks, so a rep reads their own row and `sees_all_reps`
+ * reads everyone's. `S123` is *never an enforcement*: nothing in this module or
+ * the screen above it blocks, warns or refuses on either figure.
+ *
+ * **The month bounds the ACT, not the dispatch date.** Every other figure on
+ * `/performance` is bounded by `dispatch_date`; these two are bounded by when
+ * somebody did something, because that is what `S123` measures — and because
+ * the second figure has no other date to use. An edit made in March is a fact
+ * about March, not about the month the goods moved. The screen says so.
+ */
+export async function requestOriginForPeriod(
+  session: AuthSession,
+  periodStart: string,
+  nextPeriodStart: string,
+): Promise<RequestOriginRow[]> {
+  // 1. Whose numbers may this identity read? The predicate lives in `authz`,
+  //    and it is the one `achievementForPeriod` asks two sections above on the
+  //    same screen — two different answers there would be the defect.
+  const measured = await db
+    .select({ id: users.id, name: users.name })
+    .from(users)
+    .where(and(eq(users.isActive, true), visibleMeasuredUsersFilter(session)))
+    .orderBy(asc(users.name));
+  if (measured.length === 0) return [];
+
+  // **A calendar month in Riyadh, not an instant.** `created_at` is
+  // `timestamptz` while a period is a day string, so the bound is converted
+  // outright rather than left to the server's `TimeZone` setting.
+  // `currentPeriod` already reads the month in Riyadh; this is the same claim
+  // at the other end. Cast explicitly — an untyped bound parameter is where
+  // date arithmetic goes wrong quietly.
+  const from = sql`${periodStart}::date at time zone 'Asia/Riyadh'`;
+  const to = sql`${nextPeriodStart}::date at time zone 'Asia/Riyadh'`;
+
+  // 2. The three counts, grouped in SQL before anything is read `CLAUDE.md`.
+  //
+  //    **No date term in the outer `where`.** `editedByAnother` asks about an
+  //    edit in the month on a request raised at any time, so narrowing the rows
+  //    by `created_at` here would silently drop exactly the case the figure is
+  //    for. It is `dispatchesInPeriod`'s cost, at the same size.
+  const counts = await db
+    .select({
+      userId: dispatches.userId,
+      raised: sql<number>`count(*) filter (
+        where dispatches.created_at >= ${from}
+          and dispatches.created_at < ${to}
+      )::int`,
+      // Both columns are NOT NULL, so `<>` cannot go null here.
+      raisedForThem: sql<number>`count(*) filter (
+        where dispatches.created_at >= ${from}
+          and dispatches.created_at < ${to}
+          and dispatches.recorded_by_user_id <> dispatches.user_id
+      )::int`,
+      /*
+       * `S123` — *a request the coordinator had to edit before approving*.
+       *
+       * **Derived from `assertEditable`'s constraint rather than from a stored
+       * status snapshot.** A draft is editable only by the person who raised it
+       * and a submitted request only by a `can_dispatch` holder, so an edit
+       * whose actor is not the raiser IS an edit after submission. Nothing has
+       * to record which state the row was in when she touched it.
+       *
+       * **`coalesce(acting_as_user_id, actor_user_id)`**, never the raw actor:
+       * `actor_user_id` is the real person and `acting_as_user_id` is who they
+       * were acting as, which is what `session.user.id` was at the time — so
+       * the raw column compares the wrong side under impersonation.
+       * `is distinct from` rather than `<>` because a system actor is null, and
+       * null is *not* the raiser: `<>` would return null and drop the row.
+       *
+       * **This is not `lines_changed_after_submission`.** `S123` says so
+       * outright — that column records only that the LINES moved, and this
+       * counts *every edit she had to make, lines or not*. Reading the column
+       * here would miss a call that fixed a date, a stock or a shipment.
+       *
+       * Both tables are named outright inside the correlated subquery
+       * `CLAUDE.md`: a bare `entity_id = id` resolves inside `audit_log`, is
+       * never true, and raises no error.
+       */
+      editedByAnother: sql<number>`count(*) filter (
+        where exists (
+          select 1 from audit_log
+          where audit_log.entity_type = 'dispatch'
+            and audit_log.entity_id = dispatches.id
+            and audit_log.action = 'dispatch.edited'
+            and coalesce(audit_log.acting_as_user_id, audit_log.actor_user_id)
+                  is distinct from dispatches.recorded_by_user_id
+            and audit_log.created_at >= ${from}
+            and audit_log.created_at < ${to}
+        )
+      )::int`,
+    })
+    .from(dispatches)
+    .where(
+      inArray(
+        dispatches.userId,
+        measured.map((person) => person.id),
+      ),
+    )
+    .groupBy(dispatches.userId);
+
+  const byUser = new Map(counts.map((row) => [row.userId, row]));
+
+  // Zero, not null — unlike a target `[07 D1]`, "nobody created anything for
+  // you this month" is a measured answer rather than an unmeasured one.
+  return measured.map((person) => {
+    const row = byUser.get(person.id);
+    return {
+      userId: person.id,
+      userName: person.name,
+      raised: row?.raised ?? 0,
+      raisedForThem: row?.raisedForThem ?? 0,
+      editedByAnother: row?.editedByAnother ?? 0,
+    };
+  });
 }
