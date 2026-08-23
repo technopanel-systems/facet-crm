@@ -310,7 +310,7 @@ export async function listCompanyReps(
  *
  * Two rows, one transaction: the company, and the membership that makes it
  * the creating rep's `[09 §3.2]`. The registering rep automatically becomes
- * primary `[04 Q11]` and the origin is `self_registered` — a rep's own find
+ * primary `S18` and the origin is `self_registered` — a rep's own find
  * registers to himself `[07 B3]`.
  *
  * Under impersonation `session.user.id` is the impersonated rep, so the

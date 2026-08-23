@@ -91,10 +91,12 @@ exhibition, marketing, other. **Marketing is not selectable by an ordinary rep**
 — it means the lead came from the marketing team. A company that already carries
 it keeps it when a rep edits.
 
-**S18. [CHANGE]** The rep who creates a company becomes its **primary rep**
-automatically. The primary rep is always the first rep who had the company. The
-first sentence ships. The second does not: handover and dormancy reassignment
-both carry primacy to the new holder.
+**S18.** The rep who creates a company becomes its **primary rep**
+automatically. **Primacy follows the company, not its finder**: it moves to the
+recipient on handover `S103` and on dormancy reassignment, so the primary rep
+is whoever holds the company now. A company with a rep on it has **exactly one**
+primary rep — none is as wrong as two. Who *found* the company is `created_by`
+`S123`, and that never moves.
 
 **S19.** A **contact has one name field**, English or Arabic.
 

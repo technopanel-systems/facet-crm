@@ -278,7 +278,7 @@ export async function reassignHandover(
       });
 
       const [existing] = await tx
-        .select({ id: companyReps.id })
+        .select({ id: companyReps.id, isPrimary: companyReps.isPrimary })
         .from(companyReps)
         .where(
           and(
@@ -290,8 +290,25 @@ export async function reassignHandover(
         .limit(1);
 
       if (existing) {
-        // Already a rep on this company — nothing to add. Whether their row is
-        // promoted to primary when the departing one was is OPEN `[19 §8]`.
+        // Already a rep on this company — no row to add, and `S18` now decides
+        // what `[19 §8]` left OPEN: primacy follows the company, so the row
+        // that stays takes it. Leaving it alone is what strands a company with
+        // reps on it and no primary, which `S18` forbids as squarely as two.
+        if (removed.isPrimary && !existing.isPrimary) {
+          const [promoted] = await tx
+            .update(companyReps)
+            .set({ isPrimary: true })
+            .where(eq(companyReps.id, existing.id))
+            .returning();
+
+          log({
+            action: "company_rep.promoted",
+            entityType: "company_rep",
+            entityId: promoted.id,
+            before: { userId: toUserId, isPrimary: false },
+            after: { userId: toUserId, isPrimary: true },
+          });
+        }
         outcome.companiesAlreadyMember += 1;
         continue;
       }
@@ -302,7 +319,7 @@ export async function reassignHandover(
           companyId: removed.companyId,
           userId: toUserId,
           // The same holding moving to a new person keeps its primacy;
-          // dropping it would leave the company with no primary rep `[04 Q11]`.
+          // dropping it would leave the company with no primary rep `S18`.
           isPrimary: removed.isPrimary,
           // `07 B3` — a hand-over is an assignment. `self_registered` is a lie.
           origin: "assigned",

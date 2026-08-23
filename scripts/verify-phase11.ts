@@ -797,7 +797,7 @@ async function main(): Promise<void> {
     newMembership?.origin === "assigned",
   );
   check(
-    "and it carries the primary flag across [04 Q11]",
+    "and it carries the primary flag across [S18]",
     newMembership?.isPrimary === true,
   );
 
@@ -832,6 +832,16 @@ async function main(): Promise<void> {
   check(
     "and the departing rep's row on it was removed",
     (await liveMembership(companyShared.id, departing.user.id)) === undefined,
+  );
+  // *** The branch `S18` closes. *** The fixture is built so the departing rep
+  // is primary on the shared company and the recipient is NOT — the one shape
+  // where "no row to add" used to mean "and no primary either". Nothing here
+  // inserted a row, so primacy had to move onto the row that stayed.
+  check(
+    "*** and THAT row is now primary — the company keeps exactly one *** [S18]",
+    (await liveMembership(companyShared.id, receiver.user.id))?.isPrimary ===
+      true,
+    "the recipient's surviving row is not primary",
   );
 
   const emptyBook = (await getHandoverBook(manager, departing.user.id))!;

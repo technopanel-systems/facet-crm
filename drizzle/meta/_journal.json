@@ -183,6 +183,13 @@
       "when": 1787495995987,
       "tag": "0025_a_decision_that_ends_your_work",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1787513191483,
+      "tag": "0026_primacy_follows_the_company",
+      "breakpoints": true
     }
   ]
 }

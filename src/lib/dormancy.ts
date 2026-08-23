@@ -237,7 +237,7 @@ export async function reassignCompany(
         companyId,
         userId: toUserId,
         // A company handed over keeps a primary rep; dropping it would leave
-        // the company with none `[04 Q11]`.
+        // the company with none `S18`.
         isPrimary: true,
         // `07 B3` — a hand-over is an assignment. `self_registered` is a lie.
         origin: "assigned",

@@ -766,7 +766,13 @@ export const companyReps = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id),
-    /** The registering rep automatically becomes primary `[04 Q11]`. */
+    /**
+     * The registering rep automatically becomes primary `S18`, and primacy
+     * then follows the company: handover and dormancy reassignment both move
+     * it to whoever holds it now. A company with a live membership carries
+     * exactly one — no index holds that, because "at least one" is not
+     * row-local; `verify:schema25` §20 asserts it over every row.
+     */
     isPrimary: boolean("is_primary").notNull().default(false),
     origin: companyRepOriginEnum("origin").notNull(),
     /** The delete-request outcome `[04 Q8]`. Never a deleted row. */

@@ -61,6 +61,11 @@
  *      arithmetic §12 asserts of a quotation line, and there is no `sqm`
  *      column left on `dispatches` for a second answer to live in. Over every
  *      row ever written.
+ *  20. *** Every company with a rep on it has exactly ONE primary rep ***
+ *      `S18` — AUDIT 1 F5. The rule's other half, and the one no constraint
+ *      can hold: a partial unique index could refuse a second primary, but
+ *      "at least one" is not row-local and that is the half that was broken.
+ *      Over every row ever written, and it was false when it was written.
  *  13. *** The repository and the database agree *** — CHECK constraints, enum
  *      types and their values, and indexes, as set differences both ways. This
  *      is the one claim `drizzle-kit generate` structurally cannot make: it
@@ -2547,6 +2552,77 @@ async function repositoryMatchesDatabase(): Promise<void> {
     "…and something IS won, so a subquery returning false for everything fails here [S31]",
     wonCount > 0,
     `${wonCount} won`,
+  );
+
+  /* --- 20. One primary rep per company, over every row [S18] ------- */
+
+  console.log(
+    "\n20. *** Every company with a rep on it has exactly ONE primary rep *** [S18]",
+  );
+
+  // **The invariant, not the fixture** — and the second of §18's shape: not
+  // row-local, so no CHECK can hold it, and only half of it is even an index.
+  // Postgres could refuse a SECOND primary with a partial unique index on
+  // `(company_id) WHERE removed_at IS NULL AND is_primary` — the shape
+  // `project_companies_one_buyer_key` already has for `S26` — but "at least
+  // one" has no such form, and that is the half that was actually broken. So
+  // what holds `S18` is its three writers, and this count over every row ever
+  // written.
+  //
+  // It has teeth: it was **false** when it was written. Twelve of 393
+  // companies with a live membership carried no primary rep at all — six from
+  // `verify-phase11` §11, which drives handover's already-a-member branch
+  // where primacy used to move nowhere, and six from `verify-phase9` §16,
+  // which stamps `removed_at` on the primary directly. `team.ts` now promotes
+  // the row that stays, §16 promotes what is left of its company, and `0026`
+  // repaired the twelve. **None ever carried two** — no writer has ever made
+  // a second primary — so only the missing half needed repairing.
+  //
+  // Both tables are named outright in the aggregate below — `CLAUDE.md`'s
+  // rule, and the reason it exists: a correlation that resolves inside the
+  // inner table returns nothing for every row and reports a clean database.
+  const [primacy] = (await db.execute(sql`
+    select
+      count(*)::int as held_companies,
+      count(*) filter (where g.primaries = 0)::int as none,
+      count(*) filter (where g.primaries > 1)::int as many,
+      coalesce(sum(g.primaries), 0)::int as primary_rows
+    from (
+      select cr.company_id,
+             count(*) filter (where cr.is_primary)::int as primaries
+      from company_reps cr
+      where cr.removed_at is null
+      group by cr.company_id
+    ) g
+  `)) as unknown as {
+    held_companies: number;
+    none: number;
+    many: number;
+    primary_rows: number;
+  }[];
+
+  console.log(
+    `  --    ${primacy.held_companies} company(s) with at least one live membership`,
+  );
+  check(
+    "*** none of them carries NO primary rep *** [S18]",
+    primacy.none === 0,
+    `${primacy.none} of ${primacy.held_companies} carry no primary rep`,
+  );
+  check(
+    "*** and none of them carries more than one *** [S18]",
+    primacy.many === 0,
+    `${primacy.many} of ${primacy.held_companies} carry more than one`,
+  );
+  // The negative half, and the one an empty read would pass: on a database
+  // where the grouping found nothing, both counts above are zero and both
+  // checks go green. The rows have to be there to have been counted, and
+  // exactly one per company is the whole rule stated a third way.
+  check(
+    "…and the primary rows counted equal the companies, so an empty read fails here [S18]",
+    primacy.held_companies > 0 &&
+      primacy.primary_rows === primacy.held_companies,
+    `${primacy.primary_rows} primary row(s) across ${primacy.held_companies} company(s)`,
   );
 
   console.log("\n13. *** The repository and the database agree ***");

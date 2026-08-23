@@ -57,7 +57,7 @@
 
 process.loadEnvFile(".env");
 
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { closeDatabase, db } from "@/db";
 import {
@@ -1523,6 +1523,21 @@ async function main(): Promise<void> {
       and(
         eq(companyReps.companyId, companyA.id),
         eq(companyReps.userId, authorUser.id),
+      ),
+    );
+  // The author was company A's PRIMARY rep, and the two removals above reach
+  // around `team.ts` to stamp `removed_at` directly — a shape the application
+  // has no route to. Left there it strands company A with a live rep and no
+  // primary, which `S18` forbids and `verify:schema25` §20 counts over every
+  // row. Primacy follows the company: the sharer is what is left of it.
+  await db
+    .update(companyReps)
+    .set({ isPrimary: true })
+    .where(
+      and(
+        eq(companyReps.companyId, companyA.id),
+        eq(companyReps.userId, sharerUser.id),
+        isNull(companyReps.removedAt),
       ),
     );
   const authorKept = await listReports(author, { companyId: companyA.id });
