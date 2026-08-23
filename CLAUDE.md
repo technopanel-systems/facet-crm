@@ -91,6 +91,13 @@ build task. `SPEC.md` supersedes all of them.
 - **Derived conditions are resolved in SQL, before pagination.** Filtering a
   page after fetching it returns silently empty screens — this has already
   shipped once.
+- **A Drizzle column in a `sql` template keeps its table qualifier only when
+  the outer query joins something.** In a correlated subquery with no join both
+  sides render bare and resolve inside the inner table — `where "dispatch_id" =
+  "id"` is never true, returns zero, and raises no error. This has bitten three
+  times: sessions 5, 6 and 1b-3, the last shipping wrong numbers until a verify
+  assertion caught it. Name both tables outright in any correlated subquery, and
+  assert a derived figure at every reader, not one.
 
 The screen and form conventions live in the **`facet-ui`** skill. Load it for
 any work under `src/app` or `src/components`. The verify-script shape is the
