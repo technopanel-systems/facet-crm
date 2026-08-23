@@ -53,7 +53,6 @@ import { closeDatabase, db } from "@/db";
 import {
   auditLog,
   commentMentions,
-  comments,
   companies,
   companyReps,
   contacts,
@@ -125,43 +124,13 @@ async function refuses(
   }
 }
 
-/**
- * Assert the DATABASE refuses, by constraint name.
- *
- * postgres.js puts the constraint on `error.cause`, so the chain is walked —
- * `verify-phase10a.ts` learned that the hard way. Naming the constraint is what
- * makes this an assertion about the schema rather than about any one query.
- */
-async function databaseRefuses(
-  label: string,
-  constraint: string,
-  fn: () => Promise<unknown>,
-): Promise<void> {
-  try {
-    await fn();
-    failures += 1;
-    console.error(`  FAIL  ${label} — the database allowed it`);
-  } catch (error) {
-    const text = causeChain(error);
-    check(
-      `${label} (${constraint})`,
-      text.includes(constraint),
-      `got ${text.slice(0, 160)}`,
-    );
-  }
-}
-
-function causeChain(error: unknown): string {
-  const parts: string[] = [];
-  let current: unknown = error;
-  while (current instanceof Error) {
-    parts.push(current.message);
-    const withConstraint = current as Error & { constraint_name?: string };
-    if (withConstraint.constraint_name) parts.push(withConstraint.constraint_name);
-    current = current.cause;
-  }
-  return parts.join(" | ");
-}
+/* `databaseRefuses` and its `causeChain` helper stood here until `0027`. Their
+ * one caller asserted that `comments_record_type` refuses a comment on a
+ * quotation VERSION; the sweep dropped `quotation_version` from the
+ * `record_type` enum, so there is no such value left to offer and no refusal
+ * to test. `verify:schema25` §13 compares the enum's live values to
+ * `schema.ts`, which covers all seven tables carrying the type rather than
+ * comments alone. */
 
 /** A session for a user, assembled the way `getSession` would. */
 async function sessionFor(email: string): Promise<AuthSession> {
@@ -263,7 +232,7 @@ async function main(): Promise<void> {
   const [supplier] = await db
     .select()
     .from(productSuppliers)
-    .where(eq(productSuppliers.code, "N"))
+    .where(eq(productSuppliers.nameEn, "N"))
     .limit(1);
   const [productClass] = await db.select().from(productClasses).limit(1);
   const [fireRating] = await db.select().from(productFireRatings).limit(1);
@@ -414,19 +383,15 @@ async function main(): Promise<void> {
     ),
   );
 
-  // The CHECK is stated positively so a value added to the shared enum later
-  // cannot silently become commentable. Nothing else would catch that.
-  await databaseRefuses(
-    "the database refuses a comment on a quotation VERSION [25 §9]",
-    "comments_record_type",
-    () =>
-      db.insert(comments).values({
-        recordType: "quotation_version",
-        recordId: thread.id,
-        authorUserId: repA.user.id,
-        body: `${stamp} should not exist`,
-      }),
-  );
+  // The refusal that stood here inserted `record_type = 'quotation_version'`
+  // and asserted `comments_record_type` rejected it. `0027` dropped the value
+  // from the enum itself — 0 rows carried it across all seven columns of the
+  // type, and no rule ever named it — so the insert no longer type-checks and
+  // there is nothing left to refuse. The CHECK stays, still stated positively,
+  // for the reason it always was: `record_type` is shared with six other
+  // tables and will grow for reasons that have nothing to do with comments.
+  // `verify:schema25` §13 compares the enum's live value list to `schema.ts`,
+  // which is what now catches a sixth kind appearing.
 
   // All roles comment `[25 §9]` — no flag gate, the way logging has none.
   const coordinatorComment = await addComment(coordinator, {
@@ -673,10 +638,11 @@ async function main(): Promise<void> {
     mentionType.tier === "act_now" && mentionType.isPersistent === false,
     `got tier=${mentionType.tier} persistent=${mentionType.isPersistent}`,
   );
-  check(
-    "…and carries the in_app channel [04 C3]",
-    mentionType.defaultChannel === "in_app",
-  );
+  // The channel claim that stood here is gone with its column. `0027` dropped
+  // `notification_types.default_channel` and `notifications.channel`: every
+  // row said `in_app`, and the only reader of the first was the writer of the
+  // second. Delivery is in-app because there is no other kind, which is a
+  // stronger statement than a column asserting it.
 
   const before = await mentionsFor(repB.user.id);
   await addComment(repA, {

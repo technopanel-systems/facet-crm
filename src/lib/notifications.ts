@@ -340,8 +340,11 @@ export async function raise(
   log: (entry: AuditEntry) => void,
   input: RaiseInput,
 ): Promise<string | null> {
+  // The id and nothing else. `default_channel` was read here until `0027`,
+  // and only to stamp `notifications.channel`, which nothing read back — a
+  // reader that existed to feed a dead column. Both are gone.
   const [type] = await tx
-    .select({ id: notificationTypes.id, channel: notificationTypes.defaultChannel })
+    .select({ id: notificationTypes.id })
     .from(notificationTypes)
     .where(eq(notificationTypes.key, input.typeKey))
     .limit(1);
@@ -363,7 +366,6 @@ export async function raise(
     .values({
       recipientUserId: input.recipientUserId,
       notificationTypeId: type.id,
-      channel: type.channel,
       recordType: input.anchorType,
       recordId: input.anchorId,
       payload: input.payload ?? null,

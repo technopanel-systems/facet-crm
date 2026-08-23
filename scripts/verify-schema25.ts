@@ -31,7 +31,11 @@
  *      `project_companies.role` `S25`, and `project_companies.is_buyer` with
  *      the `project_companies_one_buyer_key` index `S26` — the index asserted
  *      in its own right, since "at most one buyer" is what S26 forbids and a
- *      dropped column takes its index silently.
+ *      dropped column takes its index silently. **The `0027` sweep lands here
+ *      too**, and with it the half that would otherwise go quiet: the five
+ *      tables, six indexes and three role flags the sweep examined and LEFT,
+ *      each asserted present with the rule that keeps it. Unused was never the
+ *      test — unwanted was, and only a positive check records the difference.
  *   3. Every CHECK refuses **at the database** `[13 §1]`.
  *   4. The seeds: ten categories and nine loss reasons `[25 §5, §33]`. The
  *      read-only flag `25 §28` seeded is gone with the column `[26 §2]`.
@@ -451,6 +455,57 @@ const SPEC15_DROPPED_COLUMNS = ["rep_reports.reference"];
  */
 const ADAPTER_REQUIRED_TABLES = ["accounts"];
 
+/**
+ * **The dead-structure sweep, `0027`.** Everything here had no rule behind it:
+ * a column with no reader, a value nothing set, an index no query could use.
+ * Same shape as the six lists above and separate for their reason — one
+ * decision, one migration, one claim, legible without git blame.
+ *
+ * Every one of them predates `SPEC.md`. Ten trace to `0000` and the rest to
+ * `0002`, `0005` and `0007`, all generated from `docs/09-schema-design.md`, so
+ * this list is the original schema being finished rather than recent drift.
+ *
+ * **What is deliberately NOT here**, because a rule still asks for it:
+ * `attachments` `S115`; `delete_requests` `S105`–`S107`; `duplicate_flags`,
+ * `non_duplicates` and `companies.merged_into_id` `S21`–`S23`;
+ * `quotation_threads.closed_at` and `closed_by_user_id` `S47`;
+ * `roles.can_export`, `can_approve_delete` and `can_resolve_duplicate` `S8`.
+ * `product_specifications` is `SPEC §16`'s open question. Unused is not the
+ * test — unwanted is.
+ */
+const SWEEP_DROPPED_COLUMNS = [
+  "users.city_id",
+  "quotation_threads.cancelled_at",
+  "quotation_lines.form_factor",
+  "notifications.channel",
+  "notification_types.default_channel",
+  "product_suppliers.code",
+  "product_classes.code",
+  "product_fire_ratings.code",
+];
+
+/**
+ * Both types the sweep emptied. Neither had a column left, so both are a
+ * `DROP TYPE` rather than the rebuild `record_type` needed — the distinction
+ * `0014`, `0018` and `0024`'s headers all turn on.
+ */
+const SWEEP_DROPPED_TYPES = ["form_factor", "notification_channel"];
+
+/**
+ * Four indexes no query could use. Three are `AUDIT 1 F15`'s live ones; the
+ * fourth, `audit_log_actor_idx`, is the eleventh of the ten it counted — every
+ * reader asks for `coalesce(acting_as_user_id, actor_user_id)` `[07 A6]`, and
+ * a btree on one column cannot serve a coalesce over two.
+ *
+ * `F14`'s six sit on tables a rule still wants and stay with them.
+ */
+const SWEEP_DROPPED_INDEXES = [
+  "comments_author_idx",
+  "comment_mentions_user_idx",
+  "rep_report_signals_signal_idx",
+  "audit_log_actor_idx",
+];
+
 /** Whole tables feature slice 6 dropped `[26 §2, §6]`. */
 const SLICE6_DROPPED_TABLES = ["product_colours", "activities", "tasks"];
 
@@ -532,7 +587,7 @@ async function main(): Promise<void> {
   /* --- 2. Every withdrawn thing is gone [25 §6, §23, §35], [26 §2], S25, S26 - */
 
   console.log(
-    "\n2. Warmth, tolerance, the sales desk, slice 6's drops, the participant\n   role, the buyer flag and SPEC §15's dead structure are absent — and the\n   one Auth.js table the adapter requires is not",
+    "\n2. Warmth, tolerance, the sales desk, slice 6's drops, the participant\n   role, the buyer flag, SPEC §15's dead structure and the 0027 sweep are\n   absent — and the Auth.js table the adapter requires, the five tables whose\n   rules are unbuilt and S8's three flags are not",
   );
 
   for (const key of WITHDRAWN) {
@@ -624,6 +679,26 @@ async function main(): Promise<void> {
   for (const name of S26_DROPPED_INDEXES) {
     check(`index ${name} is gone [S26]`, !liveIndexes.has(name));
   }
+  // The sweep's four, for the same reason: an index is not implied by any
+  // column check, because every column it sat on is still here.
+  for (const name of SWEEP_DROPPED_INDEXES) {
+    check(`index ${name} is gone [0027]`, !liveIndexes.has(name));
+  }
+  // The six on the tables a rule still wants are NOT dropped, and this is the
+  // half that would go quiet if a later sweep took them by mistake.
+  for (const name of [
+    "attachments_record_idx",
+    "delete_requests_record_idx",
+    "duplicate_flags_a_idx",
+    "duplicate_flags_b_idx",
+    "non_duplicates_pair_key",
+    "companies_merged_into_idx",
+  ]) {
+    check(
+      `index ${name} SURVIVES — its rule is unbuilt, not absent [S115], [S105], [S21]`,
+      liveIndexes.has(name),
+    );
+  }
   // Its sibling stays: removal is still soft and re-linkable `S27`, which is
   // unchanged by this slice and is exactly the thing a regenerated migration
   // would quietly take out alongside the buyer index.
@@ -680,6 +755,63 @@ async function main(): Promise<void> {
       sql.raw(`select typname from pg_type where typname = '${typeName}'`),
     )) as unknown as { typname: string }[];
     check(`type ${typeName} is gone [26 §6]`, dropped.length === 0);
+  }
+
+  /* --- the dead-structure sweep, 0027 -------------------------------- */
+
+  for (const key of SWEEP_DROPPED_COLUMNS) {
+    check(`${key} is gone [0027]`, !columns.has(key));
+  }
+  for (const typeName of SWEEP_DROPPED_TYPES) {
+    const dropped = (await db.execute(
+      sql.raw(`select typname from pg_type where typname = '${typeName}'`),
+    )) as unknown as { typname: string }[];
+    check(`type ${typeName} is gone [0027]`, dropped.length === 0);
+  }
+
+  // `record_type` is the one the sweep rebuilt rather than dropped: six other
+  // columns still carry it. `quotation_version` was the canonical dead value —
+  // 0 rows across all seven, no rule, and the value `dispatchStatusEnum`'s
+  // header cites for why `cancelled` waited for a writer.
+  const recordTypes = (await db.execute(
+    sql`select unnest(enum_range(null::record_type))::text as value`,
+  )) as unknown as { value: string }[];
+  const recordTypeValues = recordTypes.map((row) => row.value).sort();
+  check(
+    "record_type lost quotation_version and kept the other five [0027]",
+    recordTypeValues.join(",") ===
+      "company,contact,dispatch,project,quotation_thread",
+    recordTypeValues.join(",") || "(empty)",
+  );
+
+  // The counterpart, and the one that matters: the five tables the sweep
+  // examined and LEFT, each because a rule still names it. A later sweep
+  // reading "0 rows, no reference" and taking them would pass every check
+  // above and break `S115`, `S105`–`S107` and `S21`–`S23` silently.
+  for (const [table, rule] of [
+    ["attachments", "S115"],
+    ["delete_requests", "S105-S107"],
+    ["duplicate_flags", "S21-S23"],
+    ["non_duplicates", "S21-S23"],
+    ["product_specifications", "SPEC §16"],
+  ] as const) {
+    const exists = (await db.execute(
+      sql.raw(`select to_regclass('public.${table}') is not null as exists`),
+    )) as unknown as { exists: boolean }[];
+    check(
+      `table ${table} SURVIVES the sweep — unbuilt, not unwanted [${rule}]`,
+      exists[0]?.exists === true,
+    );
+  }
+  // And the three flags `S8` names outright: *all three must be read by the
+  // code; today none are*. Unread is why they were candidates; `S8` is why
+  // they stayed.
+  for (const flag of [
+    "roles.can_export",
+    "roles.can_approve_delete",
+    "roles.can_resolve_duplicate",
+  ]) {
+    check(`${flag} SURVIVES the sweep — S8 names it [S8]`, columns.has(flag));
   }
 
   const repOrigins = (await db.execute(
@@ -819,12 +951,12 @@ async function main(): Promise<void> {
        (project_id, company_id, raised_by_user_id, closed_at)
      values ('${openProject.id}', '${company.id}', '${rep.user.id}', now())`,
   );
-  await databaseRefuses(
-    "a comment on a quotation VERSION is refused [25 §9]",
-    "comments_record_type",
-    `insert into comments (record_type, record_id, author_user_id, body)
-     values ('quotation_version', '${openProject.id}', '${rep.user.id}', 'no')`,
-  );
+  // The refusal that stood here fed `record_type = 'quotation_version'` to
+  // `comments_record_type`. `0027` dropped the value from the enum, so the
+  // insert now fails on the TYPE rather than on the constraint and would
+  // report the wrong constraint name. §13's enum-value comparison is what
+  // holds the claim now, and it holds it for all seven tables at once rather
+  // than for comments alone.
   // The invariant that stood here — a `reference` only on an interaction —
   // went with the column it guarded. `SPEC §15` dropped
   // `rep_reports.reference`; section 2 asserts the column and its CHECK are

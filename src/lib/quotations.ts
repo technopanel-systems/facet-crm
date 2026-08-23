@@ -1143,10 +1143,10 @@ async function insertLine(
       // never actually tested against `null` from application code.
       customColour: input.customColour!,
       thicknessId: input.thicknessId,
-      // `12 §11` — quotation lines are sheets only; the application writes it
-      // rather than a CHECK, because this is a current scope boundary on one
-      // module and the column is shared with production `[13 §2]`.
-      formFactor: "sheet",
+      // No `formFactor`. `12 §11` still says quotation lines are sheets only,
+      // but the column recording it was written `'sheet'` 850 times and read
+      // by nothing, so `0027` dropped it with its enum. The scope boundary is
+      // the rule; it needed no column to state it.
       widthM: input.widthM,
       lengthM: input.lengthM,
       quantityPcs: input.quantityPcs,
@@ -1773,7 +1773,6 @@ export async function createRevision(
           fireRatingId: line.fireRatingId,
           customColour: line.customColour,
           thicknessId: line.thicknessId,
-          formFactor: line.formFactor,
           widthM: line.widthM,
           lengthM: line.lengthM,
           quantityPcs: line.quantityPcs,
@@ -1929,10 +1928,10 @@ export async function acceptThread(
  *
  * **No `rejection_reason` column, deliberately.** `S62` says the reason
  * *becomes a comment on the thread*, which is a home somebody actually reads; a
- * column beside it would be a second home for one sentence, and
- * `quotation_threads.cancelled_at` is what an unread second home looks like
- * (`WORKFLOW §5`). The comment is the record, the notification is the telling,
- * and the audit row keeps both permanently `S112` `S107`.
+ * column beside it would be a second home for one sentence, which
+ * `quotation_threads.cancelled_at` was until `0027` dropped it as read by
+ * nothing. The comment is the record, the notification is the telling, and the
+ * audit row keeps both permanently `S112` `S107`.
  */
 export async function rejectThread(
   session: AuthSession,
@@ -1983,8 +1982,10 @@ export async function cancelThread(
     threadId,
     "cancelled",
     {
+      // No `cancelledAt`: the column was dropped in `0027` after nine
+      // cancellations wrote it and nothing ever read one. The
+      // `quotation_thread.end_state_set` audit row carries the moment `S112`.
       cancelledByUserId: session.user.id,
-      cancelledAt: new Date(),
       cancellationReason: body,
     },
     { body, decision: "quotation_cancelled" },

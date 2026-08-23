@@ -241,26 +241,33 @@ async function seedLossReasons(): Promise<Counts> {
   return counts;
 }
 
-type CodeRow = { code: string; nameEn: string; nameAr: string };
+/**
+ * The three product lookups are keyed on `name_en`, not on a `code`. `0027`
+ * dropped the code column from all three: `S53` says FACET does not reproduce
+ * SMAC's product code, nothing rendered it, and the code WAS the name in every
+ * seeded row `[08 B1]` — so the upsert key is the same string it always was.
+ */
+type NameRow = { nameEn: string; nameAr: string };
 
 /** Suppliers N, K, D, C `[17 §1]`. The code is the name — no factory name is
  *  needed, and one would be invented product data. */
 async function seedSuppliers(): Promise<Counts> {
   const counts = zero();
-  for (const row of PRODUCT_SUPPLIER_SEED as readonly CodeRow[]) {
+  for (const row of PRODUCT_SUPPLIER_SEED as readonly NameRow[]) {
     const [existing] = await db
       .select()
       .from(productSuppliers)
-      .where(eq(productSuppliers.code, row.code))
+      .where(eq(productSuppliers.nameEn, row.nameEn))
       .limit(1);
 
     if (!existing) {
       await db.insert(productSuppliers).values(row);
       counts.inserted += 1;
-    } else if (existing.nameEn !== row.nameEn || existing.nameAr !== row.nameAr) {
+    } else if (existing.nameAr !== row.nameAr) {
+      // `name_en` is the key now, so only the Arabic form can have drifted.
       await db
         .update(productSuppliers)
-        .set({ nameEn: row.nameEn, nameAr: row.nameAr })
+        .set({ nameAr: row.nameAr })
         .where(eq(productSuppliers.id, existing.id));
       counts.updated += 1;
     } else {
@@ -273,20 +280,21 @@ async function seedSuppliers(): Promise<Counts> {
 /** Classes A, B, A2G1, A2G2 `[08 B1]`. */
 async function seedClasses(): Promise<Counts> {
   const counts = zero();
-  for (const row of PRODUCT_CLASS_SEED as readonly CodeRow[]) {
+  for (const row of PRODUCT_CLASS_SEED as readonly NameRow[]) {
     const [existing] = await db
       .select()
       .from(productClasses)
-      .where(eq(productClasses.code, row.code))
+      .where(eq(productClasses.nameEn, row.nameEn))
       .limit(1);
 
     if (!existing) {
       await db.insert(productClasses).values(row);
       counts.inserted += 1;
-    } else if (existing.nameEn !== row.nameEn || existing.nameAr !== row.nameAr) {
+    } else if (existing.nameAr !== row.nameAr) {
+      // `name_en` is the key now, so only the Arabic form can have drifted.
       await db
         .update(productClasses)
-        .set({ nameEn: row.nameEn, nameAr: row.nameAr })
+        .set({ nameAr: row.nameAr })
         .where(eq(productClasses.id, existing.id));
       counts.updated += 1;
     } else {
@@ -300,20 +308,21 @@ async function seedClasses(): Promise<Counts> {
  *  class — which combinations are real varies by factory `[12 §8]`. */
 async function seedFireRatings(): Promise<Counts> {
   const counts = zero();
-  for (const row of PRODUCT_FIRE_RATING_SEED as readonly CodeRow[]) {
+  for (const row of PRODUCT_FIRE_RATING_SEED as readonly NameRow[]) {
     const [existing] = await db
       .select()
       .from(productFireRatings)
-      .where(eq(productFireRatings.code, row.code))
+      .where(eq(productFireRatings.nameEn, row.nameEn))
       .limit(1);
 
     if (!existing) {
       await db.insert(productFireRatings).values(row);
       counts.inserted += 1;
-    } else if (existing.nameEn !== row.nameEn || existing.nameAr !== row.nameAr) {
+    } else if (existing.nameAr !== row.nameAr) {
+      // `name_en` is the key now, so only the Arabic form can have drifted.
       await db
         .update(productFireRatings)
-        .set({ nameEn: row.nameEn, nameAr: row.nameAr })
+        .set({ nameAr: row.nameAr })
         .where(eq(productFireRatings.id, existing.id));
       counts.updated += 1;
     } else {

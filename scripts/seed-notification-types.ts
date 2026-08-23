@@ -4,9 +4,13 @@
  * lookups and settings.
  *
  * **Insert if absent, and never overwrite.** Same rule as `seed-settings.ts`,
- * for the same reason: `10 §10` makes the tier, channel and persistence data
- * precisely so they can be changed, and a seed run that quietly reset
- * `is_persistent` would undo that without saying so.
+ * for the same reason: `10 §10` makes the tier and persistence data precisely
+ * so they can be changed, and a seed run that quietly reset `is_persistent`
+ * would undo that without saying so.
+ *
+ * The channel was a third such value until `0027`. It is gone: every row said
+ * `in_app`, and the column reading it existed only to stamp a second column
+ * nothing read.
  *
  * Nothing is deleted either — a type that stops being produced keeps its row,
  * because notifications already raised point at it `[12 §7]`.
@@ -42,8 +46,6 @@ export async function seedNotificationTypes(): Promise<void> {
       nameEn: row.nameEn,
       nameAr: row.nameAr,
       tier: row.tier,
-      // `04 Q17, C3` — in-app is still the only working channel.
-      defaultChannel: "in_app",
       isPersistent: row.isPersistent,
     });
     inserted += 1;

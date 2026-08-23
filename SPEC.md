@@ -843,6 +843,43 @@ Ordered by what unblocks what.
   rewrote them: a credit customer is the `handled by finance` payment method
   (S71), not a flag beside a gate.
 
+**The dead-structure sweep — migration `0027`.** AUDIT 1's F9–F18 and
+WORKFLOW §5's own rows, taken together. Everything below had no rule behind it
+and none of it is recent: ten of the fifteen trace to migration `0000` and the
+rest to `0002`, `0005` and `0007`, all written from the schema-design document
+before this file existed. `has_credit_terms` above was not an anomaly.
+
+- `users.city_id` — 0 of 401 rows. `createUser` took the parameter and wrote
+  the column; nothing ever supplied or read one. `users.region` is the half of
+  the rep's base that has a reader, and it stays
+- `quotation_threads.cancelled_at` — written by `cancelThread`, read by
+  nothing. `cancelled_by_user_id` beside it **is** read and stays
+- `quotation_lines.form_factor`, and the `form_factor` type with it — 850 of
+  850 `sheet`. Quotation lines are sheets only, so the application wrote a
+  constant nothing read back. `dispatch_lines` had already refused to copy it
+- `notifications.channel` and `notification_types.default_channel`, and the
+  `notification_channel` type — every row `in_app`. The second is the sweep's
+  clearest case: its only reader existed to write the first, which nothing read
+- `record_type.quotation_version` — 0 rows across all seven columns of the
+  type. A version is reached through its thread; nothing hangs off one
+- `product_suppliers.code`, `product_classes.code`,
+  `product_fire_ratings.code` — the token of a generated product name **S53**
+  says FACET does not produce. Never rendered; an `ORDER BY` is not a reader.
+  No data lost: the code was the name in every row
+- Four indexes no query can use — `comments_author_idx`,
+  `comment_mentions_user_idx`, `rep_report_signals_signal_idx` and
+  `audit_log_actor_idx`, the last being an eleventh AUDIT 1 did not count
+
+**Examined by the sweep and deliberately kept**, because a rule still asks:
+`attachments` (S115) · `delete_requests` (S105–S107) · `duplicate_flags` and
+`non_duplicates` (S21–S23) · `companies.merged_into_id` (S21–S23) ·
+`quotation_threads.closed_at` and `closed_by_user_id` (S47) ·
+`roles.can_export`, `can_approve_delete` and `can_resolve_duplicate` (S8, and
+item 14 above) · `product_specifications` (§16). Their indexes go with them.
+**Unused was never the test — unwanted was**, and `verify:schema25` §2 now
+asserts each of them present, with its rule, so a later sweep cannot take them
+for being empty.
+
 ---
 
 ## 16. Open

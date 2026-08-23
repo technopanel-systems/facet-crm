@@ -83,8 +83,6 @@ export async function addQuotationLineRow(
     fireRatingId: fireRating.id,
     customColour: "168",
     thicknessId: thickness.id,
-    // Always `sheet`; the enum's `coil` is set nowhere (`WORKFLOW §5`).
-    formFactor: "sheet",
     widthM: "1.0000",
     lengthM: "1.0000",
     quantityPcs: sqm,

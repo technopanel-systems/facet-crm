@@ -92,13 +92,23 @@ export const regionEnum = pgEnum("region", [
  * stands `[25 §16]`, and qualification is still a correlated EXISTS over
  * quotation threads, never a column. */
 
-/** `[09 §1]` — the polymorphic record reference used across the schema. */
+/**
+ * `[09 §1]` — the polymorphic record reference used across the schema.
+ *
+ * **`quotation_version` was a sixth until `0027`.** It was the canonical dead
+ * enum value — the shape `dispatchStatusEnum` cites below for why `cancelled`
+ * waited for its writer. Nothing ever set it: `comments_record_type` excluded
+ * it, `SHARED_RECORD_TYPES` and `ANCHOR_TYPES` exclude it, and 0 rows carried
+ * it across all seven columns of this type. A version is reached through its
+ * thread, which is the conversation; nothing hangs off one directly. The
+ * `entityType: "quotation_version"` strings in `quotations.ts` are
+ * `audit_log.entity_type`, which is free text and not this type.
+ */
 export const recordTypeEnum = pgEnum("record_type", [
   "company",
   "contact",
   "project",
   "quotation_thread",
-  "quotation_version",
   "dispatch",
 ]);
 
@@ -271,8 +281,12 @@ export const shipmentMethodEnum = pgEnum("shipment_method", [
   "cargo",
 ]);
 
-/** `[08 B2]` */
-export const formFactorEnum = pgEnum("form_factor", ["sheet", "coil"]);
+/* `form_factor` was an enum here until `0027`. `[08 B2]` defined it and
+ * `12 §11` immediately narrowed it — *quotation lines are sheets only; coils
+ * belong to production* — so the application wrote `'sheet'` on every one of
+ * 850 lines and nothing ever set `coil`. `quotation_lines.form_factor` was its
+ * only column and read by nothing, so the column and the type went together.
+ * `dispatch_lines` had already refused to copy it `S116`. */
 
 /**
  * `S72` — the life of a dispatch, from the rep's request to the coordinator's
@@ -338,13 +352,12 @@ export const notificationTierEnum = pgEnum("notification_tier", [
   "digest",
 ]);
 
-/**
- * `[04 Q17, C3]` — in-app only today, but the column exists from day one so
- * adding a channel is a migration, not a rewrite of every call site.
- */
-export const notificationChannelEnum = pgEnum("notification_channel", [
-  "in_app",
-]);
+/* `notification_channel` was an enum here until `0027`. `[04 Q17, C3]` argued
+ * the column should exist from day one "so adding a channel is a migration,
+ * not a rewrite of every call site" — speculative generality, and no rule in
+ * `SPEC.md` ever asked for a second channel. Both its columns went with it:
+ * `notifications.channel` was written and read by nothing, and
+ * `notification_types.default_channel`'s only reader existed to write it. */
 
 /**
  * `[20 §2]` — the two things a rep writes. An interaction is anchored to a
@@ -512,8 +525,15 @@ export const cities = pgTable("cities", {
 
 /**
  * `09 §2.2` — the person. Deactivates, never deletes `[04 C2]`, `[07 B7]`.
- * Region and city per `[10 §7]`: the rep's base, which makes "sales by rep's
- * region" and "sales by site region" two separately answerable questions.
+ * Region per `[10 §7]`: the rep's base, which makes "sales by rep's region"
+ * and "sales by site region" two separately answerable questions.
+ *
+ * **`city_id` was beside it until `0027`.** `10 §7` asked for both, but only
+ * `region` ever gained a writer: `createUser` took a `cityId` no form, action
+ * or select ever supplied, `UserUpdateInput` omitted it and `ManagedUserRow`
+ * never read it. 0 of 401 users carried one — a live foreign key to `cities`
+ * that nothing filled. `region` is what serves `10 §7` today, and a rep's city
+ * is a rule away rather than a column away.
  *
  * Deliberately absent: per-rep working days. `04 Q16 / C4` required them;
  * `07 D6` supersedes that with a global weekend and a grace for everyone.
@@ -528,7 +548,6 @@ export const users = pgTable(
       .notNull()
       .references(() => roles.id),
     region: regionEnum("region"),
-    cityId: uuid("city_id").references(() => cities.id),
     isActive: boolean("is_active").notNull().default(true),
     deactivatedAt: timestamp("deactivated_at", { withTimezone: true }),
     /** Adapter-dictated `[09 §2.2]` — unused under credentials-only auth. */
@@ -1190,8 +1209,14 @@ export const quotationThreads = pgTable(
       .notNull()
       .references(() => users.id),
     endState: quotationThreadEndStateEnum("end_state"),
+    /**
+     * Who cancelled and why. **There is no `cancelled_at`** since `0027`: it
+     * was written by `cancelThread` and read by nothing through nine
+     * cancellations, and the `quotation_thread.cancelled` audit row already
+     * carries the moment `S112`. `dispatches.cancellation_reason` cited it as
+     * the counter-example for having no stamp of its own, and it now matches.
+     */
     cancelledByUserId: uuid("cancelled_by_user_id").references(() => users.id),
-    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
     cancellationReason: text("cancellation_reason"),
     paymentConfirmedByUserId: uuid("payment_confirmed_by_user_id").references(
       () => users.id,
@@ -1302,15 +1327,22 @@ export const quotationVersions = pgTable(
 
 /* --- Product attribute lookups — `09 §5.6` ------------------------- *
  * Five lookups replace a SKU catalogue that would run to thousands of
- * combinations and go stale `[08 D1]`. `code` is the token that appears in the
- * generated product name; the name itself is derived output, never a stored
- * free-text column `[08 B1, D1]`.
+ * combinations and go stale `[08 D1]`.
+ *
+ * **`code` was on the three below until `0027`.** It was the token that
+ * appeared in the generated product name, and `S53` says FACET does not
+ * produce that name: *a product line carries supplier, class, fire rating,
+ * colour, thickness, width, length and number of pieces, displayed as ordinary
+ * readable fields*. No screen ever rendered a code; all three survived only as
+ * the `ORDER BY` of three dropdowns, and an `ORDER BY` is not a reader. The
+ * code was also literally the name in every seeded row — `08 B1` says an
+ * invented longer form would be fiction — so `name_en` carries exactly what
+ * was dropped, and the three lists order by it like every other lookup.
  * ------------------------------------------------------------------ */
 
-/** N, K, D, C, G, G1, Y `[08 B1]`. */
+/** N, K, D, C `[08 B1]`, `[17 §1]`. */
 export const productSuppliers = pgTable("product_suppliers", {
   id: pk(),
-  code: text("code").notNull(),
   nameEn: text("name_en").notNull(),
   nameAr: text("name_ar").notNull(),
   createdAt: createdAt(),
@@ -1319,7 +1351,6 @@ export const productSuppliers = pgTable("product_suppliers", {
 /** A, B, A2G1, A2G2 `[08 B1]`. */
 export const productClasses = pgTable("product_classes", {
   id: pk(),
-  code: text("code").notNull(),
   nameEn: text("name_en").notNull(),
   nameAr: text("name_ar").notNull(),
   createdAt: createdAt(),
@@ -1328,7 +1359,6 @@ export const productClasses = pgTable("product_classes", {
 /** B1, A2, Normal `[08 B1]`. */
 export const productFireRatings = pgTable("product_fire_ratings", {
   id: pk(),
-  code: text("code").notNull(),
   nameEn: text("name_en").notNull(),
   nameAr: text("name_ar").notNull(),
   createdAt: createdAt(),
@@ -1432,12 +1462,13 @@ export const quotationLines = pgTable(
     thicknessId: uuid("thickness_id")
       .notNull()
       .references(() => productThicknesses.id),
-    /**
-     * `12 §11` — quotation lines are sheets only; coils belong to production.
-     * The column is left as `08 B2` defined it and the application writes
-     * `sheet`; nothing in `12 §14` asks for it to change.
+    /*
+     * `form_factor` was here until `0027`. `12 §11` — quotation lines are
+     * sheets only; coils belong to production — so the application wrote
+     * `'sheet'` on all 850 of them and no rule ever read the column. It went
+     * with its enum type, which had no other column. `dispatch_lines` never
+     * copied it, and its header says why.
      */
-    formFactor: formFactorEnum("form_factor").notNull(),
     widthM: numeric("width_m", SQM).notNull(),
     lengthM: numeric("length_m", SQM).notNull(),
     /** Coil quantity unit is still open `[08 E5]`, `[10 §13 item 10]`. */
@@ -1624,9 +1655,10 @@ export const dispatches = pgTable(
      * **No `cancelled_at` and no `cancelled_by_user_id`**, deliberately.
      * `refusal_reason` has neither either, and the `dispatch.cancelled` audit
      * row carries the actor and the moment `S112` — which is what `S107` means
-     * by nothing being deleted. `quotation_threads.cancelled_at` is the
-     * counter-example: written by `cancelThread` and read by nothing since it
-     * landed (`WORKFLOW §5`).
+     * by nothing being deleted. `quotation_threads.cancelled_at` used to be
+     * the counter-example — written by `cancelThread` and read by nothing —
+     * and `0027` dropped it, so the two tables now say the same thing. The
+     * thread keeps `cancelled_by_user_id`, which a screen does read.
      *
      * `S128` carries this to the rep rather than leaving it here to be found:
      * *a record that vanishes with its reason in a column nobody reads is the
@@ -1943,11 +1975,11 @@ export const dispatches = pgTable(
  * unpriced line is legal `S58`. The rate behind `vat_amount` is `VAT_RATE`
  * and no column holds it `S57`.
  *
- * **No `form_factor`**, unlike `quotation_lines`: that column is always written
- * `'sheet'`, nothing reads it and nothing sets `coil` (`WORKFLOW §5`), so
- * copying it into a new table would be landing dead structure. **No
- * `quotation_line_id`** either — the line-to-line comparison is `S120`'s, and
- * a column with a writer and no reader is a defect.
+ * **No `form_factor`**, and `quotation_lines` has none either since `0027`:
+ * that column was always written `'sheet'`, nothing read it and nothing ever
+ * set `coil`, so refusing to copy it here was right and the original has now
+ * followed. **No `quotation_line_id`** either — the line-to-line comparison is
+ * `S120`'s, and a column with a writer and no reader is a defect.
  */
 export const dispatchLines = pgTable(
   "dispatch_lines",
@@ -2178,8 +2210,13 @@ export const repReportSignals = pgTable(
   },
   (t) => [
     uniqueIndex("rep_report_signals_key").on(t.reportId, t.signal),
-    /** So `20 §4`'s aggregation needs no migration when Phase 12 asks. */
-    index("rep_report_signals_signal_idx").on(t.signal),
+    /* `rep_report_signals_signal_idx` on `(signal)` was here until `0027`. It
+     * was landed in `0005` "so `20 §4`'s aggregation needs no migration when
+     * Phase 12 asks" — an index built for `S49`, which is still `[BUILD]`.
+     * Every query on this table leads with `report_id`, which the unique key
+     * above serves. `S49` adds the index it needs with the query that needs
+     * it; that is the same rule `CLAUDE.md` states for a column and its
+     * writer. */
   ],
 );
 
@@ -2244,8 +2281,12 @@ export const comments = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
+    /* `comments_author_idx` on `(author_user_id, created_at)` was here until
+     * `0027`. No query has ever filtered or ordered by the author: every
+     * reader reaches `users` through `eq(users.id, comments.authorUserId)`,
+     * which uses the users primary key, and the one authorship test is a
+     * row-local `!==` on a comment already fetched by id. */
     index("comments_record_idx").on(t.recordType, t.recordId, t.createdAt),
-    index("comments_author_idx").on(t.authorUserId, t.createdAt),
     /**
      * `13 §1`, `25 §9` — the five kinds §9 names, stated **positively**.
      *
@@ -2293,7 +2334,10 @@ export const commentMentions = pgTable(
   },
   (t) => [
     uniqueIndex("comment_mentions_key").on(t.commentId, t.mentionedUserId),
-    index("comment_mentions_user_idx").on(t.mentionedUserId, t.createdAt),
+    /* `comment_mentions_user_idx` on `(mentioned_user_id, created_at)` was
+     * here until `0027`. The one predicate on the column is an `inArray`
+     * inside a delete already scoped by `comment_id`, which the unique key
+     * above serves; everything else joins `users` on its primary key. */
   ],
 );
 
@@ -2304,7 +2348,13 @@ export const commentMentions = pgTable(
 /**
  * `10 §10` — type is a lookup, not an enum in code: the full trigger list
  * stays open, and adding a type must be data, not a migration. Each type
- * carries its tier, default channel and whether it is persistent.
+ * carries its tier and whether it is persistent.
+ *
+ * **`default_channel` was a third until `0027`**, and it is the clearest case
+ * in the sweep of a column whose reader was itself dead: the one query that
+ * read it (`notifications.ts`) read it only to stamp `notifications.channel`,
+ * which nothing read at all. Delivery is in-app and no rule names a second
+ * channel, so both columns and the `notification_channel` type went together.
  */
 export const notificationTypes = pgTable(
   "notification_types",
@@ -2315,9 +2365,6 @@ export const notificationTypes = pgTable(
     nameEn: text("name_en").notNull(),
     nameAr: text("name_ar").notNull(),
     tier: notificationTierEnum("tier").notNull(),
-    defaultChannel: notificationChannelEnum("default_channel")
-      .notNull()
-      .default("in_app"),
     /** Act-now notifications stay until the action is resolved `[07 G1]`. */
     isPersistent: boolean("is_persistent").notNull().default(false),
     createdAt: createdAt(),
@@ -2326,10 +2373,15 @@ export const notificationTypes = pgTable(
 );
 
 /**
- * `09 §9.1` — in-app only for now, but every notification carries a channel
- * from day one `[04 Q17, C3]`. Resolution is by condition, not by click
+ * `09 §9.1` — in-app only. Resolution is by condition, not by click
  * `[10 §10]`: `resolved_at` is written by the completing action, which is what
  * makes persistence safe rather than maddening `[07 G1]`.
+ *
+ * **There is no `channel` column** since `0027`. `[04 Q17, C3]` wanted one on
+ * every row "from day one" so a second channel would be a migration rather
+ * than a rewrite; six hundred and twenty rows later every one said `in_app`
+ * and no query, screen or filter had ever asked. A channel arrives with its
+ * reader or not at all — see `notification_types` above.
  *
  * **Recipient filtering is in the application layer**, in every query's own
  * `WHERE` — `src/lib/notifications.ts`. v1's bug was selecting and bulk-updating
@@ -2346,7 +2398,6 @@ export const notifications = pgTable(
     notificationTypeId: uuid("notification_type_id")
       .notNull()
       .references(() => notificationTypes.id),
-    channel: notificationChannelEnum("channel").notNull().default("in_app"),
     recordType: recordTypeEnum("record_type"),
     recordId: uuid("record_id"),
     /**
@@ -2439,7 +2490,12 @@ export const auditLog = pgTable(
   },
   (t) => [
     index("audit_log_entity_idx").on(t.entityType, t.entityId),
-    index("audit_log_actor_idx").on(t.actorUserId, t.createdAt),
+    /* `audit_log_actor_idx` on `(actor_user_id, created_at)` was here until
+     * `0027`, and it is the eleventh of the ten `AUDIT 1` counted. Every
+     * reader that cares who acted asks for the EFFECTIVE actor —
+     * `coalesce(acting_as_user_id, actor_user_id)` `[07 A6]` — and a btree on
+     * one of the two columns cannot serve a coalesce over both. `S123`'s
+     * measure adds an index with its query if it needs one. */
   ],
 );
 

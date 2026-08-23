@@ -326,8 +326,12 @@ export async function assertLeadSourceSelectable(
  * because an unseeded database is a real state.
  * ------------------------------------------------------------------ */
 
-/** A product attribute whose `code` is the token in the generated name. */
-export type ProductCodeRow = LookupRow & { code: string };
+/* `ProductCodeRow` was here until `0027`. It carried the `code` token of the
+ * generated product name `S53` says FACET does not produce; nothing rendered
+ * it, and the three lists below ordered by it. They order by `name_en` now,
+ * like every other lookup in this file, and the three tables are plain
+ * `LookupRow`s. The code WAS the name in every seeded row `[08 B1]`, so
+ * nothing on a screen changes but the sort key's name. */
 
 /** 4 mm is standard and is omitted from the generated name `[08 B1]`. */
 export type ThicknessRow = {
@@ -336,40 +340,37 @@ export type ThicknessRow = {
   isStandard: boolean;
 };
 
-export async function listProductSuppliers(): Promise<ProductCodeRow[]> {
+export async function listProductSuppliers(): Promise<LookupRow[]> {
   return db
     .select({
       id: productSuppliers.id,
-      code: productSuppliers.code,
       nameEn: productSuppliers.nameEn,
       nameAr: productSuppliers.nameAr,
     })
     .from(productSuppliers)
-    .orderBy(asc(productSuppliers.code));
+    .orderBy(asc(productSuppliers.nameEn));
 }
 
-export async function listProductClasses(): Promise<ProductCodeRow[]> {
+export async function listProductClasses(): Promise<LookupRow[]> {
   return db
     .select({
       id: productClasses.id,
-      code: productClasses.code,
       nameEn: productClasses.nameEn,
       nameAr: productClasses.nameAr,
     })
     .from(productClasses)
-    .orderBy(asc(productClasses.code));
+    .orderBy(asc(productClasses.nameEn));
 }
 
-export async function listProductFireRatings(): Promise<ProductCodeRow[]> {
+export async function listProductFireRatings(): Promise<LookupRow[]> {
   return db
     .select({
       id: productFireRatings.id,
-      code: productFireRatings.code,
       nameEn: productFireRatings.nameEn,
       nameAr: productFireRatings.nameAr,
     })
     .from(productFireRatings)
-    .orderBy(asc(productFireRatings.code));
+    .orderBy(asc(productFireRatings.nameEn));
 }
 
 export async function listProductThicknesses(): Promise<ThicknessRow[]> {

@@ -1374,8 +1374,14 @@ export type NewUserInput = {
   roleId: string;
   /** Omitted = the account exists but cannot log in yet. */
   password?: string;
+  /**
+   * The rep's base `[10 §7]`, and the only half of it that ever had a writer.
+   * `cityId` sat beside this until `0027`: it was accepted here, written to a
+   * column, and then read by nothing — no form posted it, `UserUpdateInput`
+   * omitted it and `ManagedUserRow` never selected it, so all 401 users
+   * carried null. Taking the parameter was what made the column look alive.
+   */
   region?: User["region"];
-  cityId?: string | null;
 };
 
 /** Create a user. There is no self-registration anywhere in FACET `[11 §1]`. */
@@ -1404,7 +1410,6 @@ export async function createUser(
         email,
         roleId: input.roleId,
         region: input.region ?? null,
-        cityId: input.cityId ?? null,
         passwordHash,
       })
       .returning();

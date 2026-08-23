@@ -435,7 +435,7 @@ async function main(): Promise<void> {
   const [supplier] = await db
     .select()
     .from(productSuppliers)
-    .where(eq(productSuppliers.code, "N"))
+    .where(eq(productSuppliers.nameEn, "N"))
     .limit(1);
   const [productClass] = await db.select().from(productClasses).limit(1);
   const [fireRating] = await db.select().from(productFireRatings).limit(1);

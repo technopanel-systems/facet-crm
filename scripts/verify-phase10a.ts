@@ -322,11 +322,10 @@ async function main(): Promise<void> {
       row?.tier === want.tier && row?.isPersistent === want.persistent,
       `got tier=${row?.tier} persistent=${row?.isPersistent}`,
     );
-    check(
-      `${want.key} carries the in_app channel [04 C3]`,
-      row?.defaultChannel === "in_app",
-      `got ${row?.defaultChannel}`,
-    );
+    // No channel check: `0027` dropped `default_channel` and
+    // `notifications.channel` together. See `schema.ts` above
+    // `notificationTypes` for why a column asserting the only possible value
+    // was worth less than not having one.
   }
   /**
    * A type nothing produces is the shape of v1's dead approval gate `[20 §11]`.

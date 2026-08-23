@@ -18,36 +18,40 @@
  */
 
 /**
- * `17 §1` — four codes. `08 B1`'s G, G1 and Y are dropped: *"we dont need them
- * anymore."* They were never seeded, so nothing is deleted and no line can
+ * `17 §1` — four suppliers. `08 B1`'s G, G1 and Y are dropped: *"we dont need
+ * them anymore."* They were never seeded, so nothing is deleted and no line can
  * point at them.
  *
  * **The code is the name**, deliberately — the founder says no factory name is
  * needed, and this is the same treatment `08 B1` already forced on the classes:
- * an invented longer form would be fiction. The code is also the first token of
- * the generated product name, so it is what everyone recognises anyway.
+ * an invented longer form would be fiction.
+ *
+ * That is also why `0027` could drop the `code` column from all three tables
+ * with no data loss: every row's code and `name_en` were the same string. What
+ * the column bought was the first token of a generated product name `S53` says
+ * FACET does not produce, and no screen ever showed it.
  */
 export const PRODUCT_SUPPLIER_SEED = [
-  { code: "N", nameEn: "N", nameAr: "N" },
-  { code: "K", nameEn: "K", nameAr: "K" },
-  { code: "D", nameEn: "D", nameAr: "D" },
-  { code: "C", nameEn: "C", nameAr: "C" },
+  { nameEn: "N", nameAr: "N" },
+  { nameEn: "K", nameAr: "K" },
+  { nameEn: "D", nameAr: "D" },
+  { nameEn: "C", nameAr: "C" },
 ] as const;
 
 /** `08 B1`. The code is the name — an invented longer form would be fiction. */
 export const PRODUCT_CLASS_SEED = [
-  { code: "A", nameEn: "A", nameAr: "A" },
-  { code: "B", nameEn: "B", nameAr: "B" },
-  { code: "A2G1", nameEn: "A2G1", nameAr: "A2G1" },
-  { code: "A2G2", nameEn: "A2G2", nameAr: "A2G2" },
+  { nameEn: "A", nameAr: "A" },
+  { nameEn: "B", nameAr: "B" },
+  { nameEn: "A2G1", nameAr: "A2G1" },
+  { nameEn: "A2G2", nameAr: "A2G2" },
 ] as const;
 
 /** `08 B1`. "Normal" is the only one of the three that is a word, so it is the
  *  only one with an Arabic form; `B1` and `A2` are standards designations. */
 export const PRODUCT_FIRE_RATING_SEED = [
-  { code: "B1", nameEn: "B1", nameAr: "B1" },
-  { code: "A2", nameEn: "A2", nameAr: "A2" },
-  { code: "Normal", nameEn: "Normal", nameAr: "عادي" },
+  { nameEn: "B1", nameAr: "B1" },
+  { nameEn: "A2", nameAr: "A2" },
+  { nameEn: "Normal", nameAr: "عادي" },
 ] as const;
 
 /**
