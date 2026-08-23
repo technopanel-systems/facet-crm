@@ -66,6 +66,12 @@
  *      can hold: a partial unique index could refuse a second primary, but
  *      "at least one" is not row-local and that is the half that was broken.
  *      Over every row ever written, and it was false when it was written.
+ *  21. *** No live company membership belongs to somebody who could not now
+ *      receive one *** `S9` — AUDIT 1 F8. The rule names four recipients and
+ *      no flag says "holds a company book", so the test stands `sees_all_reps`
+ *      in for the three elevated roles. That makes the seed load-bearing: the
+ *      partition is asserted by role name against the live table first, then
+ *      every live membership is counted against it.
  *  13. *** The repository and the database agree *** — CHECK constraints, enum
  *      types and their values, and indexes, as set differences both ways. This
  *      is the one claim `drizzle-kit generate` structurally cannot make: it
@@ -2623,6 +2629,83 @@ async function repositoryMatchesDatabase(): Promise<void> {
     primacy.held_companies > 0 &&
       primacy.primary_rows === primacy.held_companies,
     `${primacy.primary_rows} primary row(s) across ${primacy.held_companies} company(s)`,
+  );
+
+  /* --- 21. Every live company book is held by an S9 recipient ------- */
+
+  console.log(
+    "\n21. *** No live company membership belongs to somebody who could not now receive one *** [S9]",
+  );
+
+  // **The invariant behind AUDIT 1 F8.** `S9` names four recipients — a rep, a
+  // desk rep, marketing, the coordinator — and no flag says "holds a company
+  // book", so `companyBookHolderFilter` stands in `sees_all_reps` for the three
+  // elevated roles the rule leaves out. That makes the seed load-bearing in a
+  // way a CHECK cannot hold: the test is a join to `roles`, so a seed edit that
+  // granted `sees_all_reps` to a rep would silently empty every picker, and one
+  // that dropped it from the manager would silently widen both writers.
+  //
+  // So the partition is asserted first, by name, against the LIVE table — the
+  // only place in `src/` or `scripts/` a role name may decide anything is the
+  // seed `[07 A5 C1]`, and this is asserting the seed, not authorizing by it.
+  const seededRoles = (await db.execute(sql`
+    select name_en, sees_all_reps
+    from roles
+    where name_en in (
+      'Sales Rep', 'Desk Rep', 'Marketing', 'Sales Coordinator',
+      'Sales Manager', 'Executive', 'Super Admin'
+    )
+  `)) as unknown as { name_en: string; sees_all_reps: boolean }[];
+
+  const holders = new Set(
+    seededRoles.filter((row) => !row.sees_all_reps).map((row) => row.name_en),
+  );
+  check(
+    "all seven seeded roles are present, so the partition below is over all of them [S7]",
+    seededRoles.length === 7,
+    `${seededRoles.length} of 7 found`,
+  );
+  for (const name of [
+    "Sales Rep",
+    "Desk Rep",
+    "Marketing",
+    "Sales Coordinator",
+  ]) {
+    check(`${name} may hold a company book [S9]`, holders.has(name));
+  }
+  for (const name of ["Sales Manager", "Executive", "Super Admin"]) {
+    check(
+      `${name} may NOT — above the book, not a place to put one [S9]`,
+      !holders.has(name),
+    );
+  }
+
+  // Then every row. `company_reps` and `users` and `roles` are all named
+  // outright — `CLAUDE.md`'s rule, and the failure it names is exactly this
+  // shape: a correlation resolving inside the inner table counts nothing and
+  // reports a clean database.
+  const [book] = (await db.execute(sql`
+    select
+      count(*)::int as live_memberships,
+      count(*) filter (where r.sees_all_reps)::int as elevated
+    from company_reps cr
+    join users u on u.id = cr.user_id
+    join roles r on r.id = u.role_id
+    where cr.removed_at is null
+  `)) as unknown as { live_memberships: number; elevated: number }[];
+
+  console.log(`  --    ${book.live_memberships} live company membership(s)`);
+  check(
+    "*** none of them is held by a role that may not now receive one *** [S9]",
+    book.elevated === 0,
+    `${book.elevated} of ${book.live_memberships} held by an elevated role`,
+  );
+  // The negative half, and the one an empty read passes: on a database with no
+  // memberships the count above is zero and the check goes green regardless.
+  check(
+    "…and there were memberships to check, so an empty read fails here [S9]",
+    book.live_memberships > 0,
+    `${book.live_memberships} live membership(s)`,
   );
 
   console.log("\n13. *** The repository and the database agree ***");

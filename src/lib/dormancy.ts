@@ -39,7 +39,12 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { companies, companyDormancyReviews, companyReps, users } from "@/db/schema";
 import { withAudit } from "@/lib/audit";
-import { can, canViewRecord, type AuthSession } from "@/lib/authz";
+import {
+  can,
+  canViewRecord,
+  isCompanyBookHolder,
+  type AuthSession,
+} from "@/lib/authz";
 import { NOTIFICATION_TYPES, type DormancyOutcome } from "@/lib/enums";
 import { raise } from "@/lib/notifications";
 import { today } from "@/lib/reports";
@@ -204,6 +209,11 @@ export async function reassignCompany(
   // Work may only be handed to someone who can act on it `[04 C2]`.
   if (!recipient || !recipient.isActive) {
     throw new RuleError("dormancy.errors.recipientInactive", "toUserId");
+  }
+  // …and only to one of `S9`'s four recipients. Active is not the whole of it:
+  // a manager or an executive is above the book, not a place to put one.
+  if (!(await isCompanyBookHolder(toUserId))) {
+    throw new RuleError("dormancy.errors.recipientNotAHolder", "toUserId");
   }
 
   await withAudit(session.actor, async (tx, log) => {

@@ -781,6 +781,7 @@
       "nothingSelected": "Choose at least one item to hand over.",
       "recipientIsSource": "Choose somebody other than this person.",
       "recipientInactive": "Work can only be handed to an active colleague.",
+      "recipientNotAHolder": "Work can only be handed to a rep, a desk rep, marketing or the coordinator.",
       "userStillActive": "Deactivate the account before handing over their work.",
       "itemNotHeld": "Something on this list has already moved. Reload the page and try again.",
       "cannotDeactivateSelf": "You cannot deactivate your own account."
@@ -1061,6 +1062,7 @@
       "companyNotVisible": "That company is not yours to review.",
       "cannotAssign": "You may not reassign or archive a company.",
       "recipientInactive": "That account is not active.",
+      "recipientNotAHolder": "A company can only be handed to a rep, a desk rep, marketing or the coordinator.",
       "alreadyArchived": "That company is already archived.",
       "noteRequired": "A written reason is required to archive a company.",
       "noteTooLong": "That note is too long."

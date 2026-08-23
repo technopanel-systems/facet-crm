@@ -52,7 +52,7 @@ import {
   users,
 } from "@/db/schema";
 import { withAudit } from "@/lib/audit";
-import { can, type AuthSession } from "@/lib/authz";
+import { can, isCompanyBookHolder, type AuthSession } from "@/lib/authz";
 import { NOTIFICATION_TYPES } from "@/lib/enums";
 import { raise } from "@/lib/notifications";
 import { RuleError } from "@/lib/validation";
@@ -238,6 +238,11 @@ export async function reassignHandover(
   // Work may only be handed to someone who can act on it `[04 C2]`.
   if (!recipient || !recipient.isActive) {
     throw new RuleError("team.errors.recipientInactive", "toUserId");
+  }
+  // …and only to one of `S9`'s four recipients. Active is not the whole of it:
+  // a manager or an executive is above the book, not a place to put one.
+  if (!(await isCompanyBookHolder(toUserId))) {
+    throw new RuleError("team.errors.recipientNotAHolder", "toUserId");
   }
 
   return withAudit(session.actor, async (tx, log) => {

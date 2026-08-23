@@ -624,6 +624,15 @@ async function main(): Promise<void> {
       await reassignCompany(manager, quietOver.id, ghost.id);
     },
   );
+  // `S9` — and active is not the whole of it. The manager fixture is a Sales
+  // Manager, so `sees_all_reps` is true and they are above the book rather
+  // than a place to put one. AUDIT 1 F8: the code used to accept anybody
+  // active, so a company book could land on an executive.
+  await refuses(
+    "*** a company cannot be handed to a role that may not hold one *** [S9]",
+    "dormancy.errors.recipientNotAHolder",
+    () => reassignCompany(manager, quietOver.id, manager.user.id),
+  );
 
   // The negative half. Both screens are SCOPED, not gated `[21 §9]` — the same
   // shape `20 §7` gave coverage, and a gate here would look identical to a bug.

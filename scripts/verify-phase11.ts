@@ -26,7 +26,10 @@
  *  10. The book is exactly three buckets — contacts are not one `[14 §1]`,
  *      and `tasks` no longer is either `[26 §6]`.
  *  11. Reassignment bucket by bucket, including the partial-unique-index trap.
- *  12. Every reassignment refusal, and that a failure rolls back whole.
+ *  12. Every reassignment refusal, and that a failure rolls back whole —
+ *      including `S9`'s, which the picker itself is asserted against (AUDIT 1
+ *      F8): only a rep, a desk rep, marketing or the coordinator may be
+ *      handed a book, and no flag says so, so the test is a chosen proxy.
  *  13. A handover does not move past credit `[18 §1]`. The central claim.
  *  14. Visibility follows the move, in both directions `[04 Q7]`, `[11 §2]`.
  *  15. An impersonated identity loses the flag `[07 A6]`.
@@ -75,6 +78,8 @@ import {
   createUser,
   deactivateUser,
   getManagedUser,
+  listActiveUsers,
+  listCompanyBookHolders,
   listRoles,
   listUsers,
   reactivateUser,
@@ -921,6 +926,44 @@ async function main(): Promise<void> {
         manager,
         strandedUser.id,
         departing.user.id,
+        only({ projectIds: [strandedProject.id] }),
+      ),
+  );
+  // The **picker** behind that refusal, asserted directly: the route walk only
+  // checks the handover gate, so an empty directory would render an empty
+  // select and pass. `S9`'s four roles are offered; the three elevated ones
+  // are not, and the wider directory the other pickers still read proves the
+  // narrowing removed somebody rather than returning the same list.
+  const offered = await listCompanyBookHolders();
+  const everyone = await listActiveUsers();
+  const offeredIds = new Set(offered.map((person) => person.id));
+  check(
+    "the handover picker offers a rep [S9]",
+    offeredIds.has(receiver.user.id),
+  );
+  check(
+    "*** and offers no role that may not hold a book *** [S9]",
+    !offeredIds.has(manager.user.id),
+    `${manager.user.id} is offered`,
+  );
+  check(
+    "…and it is narrower than the directory the other pickers read [S9]",
+    offered.length > 0 && offered.length < everyone.length,
+    `${offered.length} offered of ${everyone.length} active`,
+  );
+
+  // `S9` — active is not the whole of it. The manager fixture is a Sales
+  // Manager, so `sees_all_reps` is true and they are above the book rather
+  // than a place to put one. AUDIT 1 F8: the code used to accept anybody
+  // active, so a whole book could land on an executive or a super admin.
+  await refuses(
+    "*** handing to a role that may not hold a book is refused *** [S9]",
+    "team.errors.recipientNotAHolder",
+    () =>
+      reassignHandover(
+        manager,
+        strandedUser.id,
+        manager.user.id,
         only({ projectIds: [strandedProject.id] }),
       ),
   );

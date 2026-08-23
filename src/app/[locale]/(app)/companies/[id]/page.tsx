@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
-import { can, listActiveUsers, requireSession } from "@/lib/authz";
+import { can, listCompanyBookHolders, requireSession } from "@/lib/authz";
 import { getCompany, listCompanyReps } from "@/lib/companies";
 import { listContacts } from "@/lib/contacts";
 import { dormancyReviews, isCompanyQuiet } from "@/lib/dormancy";
@@ -85,7 +85,8 @@ export default async function CompanyDetailPage({
     // The same derivation `follow-ups.ts` uses, not a second one `[21 §7]`.
     isCompanyQuiet(company.id, thresholds),
     dormancyReviews(company.id),
-    canAssign ? listActiveUsers() : Promise.resolve([]),
+    // `S9` — the four roles that may be handed a company book.
+    canAssign ? listCompanyBookHolders() : Promise.resolve([]),
   ]);
 
   const dash = t("common.none");

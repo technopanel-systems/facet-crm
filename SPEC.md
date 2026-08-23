@@ -56,8 +56,11 @@ role is configuration.
 **Executive, Sales Manager and Super Admin**, and in practice the Sales Manager
 uses them. All three flags must be read by the code; today none are.
 
-**S9. [CHANGE]** Marketing assigns a company to a **rep, a desk rep, or the
-coordinator**.
+**S9.** Marketing assigns a company to a **rep, a desk rep, marketing, or the
+coordinator**. **Marketing holds companies exactly as a rep does, and assigns
+them as well** — taking calls and passing leads on is work added on top of a
+rep's, not a different job, which is why marketing and the desk rep carry the
+same permission flags.
 
 **S10.** No self-registration. A user exists because a `can_manage_users` holder
 created them.

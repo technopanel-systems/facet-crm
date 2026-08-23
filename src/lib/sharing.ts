@@ -156,9 +156,12 @@ export async function listShares(
  * grant twice is the only thing this excludes. It does NOT exclude the record's
  * owner or members; see the module doc for why that non-rule is deliberate.
  *
- * `listActiveUsers` is the same directory the assignment, handover and mention
- * pickers use: a list of colleagues is not a record, so it carries no
- * visibility filter. Deactivated accounts are absent — work may only be handed
+ * `listActiveUsers` is the same directory the dispatch, credit-split and
+ * mention pickers use: a list of colleagues is not a record, so it carries no
+ * visibility filter. **Handover and dormancy no longer read it** — `S9` names
+ * who may hold a company book and `listCompanyBookHolders` is that narrower
+ * directory. Sharing is not that question: a share grants access to a record
+ * somebody else still holds `S100`, so it hands over no book. Deactivated accounts are absent — work may only be handed
  * to somebody who can act on it `[04 C2]`.
  *
  * The grantor is dropped from their own picker. Sharing a record with yourself

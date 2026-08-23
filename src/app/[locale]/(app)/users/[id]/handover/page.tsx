@@ -2,7 +2,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/page-header";
-import { can, listActiveUsers, requireSession } from "@/lib/authz";
+import { can, listCompanyBookHolders, requireSession } from "@/lib/authz";
 import { lookupName } from "@/lib/lookups";
 import { getHandoverBook } from "@/lib/team";
 
@@ -30,9 +30,9 @@ export default async function HandoverPage({
 
   const t = await getTranslations();
 
-  // Only an active colleague may receive work, and never the departing person
-  // themselves — though the data layer refuses that too.
-  const colleagues = (await listActiveUsers()).filter(
+  // Only one of `S9`'s four recipients may receive work, and never the
+  // departing person themselves — though the data layer refuses both.
+  const colleagues = (await listCompanyBookHolders()).filter(
     (colleague) => colleague.id !== book.user.id,
   );
 

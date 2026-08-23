@@ -1132,6 +1132,76 @@ export async function listActiveUsers(): Promise<
     .orderBy(users.name);
 }
 
+/**
+ * Who may **hold a company book** — `S9`'s four recipients: a rep, a desk rep,
+ * marketing, or the coordinator.
+ *
+ * **`sees_all_reps` is standing in for something no flag says.** None of the
+ * twelve names holding a company: every one names an *act*. So this is a proxy
+ * for the three elevated roles `S9` leaves out — Sales Manager, Executive,
+ * Super Admin — and it is chosen, not derived. Five flags give exactly the same
+ * partition today (`can_manage_users`, `can_set_targets`, `can_approve_delete`,
+ * `can_resolve_duplicate` are the others), because those three roles are
+ * uniformly elevated. **`sees_all_reps` is the one that most nearly means what
+ * is meant**: the other four name acts performed *on* a book — approving a
+ * delete, resolving a duplicate — and somebody reaching into a book is not
+ * thereby above it. `sees_all_reps` names a *position relative to the reps*,
+ * which is the actual question, and `visibleMeasuredUsersFilter` `[:984]`
+ * already reads it that way — every rep's figures rather than your own.
+ *
+ * **If a rule ever needs the real thing, that is a flag, not a sixth proxy.**
+ * The moment a role must hold a book while seeing every rep — or see none while
+ * holding none — this stops being expressible and `roles` gains a column.
+ *
+ * Written once, here. Every reader runs this same filter rather than naming
+ * the flag again, which is the shape `canOpenRecord` `[:1015]` uses for the
+ * visibility lists and for the same reason: a second copy is a second rule.
+ * Any query composing it must join `roles`.
+ */
+export function companyBookHolderFilter(): SQL {
+  return eq(roles.seesAllReps, false);
+}
+
+/**
+ * The filter above asked of one person — may this user be handed a book `S9`.
+ *
+ * `isActive` is **not** asked here. Both writers check it already, and with
+ * their own message: *"that account is not active"* and *"you may not hand a
+ * book to this person"* are different refusals, and a rep promoted to manager
+ * while a handover screen sits open earns the second one.
+ */
+export async function isCompanyBookHolder(userId: string): Promise<boolean> {
+  return rowExists(
+    db
+      .select({ one: sql<number>`1` })
+      .from(users)
+      .innerJoin(roles, eq(roles.id, users.roleId))
+      .where(and(eq(users.id, userId), companyBookHolderFilter()))
+      .limit(1),
+  );
+}
+
+/**
+ * The directory narrowed to `S9`'s recipients — the picker behind handover
+ * `S103` and dormancy reassignment `S106`.
+ *
+ * Separate from `listActiveUsers` above rather than a narrowing of it, because
+ * the other four callers of that directory ask a different question and are
+ * **deliberately** left alone: the rep on a direct dispatch, a credit split's
+ * members, a share's recipient and the mention pickers. `SPEC §15`'s F8 row
+ * records what each of them checks today.
+ */
+export async function listCompanyBookHolders(): Promise<
+  { id: string; name: string }[]
+> {
+  return db
+    .select({ id: users.id, name: users.name })
+    .from(users)
+    .innerJoin(roles, eq(roles.id, users.roleId))
+    .where(and(eq(users.isActive, true), companyBookHolderFilter()))
+    .orderBy(users.name);
+}
+
 /* --- The management screens `[19]` -------------------------------- */
 
 /** `09 §3.1` — no document sets a page size; 25 is a display detail. */
