@@ -460,6 +460,12 @@ async function main(): Promise<void> {
       // dispatch is the only thing that credits a target, and every figure
       // below reads it through `approvedDispatches()`. The three stamps move
       // together or the `dispatches_approval_stamps` CHECK refuses the row.
+      // `S120` — a hand-written row has to satisfy
+      // `dispatches_difference_flag` before it has any lines to compare, so
+      // the pair starts here and `addDispatchLine` corrects the rep's half to
+      // the truth once the line exists.
+      differedAtSubmission: false,
+      linesChangedAfterSubmission: false,
       status: "approved" as const,
       submittedAt: new Date(),
       approvedByUserId: coordinator.user.id,

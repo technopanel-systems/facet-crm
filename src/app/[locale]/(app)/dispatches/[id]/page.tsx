@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import {
   getFormatter,
   getTranslations,
@@ -73,6 +74,27 @@ export default async function DispatchPage({
   });
 
   const dash = t("common.none");
+
+  // `S120` — **who made the difference**, read off the two stored halves.
+  //
+  // Five real cases and the screen names each: matched throughout · the rep's
+  // deviation · hers alone · both · the rep deviated and she brought it back.
+  // Only the coordinator may edit a submitted request `S62` `S125`, so *after
+  // submission* names her without asking a role.
+  //
+  // Null while it is a draft, where neither half is recorded yet. `differs`
+  // with NEITHER half set is impossible on a submitted row — the lines cannot
+  // have moved with nobody moving them — and `verify:slice3` asserts it rather
+  // than this screen quietly rendering a badge with no sentence.
+  const attribution =
+    dispatch.differedAtSubmission && dispatch.linesChangedAfterSubmission
+      ? "dispatches.difference.byBoth"
+      : dispatch.differedAtSubmission
+        ? "dispatches.difference.byRep"
+        : dispatch.linesChangedAfterSubmission
+          ? "dispatches.difference.byCoordinator"
+          : null;
+
   const day = (value: string) =>
     format.dateTime(new Date(`${value}T00:00:00Z`), {
       dateStyle: "medium",
@@ -290,64 +312,46 @@ export default async function DispatchPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col" data-slot="dispatch-lines">
-            {dispatch.lines.map((line) => (
-              <div
-                key={line.id}
-                data-line={line.id}
-                className="flex flex-col gap-2 border-t py-4 first:border-t-0 first:pt-0"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                  {/* Supplier, class, fire rating, thickness, colour — set out
-                      as words `S53`, never a reassembled SMAC code. */}
-                  <p className="flex flex-wrap items-baseline gap-x-2 text-start text-sm font-medium">
-                    {lineParts(line, locale).map((part, index) => (
-                      <span key={part + index} dir="auto">
-                        {index > 0 ? (
-                          <span
-                            aria-hidden
-                            className="text-faint me-2 font-normal"
-                          >
-                            ·
-                          </span>
-                        ) : null}
-                        {part}
-                      </span>
-                    ))}
-                  </p>
-                  <p className="text-start text-sm" dir="ltr">
-                    <span className="num">{line.quantityPcs}</span> ×{" "}
-                    <span className="num">{line.widthM}</span> ×{" "}
-                    <span className="num">{line.lengthM}</span> ={" "}
-                    <span className="num font-medium">{line.sqm}</span>{" "}
-                    {t("common.sqm")}
-                  </p>
-                </div>
-
-                {/* No rate beside the amount: VAT is fixed at 15% and never
-                    editable `S57`, so only the figure varies. */}
-                <div className="text-muted-foreground flex flex-wrap gap-x-6 gap-y-1 text-start text-xs">
-                  <span dir="ltr">
-                    {t("quotations.detail.unitPrice")}:{" "}
-                    <span className="num">{line.unitPrice}</span>{" "}
-                    {t("common.sar")}
-                  </span>
-                  <span dir="ltr">
-                    {t("quotations.detail.lineTotal")}:{" "}
-                    <span className="num">{line.lineTotal}</span>{" "}
-                    {t("common.sar")}
-                  </span>
-                  <span dir="ltr">
-                    {t("quotations.detail.vatAmount")}:{" "}
-                    <span className="num">{line.vatAmount}</span>{" "}
-                    {t("common.sar")}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+          <LineRows lines={dispatch.lines} slot="dispatch-lines" locale={locale} />
         </CardContent>
       </Card>
+
+      {/* `S120` `S77` — **what was quoted, beside what is going out.** *The
+          gap is the point, not drift to be prevented*, and a flag that says
+          "something differs, go and look" would send the coordinator to the
+          quotation to find out — the round trip putting approve on this screen
+          rather than the row was meant to avoid.
+
+          `D24`'s fourth element, *related records as cards*: the version is a
+          related record, so this is a SIBLING card and never one nested inside
+          the lines card `D21`. Stacked rather than set side by side — two
+          six-field rows in parallel columns inside the 1320px cap `D23` is what
+          `D22` refuses at 1366, where legibility beats fitting one more row.
+
+          **Only when there is a gap**, and only for an identity that may open
+          the quotation. `getDispatch` returns an empty array otherwise: a
+          matching dispatch would print the same lines twice, which is a control
+          that does nothing `D51`, and the contents may not go where the link
+          does not `S109`. */}
+      {dispatch.quotedLines.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-start">
+              {t("dispatches.difference.quotedLines")}
+            </CardTitle>
+            <CardDescription className="text-start">
+              {t("dispatches.difference.quotedLinesNotice")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <LineRows
+              lines={dispatch.quotedLines}
+              slot="quoted-lines"
+              locale={locale}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* `07 C6` — the free-entry route is visible as such, so it cannot
           quietly become a way to skip the chain. **Approval is no longer part
@@ -395,6 +399,93 @@ export default async function DispatchPage({
                 ? ` · ${format.dateTime(dispatch.approvedAt, { dateStyle: "medium" })}`
                 : ""}
             </Fact>
+
+            {/* `S120` — the flag and **who made the difference**, on the card
+                that already says where this came from.
+
+                Nothing renders on a free entry `S75`: `differsFromQuotation`
+                is null there, and saying either "differs" or "matches" about a
+                dispatch with no quotation would be a claim the record cannot
+                support — the reason the column is nullable rather than
+                defaulting to false.
+
+                The sentence is `wide`, because it is a sentence rather than a
+                datum. It is absent on a DRAFT, where both stored halves are
+                still null: nothing has been handed over, so no attribution has
+                been recorded, and the turn panel above already says whose it
+                is. The badge still shows — a rep editing a draft can see they
+                have moved away from the quotation. */}
+            {dispatch.differsFromQuotation === null ? null : (
+              <Fact
+                label={t("dispatches.difference.title")}
+                name="difference"
+                wide
+              >
+                {dispatch.differsFromQuotation ? (
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <Badge variant="outline" data-differs="yes">
+                      {t("dispatches.difference.flag")}
+                    </Badge>
+                    {attribution ? <span>{t(attribution)}</span> : null}
+                  </span>
+                ) : (
+                  <span data-differs="no">
+                    {t("dispatches.difference.matches")}
+                    {/* The fifth case: the rep deviated and the coordinator
+                        brought it back. Nothing differs now, and the rep's own
+                        half is kept — `S120`'s flag is permanent, and this is
+                        the reading a later figure must not lose. */}
+                    {dispatch.differedAtSubmission === true
+                      ? ` ${t("dispatches.difference.correctedBack")}`
+                      : ""}
+                  </span>
+                )}
+              </Fact>
+            )}
+
+            {/* `S77` — **what was quoted against what was actually
+                dispatched.** Three figures rather than two: *one quotation
+                produces any number of dispatches*, so this dispatch's own
+                square metres set against the version's total would read a
+                lawful partial dispatch as a deviation nobody made. The middle
+                figure is every APPROVED dispatch raised from the same version
+                `S72`, which is what makes the pair mean something.
+
+                Below square metres in prominence is `S117`'s rule for money;
+                these ARE square metres, which is what a rep is measured on
+                `S83`, so they are mono and end-aligned like every magnitude
+                `D11` `D24`. */}
+            {dispatch.quotedSqm === null ? null : (
+              <>
+                <Fact
+                  label={t("dispatches.difference.quotedSqm")}
+                  name="quotedSqm"
+                  numeric
+                >
+                  <span dir="ltr">
+                    {dispatch.quotedSqm} {t("common.sqm")}
+                  </span>
+                </Fact>
+                <Fact
+                  label={t("dispatches.difference.dispatchedAgainstVersion")}
+                  name="dispatchedAgainstVersion"
+                  numeric
+                >
+                  <span dir="ltr">
+                    {dispatch.dispatchedAgainstVersionSqm} {t("common.sqm")}
+                  </span>
+                </Fact>
+                <Fact
+                  label={t("dispatches.difference.thisDispatch")}
+                  name="thisDispatchSqm"
+                  numeric
+                >
+                  <span dir="ltr">
+                    {dispatch.sqm} {t("common.sqm")}
+                  </span>
+                </Fact>
+              </>
+            )}
           </Facts>
         </CardContent>
       </Card>
@@ -487,6 +578,113 @@ export default async function DispatchPage({
         page={timeline.page}
         total={timeline.total}
       />
+    </div>
+  );
+}
+
+/**
+ * The product lines of a dispatch, or of the quotation version it was raised
+ * from `S116` `S120`.
+ *
+ * **One renderer for both**, because the two lists are compared by eye and a
+ * second copy of this markup would let them drift into looking different for
+ * reasons that are not differences. The shape is `S53`'s — supplier, class,
+ * fire rating, thickness and colour as words, never a reassembled SMAC code —
+ * and the money sits BELOW the square metres in prominence `S117`, because
+ * square metres are what a rep is measured on `S83`.
+ *
+ * The money is nullable here and not on `DispatchLineRow`: a quotation line may
+ * carry no price `S58`, and *a line with no price contributes nothing and the
+ * screen says so* rather than showing a total quietly missing a line. On a
+ * dispatch line the columns are NOT NULL `S116`, so that branch is unreachable
+ * from the list above — it exists for the quoted one below it.
+ */
+function LineRows({
+  lines,
+  slot,
+  locale,
+}: {
+  lines: {
+    id: string;
+    supplierNameEn: string;
+    supplierNameAr: string;
+    classNameEn: string;
+    classNameAr: string;
+    fireRatingNameEn: string;
+    fireRatingNameAr: string;
+    customColour: string | null;
+    thicknessMm: string;
+    widthM: string;
+    lengthM: string;
+    quantityPcs: string;
+    sqm: string | null;
+    unitPrice: string | null;
+    lineTotal: string | null;
+    vatAmount: string | null;
+  }[];
+  slot: string;
+  locale: string;
+}) {
+  const t = useTranslations();
+  return (
+    <div className="flex flex-col" data-slot={slot}>
+      {lines.map((line) => (
+        <div
+          key={line.id}
+          data-line={line.id}
+          className="flex flex-col gap-2 border-t py-4 first:border-t-0 first:pt-0"
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            {/* Supplier, class, fire rating, thickness, colour — set out
+                as words `S53`, never a reassembled SMAC code. */}
+            <p className="flex flex-wrap items-baseline gap-x-2 text-start text-sm font-medium">
+              {lineParts(line, locale).map((part, index) => (
+                <span key={part + index} dir="auto">
+                  {index > 0 ? (
+                    <span aria-hidden className="text-faint me-2 font-normal">
+                      ·
+                    </span>
+                  ) : null}
+                  {part}
+                </span>
+              ))}
+            </p>
+            <p className="text-start text-sm" dir="ltr">
+              <span className="num">{line.quantityPcs}</span> ×{" "}
+              <span className="num">{line.widthM}</span> ×{" "}
+              <span className="num">{line.lengthM}</span> ={" "}
+              <span className="num font-medium">{line.sqm}</span>{" "}
+              {t("common.sqm")}
+            </p>
+          </div>
+
+          {/* No rate beside the amount: VAT is fixed at 15% and never
+              editable `S57`, so only the figure varies. */}
+          <div className="text-muted-foreground flex flex-wrap gap-x-6 gap-y-1 text-start text-xs">
+            {line.unitPrice === null ? (
+              <span>{t("dispatches.difference.unpriced")}</span>
+            ) : (
+              <>
+                <span dir="ltr">
+                  {t("quotations.detail.unitPrice")}:{" "}
+                  <span className="num">{line.unitPrice}</span>{" "}
+                  {t("common.sar")}
+                </span>
+                <span dir="ltr">
+                  {t("quotations.detail.lineTotal")}:{" "}
+                  <span className="num">{line.lineTotal}</span>{" "}
+                  {t("common.sar")}
+                </span>
+                <span dir="ltr">
+                  {t("quotations.detail.vatAmount")}:{" "}
+                  <span className="num">{line.vatAmount}</span>{" "}
+                  {t("common.sar")}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

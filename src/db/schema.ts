@@ -1637,6 +1637,52 @@ export const dispatches = pgTable(
      * unapproved dispatch carries one.
      */
     smacDispatchNumber: text("smac_dispatch_number"),
+    /**
+     * `S120` — **the rep's half of the difference flag**, and the only half no
+     * later reading can recover.
+     *
+     * *The flag records who made each difference — the rep before submitting,
+     * or the coordinator after.* Whether the dispatch differs from its version
+     * **now** is derived in SQL at every reader (`dispatchDiffers`) and needs no
+     * column: `S126` names an issued version, `S61` will not let its lines be
+     * edited and `S66` supersedes it rather than rewriting it, so the left-hand
+     * side is frozen — and after approval nothing edits the right-hand side
+     * either `S73`. The comparison is therefore permanent without being stored.
+     *
+     * What is **not** recoverable is the state of the lines at the moment the
+     * rep handed them over. `updateDispatchRequest` deletes every line and
+     * re-inserts the set, so `dispatch_lines.created_at` is rewritten by the
+     * rep's own edits as much as by the coordinator's: no timestamp anywhere
+     * separates them, and a figure reading one would attribute the rep's whole
+     * dispatch to her. So this is computed once, at submission, with the same
+     * SQL expression the readers use, and never moves again.
+     *
+     * **Nullable, and null is not false.** A free entry `S75` has no quotation
+     * to differ from, and `false` there would let a later compliance figure
+     * count every direct sale as a dispatch that matched its quotation. Null
+     * until submission for the same reason: nothing has been handed over yet.
+     */
+    differedAtSubmission: boolean("differed_at_submission"),
+    /**
+     * `S120` — **the coordinator's half**, and named for the act rather than
+     * the actor for two reasons.
+     *
+     * Only she may edit a submitted request `S62` `S125`, so *after submission*
+     * names her without a role column. And it records that the lines **moved**,
+     * not that a gap was created, because after her first edit the submitted set
+     * is gone: the honest claim is that what is going out is no longer purely
+     * what the rep handed over. Sticky for the same reason.
+     *
+     * Read with `differedAtSubmission` and the derived comparison it gives all
+     * five real cases — matched throughout · the rep's deviation · hers alone ·
+     * both · the rep deviated and she brought it back to the quotation.
+     *
+     * **This is not `S123`'s figure.** That counts *a request the coordinator
+     * had to edit before approving* — any edit, from the audit row that already
+     * names her. This records only that the LINES changed, which is what stops
+     * a gap she introduced being read as the rep's.
+     */
+    linesChangedAfterSubmission: boolean("lines_changed_after_submission"),
     createdAt: createdAt(),
   },
   (t) => [
@@ -1759,6 +1805,22 @@ export const dispatches = pgTable(
      * message; this is what holds when two coordinators race.
      */
     uniqueIndex("dispatches_smac_number_key").on(t.smacDispatchNumber),
+    /**
+     * `S120` — the two halves of the flag exist exactly when there is something
+     * for them to be about.
+     *
+     * Both are written at submission and both clear on revival `S122`, so they
+     * are null together; and neither means anything without a version to differ
+     * from `S126` or a submission to have differed at. Row-local, so the
+     * database holds it `CLAUDE.md`, and it is what stops a free entry `S75`
+     * ever carrying a `false` a compliance figure would count as compliant.
+     */
+    check(
+      "dispatches_difference_flag",
+      sql`(differed_at_submission is null) = (lines_changed_after_submission is null)
+          and (differed_at_submission is not null)
+              = (submitted_at is not null and quotation_version_id is not null)`,
+    ),
   ],
 );
 

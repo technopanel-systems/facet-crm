@@ -15,16 +15,18 @@
  * not a panel anybody would order.
  */
 
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
   dispatchLines,
+  dispatches,
   productClasses,
   productFireRatings,
   productSuppliers,
   productThicknesses,
 } from "@/db/schema";
+import { dispatchDiffers } from "@/lib/dispatches";
 import { productLineMoney } from "@/lib/quotations";
 
 const UNIT_PRICE = "95.00";
@@ -81,4 +83,31 @@ export async function addDispatchLine(
     lineTotal: money.lineTotal as string,
     vatAmount: money.vatAmount as string,
   });
+
+  // **And now `S120`'s flag can be true.** The same shape as the arithmetic
+  // above, one rule later: a hand-written row has to satisfy
+  // `dispatches_difference_flag` at INSERT, before any line exists, so its
+  // callers write `false` there — and `false` would then be a claim that this
+  // fixture matched the quotation it names, which nothing checked.
+  //
+  // `verify:schema25` §17 is what makes that matter: it asserts over EVERY row
+  // that a dispatch which differs from its version has somebody named for it,
+  // and a fixture left at `false` while its line differs would fail that check
+  // for a reason about the fixture — the least useful failure a verify script
+  // can produce, and the one this file's `productLineMoney` note already
+  // records happening once.
+  //
+  // Corrected with `dispatchDiffers` itself, so the fixture cannot hold a
+  // second definition of the word. A free-entry row `S75` names no version and
+  // is left alone: its pair is null, and null is not false.
+  await db
+    .update(dispatches)
+    .set({ differedAtSubmission: dispatchDiffers, linesChangedAfterSubmission: false })
+    .where(
+      and(
+        eq(dispatches.id, dispatchId),
+        isNotNull(dispatches.quotationVersionId),
+        isNotNull(dispatches.submittedAt),
+      ),
+    );
 }

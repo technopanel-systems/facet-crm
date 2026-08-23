@@ -391,10 +391,14 @@ either. Her edit right under **S62** reaches a submitted dispatch request's own
 fields — lines, stock, shipment, payment — and never the project or contact
 records it names.
 
-**S77. [CHANGE]** One quotation produces **any number of dispatches**. That is
-true today. The comparison is not — it is S120's, and unbuilt. What was
-quoted and what was actually dispatched are **deliberately compared** — the gap
-is the point, not drift to be prevented.
+**S77.** One quotation produces **any number of dispatches**. What was quoted
+and what was actually dispatched are **deliberately compared** — the gap is the
+point, not drift to be prevented. The comparison is **S120**'s, and it is drawn
+on the dispatch itself as three figures: what that version quoted, what has been
+**approved** against it so far, and what this dispatch carries. Three rather
+than two, because one quotation produces several dispatches and a partial one
+measured alone against the version's total would read as a deviation nobody
+made.
 
 **S116.** **A dispatch carries its own lines**, the same shape as a
 quotation's product lines — product, thickness, colour, dimensions, pieces and
@@ -428,17 +432,29 @@ destination note. The rep chooses the shipment method when requesting. A Cargo
 destination note is optional. **That TT is discouraged at Malham is the
 coordinator's knowledge, not a rule FACET enforces.**
 
-**S120. [BUILD]** **A dispatch that differs from its quotation is flagged**, and
-the flag is visible to the rep, the coordinator and the manager. **Any
-difference flags it** — a colour swapped at the same price and quantity counts.
-The flag is **permanent**: it survives approval and is kept for later analysis,
-because the gap between quoted and dispatched is the thing being measured (S77).
-**The flag records who made each difference** — the rep before submitting, or
-the coordinator after. A gap the coordinator created while fixing a request is
-not the rep's deviation, and no figure may read it as one. The comparison is
+**S120.** **A dispatch that differs from its quotation is flagged**, and the
+flag is visible to the rep, the coordinator and the manager. **Nobody is
+notified.** **Any difference flags it** — a colour swapped at the same price and
+quantity counts, and so does pricing a line the quotation left unpriced (S58),
+because in money terms a line that was never priced was never quoted. The flag
+is **permanent**: it survives approval and is kept for later analysis, because
+the gap between quoted and dispatched is the thing being measured (S77). **The
+flag records who made each difference** — the rep before submitting, or the
+coordinator after. A gap the coordinator created while fixing a request is not
+the rep's deviation, and no figure may read it as one. The comparison is
 against **the version the dispatch was raised from**, not the latest one (S68).
 A later revision changes what is quoted; it does not retroactively create a gap
 on a dispatch that never moved.
+
+Two halves, and only one of them is stored. **Whether it differs is derived**,
+over the fields a dispatch line takes from a quotation line, and it is permanent
+without being stored because neither side can move: an issued version's lines
+are not editable (S61, S66, S126) and an approved dispatch's are not either
+(S73). **Who made the difference is stored**, because nothing else can recover
+it — the rep's half is fixed when they submit, and the coordinator's records
+that the lines moved after that. **A free-entry dispatch (S75) is outside the
+question entirely**: it has no quotation to differ from, so it is neither
+flagged nor recorded as matching one, and no figure may count it as either.
 
 **S121.** An approved dispatch carries its **SMAC dispatch number**,
 which is unique. The coordinator writes it when SMAC issues it — usually at
@@ -700,9 +716,12 @@ from a quotation; that the coordinator had to introduce it is a fact about how
 the request arrived. Two questions, two figures, and a screen showing both must
 say which is which. `created_by` exists today on companies, contacts, projects
 and quotation versions; the dispatch request records who raised it, and a
-coordinator's edit of a submitted one is an audit row naming her. **The two
-figures do not exist** — nothing counts either, and no screen says which is
-which.
+coordinator's edit of a submitted one is an audit row naming her. S120's second
+column is **not** this figure and must not be read as one: it records only that
+the dispatch's *lines* moved after submission, which is what stops a gap she
+introduced being counted as the rep's — this rule counts every edit she had to
+make, lines or not. **The two figures do not exist** — nothing counts either,
+and no screen says which is which.
 
 ---
 

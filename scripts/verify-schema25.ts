@@ -105,7 +105,7 @@ import {
 } from "@/db/schema";
 import type { AuthSession } from "@/lib/authz";
 import { createCompany, updateCompany } from "@/lib/companies";
-import { dispatchesInPeriod } from "@/lib/dispatches";
+import { dispatchDiffers, dispatchesInPeriod } from "@/lib/dispatches";
 import {
   OTHER_LOSS_REASON_CODE,
   REPORT_OUTCOMES,
@@ -2272,6 +2272,76 @@ async function paymentAndShipmentHold(): Promise<void> {
  * declared through a helper or spread from a shared list still counts.
  */
 async function repositoryMatchesDatabase(): Promise<void> {
+  /* --- 17. The difference flag, over every row [S120] -------------- */
+
+  console.log(
+    "\n17. *** The difference flag, and what no CHECK can hold *** [S120]",
+  );
+
+  // **The comparison is the module's own**, imported rather than rewritten.
+  // A second copy of the canonicalisation here would make this script prove
+  // its own arithmetic instead of `dispatches.ts`'s — the failure `S116`'s
+  // `sqm` sweep was written to avoid, one level up.
+  const [flags] = (await db.execute(sql`
+    select
+      count(*)::int as total,
+      count(*) filter (where ${dispatchDiffers})::int as differing,
+      count(*) filter (where differed_at_submission)::int as by_rep,
+      count(*) filter (where lines_changed_after_submission)::int as touched,
+      count(*) filter (where quotation_version_id is null)::int as free_entries,
+      -- The CHECK's own claim, asserted as DATA as well: a constraint written
+      -- against the wrong column would still be satisfied.
+      count(*) filter (
+        where (differed_at_submission is null)
+           <> (lines_changed_after_submission is null)
+      )::int as unpaired,
+      count(*) filter (
+        where (differed_at_submission is not null)
+           <> (submitted_at is not null and quotation_version_id is not null)
+      )::int as misplaced,
+      -- **What no CHECK can hold**, because it spans two tables and a derived
+      -- comparison: a dispatch that differs from its version, submitted, with
+      -- NEITHER half set. The lines cannot have moved with nobody moving them,
+      -- and the detail screen's attribution reads exactly this as impossible.
+      count(*) filter (
+        where ${dispatchDiffers}
+          and submitted_at is not null
+          and differed_at_submission is not true
+          and lines_changed_after_submission is not true
+      )::int as unattributed
+    from dispatches
+  `)) as unknown as {
+    total: number;
+    differing: number;
+    by_rep: number;
+    touched: number;
+    free_entries: number;
+    unpaired: number;
+    misplaced: number;
+    unattributed: number;
+  }[];
+
+  console.log(
+    `  --    ${flags.total} dispatch(es): ${flags.differing} differ from their version, ` +
+      `${flags.by_rep} deviated at submission, ${flags.touched} had their lines changed after it, ` +
+      `${flags.free_entries} are free entries with no version to differ from`,
+  );
+  check(
+    "the two halves are null together, or set together [S120]",
+    flags.unpaired === 0,
+    `${flags.unpaired} disagree`,
+  );
+  check(
+    "…and they exist exactly where there is a submission and a version [S120], [S75]",
+    flags.misplaced === 0,
+    `${flags.misplaced} disagree`,
+  );
+  check(
+    "*** no submitted dispatch differs with nobody named for it *** [S120]",
+    flags.unattributed === 0,
+    `${flags.unattributed} unattributed`,
+  );
+
   console.log("\n13. *** The repository and the database agree ***");
 
   // `Object.values` types each export as its own concrete table or enum type,

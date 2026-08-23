@@ -571,6 +571,26 @@ async function loadLines(versionId: string): Promise<QuotationLineRow[]> {
   }));
 }
 
+/**
+ * A version's product lines, for the one caller outside this module `S120`.
+ *
+ * `dispatches.ts` compares a dispatch to *the version it was raised from*, and
+ * the dispatch screen renders that version's lines beside the dispatched ones
+ * when the two differ. Both need what `loadLines` already builds — the four
+ * lookup names resolved `S53` — and a second loader over `quotation_lines`
+ * would be a second answer to the same question, drifting on the thickness
+ * trim or on which columns count.
+ *
+ * No visibility term, exactly as `loadLines` has none: the caller has already
+ * decided whether this identity may see the record, and `getDispatch` asks
+ * `canOpenRecord` for the thread before it renders a line of it.
+ */
+export function quotationVersionLines(
+  versionId: string,
+): Promise<QuotationLineRow[]> {
+  return loadLines(versionId);
+}
+
 async function loadServiceLines(
   versionId: string,
 ): Promise<QuotationServiceLineRow[]> {

@@ -60,10 +60,25 @@
  *
  * 10. **Approval is the event, not the row** `S72`. *An approved dispatch is
  *     the only event that credits a target — not the request.* So no figure
- *     anywhere may count a row by its existence, and the seven that read
- *     dispatches all compose `approvedDispatches()` below. Seven hand-written
+ *     anywhere may count a row by its existence, and the eight that read
+ *     dispatches all compose `approvedDispatches()` below. Eight hand-written
  *     `status = 'approved'` terms is how one gets missed, and a missed one
  *     silently counts somebody's unapproved request toward their month.
+ *
+ * 11. **A dispatch that differs from its version is FLAGGED** `S120`, and the
+ *     flag says who made the difference. The comparison itself is derived —
+ *     `dispatchDiffers`, a multiset over the nine fields `prefillByVersion`
+ *     copies, resolved in SQL at both readers — and it is permanent without
+ *     being stored, because `S126` names an ISSUED version whose lines `S61`
+ *     will not let anyone edit and `S66` supersedes rather than rewrites.
+ *
+ *     What IS stored is the attribution, because nothing else can recover it:
+ *     an edit deletes and re-inserts every line, so `created_at` is rewritten
+ *     by the rep's own edits as much as by the coordinator's and no timestamp
+ *     separates them. `differed_at_submission` is fixed by the rep at submit;
+ *     `lines_changed_after_submission` records that she moved them afterwards.
+ *     Both null on a free entry `S75` — no quotation, no left-hand side, and
+ *     `false` would let a later figure count a direct sale as compliant.
  *
  * **`sqm` is derived, not stored.** It is `sum(dispatch_lines.sqm)`, resolved
  * in SQL at every reader here and in `projects.ts`, `targets.ts` and
@@ -133,7 +148,11 @@ import {
   type Stock,
 } from "@/lib/enums";
 import { ensureProjectParticipant } from "@/lib/projects";
-import { productLineMoney } from "@/lib/quotations";
+import {
+  productLineMoney,
+  quotationVersionLines,
+  type QuotationLineRow,
+} from "@/lib/quotations";
 import { RuleError } from "@/lib/validation";
 
 export type Dispatch = typeof dispatches.$inferSelect;
@@ -201,12 +220,146 @@ const dispatchSqm = sql<string>`(
 )`;
 
 /**
+ * One product line, canonically `S120`.
+ *
+ * **The nine fields `prefillByVersion` copies, and nothing else.** Those are
+ * what travels from a quotation line onto a dispatch line, so those are what
+ * can differ. Everything else is excluded for a stated reason: `sqm` is
+ * generated from three of them and cannot move alone; `line_total` and
+ * `vat_amount` come from `productLineMoney`, which this module imports from
+ * `quotations.ts` precisely so the two arithmetics cannot drift, and comparing
+ * them would be comparing the same expression twice; `form_factor` is not on
+ * `dispatch_lines` at all; `id` and `created_at` are not values.
+ *
+ * **The colour is `btrim`-ed on both sides.** `writeLines` trims and
+ * `quotations.ts` does not, so an untrimmed comparison would read a trailing
+ * space as a colour change — on every dispatch raised from that quotation,
+ * permanently, with nothing on either screen to explain it.
+ *
+ * `concat_ws` with every field cast to `text`, and the one nullable field
+ * `coalesce`d rather than left null: `concat_ws` SKIPS a null argument, which
+ * would let a nine-field line collide with an eight-field one. An unpriced
+ * quotation line `S58` is the only field that can be null, and pricing it IS a
+ * difference — *any difference flags it*, and in money terms a line that was
+ * never priced was never quoted.
+ */
+const LINE_FIELDS = (t: string) => `concat_ws('|',
+      ${t}.supplier_id::text, ${t}.class_id::text, ${t}.fire_rating_id::text,
+      btrim(${t}.custom_colour), ${t}.thickness_id::text,
+      ${t}.width_m::text, ${t}.length_m::text, ${t}.quantity_pcs::text,
+      coalesce(${t}.unit_price::text, ''))`;
+
+/**
+ * The lines of the dispatch in the current row, as a sorted array `S120`.
+ *
+ * **Sorted, so reordering is not a difference** — the form posts a set, and the
+ * order rows happen to sit in says nothing about what goes out. **An array
+ * rather than a set**, so two identical lines are not one: a duplicated line is
+ * twice the quantity.
+ *
+ * Correlated on `dispatches.id` **written out as text, with the table named**.
+ * A Drizzle column interpolated into a `sql` template loses its qualifier
+ * whenever the outer query joins nothing, and `dispatch_id = id` then resolves
+ * inside `dispatch_lines`, is never true, returns nothing and raises no error —
+ * the trap `dispatchSqm` carries above and `CLAUDE.md` records three times.
+ */
+const dispatchLinesDigest = sql<string[] | null>`(
+  select array_agg(x order by x)
+  from (
+    select ${sql.raw(LINE_FIELDS("dl"))} as x
+    from dispatch_lines dl
+    where dl.dispatch_id = dispatches.id
+  ) s
+)`;
+
+/** The same, over the version this dispatch was raised from `S126`. */
+const versionLinesDigest = sql<string[] | null>`(
+  select array_agg(x order by x)
+  from (
+    select ${sql.raw(LINE_FIELDS("ql"))} as x
+    from quotation_lines ql
+    where ql.version_id = dispatches.quotation_version_id
+  ) s
+)`;
+
+/**
+ * `S120` — **does this dispatch differ from the version it was raised from?**
+ *
+ * *Any difference flags it — a colour swapped at the same price and quantity
+ * counts.* An added product makes the array longer, a dropped one shorter, and
+ * a changed field changes one member; `is distinct from` catches all three and
+ * treats two nulls as equal.
+ *
+ * **Derived, never stored, and permanent anyway.** The left-hand side is frozen
+ * by `S126`: the dispatch names an ISSUED version, `S61` will not let its lines
+ * be edited, and `S66` makes a revision a NEW version rather than a rewrite —
+ * so *a later revision changes what is quoted; it does not retroactively create
+ * a gap on a dispatch that never moved*. The right-hand side freezes at
+ * approval, because nothing edits an approved dispatch `S73`. A stored boolean
+ * would be a second answer to a question the rows already answer.
+ *
+ * **Resolved in SQL, before pagination** `CLAUDE.md` — it sits in the SELECT of
+ * both readers beside `dispatchSqm`, so `/dispatches` can say which three of
+ * thirteen differ without opening one.
+ *
+ * **Null on a free entry, and null is not false** `S75`. There is no quotation
+ * to differ from, so the comparison has no left-hand side; `false` would let a
+ * later figure count every direct sale as a dispatch that matched its
+ * quotation.
+ *
+ * **Exported for one caller outside this module**, and deliberately: it is what
+ * `verify:schema25` asserts the flag against over every row ever written. A
+ * second copy of the canonicalisation in a verification script would be a
+ * second definition of "differs", and the script would then be proving its own
+ * arithmetic rather than the module's.
+ */
+export const dispatchDiffers = sql<boolean | null>`(
+  case when dispatches.quotation_version_id is null then null
+  else ${dispatchLinesDigest} is distinct from ${versionLinesDigest}
+  end
+)`;
+
+/**
+ * The same expression the readers use, for the one row an act is about — so
+ * what is stored at submission and what a screen shows can never become two
+ * different definitions of "differs".
+ */
+async function differsFor(
+  tx: Parameters<Parameters<typeof withAudit>[1]>[0],
+  id: string,
+): Promise<boolean | null> {
+  const [row] = await tx
+    .select({ differs: dispatchDiffers })
+    .from(dispatches)
+    .where(eq(dispatches.id, id))
+    .limit(1);
+  return row?.differs ?? null;
+}
+
+/**
+ * The dispatch's own lines, canonically — the before and after an edit is
+ * measured by. Correlated to `dispatches`, so it needs no second key form and
+ * no second canonicalisation.
+ */
+async function linesDigestFor(
+  tx: Parameters<Parameters<typeof withAudit>[1]>[0],
+  id: string,
+): Promise<string[] | null> {
+  const [row] = await tx
+    .select({ digest: dispatchLinesDigest })
+    .from(dispatches)
+    .where(eq(dispatches.id, id))
+    .limit(1);
+  return row?.digest ?? null;
+}
+
+/**
  * **The one place a figure asks whether a dispatch counts** `S72`.
  *
  * *An approved dispatch is the only event that credits a target — not the
  * request.* Before `S72` there was no request, so the row's existence was the
  * event and every reader simply counted rows. There are now four states and
- * three of them count for nothing, so each of the seven readers composes this:
+ * three of them count for nothing, so each of the eight readers composes this:
  *
  *  1. `dispatchesInPeriod` — `S85`'s achievement, and every target figure
  *  2. `listDispatchableThreads` — what has already gone out against a thread
@@ -216,9 +369,11 @@ const dispatchSqm = sql<string>`(
  *  6. `getDispatch` — the credit table, which is rendered only once approved
  *  7. `listDispatches({ status })`, which the two `hasDispatch` callers pass
  *     `"approved"` so an unapproved request cannot advance a chain `[chain.ts]`
+ *  8. `getDispatch` again — `S77`'s *dispatched against this version so far*,
+ *     which a submitted request must not move: nothing has gone out
  *
- * **One function rather than seven `eq(...)` terms**, for the reason
- * `dispatchedSqmByCompany` already carries: seven copies is how one gets
+ * **One function rather than eight `eq(...)` terms**, for the reason
+ * `dispatchedSqmByCompany` already carries: eight copies is how one gets
  * missed, and a missed one does not fail — it silently counts somebody's
  * unapproved request toward their month. `verify:slice3` asserts the figure at
  * every one of the seven rather than at the two that are easiest to reach,
@@ -374,6 +529,14 @@ export type DispatchListRow = {
    * approved dispatch reading null here is ordinary rather than incomplete.
    */
   smacDispatchNumber: string | null;
+  /**
+   * `S120` — **does this differ from the version it was raised from?** Derived
+   * in SQL before pagination, never a column, and **null on a free entry**
+   * `S75`, which has no quotation to differ from. The list marks `true` and
+   * says nothing on either of the other two, so a direct sale is never shown as
+   * a dispatch that matched its quotation.
+   */
+  differsFromQuotation: boolean | null;
   createdAt: Date;
 };
 
@@ -425,6 +588,43 @@ export type DispatchDetail = DispatchListRow & {
    */
   threadProjectId: string | null;
   lines: DispatchLineRow[];
+  /**
+   * `S120`'s two stored halves — the part of the rule no reading of the rows
+   * can recover, because every edit deletes and re-inserts the lines and
+   * nothing left on them says who typed which.
+   *
+   * `differedAtSubmission` is the rep's deviation, fixed when they handed it
+   * over. `linesChangedAfterSubmission` says the lines moved afterwards, which
+   * only the coordinator may do `S62` `S125`. With `differsFromQuotation` the
+   * three give all five real cases, and the screen names which.
+   *
+   * Both null on a free entry and on a draft, per `dispatches_difference_flag`.
+   */
+  differedAtSubmission: boolean | null;
+  linesChangedAfterSubmission: boolean | null;
+  /**
+   * `S77` — **what was quoted against what was actually dispatched.** Three
+   * figures, because two would mislead: *one quotation produces any number of
+   * dispatches*, so this dispatch's own square metres against the version's
+   * total would read a lawful partial dispatch as a deviation.
+   *
+   * `quotedSqm` is the version's `total_sqm`, which excludes service lines
+   * `S59` and is therefore the same quantity the dispatch's `sqm` measures.
+   * `dispatchedAgainstVersionSqm` is every **approved** dispatch raised from
+   * that same version `S72`. Both null on a free entry.
+   */
+  quotedSqm: string | null;
+  dispatchedAgainstVersionSqm: string | null;
+  /**
+   * The version's own lines, to render beside the dispatched ones `S120` `S77`
+   * — *the gap is the point, not drift to be prevented*.
+   *
+   * **Empty unless the dispatch actually differs**, and unless this identity
+   * may open the quotation. A dispatch that matches would print the same lines
+   * twice, and a reader who may not open the thread is not shown its contents
+   * through a side door `S109`.
+   */
+  quotedLines: QuotationLineRow[];
   /** `S124` — set on a refused request and nowhere else, which the
    *  `dispatches_refusal_reason` CHECK holds at the database. */
   refusalReason: string | null;
@@ -949,6 +1149,16 @@ export async function updateDispatchRequest(
       },
     });
 
+    // `S120` — the lines as they stand before this edit replaces them. Read
+    // inside the transaction and before the delete, because after it there is
+    // nothing left to read: `dispatch_lines.created_at` is rewritten by every
+    // edit, the rep's included, so no timestamp on a surviving row could
+    // reconstruct this.
+    const before =
+      request.status === "submitted" && request.quotationVersionId
+        ? await linesDigestFor(tx, id)
+        : null;
+
     const removed = await tx
       .delete(dispatchLines)
       .where(eq(dispatchLines.dispatchId, id))
@@ -963,6 +1173,39 @@ export async function updateDispatchRequest(
     }
 
     await writeLines(tx, log, id, input.lines);
+
+    // `S120` — **the lines moved after submission**, which only the
+    // coordinator may do `S62` `S125`, so the act names her without a role
+    // column. Recorded on the change rather than on the act of editing: an
+    // edit that only moved the date is not a difference anybody made.
+    //
+    // **Sticky, and that is honest rather than convenient.** Once she has
+    // replaced the set, the one the rep submitted is gone — a second edit
+    // cannot know whether it restored it. What the column claims is that what
+    // is going out is no longer purely what the rep handed over, and that
+    // stays true. `differed_at_submission` beside it keeps the rep's own half
+    // intact either way.
+    if (before !== null) {
+      const after2 = await linesDigestFor(tx, id);
+      if (JSON.stringify(before) !== JSON.stringify(after2)) {
+        const [flagged] = await tx
+          .update(dispatches)
+          .set({ linesChangedAfterSubmission: true })
+          .where(eq(dispatches.id, id))
+          .returning();
+        log({
+          action: "dispatch.lines_changed_after_submission",
+          entityType: "dispatch",
+          entityId: id,
+          before: {
+            linesChangedAfterSubmission: request.linesChangedAfterSubmission,
+          },
+          after: {
+            linesChangedAfterSubmission: flagged.linesChangedAfterSubmission,
+          },
+        });
+      }
+    }
   });
 }
 
@@ -997,12 +1240,32 @@ export async function submitDispatchRequest(
   }
 
   await withAudit(session.actor, async (tx, log) => {
+    // `S120` — **the rep's half of the flag, and the only half that has to be
+    // stored.** Whether the dispatch differs from its version is derived at
+    // every reader; what cannot be recovered later is whether the lines the
+    // REP handed over differed, because the coordinator's edit `S125` replaces
+    // the whole set. Computed here with `dispatchDiffers` itself, so the
+    // stored fact and the screen's cannot become two definitions.
+    //
+    // Null on a free entry `S75`: no quotation, nothing to differ from, and
+    // `false` would let a later figure count a direct sale as compliant.
+    // `lines_changed_after_submission` starts `false` beside it — nobody has
+    // edited it yet — and the pair is what `dispatches_difference_flag` holds.
+    const differed = request.quotationVersionId
+      ? await differsFor(tx, id)
+      : null;
+
     const [after] = await tx
       .update(dispatches)
       // `submitted_at` is not `created_at`: a revived request `S122` is
       // submitted again, later, and this is the age the coordinator's queue
       // sorts on — and `S89`'s, when the waiting list arrives.
-      .set({ status: "submitted", submittedAt: new Date() })
+      .set({
+        status: "submitted",
+        submittedAt: new Date(),
+        differedAtSubmission: differed,
+        linesChangedAfterSubmission: differed === null ? null : false,
+      })
       .where(eq(dispatches.id, id))
       .returning();
 
@@ -1236,7 +1499,20 @@ export async function reviveDispatchRequest(
   await withAudit(session.actor, async (tx, log) => {
     const [after] = await tx
       .update(dispatches)
-      .set({ status: "draft", refusalReason: null, submittedAt: null })
+      // `S120` — the flag clears with `submitted_at`. *A revived request is
+      // treated as new* `S122`: it returns to the rep unsubmitted, they edit
+      // and submit it as they would a new one, and the rep's half is recomputed
+      // at that submission. Keeping the old pair would attribute a deviation to
+      // a submission that has been withdrawn — and `dispatches_difference_flag`
+      // would refuse the row anyway. The `dispatch.submitted` audit rows keep
+      // every earlier reading `S112` `S107`.
+      .set({
+        status: "draft",
+        refusalReason: null,
+        submittedAt: null,
+        differedAtSubmission: null,
+        linesChangedAfterSubmission: null,
+      })
       .where(eq(dispatches.id, id))
       .returning();
 
@@ -1410,6 +1686,12 @@ export async function listDispatches(
       paymentMethod: dispatches.paymentMethod,
       paymentNote: dispatches.paymentNote,
       smacDispatchNumber: dispatches.smacDispatchNumber,
+      // `S120` — **resolved here, before pagination**, so the coordinator's
+      // queue can say which three of thirteen differ without opening one
+      // (`WORKFLOW §5`). Filtering a page after fetching it returns silently
+      // empty screens `CLAUDE.md`, and deriving it in the screen would be the
+      // same defect wearing a different coat.
+      differsFromQuotation: dispatchDiffers,
       createdAt: dispatches.createdAt,
     })
     .from(dispatches)
@@ -1469,6 +1751,7 @@ type BareRow = {
   paymentMethod: PaymentMethod | null;
   paymentNote: string | null;
   smacDispatchNumber: string | null;
+  differsFromQuotation: boolean | null;
   createdAt: Date;
 };
 
@@ -1626,6 +1909,18 @@ export async function getDispatch(
       paymentMethod: dispatches.paymentMethod,
       paymentNote: dispatches.paymentNote,
       smacDispatchNumber: dispatches.smacDispatchNumber,
+      // `S120` — the same expression the list resolves, asserted at BOTH
+      // readers by `verify:slice3`. `S116`'s lesson was that a derived figure
+      // checked at the reader that is easiest to reach ships wrong at the one
+      // that is not.
+      differsFromQuotation: dispatchDiffers,
+      differedAtSubmission: dispatches.differedAtSubmission,
+      linesChangedAfterSubmission: dispatches.linesChangedAfterSubmission,
+      // `S126` — the version itself, for `S77`'s comparison below.
+      quotationVersionId: dispatches.quotationVersionId,
+      // `S77` — what the version quoted. Product lines only `S59`, so it is
+      // the same quantity a dispatch's own square metres measure.
+      quotedSqm: quotationVersions.totalSqm,
       createdAt: dispatches.createdAt,
       projectId: dispatches.projectId,
       projectNameEn: projects.nameEn,
@@ -1665,6 +1960,48 @@ export async function getDispatch(
     decorate(session, [row]).then(([only]) => only),
     loadDispatchLines(row.id),
   ]);
+
+  // `S77` — **what has actually gone out against this version**, which is the
+  // figure that stops the comparison misleading: *one quotation produces any
+  // number of dispatches*, so a partial dispatch measured alone against the
+  // version's total would read as a deviation nobody made.
+  //
+  // Composed from `approvedDispatches()` rather than a hand-written status
+  // term, for the reason that function carries: this is the eighth reader, and
+  // seven copies is how one gets missed. Against the VERSION, not the thread —
+  // `S120` anchors on the version a dispatch was raised from `S126`, and a
+  // revision `S66` quotes a different total.
+  let dispatchedAgainstVersionSqm: string | null = null;
+  if (row.quotationVersionId) {
+    const [total] = await db
+      .select({
+        // Written out, no interpolated column: the qualifier trap `dispatchSqm`
+        // records. `listDispatchableThreads` sums the same way.
+        sqm: sql<string>`coalesce(sum(dispatch_lines.sqm), 0)::numeric(14, 4)`,
+      })
+      .from(dispatches)
+      .innerJoin(dispatchLines, eq(dispatchLines.dispatchId, dispatches.id))
+      .where(
+        and(
+          approvedDispatches(),
+          eq(dispatches.quotationVersionId, row.quotationVersionId),
+        ),
+      );
+    dispatchedAgainstVersionSqm = total?.sqm ?? "0.0000";
+  }
+
+  // `S120` — the version's own lines, and **only when there is a gap to look
+  // at**. A dispatch that matches would print the same lines twice, which is a
+  // control that does nothing `D51`. And only for an identity that may open the
+  // quotation: `threadViewable` is the question the Source card already asks
+  // before it draws the link, and the contents may not go where the link does
+  // not `S109`.
+  const quotedLines =
+    row.differsFromQuotation === true &&
+    row.quotationVersionId &&
+    decorated.threadViewable
+      ? await quotationVersionLines(row.quotationVersionId)
+      : [];
   // **Credit is a consequence of approval** `S72`, so an unapproved request has
   // none to show. Not zero and not a table of shares nobody has been given —
   // absent, which is what the screen renders.
@@ -1696,6 +2033,12 @@ export async function getDispatch(
       : false,
     // `S116` — what actually went out, which is what the invoice is made from.
     lines,
+    // `S120` `S77` — the flag, its two stored halves, and the gap measured.
+    differedAtSubmission: row.differedAtSubmission,
+    linesChangedAfterSubmission: row.linesChangedAfterSubmission,
+    quotedSqm: row.quotedSqm,
+    dispatchedAgainstVersionSqm,
+    quotedLines,
     credit: credits?.get(row.id) ?? null,
   };
 }

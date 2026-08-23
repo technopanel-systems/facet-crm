@@ -560,6 +560,21 @@
       "cargoDestinationHint": "Where the third party is taking it. Optional.",
       "actionsApproved": "This dispatch is approved and credits its target. Add the SMAC number when SMAC issues it."
     },
+    "difference": {
+      "flag": "Differs from the quotation",
+      "title": "Against the quotation",
+      "matches": "Every line matches the quotation this was raised from.",
+      "byRep": "The rep changed it before submitting.",
+      "byCoordinator": "Internal sales changed it after it was submitted.",
+      "byBoth": "The rep changed it before submitting, and internal sales changed it again afterwards.",
+      "correctedBack": "The rep changed it before submitting; internal sales brought it back to the quotation.",
+      "quotedSqm": "Quoted on this version",
+      "dispatchedAgainstVersion": "Approved against it so far",
+      "thisDispatch": "This dispatch",
+      "quotedLines": "As quoted",
+      "quotedLinesNotice": "The lines of the quotation version this was raised from. What is going out is above.",
+      "unpriced": "No price quoted"
+    },
     "actions": {
       "request": "Request dispatch",
       "edit": "Edit",

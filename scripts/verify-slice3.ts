@@ -83,7 +83,7 @@
 
 process.loadEnvFile(".env");
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 
 import { closeDatabase, db } from "@/db";
 import {
@@ -92,6 +92,7 @@ import {
   companyReps,
   dispatchLines,
   dispatches as dispatchesTable,
+  notifications,
   productClasses,
   productFireRatings,
   productSuppliers,
@@ -99,6 +100,7 @@ import {
   projectCompanies,
   projectCreditSplits,
   projects,
+  quotationLines,
   quotationThreads,
   quotationVersions,
   recordShares,
@@ -159,9 +161,12 @@ import {
   addServiceLine,
   confirmPayment,
   createQuotationThread,
+  createRevision,
   getQuotationThread,
   issueVersion,
   listQuotationFormOptions,
+  updateQuotationLine,
+  type QuotationLineInput,
   type QuotationVersionInput,
 } from "@/lib/quotations";
 import {
@@ -3094,6 +3099,490 @@ async function main(): Promise<void> {
     "*** only the coordinator may write it *** [S121], [S62]",
     "dispatches.errors.smacNumberOnly",
     () => setDispatchSmacNumber(repA, numbering.id, `${stamp}-DN-3`),
+  );
+
+  /* --- 27. The difference flag [S120], [S77] ---------------------- */
+
+  console.log(
+    "\n27. *** A dispatch that differs from its quotation is flagged, and the flag says who *** [S120], [S77]",
+  );
+
+  // `S120` — *nobody is notified*. The baseline, asserted at the foot.
+  const notifiedBefore =
+    (await db.select({ total: count() }).from(notifications))[0]?.total ?? 0;
+
+  /**
+   * A thread of its own, issued, with two lines — so a section that drops one
+   * still leaves a dispatch, and so "added" and "dropped" are different
+   * assertions rather than the same one twice.
+   */
+  async function issuedThread(
+    label: string,
+    lines: QuotationLineInput[],
+  ): Promise<{ id: string; prefill: DispatchInput["lines"] }> {
+    const thread = await createQuotationThread(
+      repA,
+      { projectId: project.id, companyId: company.id, contactId: null },
+      version,
+      lines,
+      [],
+    );
+    await issueVersion(coordinator, thread.id, {
+      smacReference: `${stamp}-${label}`,
+      verification: "unverified",
+    });
+    const offered = (await listDispatchableThreads(coordinator)).find(
+      (row) => row.id === thread.id,
+    )!;
+    return { id: thread.id, prefill: offered.lines };
+  }
+
+  /** The flag as the LIST resolves it, which is a different query from the
+   *  detail's — `S116`'s lesson was that one reader is not the readers. */
+  async function flagOnList(id: string): Promise<boolean | null | undefined> {
+    for (let page = 1; ; page += 1) {
+      const { rows, total } = await listDispatches(coordinator, { page });
+      const found = rows.find((row) => row.id === id);
+      if (found) return found.differsFromQuotation;
+      if (page * 25 >= total || rows.length === 0) return undefined;
+    }
+  }
+
+  const twoLines: QuotationLineInput[] = [
+    { ...line, quantityPcs: "3.0000" },
+    { ...line, customColour: "9006", quantityPcs: "4.0000" },
+  ];
+
+  /* --- the negative half first: an unedited dispatch is NOT flagged --- */
+
+  const untouched = await issuedThread("120a", twoLines);
+  const asQuotedReq = await requestDispatch(repA, {
+    ...SHIP,
+    lines: untouched.prefill,
+    dispatchDate: "2026-09-27",
+    quotationThreadId: untouched.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  await submitDispatchRequest(repA, asQuotedReq.id);
+  const asQuotedFlag = (await getDispatch(coordinator, asQuotedReq.id))!;
+  check(
+    "*** an unedited dispatch is NOT flagged *** [S120]",
+    asQuotedFlag.differsFromQuotation === false &&
+      asQuotedFlag.differedAtSubmission === false &&
+      asQuotedFlag.linesChangedAfterSubmission === false,
+    `differs ${asQuotedFlag.differsFromQuotation}, at submit ${asQuotedFlag.differedAtSubmission}`,
+  );
+  check(
+    "…and the LIST resolves the same answer, in SQL before pagination [S120]",
+    (await flagOnList(asQuotedReq.id)) === false,
+    `got ${await flagOnList(asQuotedReq.id)}`,
+  );
+
+  /* --- a colour swapped at the same price and quantity ---------------- */
+
+  const colourOnly = await issuedThread("120b", twoLines);
+  const swapped = await requestDispatch(repA, {
+    ...SHIP,
+    // Same price, same quantity, same everything but the colour — the exact
+    // case `S120` names, and the one a quantity-only comparison would miss.
+    lines: colourOnly.prefill.map((row, index) =>
+      index === 0 ? { ...row, customColour: "7016" } : row,
+    ),
+    dispatchDate: "2026-09-27",
+    quotationThreadId: colourOnly.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  await submitDispatchRequest(repA, swapped.id);
+  const swappedFlag = (await getDispatch(coordinator, swapped.id))!;
+  check(
+    "*** a colour swapped at the same price and quantity IS flagged *** [S120]",
+    swappedFlag.differsFromQuotation === true &&
+      swappedFlag.differedAtSubmission === true &&
+      swappedFlag.linesChangedAfterSubmission === false,
+    `differs ${swappedFlag.differsFromQuotation}, at submit ${swappedFlag.differedAtSubmission}`,
+  );
+  check(
+    "…and it is the REP's deviation, on both readers [S120]",
+    (await flagOnList(swapped.id)) === true,
+  );
+  // `S77` — the measurement beside the flag. Quoted is the version's own total
+  // `S59`; approved-against-it is nothing yet, because this one is submitted.
+  check(
+    "*** what was quoted, and what has actually gone out against it *** [S77]",
+    swappedFlag.quotedSqm !== null &&
+      swappedFlag.dispatchedAgainstVersionSqm === "0.0000",
+    `quoted ${swappedFlag.quotedSqm}, dispatched ${swappedFlag.dispatchedAgainstVersionSqm}`,
+  );
+
+  /* --- an added line, and a dropped one ------------------------------- */
+
+  const addedThread = await issuedThread("120c", twoLines);
+  const addedReq = await requestDispatch(repA, {
+    ...SHIP,
+    lines: [...addedThread.prefill, ...linesOf("2.0000", "60.00")],
+    dispatchDate: "2026-09-27",
+    quotationThreadId: addedThread.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  await submitDispatchRequest(repA, addedReq.id);
+  check(
+    "a product the quotation never had is a difference [S120], [S116]",
+    (await getDispatch(coordinator, addedReq.id))?.differsFromQuotation === true,
+  );
+
+  const dropped = await issuedThread("120d", twoLines);
+  const droppedReq = await requestDispatch(repA, {
+    ...SHIP,
+    lines: dropped.prefill.slice(0, 1),
+    dispatchDate: "2026-09-27",
+    quotationThreadId: dropped.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  await submitDispatchRequest(repA, droppedReq.id);
+  check(
+    "…and so is a line the dispatch left behind [S120]",
+    (await getDispatch(coordinator, droppedReq.id))?.differsFromQuotation ===
+      true,
+  );
+
+  /* --- reordering is not a difference --------------------------------- */
+
+  const reordered = await issuedThread("120e", twoLines);
+  const reorderedReq = await requestDispatch(repA, {
+    ...SHIP,
+    lines: [...reordered.prefill].reverse(),
+    dispatchDate: "2026-09-27",
+    quotationThreadId: reordered.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  await submitDispatchRequest(repA, reorderedReq.id);
+  check(
+    "*** the same lines in a different order are NOT a difference *** [S120]",
+    (await getDispatch(coordinator, reorderedReq.id))?.differsFromQuotation ===
+      false,
+    "the comparison is a sorted multiset, not a positional walk",
+  );
+
+  /* --- an unpriced quotation line, priced by the rep ------------------- */
+
+  // **The founder's decision, exercised rather than asserted.** `S58` lets a
+  // quotation line carry no price and `S116` makes the rep price it before
+  // submitting, so the dispatch holds a price the quotation never did. That IS
+  // a difference — *any difference flags it*, and in money terms a line that
+  // was never priced was never quoted. No line in the fixtures had ever been
+  // unpriced, so this one is built on purpose: the decision would otherwise
+  // ship with nothing behind it.
+  const unpriced = await issuedThread("120f", [
+    { ...line, unitPrice: null, quantityPcs: "5.0000" },
+  ]);
+  check(
+    "an unpriced quotation line arrives unpriced [S58], [S116]",
+    unpriced.prefill[0].unitPrice === "",
+    `got "${unpriced.prefill[0].unitPrice}"`,
+  );
+  const pricedReq = await requestDispatch(repA, {
+    ...SHIP,
+    lines: unpriced.prefill.map((row) => ({ ...row, unitPrice: "77.00" })),
+    dispatchDate: "2026-09-27",
+    quotationThreadId: unpriced.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  await submitDispatchRequest(repA, pricedReq.id);
+  check(
+    "*** pricing it IS a difference — no exception was invented *** [S120], [S58]",
+    (await getDispatch(coordinator, pricedReq.id))?.differsFromQuotation ===
+      true,
+  );
+
+  /* --- the coordinator's edit attributes to HER ------------------------ */
+
+  const hersThread = await issuedThread("120g", twoLines);
+  const hersReq = await requestDispatch(repA, {
+    ...SHIP,
+    lines: hersThread.prefill,
+    dispatchDate: "2026-09-27",
+    quotationThreadId: hersThread.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  await submitDispatchRequest(repA, hersReq.id);
+  // She edits the submitted request `S125` `S62` — the phone call, not a
+  // refusal — and changes a quantity.
+  await updateDispatchRequest(coordinator, hersReq.id, {
+    lines: hersThread.prefill.map((row, index) =>
+      index === 0 ? { ...row, quantityPcs: "1.0000" } : row,
+    ),
+    dispatchDate: "2026-09-27",
+    projectId: null,
+    ...SHIP,
+  });
+  const hersFlag = (await getDispatch(coordinator, hersReq.id))!;
+  check(
+    "*** a gap the coordinator introduced is NOT the rep's deviation *** [S120], [S123]",
+    hersFlag.differsFromQuotation === true &&
+      hersFlag.differedAtSubmission === false &&
+      hersFlag.linesChangedAfterSubmission === true,
+    `differs ${hersFlag.differsFromQuotation}, rep ${hersFlag.differedAtSubmission}, hers ${hersFlag.linesChangedAfterSubmission}`,
+  );
+  // An edit that touches no line is not a difference anybody made.
+  await updateDispatchRequest(coordinator, asQuotedReq.id, {
+    lines: untouched.prefill,
+    dispatchDate: "2026-09-28",
+    projectId: null,
+    ...SHIP,
+  });
+  const dateOnly = (await getDispatch(coordinator, asQuotedReq.id))!;
+  check(
+    "…and an edit that moves only the date changes neither half [S120]",
+    dateOnly.differsFromQuotation === false &&
+      dateOnly.differedAtSubmission === false &&
+      dateOnly.linesChangedAfterSubmission === false,
+    `hers ${dateOnly.linesChangedAfterSubmission}`,
+  );
+
+  /* --- both, and the correction back ---------------------------------- */
+
+  const bothOf = await issuedThread("120h", twoLines);
+  const bothReq = await requestDispatch(repA, {
+    ...SHIP,
+    lines: bothOf.prefill.map((row, index) =>
+      index === 0 ? { ...row, customColour: "5010" } : row,
+    ),
+    dispatchDate: "2026-09-27",
+    quotationThreadId: bothOf.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  await submitDispatchRequest(repA, bothReq.id);
+  await updateDispatchRequest(coordinator, bothReq.id, {
+    lines: bothOf.prefill.map((row, index) =>
+      index === 0 ? { ...row, customColour: "5010", unitPrice: "10.00" } : row,
+    ),
+    dispatchDate: "2026-09-27",
+    projectId: null,
+    ...SHIP,
+  });
+  const bothFlag = (await getDispatch(coordinator, bothReq.id))!;
+  check(
+    "*** the rep deviated AND she changed it again — the screen can say both *** [S120]",
+    bothFlag.differsFromQuotation === true &&
+      bothFlag.differedAtSubmission === true &&
+      bothFlag.linesChangedAfterSubmission === true,
+    `rep ${bothFlag.differedAtSubmission}, hers ${bothFlag.linesChangedAfterSubmission}`,
+  );
+
+  const back = await issuedThread("120i", twoLines);
+  const backReq = await requestDispatch(repA, {
+    ...SHIP,
+    lines: back.prefill.map((row, index) =>
+      index === 0 ? { ...row, customColour: "5010" } : row,
+    ),
+    dispatchDate: "2026-09-27",
+    quotationThreadId: back.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  await submitDispatchRequest(repA, backReq.id);
+  await updateDispatchRequest(coordinator, backReq.id, {
+    lines: back.prefill,
+    dispatchDate: "2026-09-27",
+    projectId: null,
+    ...SHIP,
+  });
+  const backFlag = (await getDispatch(coordinator, backReq.id))!;
+  check(
+    "*** she brought it back to the quotation — nothing differs, the rep's half is KEPT *** [S120]",
+    backFlag.differsFromQuotation === false &&
+      backFlag.differedAtSubmission === true &&
+      backFlag.linesChangedAfterSubmission === true,
+    `differs ${backFlag.differsFromQuotation}, rep ${backFlag.differedAtSubmission}`,
+  );
+
+  /* --- a free entry is outside the question altogether ---------------- */
+
+  const freeFlagged = await requestDispatch(coordinator, {
+    ...SHIP,
+    lines: linesOf("5.0000"),
+    dispatchDate: "2026-09-27",
+    quotationThreadId: null,
+    companyId: company.id,
+    userId: repB.user.id,
+    projectId: null,
+  });
+  await submitDispatchRequest(coordinator, freeFlagged.id);
+  const freeFlag = (await getDispatch(coordinator, freeFlagged.id))!;
+  check(
+    "*** a free entry is NULL on every half, never false *** [S120], [S75]",
+    freeFlag.differsFromQuotation === null &&
+      freeFlag.differedAtSubmission === null &&
+      freeFlag.linesChangedAfterSubmission === null &&
+      freeFlag.quotedSqm === null,
+    `differs ${freeFlag.differsFromQuotation}, rep ${freeFlag.differedAtSubmission}`,
+  );
+  check(
+    "…and the list says the same, so no figure can count it as compliant [S120]",
+    (await flagOnList(freeFlagged.id)) === null,
+    `got ${await flagOnList(freeFlagged.id)}`,
+  );
+
+  /* --- stable against a later revision -------------------------------- */
+
+  // `S120` — *the comparison is against the version the dispatch was raised
+  // from, not the latest one* `S68`. A revision supersedes that version `S66`
+  // and starts from its lines; changing the NEW one must not reach backwards.
+  const revised = await issuedThread("120j", twoLines);
+  const beforeRevision = await requestDispatch(repA, {
+    ...SHIP,
+    lines: revised.prefill,
+    dispatchDate: "2026-09-27",
+    quotationThreadId: revised.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  await submitDispatchRequest(repA, beforeRevision.id);
+  await approveDispatchRequest(coordinator, beforeRevision.id, PAID);
+  check(
+    "a dispatch raised exactly as quoted, and approved, is not flagged [S120]",
+    (await getDispatch(coordinator, beforeRevision.id))
+      ?.differsFromQuotation === false,
+  );
+
+  await createRevision(repA, revised.id, "rep_change_request");
+  const [newLine] = await db
+    .select({ id: quotationLines.id })
+    .from(quotationLines)
+    .innerJoin(
+      quotationVersions,
+      eq(quotationVersions.id, quotationLines.versionId),
+    )
+    .where(
+      and(
+        eq(quotationVersions.threadId, revised.id),
+        eq(quotationVersions.status, "requested"),
+      ),
+    )
+    .limit(1);
+  await updateQuotationLine(repA, revised.id, newLine.id, {
+    ...line,
+    customColour: "1013",
+    quantityPcs: "99.0000",
+  });
+  const afterRevision = (await getDispatch(coordinator, beforeRevision.id))!;
+  check(
+    "*** a later revision does not retroactively create a gap *** [S120], [S126], [S66]",
+    afterRevision.differsFromQuotation === false &&
+      afterRevision.differedAtSubmission === false,
+    `differs ${afterRevision.differsFromQuotation}`,
+  );
+  check(
+    "…and the flag survives approval, which is what permanent means [S120], [S73]",
+    afterRevision.status === "approved",
+    `got ${afterRevision.status}`,
+  );
+
+  /* --- revival clears it, and resubmission recomputes ----------------- */
+
+  const revivable = await issuedThread("120k", twoLines);
+  const revivedReq = await requestDispatch(repA, {
+    ...SHIP,
+    lines: revivable.prefill.map((row, index) =>
+      index === 0 ? { ...row, quantityPcs: "1.0000" } : row,
+    ),
+    dispatchDate: "2026-09-27",
+    quotationThreadId: revivable.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  await submitDispatchRequest(repA, revivedReq.id);
+  check(
+    "a deviating request carries the rep's half [S120]",
+    (await getDispatch(coordinator, revivedReq.id))?.differedAtSubmission ===
+      true,
+  );
+  await refuseDispatchRequest(coordinator, revivedReq.id, `${stamp} 120 refused`);
+  await reviveDispatchRequest(coordinator, revivedReq.id);
+  const revivedFlag = (await getDispatch(coordinator, revivedReq.id))!;
+  check(
+    "*** a revived request is treated as new — both halves clear *** [S120], [S122]",
+    revivedFlag.differedAtSubmission === null &&
+      revivedFlag.linesChangedAfterSubmission === null,
+    `rep ${revivedFlag.differedAtSubmission}, hers ${revivedFlag.linesChangedAfterSubmission}`,
+  );
+  // The derived comparison does NOT clear — the lines still differ, and they
+  // are still this rep's to edit. Only the attribution was withdrawn with the
+  // submission it belonged to.
+  check(
+    "…while the comparison itself still reads the lines as they stand [S120]",
+    revivedFlag.differsFromQuotation === true,
+  );
+  await updateDispatchRequest(repA, revivedReq.id, {
+    lines: revivable.prefill,
+    dispatchDate: "2026-09-27",
+    projectId: null,
+    ...SHIP,
+  });
+  await submitDispatchRequest(repA, revivedReq.id);
+  const resubmitted = (await getDispatch(coordinator, revivedReq.id))!;
+  check(
+    "*** and resubmitting recomputes it against the same version *** [S120], [S122]",
+    resubmitted.differsFromQuotation === false &&
+      resubmitted.differedAtSubmission === false &&
+      resubmitted.linesChangedAfterSubmission === false,
+    `differs ${resubmitted.differsFromQuotation}, rep ${resubmitted.differedAtSubmission}`,
+  );
+
+  /* --- the quoted lines, and who may read them ------------------------ */
+
+  check(
+    "*** a flagged dispatch carries the version's own lines, to compare *** [S120], [S77]",
+    swappedFlag.quotedLines.length === 2 &&
+      swappedFlag.quotedLines.some((row) => row.customColour === "9006"),
+    `${swappedFlag.quotedLines.length} quoted line(s)`,
+  );
+  check(
+    "…and one that matches carries none — the same list twice is not a comparison [D51]",
+    asQuotedFlag.quotedLines.length === 0 && freeFlag.quotedLines.length === 0,
+    `${asQuotedFlag.quotedLines.length} / ${freeFlag.quotedLines.length}`,
+  );
+  // `S120` — *visible to the rep, the coordinator and the manager*. No new
+  // visibility term was written: all three already see the dispatch through
+  // `visibleDispatchesFilter`, and the flag rides on the row.
+  const managerSees = await getDispatch(manager, swapped.id);
+  const repSees = await getDispatch(repA, swapped.id);
+  check(
+    "*** the flag is visible to the rep, the coordinator and the manager *** [S120]",
+    managerSees?.differsFromQuotation === true &&
+      repSees?.differsFromQuotation === true,
+    `manager ${managerSees?.differsFromQuotation}, rep ${repSees?.differsFromQuotation}`,
+  );
+  // And **nobody is notified** `S120`, which the rule says outright. Counted
+  // across the whole section rather than matched on a body: every act above —
+  // eleven requests, eleven submissions, two coordinator edits, a refusal, a
+  // revival and an approval — must have raised none between them.
+  const [notifiedAfter] = await db
+    .select({ total: count() })
+    .from(notifications);
+  check(
+    "*** …and NOBODY is notified *** [S120]",
+    (notifiedAfter?.total ?? 0) === notifiedBefore,
+    `${notifiedBefore} before, ${notifiedAfter?.total} after`,
   );
 
   /*

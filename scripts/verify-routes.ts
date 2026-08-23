@@ -2202,9 +2202,19 @@ async function main(): Promise<void> {
       // `S116` — the lines landed and the screen shows them. A DOM marker,
       // never the rendered numbers: what is asserted is that the dispatch
       // carries its own lines, and one row is one line.
-      const lineRows = [
-        ...dispatchPage.body.matchAll(/data-line="[0-9a-f-]{36}"/g),
-      ];
+      //
+      // **Scoped to `data-slot="dispatch-lines"`**, and it has to be since
+      // `S120`: a flagged dispatch renders the quotation version's lines in a
+      // second card beside them, with `data-line` markers of their own. An
+      // unscoped count over the page would read those as the dispatch's and
+      // report two lines where one went out.
+      const linesFrom = dispatchPage.body.indexOf('data-slot="dispatch-lines"');
+      const linesTo = dispatchPage.body.indexOf('data-slot="quoted-lines"');
+      const own = dispatchPage.body.slice(
+        linesFrom,
+        linesTo > linesFrom ? linesTo : undefined,
+      );
+      const lineRows = [...own.matchAll(/data-line="[0-9a-f-]{36}"/g)];
       check(
         `${locale}: *** the dispatch carries its own lines *** [S116]`,
         dispatchPage.body.includes('data-slot="dispatch-lines"') &&
@@ -2774,6 +2784,94 @@ async function main(): Promise<void> {
         `${locale}: *** the request waits on the coordinator *** [S72], [S88]`,
         sitting.body.includes('data-status="submitted"'),
         factOf(sitting.body, "status"),
+      );
+
+      /* --- 3b. she edits it, and the flag says it was HER [S120] ----- */
+
+      // `S120` — *the flag records who made each difference — the rep before
+      // submitting, or the coordinator after*. `verify:slice3` drives every
+      // case of that through the data layer; what only this file can claim is
+      // that the two SCREENS render it, in both locales, off a real form POST.
+      //
+      // The colour is changed rather than a quantity, because that is the case
+      // `S120` names outright: *a colour swapped at the same price and quantity
+      // counts*. And it is a colour no fixture uses, so the difference is
+      // certain rather than inherited from whatever the quotation happened to
+      // carry.
+      const editPage = await get(coordJar, `${path}/edit`);
+      const editShell = editPage.body.match(
+        /<form[^>]*data-slot="form-shell"[\s\S]*?<\/form>/,
+      )?.[0];
+      if (!editShell) {
+        check(`${locale}: the coordinator's edit form renders [S125]`, false);
+        continue;
+      }
+      const editFields = envelope(editShell);
+      editFields.set("dispatchDate", "2026-08-19");
+      editFields.set("stock", "riyadh");
+      editFields.set("shipment", "tt");
+      for (const [name, value] of Object.entries({
+        ...lookups,
+        customColour: `RV-${locale}-9999`,
+        widthM: "1.2",
+        lengthM: "2.4",
+        quantityPcs: "5",
+        unitPrice: "88",
+      })) {
+        editFields.set(name, value as string);
+      }
+      const editedBy = await post(coordJar, `${path}/edit`, editFields);
+      check(
+        `${locale}: *** the coordinator edits a submitted request *** [S125], [S62]`,
+        editedBy.status === 303,
+        `got ${editedBy.status} ${editedBy.location}`,
+      );
+
+      const flagged = await get(coordJar, path);
+      check(
+        `${locale}: *** the dispatch is flagged as differing from its quotation *** [S120]`,
+        flagged.body.includes('data-differs="yes"'),
+        factOf(flagged.body, "difference"),
+      );
+      check(
+        `${locale}: …and the version's own lines render beside the dispatched ones [S120], [S77]`,
+        flagged.body.includes('data-slot="quoted-lines"'),
+      );
+      check(
+        `${locale}: …with the three figures S77 compares [S77]`,
+        flagged.body.includes('data-fact="quotedSqm"') &&
+          flagged.body.includes('data-fact="dispatchedAgainstVersion"') &&
+          flagged.body.includes('data-fact="thisDispatchSqm"'),
+      );
+
+      // And on the row, which is the signal the coordinator's queue had none
+      // of: at 12–15 requests a day she opened every screen to find the three
+      // that needed reading.
+      // **Paged to, not assumed on page one.** The submitted scope is the
+      // coordinator's queue and a queue is oldest first `S87`, so a request
+      // raised now sits on the LAST page of a database this suite has been
+      // adding to. Walking is also the stronger claim: the marker is resolved
+      // in SQL before pagination `CLAUDE.md`, so it must be on the row
+      // wherever the row happens to fall.
+      const flagId = path.split("/").pop() as string;
+      let row = "";
+      for (let page = 1; page <= 60; page += 1) {
+        const queue = await get(
+          coordJar,
+          `/${locale}/dispatches?status=submitted&page=${page}`,
+        );
+        const at = queue.body.indexOf(`/dispatches/${flagId}"`);
+        if (at !== -1) {
+          row = queue.body.slice(at, queue.body.indexOf("</tr>", at));
+          break;
+        }
+        // An empty page is the end of the queue, whatever the footer says.
+        if (!/\/dispatches\/[0-9a-f-]{36}"/.test(queue.body)) break;
+      }
+      check(
+        `${locale}: *** and the LIST row carries the marker, resolved in SQL *** [S120]`,
+        row.includes('data-differs="yes"'),
+        row === "" ? "the row is not on the queue" : "no marker on the row",
       );
 
       /* --- 4. she refuses it, with a reason [S124] ------------------- */

@@ -200,23 +200,47 @@ export default async function DispatchesPage({
                     {row.sqm} {t("common.sqm")}
                   </TableCell>
                   <TableCell className="text-start">
-                    {row.isDirect ? (
-                      <Badge variant="outline">
-                        {t("dispatches.fields.direct")}
-                      </Badge>
-                    ) : row.threadViewable ? (
-                      <Link
-                        href={`/quotations/${row.quotationThreadId}`}
-                        className="hover:underline"
-                        dir="ltr"
-                      >
-                        {row.smacReference ?? t("common.none")}
-                      </Link>
-                    ) : (
-                      <span dir="ltr">
-                        {row.smacReference ?? t("common.none")}
-                      </span>
-                    )}
+                    {/* `S120` — the marker sits under the reference it is
+                        about, so the cell reads "this quotation, and this
+                        dispatch differs from it". This is the signal the
+                        coordinator's queue had none of (`WORKFLOW §5`): at
+                        12–15 requests a day she opened every screen to learn
+                        which three needed reading.
+
+                        **Plain outline, no tone** `D6`. Colour describes how
+                        long something has waited, never how good the outcome
+                        is, and a difference is a state of the record rather
+                        than an elapsed time — a red or amber pill here would
+                        also read as a verdict, which `S77` explicitly refuses:
+                        *the gap is the point, not drift to be prevented*.
+
+                        Rendered only on `true`. `null` is a free entry `S75`
+                        with no quotation to differ from, and marking it either
+                        way would say something the record cannot support. */}
+                    <span className="flex flex-col items-start gap-1.5">
+                      {row.isDirect ? (
+                        <Badge variant="outline">
+                          {t("dispatches.fields.direct")}
+                        </Badge>
+                      ) : row.threadViewable ? (
+                        <Link
+                          href={`/quotations/${row.quotationThreadId}`}
+                          className="hover:underline"
+                          dir="ltr"
+                        >
+                          {row.smacReference ?? t("common.none")}
+                        </Link>
+                      ) : (
+                        <span dir="ltr">
+                          {row.smacReference ?? t("common.none")}
+                        </span>
+                      )}
+                      {row.differsFromQuotation === true ? (
+                        <Badge variant="outline" data-differs="yes">
+                          {t("dispatches.difference.flag")}
+                        </Badge>
+                      ) : null}
+                    </span>
                   </TableCell>
                   <TableCell className="text-start">
                     {/* Approved and refused owe nobody `D26`: one is an event
