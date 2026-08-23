@@ -210,7 +210,7 @@ lead cell.
 | **Company** | a **silence meter** — a small bar and a day count, coloured by lateness | have I neglected this? |
 | **Project** | a **six-dot mini-chain** showing chain position, plus a quoted-vs-dispatched bar | where is this? |
 | **Quotation** | an **avatar and whose move it is** — "Rawan · signatures", "You · confirm payment" | who does this wait on? |
-| **Dispatch** | the square metres, mono, large | how much went out? |
+| **Dispatch** | the square metres, mono, large | how much went out? A **submitted request** owes the coordinator (S88); an **approved dispatch** owes nobody. |
 | **Contact** | name and position | who is this? |
 
 **D27.** The mini-chain draws from `src/lib/chain.ts` and nothing else. Done
