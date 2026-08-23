@@ -292,19 +292,26 @@ export const formFactorEnum = pgEnum("form_factor", ["sheet", "coil"]);
  * | `submitted` | the coordinator | waiting on her `S88`, and hers to edit `S62` |
  * | `approved` | nobody | the event that credits a target `S72` |
  * | `refused` | nobody | archived with a reason `S124`, revivable by her `S122` |
+ * | `cancelled` | nobody | undone after approval `S73`, with a reason, never revived |
  *
- * **There is no `cancelled`.** `S73` names it and nothing here would write it,
- * so it would land as a dead enum value — `record_type.quotation_version` is
- * what that looks like (`WORKFLOW §5`). `project_end_state.dormant` stood
- * beside it in this sentence until `S31` dropped it for exactly this reason.
- * It arrives with its writer.
-
+ * **`cancelled` arrived with its writer, which is the whole rule about it.**
+ * `S72`'s slice left it out deliberately — it would have been a dead enum
+ * value, `record_type.quotation_version`'s shape (`WORKFLOW §5`) — and
+ * `cancelDispatch` is what it was waiting for.
+ *
+ * It is **not** a way back to `submitted`. *Approval is final* `S73`: a
+ * cancelled dispatch keeps its approval stamps, its payment method, its SMAC
+ * number and its difference flag `S31`, and no act moves it anywhere. What
+ * changes is that it stops counting — `approvedDispatches()` reads
+ * `status = 'approved'`, so un-winning `S31` and de-crediting `S85` need no
+ * second writer.
  */
 export const dispatchStatusEnum = pgEnum("dispatch_status", [
   "draft",
   "submitted",
   "approved",
   "refused",
+  "cancelled",
 ]);
 
 /** `[07 B6]` — entry-time matching is the norm, the manager's queue the exception. */
@@ -1599,6 +1606,29 @@ export const dispatches = pgTable(
      */
     refusalReason: text("refusal_reason"),
     /**
+     * `S73` — **why an approved dispatch was undone**, and the only column
+     * this rule needs.
+     *
+     * *A cancelled dispatch stays visible on the record it belonged to,
+     * carries a reason, and is never revived.* So it is written once and never
+     * cleared — the opposite of `refusal_reason` beside it, which revival
+     * clears because a revived request is out of the archive `S122`. Nothing
+     * revives a cancellation, so nothing clears this.
+     *
+     * **No `cancelled_at` and no `cancelled_by_user_id`**, deliberately.
+     * `refusal_reason` has neither either, and the `dispatch.cancelled` audit
+     * row carries the actor and the moment `S112` — which is what `S107` means
+     * by nothing being deleted. `quotation_threads.cancelled_at` is the
+     * counter-example: written by `cancelThread` and read by nothing since it
+     * landed (`WORKFLOW §5`).
+     *
+     * `S128` carries this to the rep rather than leaving it here to be found:
+     * *a record that vanishes with its reason in a column nobody reads is the
+     * same as no reason at all.* The notification stores its own copy, because
+     * a co-credited rep cannot open the record this column sits on.
+     */
+    cancellationReason: text("cancellation_reason"),
+    /**
      * `S130` — **the dispatch's own stock**, which may differ from its
      * quotation's `S118`. The rep chooses it when requesting, as they choose
      * the shipment method `S119`; the coordinator may change it until approval,
@@ -1738,16 +1768,37 @@ export const dispatches = pgTable(
      * becoming a second answer to *is this approved?*. Every figure asks the
      * stamp `[dispatches.ts approvedDispatches]`; this is what makes asking the
      * stamp the same as asking the status.
+     *
+     * **`cancelled` is on the left-hand side because approval is final** `S73`.
+     * A cancelled dispatch *was* approved — it is undone, never un-approved —
+     * so it keeps both stamps, and `= (approved_at is not null)` would refuse
+     * the row outright. What stops the widening from making a cancelled
+     * dispatch count is that no figure reads these columns: they all compose
+     * `approvedDispatches()`, which is `status = 'approved'`.
      */
     check(
       "dispatches_approval_stamps",
-      sql`(status = 'approved') = (approved_at is not null)
-          and (status = 'approved') = (approved_by_user_id is not null)`,
+      sql`(status in ('approved', 'cancelled')) = (approved_at is not null)
+          and (status in ('approved', 'cancelled')) = (approved_by_user_id is not null)`,
     ),
     /** `S124` — refused, and only refused, carries a reason. */
     check(
       "dispatches_refusal_reason",
       sql`(status = 'refused') = (refusal_reason is not null)`,
+    ),
+    /**
+     * `S73` — **cancelled, and only cancelled, carries a cancellation reason.**
+     *
+     * The `=` form rather than the one-directional shape its two neighbours
+     * below use, and for `dispatches_refusal_reason`'s reason: this is not a
+     * value the row keeps from an earlier state, it is the record of the act
+     * itself. A reason on a live dispatch would annotate a cancellation that
+     * never happened, and a cancellation with none is the hole `S128` exists to
+     * close.
+     */
+    check(
+      "dispatches_cancellation_reason",
+      sql`(status = 'cancelled') = (cancellation_reason is not null)`,
     ),
     /**
      * `S72` — a draft has not been handed over and everything else has.
@@ -1801,9 +1852,10 @@ export const dispatches = pgTable(
      * something no rule says: `S76` puts *payment* among the fields the
      * coordinator's edit right reaches on a submitted request. More
      * importantly, `S73`'s own second half — *approval is final; anything wrong
-     * afterwards is a cancellation* — arrives with a `cancelled` state that
-     * still carries the method it was approved with. Written this way that
-     * slice adds an enum value and amends nothing here.
+     * afterwards is a cancellation* — arrived with a `cancelled` state that
+     * still carries the method it was approved with, and this constraint was
+     * the one written to need no amendment for it. It did not: the foresight
+     * held, and a cancelled row keeps its method untouched.
      */
     check(
       "dispatches_payment_method",
@@ -1822,10 +1874,17 @@ export const dispatches = pgTable(
      * of its own: **the number is not a condition of approval**, so an approved
      * dispatch with none is the ordinary state of one, and the `=` form would
      * make `S121` gate the very act the rule says it does not.
+     *
+     * **`cancelled` joins `approved` on the right-hand side** `S73`. This is
+     * the one of `0022`'s five that the cancellation slice did have to amend:
+     * one-directional in the sense that approval requires no number, it still
+     * required `status = 'approved'` for a number to exist, and a numbered
+     * dispatch is exactly the kind that gets cancelled. Nothing is cleared —
+     * `S107`, and SMAC's number is what a person would search for afterwards.
      */
     check(
       "dispatches_smac_number_after_approval",
-      sql`smac_dispatch_number is null or status = 'approved'`,
+      sql`smac_dispatch_number is null or status in ('approved', 'cancelled')`,
     ),
     /**
      * `S121` — *which is unique*. Nulls are distinct in Postgres, so every

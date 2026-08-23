@@ -67,8 +67,9 @@ export default async function DispatchPage({
   // it is an event that already happened. A REQUEST is different — `S86` puts
   // it in one of three states and `S88` says a submitted one *waits on the
   // coordinator, not on a rep*. So the panel renders for a draft and for a
-  // submitted request, and for nothing else: approved and refused are both
-  // finished, and a panel on either would claim somebody owed something.
+  // submitted request, and for nothing else: approved, refused and cancelled
+  // are all finished, and a panel on any of them would claim somebody owed
+  // something. A cancellation especially — *never revived* `S73`.
   const timeline = await recordTimeline(session, "dispatch", dispatch.id, {
     page: Number(page) || 1,
   });
@@ -151,9 +152,45 @@ export default async function DispatchPage({
         />
       ) : null}
 
+      {/* `S73` — **a cancelled dispatch stays visible on the record it belonged
+          to and carries a reason.** Above the facts, because it is the first
+          thing anyone opening this screen needs to know: nothing here counts
+          any more `S31`.
+
+          No colour, and no `destructive` anything `D6`: *colour describes how
+          long something has waited, never how good the outcome is*, and a
+          cancellation is a state of a record rather than a warning. The status
+          badge below stays plain `outline` for the same reason. The button that
+          performs the act is destructive; the record that resulted is not.
+
+          `S128` also carries this reason to the rep and to anyone whose credit
+          it took back — this card is where it lives for people who come back to
+          the record, and it is the copy a co-credited rep can never reach. */}
+      {dispatch.status === "cancelled" && dispatch.cancellationReason ? (
+        <Card data-slot="cancellation">
+          <CardHeader>
+            <CardTitle className="text-start">
+              {t("dispatches.detail.cancelled")}
+            </CardTitle>
+            <CardDescription className="text-start">
+              {t("dispatches.detail.cancelledNotice")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p
+              dir="auto"
+              className="text-start text-sm whitespace-pre-wrap"
+              data-cancellation-reason
+            >
+              {dispatch.cancellationReason}
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {/* `S124` — a refusal carries a reason, and the reason is what the rep
-          opens this screen to read. `S128` will also carry it to them; that is
-          its own session, and until then this is where it lives. */}
+          opens this screen to read. `S128` carries it to them at the moment of
+          refusal now; this is where it lives for anyone coming back to it. */}
       {dispatch.status === "refused" && dispatch.refusalReason ? (
         <Card data-slot="refusal">
           <CardHeader>

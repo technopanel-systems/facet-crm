@@ -171,7 +171,9 @@
       "recordHandedOver": "تم تسليم عمل إليك",
       "shareGranted": "تمت مشاركته معك",
       "followUpDigest": "المتابعات اليومية",
-      "mentionReceived": "أشار إليك"
+      "mentionReceived": "أشار إليك",
+      "decisionEndedWork": "قرار أنهى عملك",
+      "creditGranted": "تمت مشاركة رصيد معك"
     },
     "followUpKind": {
       "quotation_no_response": "عرض سعر بلا رد",
@@ -386,7 +388,8 @@
       "stock": "المخزن",
       "verification": "تم التحقق من المرجع",
       "grandTotal": "الإجمالي",
-      "projectNone": "بلا مشروع"
+      "projectNone": "بلا مشروع",
+      "rejectionReason": "سبب الرفض"
     },
     "detail": {
       "details": "التفاصيل",
@@ -447,6 +450,7 @@
       "accept": "اعتماد",
       "acceptHint": "اعتماد داخلي — التواقيع مكتملة. هذا ليس التزامًا من العميل.",
       "reject": "رفض",
+      "rejectHint": "السبب المكتوب مطلوب. يُسجَّل تعليقاً على العرض ويصل إلى المندوب.",
       "cancel": "إلغاء عرض السعر",
       "cancelHint": "يلزم كتابة سبب.",
       "revise": "إنشاء مراجعة",
@@ -471,6 +475,7 @@
       "coordinatorOnly": "منسق المبيعات وحده يمكنه فعل ذلك.",
       "cancellationReasonRequired": "الإلغاء يحتاج إلى سبب مكتوب.",
       "returnReasonRequired": "اذكر ما الذي يحتاج تعديلاً. يصل السبب إلى المندوب كتعليق.",
+      "rejectionReasonRequired": "اذكر سبب الرفض. يصل السبب إلى المندوب كتعليق.",
       "paymentFirst": "أكّد الدفع أولًا.",
       "noSuppliers": "لم تُضف أي جهات توريد بعد، لذلك لا يمكن حفظ البند.",
       "companyNotVisible": "تعذر العثور على هذه الشركة، أو أنها ليست ضمن شركاتك."
@@ -522,6 +527,8 @@
       "turn": "الدور على",
       "refusalReason": "سبب الرفض",
       "refusalReasonPlaceholder": "وضّح الخطأ ليتمكن المندوب من تصحيحه",
+      "cancellationReason": "سبب الإلغاء",
+      "cancellationReasonPlaceholder": "اذكر ما الذي حدث. يُبلَّغ المندوب وكل من نُسب إليه رصيد.",
       "stock": "المخزن",
       "shipment": "طريقة الشحن",
       "cargoDestination": "الوجهة",
@@ -565,7 +572,10 @@
       "stockHint": "المخزن الذي يُسحب منه. وقد يختلف عن مخزن عرض السعر.",
       "shipmentHint": "لا توجد شاحنات في الجنوب والدمام، فالشحن من أيٍّ منهما يكون على شاحنة العميل.",
       "cargoDestinationHint": "إلى أين ينقلها الطرف الثالث. اختيارية.",
-      "actionsApproved": "تمت الموافقة على هذا الشحن وهو يُحتسب للهدف. أضف رقم سماك عند إصداره."
+      "actionsApproved": "تمت الموافقة على هذا الشحن وهو يُحتسب للهدف. أضف رقم سماك عند إصداره.",
+      "cancelled": "ملغى",
+      "cancelledNotice": "هذا الشحن كان معتمداً ثم أُلغي. لم يعد يُحتسب لأي هدف ولا يربح أي مشروع، ولا يمكن إعادته.",
+      "cancelHint": "الإلغاء نهائي. يبقى الشحن على السجل مع سببه، ويتوقف عن الاحتساب، ولا يمكن إعادته — يُنشأ شحن جديد بدلاً منه. ويُبلَّغ المندوب وكل من نُسب إليه رصيد."
     },
     "difference": {
       "flag": "يختلف عن عرض السعر",
@@ -588,7 +598,8 @@
       "submit": "إرسال إلى المبيعات الداخلية",
       "approve": "اعتماد",
       "refuse": "رفض",
-      "revive": "إعادة الطلب"
+      "revive": "إعادة الطلب",
+      "cancel": "إلغاء هذا الشحن"
     },
     "errors": {
       "companyNotOnThread": "الشركة لا تطابق عرض السعر.",
@@ -621,7 +632,9 @@
       "cargoDestinationOnly": "الوجهة تخص شحن الطرف الثالث (Cargo) وحده.",
       "smacNumberTaken": "هناك شحن آخر يحمل رقم سماك نفسه.",
       "smacNumberOnly": "لا يكتب رقم أمر الشحن في سماك إلا المبيعات الداخلية.",
-      "notApproved": "يُكتب رقم سماك بعد الاعتماد، لا قبله."
+      "notApproved": "لا يمكن ترقيم شحن أو إلغاؤه إلا بعد اعتماده.",
+      "cancelOnly": "المبيعات الداخلية وحدها من يلغي الشحن.",
+      "cancellationReasonRequired": "اذكر سبب الإلغاء. يُبلَّغ المندوب وكل من نُسب إليه رصيد."
     },
     "request": "طلب توريد",
     "requestTitle": "طلب توريد",
@@ -631,7 +644,8 @@
       "draft": "مسودة",
       "submitted": "بانتظار الاعتماد",
       "approved": "معتمد",
-      "refused": "مرفوض"
+      "refused": "مرفوض",
+      "cancelled": "ملغى"
     },
     "turn": {
       "yours": "دورك",
@@ -959,7 +973,23 @@
       "clearsInteractionAgainstCompany": "يزول عند تسجيلك تواصلاً مع الشركة.",
       "mention": "أشار إليك {name} في تعليق.",
       "mentionUnknown": "أشار إليك أحدهم في تعليق.",
-      "mentionLink": "افتح السجل"
+      "mentionLink": "افتح السجل",
+      "decision": {
+        "dispatch_refused": "رفض {name} طلب التوريد الخاص بك.",
+        "dispatch_cancelled": "ألغى {name} شحناً. لم يعد يُحتسب ضمن شهر أي أحد.",
+        "quotation_rejected": "رفض {name} عرض السعر الخاص بك.",
+        "quotation_cancelled": "ألغى {name} عرض السعر الخاص بك."
+      },
+      "decisionUnknown": {
+        "dispatch_refused": "رُفض طلب التوريد الخاص بك.",
+        "dispatch_cancelled": "أُلغي شحن. لم يعد يُحتسب ضمن شهر أي أحد.",
+        "quotation_rejected": "رُفض عرض السعر الخاص بك.",
+        "quotation_cancelled": "أُلغي عرض السعر الخاص بك."
+      },
+      "decisionLink": "افتح السجل",
+      "decisionStandsAlone": "هذا السجل ليس من حقك فتحه. السبب أعلاه هو كل ما في الأمر.",
+      "credit": "منحك {name} حصة {percentage}٪ من رصيد هذا المشروع.",
+      "creditUnknown": "مُنحت حصة {percentage}٪ من رصيد هذا المشروع."
     },
     "actions": {
       "markRead": "تعليم كمقروء",

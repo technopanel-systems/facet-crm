@@ -22,6 +22,20 @@
  *  5. **Nothing is lost** `[18 §5]`. Percentages sum to exactly 100.00 and a
  *     dispatch's shares sum to exactly its own sqm — see `@/lib/decimal`.
  *  6. **No contributor** `[18 §6]`. `percentage` is always non-null.
+ *  7. **Every rep in a new generation is told** `S129`. *A rep is told when
+ *     they are given a share of someone else's credit* — the split case, never
+ *     `S78`'s ordinary 100%, which needs no telling and has no row here.
+ *
+ *     **`S129` names `S80`'s confirmation at approval as the moment, and that
+ *     moment does not exist yet**: `S80` is unbuilt, `S79` still puts the split
+ *     on the project rather than the quotation, and `dispatches.ts` deliberately
+ *     imports no writer from this module `[07 D3]`, `[12 §1]`. What does exist
+ *     is the thing `S129` names in its own next sentence — *a split is a dated
+ *     row with an author `S110`, so the event exists; nothing surfaces it
+ *     today*. That row is written here, so this is where the telling goes. When
+ *     `S80`'s prompt lands it calls `setCreditSplit` like every other caller
+ *     and inherits it. `S129` keeps its marker until then and says which half
+ *     is true (`WORKFLOW §7`).
  *
  * Every read composes a filter from `authz`; every write goes through
  * `withAudit`, which owns the transaction `[07 E1]`.
@@ -43,6 +57,9 @@ import {
   fromScaled,
   toScaled,
 } from "@/lib/decimal";
+import { NOTIFICATION_TYPES } from "@/lib/enums";
+/** `S129` — the telling. Nothing here is used at module-evaluation time. */
+import { raise } from "@/lib/notifications";
 import { RuleError } from "@/lib/validation";
 
 /** A whole generation: 100.00 percent, divided among its rows. */
@@ -223,6 +240,30 @@ export async function setCreditSplit(
         })),
       },
     });
+
+    // `S129` — one per rep in the generation, in this transaction, so nobody is
+    // told about a share that rolled back. The percentage travels in the
+    // payload rather than being re-read: a later generation supersedes this one
+    // `S110`, and re-reading would tell the rep about a share they no longer
+    // hold instead of the one they were given.
+    //
+    // **Whoever set it is not told.** `S82` forbids a rep setting their own
+    // split, so the author is not normally in the generation at all; dropping
+    // the self-directed row is `addMentions`' rule, applied here because
+    // `raise` has none of its own.
+    for (const row of inserted) {
+      if (row.userId === session.user.id) continue;
+      await raise(tx, log, {
+        typeKey: NOTIFICATION_TYPES.creditGranted,
+        recipientUserId: row.userId,
+        payload: {
+          projectId,
+          effectiveFrom: input.effectiveFrom,
+          percentage: row.percentage,
+          setByUserId: session.user.id,
+        },
+      });
+    }
   });
 }
 

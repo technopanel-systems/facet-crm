@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
+import { lookupName } from "@/lib/lookups";
 import {
   listNotifications,
   sweepNotifications,
@@ -100,6 +101,7 @@ export default async function NotificationsPage({
                       row={row}
                       t={t}
                       format={format}
+                      locale={locale}
                     />
                   ))}
                 </CardContent>
@@ -118,6 +120,7 @@ export default async function NotificationsPage({
                       row={row}
                       t={t}
                       format={format}
+                      locale={locale}
                     />
                   ))}
                 </CardContent>
@@ -160,10 +163,13 @@ function NotificationEntry({
   row,
   t,
   format,
+  locale,
 }: {
   row: NotificationRow;
   t: Translator;
   format: Formatter;
+  /** `S129`'s project still carries a name pair, so `lookupName` needs it. */
+  locale: string;
 }) {
   const title = row.typeName
     ? t(`enums.notificationType.${row.typeName}`)
@@ -251,6 +257,90 @@ function NotificationEntry({
                 {t("notifications.detail.mentionLink")}
               </Link>
             </>
+          ) : (
+            <span className="text-muted-foreground text-start text-sm">
+              {t("notifications.detail.anchorHidden")}
+            </span>
+          )}
+        </div>
+      ) : null}
+
+      {/* `S128` — **the reason is rendered whichever way the record came out.**
+          *Where the person told cannot see the record, the message carries the
+          reason and stands alone. It is not a link into something they cannot
+          open.* That is the rule's own named exception to `S112`, and it is why
+          this branch differs from the mention above: a mention withholds its
+          body when the record is closed, because a comment is the record's
+          content. A reason for ending somebody's work is theirs. */}
+      {row.payload?.kind === "decision" ? (
+        <div className="flex flex-col gap-1">
+          <p className="text-muted-foreground text-start text-sm">
+            {row.payload.decidedByName
+              ? t(`notifications.detail.decision.${row.payload.decision}`, {
+                  name: row.payload.decidedByName,
+                })
+              : t(
+                  `notifications.detail.decisionUnknown.${row.payload.decision}`,
+                )}
+          </p>
+          <p
+            className="text-start text-sm whitespace-pre-wrap"
+            dir="auto"
+            data-decision-reason
+          >
+            {row.payload.reason}
+          </p>
+          {row.payload.recordViewable && row.payload.href ? (
+            <Link
+              href={row.payload.href}
+              className="text-start text-sm hover:underline"
+            >
+              {t("notifications.detail.decisionLink")}
+            </Link>
+          ) : (
+            <span className="text-muted-foreground text-start text-sm">
+              {t("notifications.detail.decisionStandsAlone")}
+            </span>
+          )}
+        </div>
+      ) : null}
+
+      {/* `S129` — a share of someone else's credit. The **ordinary** `S112`
+          rule here, not `S128`'s exception: that one is written for credit
+          taken back, and this is credit given. A rep given a share need not
+          hold the project `S30`, so the name and the link are present only
+          while `canOpenRecord` passes — the mention branch's shape exactly.
+          The percentage and the date are the rep's own credit rather than the
+          project's data, so they are shown either way. */}
+      {row.payload?.kind === "credit" ? (
+        <div className="flex flex-col gap-1">
+          <p className="text-muted-foreground text-start text-sm">
+            {row.payload.setByName
+              ? t("notifications.detail.credit", {
+                  name: row.payload.setByName,
+                  percentage: row.payload.percentage,
+                })
+              : t("notifications.detail.creditUnknown", {
+                  percentage: row.payload.percentage,
+                })}
+          </p>
+          <p className="text-muted-foreground text-start text-sm" dir="ltr">
+            <span className="num">{row.payload.effectiveFrom}</span>
+          </p>
+          {row.payload.recordViewable && row.payload.href ? (
+            <Link
+              href={row.payload.href}
+              className="text-start text-sm hover:underline"
+              dir="auto"
+            >
+              {lookupName(
+                {
+                  nameEn: row.payload.projectNameEn ?? "",
+                  nameAr: row.payload.projectNameAr,
+                },
+                locale,
+              )}
+            </Link>
           ) : (
             <span className="text-muted-foreground text-start text-sm">
               {t("notifications.detail.anchorHidden")}

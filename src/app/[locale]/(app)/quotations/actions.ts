@@ -367,12 +367,34 @@ export async function acceptThreadAction(threadId: string): Promise<FormState> {
   return {};
 }
 
-export async function rejectThreadAction(threadId: string): Promise<FormState> {
+/**
+ * `S62` `S128` — **rejection carries a written reason**, which is why this
+ * stopped being a field-less bound-id act.
+ *
+ * It had none at all: no parameter, no column, no control — `AUDIT 1` called it
+ * the worst of `S62`'s three acts. The reason becomes a comment on the thread
+ * and reaches the rep who raised it; both happen in the data layer's own
+ * transaction, so this only shapes the input.
+ */
+export async function rejectThreadAction(
+  threadId: string,
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
   const session = await requireSession();
+  const fields = readFields(formData);
+  // `COMMENT_BODY_MAX`, because the reason IS a comment `S62` — the same cap
+  // `returnForEditAction` reads it under, rather than a second number.
+  const reason = fields.text("rejectionReason", {
+    required: true,
+    max: COMMENT_BODY_MAX,
+  });
+  if (!fields.ok || !reason) return fields.state;
+
   try {
-    await rejectThread(session, threadId);
+    await rejectThread(session, threadId, reason);
   } catch (error) {
-    return ruleErrorState(error);
+    return ruleErrorState(error, fields.values);
   }
   revalidatePath("/quotations");
   revalidatePath(`/quotations/${threadId}`);

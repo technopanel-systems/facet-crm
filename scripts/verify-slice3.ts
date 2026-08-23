@@ -92,6 +92,7 @@ import {
   companyReps,
   dispatchLines,
   dispatches as dispatchesTable,
+  notificationTypes,
   notifications,
   productClasses,
   productFireRatings,
@@ -131,6 +132,7 @@ import {
 } from "@/lib/decimal";
 import {
   approveDispatchRequest,
+  cancelDispatch,
   dispatchesInPeriod,
   getDispatch,
   listDispatchProjectOptions,
@@ -145,9 +147,10 @@ import {
   type Dispatch,
   type DispatchInput,
 } from "@/lib/dispatches";
-import { SAUDI_CODE } from "@/lib/enums";
+import { NOTIFICATION_TYPES, SAUDI_CODE } from "@/lib/enums";
 import { followUpsForRecipient, setNextFollowUp } from "@/lib/follow-ups";
 import { listCountries, listLossReasons } from "@/lib/lookups";
+import { listNotifications, type DecisionPayload } from "@/lib/notifications";
 import {
   addProjectCompany,
   createProject,
@@ -3105,9 +3108,49 @@ async function main(): Promise<void> {
     "\n27. *** A dispatch that differs from its quotation is flagged, and the flag says who *** [S120], [S77]",
   );
 
-  // `S120` — *nobody is notified*. The baseline, asserted at the foot.
-  const notifiedBefore =
-    (await db.select({ total: count() }).from(notifications))[0]?.total ?? 0;
+  /**
+   * `S120` — *nobody is notified*. The baseline, asserted at the foot.
+   *
+   * **`decision.ended_work` is excluded from both ends, and that is the rule
+   * rather than a fudge.** `S120`'s claim is about the FLAG: a dispatch that
+   * differs from its quotation is visible to three people and interrupts
+   * nobody. `S128` is a different rule about a different event — this section
+   * refuses a request `S124`, and *a decision that ends someone's work reaches
+   * them*. Counting every row would make S120's assertion fail for S128's
+   * reason, which is an assertion failing for the wrong reason.
+   *
+   * The exclusion is by type key rather than by a smaller window, so a
+   * notification of any OTHER kind raised anywhere in this section still fails
+   * it — which is what the rule actually claims.
+   */
+  const notifiableCount = async (): Promise<number> =>
+    (
+      await db
+        .select({ total: count() })
+        .from(notifications)
+        .innerJoin(
+          notificationTypes,
+          eq(notificationTypes.id, notifications.notificationTypeId),
+        )
+        .where(
+          sql`${notificationTypes.key} <> ${NOTIFICATION_TYPES.decisionEndedWork}`,
+        )
+    )[0]?.total ?? 0;
+
+  const notifiedBefore = await notifiableCount();
+  const decisionsBefore =
+    (
+      await db
+        .select({ total: count() })
+        .from(notifications)
+        .innerJoin(
+          notificationTypes,
+          eq(notificationTypes.id, notifications.notificationTypeId),
+        )
+        .where(
+          sql`${notificationTypes.key} = ${NOTIFICATION_TYPES.decisionEndedWork}`,
+        )
+    )[0]?.total ?? 0;
 
   /**
    * A thread of its own, issued, with two lines — so a section that drops one
@@ -3570,17 +3613,35 @@ async function main(): Promise<void> {
       repSees?.differsFromQuotation === true,
     `manager ${managerSees?.differsFromQuotation}, rep ${repSees?.differsFromQuotation}`,
   );
-  // And **nobody is notified** `S120`, which the rule says outright. Counted
-  // across the whole section rather than matched on a body: every act above —
-  // eleven requests, eleven submissions, two coordinator edits, a refusal, a
-  // revival and an approval — must have raised none between them.
-  const [notifiedAfter] = await db
-    .select({ total: count() })
-    .from(notifications);
+  // And **nobody is notified about the flag** `S120`, which the rule says
+  // outright. Counted across the whole section rather than matched on a body:
+  // every act above — eleven requests, eleven submissions, two coordinator
+  // edits, a refusal, a revival and an approval — must have raised nothing
+  // between them but the one thing a DIFFERENT rule requires.
+  const notifiedAfter = await notifiableCount();
   check(
-    "*** …and NOBODY is notified *** [S120]",
-    (notifiedAfter?.total ?? 0) === notifiedBefore,
-    `${notifiedBefore} before, ${notifiedAfter?.total} after`,
+    "*** …and NOBODY is notified about the difference *** [S120]",
+    notifiedAfter === notifiedBefore,
+    `${notifiedBefore} before, ${notifiedAfter} after`,
+  );
+
+  // The other end of the same window, so the exclusion above cannot hide a
+  // silence: `S128` says *a refused dispatch request carries a written reason
+  // that reaches the rep who raised it*, and this section refuses exactly one.
+  const [decisionsAfter] = await db
+    .select({ total: count() })
+    .from(notifications)
+    .innerJoin(
+      notificationTypes,
+      eq(notificationTypes.id, notifications.notificationTypeId),
+    )
+    .where(
+      sql`${notificationTypes.key} = ${NOTIFICATION_TYPES.decisionEndedWork}`,
+    );
+  check(
+    "…while the ONE refusal in it does tell the rep, which is S128, not S120 [S128], [S124]",
+    (decisionsAfter?.total ?? 0) === decisionsBefore + 1,
+    `${decisionsBefore} before, ${decisionsAfter?.total} after`,
   );
 
   /*
@@ -3870,6 +3931,306 @@ async function main(): Promise<void> {
     "a rep clears their own commitment [S29]",
     withdrawn.committed === false,
     `committed=${withdrawn.committed}`,
+  );
+
+  console.log(
+    "\n29. *** A cancelled dispatch credits nothing and wins nothing *** [S73], [S31], [S128]",
+  );
+
+  /**
+   * `S73`'s second half, and `S128`'s reason for existing.
+   *
+   * **Dated in DECEMBER on purpose.** §11 asserts September's achievement as an
+   * exact worked example and §10 October's; a new approval in either month
+   * moves a number this script proves by arithmetic. Nothing measures December.
+   */
+  const CANCEL_MONTH = "2026-12";
+  const CANCEL_DATE = "2026-12-08";
+
+  const undoneProject = await createProject(
+    repA,
+    {
+      nameEn: `${stamp} Undone Project`,
+      nameAr: null,
+      sqmExpected: null,
+      cityId: null,
+      endState: null,
+      lostReasonId: null,
+      lossReason: null,
+      inProduction: false,
+      committed: false,
+    },
+    [{ companyId: company.id }],
+  );
+
+  /**
+   * **A SPLIT, so `S128`'s second recipient exists.** *That reason reaches
+   * everyone whose work it ends — the rep who raised it, and any rep whose
+   * credit it takes back `S80`.* With no split there is only one person and the
+   * hard half of the rule is never exercised: rep B holds no company here and
+   * cannot see the dispatch at all, which is exactly the case `S128` calls
+   * *the message carries the reason and stands alone*.
+   *
+   * Effective 1 December, which is after today `S110` forbids backdating and
+   * on or before the dispatch's own date — `creditForDispatches` takes the
+   * generation in force on THAT date, so this one applies to it.
+   */
+  await setCreditSplit(manager, undoneProject.id, {
+    effectiveFrom: "2026-12-01",
+    userIds: [repA.user.id, repB.user.id],
+  });
+
+  const undoneThread = await createQuotationThread(
+    repA,
+    { projectId: undoneProject.id, companyId: company.id, contactId: null },
+    version,
+    [{ ...line, quantityPcs: "40.0000" }],
+    [],
+  );
+  await issueVersion(coordinator, undoneThread.id, {
+    smacReference: `${stamp}-DOOM`,
+    verification: "unverified",
+  });
+  /**
+   * **Raised by the rep, approved by the coordinator, and that is deliberate.**
+   * `approvedDispatch` walks all three acts as ONE identity, which §21 needs to
+   * assert `S127`. Here it would defeat the point: `cancelDispatch` drops a
+   * self-directed row, so a coordinator cancelling a request she also raised
+   * would tell nobody and the section would pass having proved nothing.
+   */
+  const undoneRequest = await requestDispatch(repA, {
+    ...SHIP,
+    lines: linesOf("50.0000"),
+    dispatchDate: CANCEL_DATE,
+    quotationThreadId: undoneThread.id,
+    companyId: null,
+    userId: null,
+    projectId: null,
+  });
+  await submitDispatchRequest(repA, undoneRequest.id);
+  await approveDispatchRequest(coordinator, undoneRequest.id, PAID);
+  const [undone] = await db
+    .select()
+    .from(dispatchesTable)
+    .where(eq(dispatchesTable.id, undoneRequest.id))
+    .limit(1);
+  const undoneSqm = await sqmOf(undone.id);
+
+  // The state before, so every "after" below is a change rather than a
+  // coincidence.
+  const wonBefore = await wonBoth(undoneProject.id);
+  const monthBefore = await achievementForPeriod(manager, CANCEL_MONTH);
+  const repABefore =
+    monthBefore.find((row) => row.userId === repA.user.id)?.achievedSqm ??
+    "0.0000";
+  const repBBefore =
+    monthBefore.find((row) => row.userId === repB.user.id)?.achievedSqm ??
+    "0.0000";
+  check(
+    "the dispatch wins its project while it is approved [S31]",
+    wonBefore.detail === true && wonBefore.list === true,
+    `detail=${wonBefore.detail} list=${wonBefore.list}`,
+  );
+
+  /* --- The gates, each with its own key [S73] ----------------------- */
+
+  await refuses(
+    "a rep may not cancel — only internal sales [S73]",
+    "dispatches.errors.cancelOnly",
+    () => cancelDispatch(repA, undone.id, "the customer changed their mind"),
+  );
+  await refuses(
+    "a cancellation with no written reason is refused [S73], [S128]",
+    "dispatches.errors.cancellationReasonRequired",
+    () => cancelDispatch(coordinator, undone.id, "   "),
+  );
+
+  /* --- The act ------------------------------------------------------ */
+
+  const CANCEL_REASON = "finance refused the transfer, so this cannot go out";
+  await cancelDispatch(coordinator, undone.id, CANCEL_REASON);
+
+  const cancelled = await getDispatch(coordinator, undone.id);
+  check(
+    "the dispatch is cancelled and carries its reason [S73]",
+    cancelled?.status === "cancelled" && cancelled?.cancellationReason === CANCEL_REASON,
+    `status=${cancelled?.status} reason=${cancelled?.cancellationReason}`,
+  );
+  check(
+    "…and it KEEPS its approval stamps — approval is final, not undone [S73]",
+    cancelled?.approvedAt !== null && cancelled?.approvedByName !== null,
+    `approvedAt=${cancelled?.approvedAt} by=${cancelled?.approvedByName}`,
+  );
+  check(
+    "…and its payment method, which the widened CHECK permits [S71], [S73]",
+    cancelled?.paymentMethod === PAID.method,
+    `got ${cancelled?.paymentMethod}`,
+  );
+  // `S31` — *its difference flag stays with it*. This one matches its
+  // quotation, so the assertion is that the comparison still resolves at all
+  // rather than going null: a cancelled dispatch keeps both sides frozen.
+  check(
+    "…and its difference flag, which S31 keeps with it [S120], [S31]",
+    cancelled?.differsFromQuotation !== null &&
+      cancelled?.differedAtSubmission !== null,
+    `differs=${cancelled?.differsFromQuotation} atSubmission=${cancelled?.differedAtSubmission}`,
+  );
+  // Credit is rendered only for an approved dispatch, so a cancelled one shows
+  // none — which is the screen half of "credits nothing".
+  check(
+    "…and it shows no credit table any more [S31]",
+    cancelled?.credit === null,
+    `got ${JSON.stringify(cancelled?.credit)}`,
+  );
+
+  /* --- It credits nothing and wins nothing [S31] -------------------- */
+
+  const wonAfter = await wonBoth(undoneProject.id);
+  check(
+    "*** cancelling UN-WINS the project, at both readers *** [S31], [S73]",
+    wonAfter.detail === false && wonAfter.list === false,
+    `detail=${wonAfter.detail} list=${wonAfter.list}`,
+  );
+
+  const monthAfter = await achievementForPeriod(manager, CANCEL_MONTH);
+  const repAAfter =
+    monthAfter.find((row) => row.userId === repA.user.id)?.achievedSqm ??
+    "0.0000";
+  const repBAfter =
+    monthAfter.find((row) => row.userId === repB.user.id)?.achievedSqm ??
+    "0.0000";
+  // Half each `S81`, so the pair sums to exactly the dispatch's own sqm `18 §5`
+  // and both halves leave the month together.
+  const halves = divideEqually(toScaled(undoneSqm, SQM_SCALE), 2).map((share) =>
+    fromScaled(share, SQM_SCALE),
+  );
+  check(
+    "*** the square metres leave rep A's month, exactly *** [S85], [S31]",
+    sumSqm([repAAfter, halves[0]]) === repABefore,
+    `before=${repABefore} after=${repAAfter} share=${halves[0]}`,
+  );
+  check(
+    "*** and the co-credited rep's, exactly *** [S80], [S85], [S31]",
+    sumSqm([repBAfter, halves[1]]) === repBBefore,
+    `before=${repBBefore} after=${repBAfter} share=${halves[1]}`,
+  );
+
+  const decemberRows = await dispatchesInPeriod("2026-12-01", "2027-01-01");
+  check(
+    "…and the one predicate every figure composes no longer returns it [S72]",
+    decemberRows.every((row) => row.id !== undone.id),
+    `${decemberRows.length} row(s) in ${CANCEL_MONTH}`,
+  );
+
+  /* --- Never revived [S73] ------------------------------------------ */
+
+  // Five acts, five keys. `S73` says *never revived: a new dispatch is raised
+  // instead* — and nothing in `cancelDispatch` enforces that. Each of these
+  // refuses by falling through a status guard written for another rule, which
+  // is exactly the kind of claim that decays silently if nobody asserts it.
+  await refuses(
+    "a cancelled dispatch is never revived [S73], [S122]",
+    "dispatches.errors.notRefused",
+    () => reviveDispatchRequest(coordinator, undone.id),
+  );
+  await refuses(
+    "…never re-approved [S73]",
+    "dispatches.errors.notSubmitted",
+    () => approveDispatchRequest(coordinator, undone.id, PAID),
+  );
+  await refuses(
+    "…never re-submitted [S73]",
+    "dispatches.errors.notDraft",
+    () => submitDispatchRequest(repA, undone.id),
+  );
+  await refuses(
+    "…never edited [S73], [S125]",
+    "dispatches.errors.requestNotEditable",
+    () =>
+      updateDispatchRequest(coordinator, undone.id, {
+        ...SHIP,
+        lines: linesOf("50.0000"),
+        dispatchDate: CANCEL_DATE,
+        projectId: null,
+      }),
+  );
+  await refuses(
+    "…never numbered [S121], [S73]",
+    "dispatches.errors.notApproved",
+    () => setDispatchSmacNumber(coordinator, undone.id, `${stamp}-NOPE`),
+  );
+  await refuses(
+    "…and never cancelled twice [S73]",
+    "dispatches.errors.notApproved",
+    () => cancelDispatch(coordinator, undone.id, "again"),
+  );
+
+  /* --- The telling [S128] ------------------------------------------- */
+
+  const decisionsFor = async (
+    who: AuthSession,
+  ): Promise<DecisionPayload[]> => {
+    const { rows } = await listNotifications(who);
+    return rows
+      .filter((row) => row.typeKey === NOTIFICATION_TYPES.decisionEndedWork)
+      .map((row) => row.payload)
+      .filter(
+        (payload): payload is DecisionPayload => payload?.kind === "decision",
+      )
+      .filter((payload) => payload.recordId === undone.id);
+  };
+
+  const [toldA] = await decisionsFor(repA);
+  check(
+    "*** the rep who raised it is told, with the reason *** [S128]",
+    toldA?.decision === "dispatch_cancelled" && toldA?.reason === CANCEL_REASON,
+    `got ${JSON.stringify(toldA)}`,
+  );
+  check(
+    "…and for them it IS a link, because they can open the dispatch [S112]",
+    toldA?.recordViewable === true && toldA?.href === `/dispatches/${undone.id}`,
+    `viewable=${toldA?.recordViewable} href=${toldA?.href}`,
+  );
+
+  /**
+   * **The half of `S128` that no other assertion reaches.**
+   *
+   * Rep B holds no company, is not on this dispatch and cannot open it — the
+   * negative is asserted first, because a message that "stands alone" proves
+   * nothing if the record turns out to be visible after all. Then: the reason
+   * is there anyway, and the link is not.
+   *
+   * *This is a deliberate exception to `S112`* — an audit row is never shown
+   * without joining back to the record and applying its visibility. *Here the
+   * rep's own credit was taken, so the reason reaches them even where the
+   * record does not.*
+   */
+  check(
+    "the co-credited rep genuinely CANNOT open the dispatch [S128], [18 §2]",
+    (await canOpenRecord(repB, "dispatch", undone.id)) === false,
+  );
+  const [toldB] = await decisionsFor(repB);
+  check(
+    "*** the co-credited rep is told anyway, and the reason stands alone *** [S128], [S80]",
+    toldB?.reason === CANCEL_REASON &&
+      toldB?.recordViewable === false &&
+      toldB?.href === null,
+    `got ${JSON.stringify(toldB)}`,
+  );
+
+  const cancelAudit = await db
+    .select({ action: auditLog.action })
+    .from(auditLog)
+    .where(
+      and(
+        eq(auditLog.entityId, undone.id),
+        eq(auditLog.action, "dispatch.cancelled"),
+      ),
+    );
+  check(
+    "the cancellation is audited [07 E1], [S112]",
+    cancelAudit.length === 1,
+    `${cancelAudit.length} row(s)`,
   );
 
   /**

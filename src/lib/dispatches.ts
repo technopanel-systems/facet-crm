@@ -65,6 +65,18 @@
  *     `status = 'approved'` terms is how one gets missed, and a missed one
  *     silently counts somebody's unapproved request toward their month.
  *
+ *     **`S73`'s cancellation is what that predicate was worth building for.**
+ *     *Approval is final*; a dispatch that must be undone is cancelled, never
+ *     un-approved, and *it credits nothing and wins nothing* `S31`. Moving one
+ *     status is the whole of it — all eight figures and `projectIsWon` fall
+ *     silent together, with no second writer and nothing to keep in step.
+ *
+ * 12. **A decision that ends someone's work reaches them** `S128`. A refusal
+ *     `S124` and a cancellation `S73` each raise `decision.ended_work` inside
+ *     the act's own transaction, carrying the reason in the payload — because a
+ *     co-credited rep cannot open the dispatch the column sits on, and because
+ *     revival clears `refusal_reason` `S122` outright.
+ *
  * 11. **A dispatch that differs from its version is FLAGGED** `S120`, and the
  *     flag says who made the difference. The comparison itself is derived —
  *     `dispatchDiffers`, a multiset over the nine fields `prefillByVersion`
@@ -142,11 +154,22 @@ import {
 } from "@/lib/credit-splits";
 import { SQM_SCALE, ZERO, toScaled } from "@/lib/decimal";
 import {
+  NOTIFICATION_TYPES,
   type PaymentMethod,
   type SameValues,
   type ShipmentMethod,
   type Stock,
 } from "@/lib/enums";
+/**
+ * `S128` — the telling. **This closes a three-module cycle** —
+ * `dispatches.ts` → `notifications.ts` → `follow-ups.ts` → `dispatches.ts`,
+ * the last leg being `approvedDispatches` — and it is safe for the reason
+ * `projects.ts`'s import already carries: no side of it is used at
+ * module-evaluation time. `raise` is called inside a transaction and
+ * `approvedDispatches()` inside a query builder; both are function references
+ * resolved when something runs.
+ */
+import { raise } from "@/lib/notifications";
 import { ensureProjectParticipant } from "@/lib/projects";
 import {
   productLineMoney,
@@ -179,7 +202,7 @@ export type PaymentMethodMatchesSchema = SameValues<
   NonNullable<Dispatch["paymentMethod"]>
 >;
 
-/** The states a working list shows `S122` — everything but the archive. */
+/** The five states of a dispatch `S72` `S73`, straight off the pg enum. */
 export const DISPATCH_STATUSES = dispatchStatusEnum.enumValues;
 
 /**
@@ -379,9 +402,12 @@ async function linesDigestFor(
  * every one of the seven rather than at the two that are easiest to reach,
  * which is the lesson `S116` left behind.
  *
- * It reads `status`, not `approved_at`. The two cannot disagree — the
- * `dispatches_approval_stamps` CHECK holds them together at the database — and
- * the status is the sentence the rule is written in.
+ * It reads `status`, not `approved_at`. **Since `S73`'s cancellation the two
+ * deliberately CAN disagree**, and reading the status is what makes the rule
+ * come out right: a cancelled dispatch keeps `approved_at`, because it was
+ * approved and approval is final, and `dispatches_approval_stamps` was widened
+ * to say so. *It credits nothing and wins nothing* `S31` — which is true here
+ * for free, and would not be for a reader that asked the stamp.
  */
 export function approvedDispatches(): SQL {
   return eq(dispatches.status, "approved");
@@ -628,6 +654,10 @@ export type DispatchDetail = DispatchListRow & {
   /** `S124` — set on a refused request and nowhere else, which the
    *  `dispatches_refusal_reason` CHECK holds at the database. */
   refusalReason: string | null;
+  /** `S73` — set on a cancelled dispatch and nowhere else, which the
+   *  `dispatches_cancellation_reason` CHECK holds at the database. Never
+   *  cleared: nothing revives a cancellation. */
+  cancellationReason: string | null;
   /**
    * **Null until the request is approved** `S72`. Credit is a consequence of
    * approval, so a request that has not been approved has none — and a screen
@@ -1053,7 +1083,9 @@ export async function requestDispatch(
  * request is the person who typed it.
  *
  * An approved request is not editable at all — approval is final `S73` — and a
- * refused one is archived until the coordinator revives it `S122`.
+ * refused one is archived until the coordinator revives it `S122`. A cancelled
+ * one falls through the same way and is never revived `S73`: the fall-through
+ * is what refuses it, and `verify:slice3` asserts that rather than trusting it.
  */
 function assertEditable(session: AuthSession, request: Dispatch): void {
   if (request.status === "draft") {
@@ -1430,9 +1462,16 @@ export async function approveDispatchRequest(
  * **The coordinator refuses** `S124` — the same person who approves.
  *
  * *A refusal carries a reason and archives the request* `S122`. The reason is
- * required and stored on the row, which is what the archive shows; `S128` will
- * carry it to the rep, and that is its own session. `submitted_at` stays: a
- * refused request WAS submitted, and clearing when would lose it.
+ * required and stored on the row, which is what the archive shows.
+ * `submitted_at` stays: a refused request WAS submitted, and clearing when
+ * would lose it.
+ *
+ * **`S128` carries it to the rep, in this transaction.** *A record that
+ * vanishes with its reason in a column nobody reads is the same as no reason at
+ * all* — and this column vanishes literally, because revival clears it `S122`.
+ * The notification keeps its own copy for that reason. Only the rep who raised
+ * it is told: nothing was credited, so there is nobody whose credit it takes
+ * back.
  */
 export async function refuseDispatchRequest(
   session: AuthSession,
@@ -1466,6 +1505,150 @@ export async function refuseDispatchRequest(
       before: { status: request.status },
       after: { status: after.status, refusalReason: after.refusalReason },
     });
+
+    // `S128`. `raise` drops a self-directed row on its own only for an inactive
+    // recipient, so the coordinator refusing a request she raised herself
+    // `S127` is skipped here — `addMentions`'s self-drop, for its reason.
+    if (request.recordedByUserId !== session.user.id) {
+      await raise(tx, log, {
+        typeKey: NOTIFICATION_TYPES.decisionEndedWork,
+        recipientUserId: request.recordedByUserId,
+        payload: {
+          decision: "dispatch_refused",
+          reason: body,
+          recordType: "dispatch",
+          recordId: id,
+          decidedByUserId: session.user.id,
+        },
+      });
+    }
+  });
+}
+
+/**
+ * **The coordinator cancels an approved dispatch** `S73`.
+ *
+ * *Approval is final. If something is wrong afterwards — finance refuses, the
+ * customer changes — the dispatch is cancelled, never un-approved.* So this is
+ * the only act that touches an approved row, and it does not undo the approval:
+ * `approved_at`, `approved_by_user_id`, the payment method `S71`, the SMAC
+ * number `S121` and the difference flag `S120` all stay exactly as they were.
+ * `S31` says so outright — *the cancelled dispatch stays visible on its record
+ * with its reason, and its difference flag stays with it*.
+ *
+ * **It credits nothing and wins nothing, and no line here makes that true.**
+ * Every figure composes `approvedDispatches()`, which is `status = 'approved'`;
+ * `projectIsWon` composes the same predicate. Moving the status therefore
+ * un-wins the project and takes the square metres out of the rep's month `S85`
+ * in one act, which is precisely why `S31` derives won rather than storing it —
+ * a stored `won` would need a second writer here and could disagree with the
+ * dispatches it claims to summarise.
+ *
+ * **Never revived** `S73`. Nothing needs to refuse it: `reviveDispatchRequest`
+ * takes only `refused`, `approveDispatchRequest` only `submitted`,
+ * `submitDispatchRequest` only `draft`, `setDispatchSmacNumber` only
+ * `approved`, and `assertEditable` falls through to `requestNotEditable` for
+ * anything but `draft` and `submitted`. *A new dispatch is raised instead.*
+ * `verify:slice3` walks all five rather than trusting that reading.
+ *
+ * **Who is told** `S128`: *the rep who raised it, and any rep whose credit it
+ * takes back* `S80`. The first is `recorded_by_user_id`; the second is whatever
+ * `creditForDispatches` says the shares were — the dispatch's own rep at 100%
+ * in the ordinary case `S78`, or the split generation in force on its date. The
+ * credit is read through that one function rather than re-derived here, so the
+ * people told are exactly the people the detail screen credited.
+ *
+ * Reading it before the transaction is safe and deliberate: credit depends on
+ * the project, the rep, the date and `project_credit_splits`, none of which
+ * this act touches. Only `status` moves, and `creditForDispatches` does not
+ * read it.
+ */
+export async function cancelDispatch(
+  session: AuthSession,
+  id: string,
+  reason: string,
+): Promise<void> {
+  // `S73` names no actor, and the founder's decision is the coordinator: the
+  // same flag and the same person as approve, refuse, revive and the SMAC
+  // number. `S72`'s reason carries over — she is the one who deals with SMAC
+  // and with finance, and a cancellation is finance refusing or the customer
+  // changing. No new flag.
+  if (!can(session, "canDispatch")) {
+    throw new RuleError("dispatches.errors.cancelOnly");
+  }
+  const body = reason.trim();
+  if (!body) {
+    throw new RuleError(
+      "dispatches.errors.cancellationReasonRequired",
+      "reason",
+    );
+  }
+
+  const request = await loadRequest(session, id);
+  if (request.status !== "approved") {
+    throw new RuleError("dispatches.errors.notApproved");
+  }
+
+  // The dispatch's own square metres and rep name, which `creditForDispatches`
+  // needs to apportion. `dispatchSqm` names both tables outright, so it is
+  // correct with or without the join beside it (see its own note).
+  const [figures] = await db
+    .select({ sqm: dispatchSqm, userName: users.name })
+    .from(dispatches)
+    .innerJoin(users, eq(users.id, dispatches.userId))
+    .where(eq(dispatches.id, id))
+    .limit(1);
+
+  const credits = await creditForDispatches([
+    {
+      id,
+      userId: request.userId,
+      userName: figures?.userName ?? "",
+      sqm: figures?.sqm ?? "0.0000",
+      dispatchDate: request.dispatchDate,
+      projectId: request.projectId,
+    },
+  ]);
+
+  const told = new Set<string>([request.recordedByUserId]);
+  for (const share of credits.get(id)?.shares ?? []) told.add(share.userId);
+  // `addMentions`'s self-drop: a coordinator cancelling a dispatch she raised
+  // and approved herself `S127` is not told about her own decision.
+  told.delete(session.user.id);
+
+  await withAudit(session.actor, async (tx, log) => {
+    const [after] = await tx
+      .update(dispatches)
+      .set({ status: "cancelled", cancellationReason: body })
+      .where(eq(dispatches.id, id))
+      .returning();
+
+    log({
+      action: "dispatch.cancelled",
+      entityType: "dispatch",
+      entityId: id,
+      before: { status: request.status },
+      after: {
+        status: after.status,
+        cancellationReason: after.cancellationReason,
+      },
+    });
+
+    // `S128` — in this transaction, so a cancellation cannot roll back leaving
+    // reps told about one that never happened, nor happen in silence.
+    for (const userId of told) {
+      await raise(tx, log, {
+        typeKey: NOTIFICATION_TYPES.decisionEndedWork,
+        recipientUserId: userId,
+        payload: {
+          decision: "dispatch_cancelled",
+          reason: body,
+          recordType: "dispatch",
+          recordId: id,
+          decidedByUserId: session.user.id,
+        },
+      });
+    }
   });
 }
 
@@ -1623,10 +1806,17 @@ export async function listDispatches(
     /** `07 C6` — the direct route, made countable. */
     direct?: boolean;
     /**
-     * `S72` — one of the four states, or absent for the **working list**:
+     * `S72` — one of the five states, or absent for the **working list**:
      * everything but `refused`, because *a refused dispatch request is
      * archived and kept out of the working lists* `S122`. Absent is not
      * "everything"; the archive is reached by asking for it.
+     *
+     * **`cancelled` stays in the default scope, and that is a decision.** `S122`
+     * archives a refusal and no rule archives a cancellation; `S31` says the
+     * opposite — *visible as history, counted nowhere*. Counted nowhere is
+     * already true by construction, because every figure composes
+     * `approvedDispatches()`, so excluding it here would only hide it from the
+     * one screen that shows history.
      *
      * A caller wanting the figure rather than the screen passes `"approved"` —
      * which is what the two `hasDispatch` callers do, so an unapproved request
@@ -1899,6 +2089,7 @@ export async function getDispatch(
       status: dispatches.status,
       submittedAt: dispatches.submittedAt,
       refusalReason: dispatches.refusalReason,
+      cancellationReason: dispatches.cancellationReason,
       approvedByName: approvedBy.name,
       approvedAt: dispatches.approvedAt,
       // `S130` `S119` `S70` `S71` `S121` — the dispatch's own, every one of
@@ -2026,6 +2217,7 @@ export async function getDispatch(
     projectNameAr: row.projectNameAr,
     threadProjectId: row.threadProjectId,
     refusalReason: row.refusalReason,
+    cancellationReason: row.cancellationReason,
     // `S76`'s own reason, on the screen it was written for: the coordinator
     // records this dispatch, so the project it carries is theirs to open.
     projectViewable: row.projectId

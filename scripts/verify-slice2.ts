@@ -48,11 +48,13 @@
 
 process.loadEnvFile(".env");
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { closeDatabase, db } from "@/db";
 import {
   auditLog,
+  commentMentions,
+  comments,
   companies,
   companyReps,
   productClasses,
@@ -69,8 +71,9 @@ import {
 } from "@/db/schema";
 import type { AuthSession } from "@/lib/authz";
 import { getCompany } from "@/lib/companies";
-import { SAUDI_CODE } from "@/lib/enums";
+import { NOTIFICATION_TYPES, SAUDI_CODE } from "@/lib/enums";
 import { listCountries } from "@/lib/lookups";
+import { listNotifications, type DecisionPayload } from "@/lib/notifications";
 import {
   acceptThread,
   addQuotationLine,
@@ -82,6 +85,7 @@ import {
   issueVersion,
   listQuotationThreads,
   markAcceptedForProcessing,
+  rejectThread,
   removeQuotationLine,
   updateQuotationLine,
 } from "@/lib/quotations";
@@ -343,6 +347,7 @@ async function main(): Promise<void> {
     ["issue", () => issueVersion(repA, thread.id, { smacReference: "9592", verification: "unverified" })],
     ["accept", () => acceptThread(repA, thread.id)],
     ["cancel", () => cancelThread(repA, thread.id, "a reason")],
+    ["reject", () => rejectThread(repA, thread.id, "a reason")],
   ] as const) {
     await refuses(`a rep may not ${label}`, "quotations.errors.coordinatorOnly", fn);
   }
@@ -350,6 +355,14 @@ async function main(): Promise<void> {
     "cancelling needs a written reason [10 §8]",
     "quotations.errors.cancellationReasonRequired",
     () => cancelThread(coordinator, thread.id, "   "),
+  );
+  // `S62` `S128` — and so does rejecting, which until this slice took no reason
+  // at all: no parameter, no column, no field. `AUDIT 1` called it the worst of
+  // `S62`'s three acts.
+  await refuses(
+    "*** rejecting needs a written reason too *** [S62], [S128]",
+    "quotations.errors.rejectionReasonRequired",
+    () => rejectThread(coordinator, thread.id, "   "),
   );
 
   /* --- 6. Payment ordering --------------------------------------- */
@@ -819,6 +832,122 @@ async function main(): Promise<void> {
       nowIssued.live.totalSqm === "7.0000",
     `${nowIssued?.live.status}, ${nowIssued?.live.lines.length} line(s), ${nowIssued?.live.totalSqm} m2`,
   );
+
+  /* --- 16. The reason reaches the rep [S62], [S128] --------------- */
+
+  console.log(
+    "\n16. *** A decision that ends the rep's work carries a reason that reaches them *** [S62], [S128]",
+  );
+
+  /**
+   * `S62` asks for two things and `AUDIT 1` found one of three acts doing both:
+   * *returning, rejecting or cancelling requires a written reason, which
+   * becomes a comment on the thread*. `S128` adds the third — it has to reach
+   * the rep, because *a record that vanishes with its reason in a column nobody
+   * reads is the same as no reason at all*.
+   *
+   * Driven on threads the REP raised and the COORDINATOR closes, because
+   * `setEndState` drops a self-directed row: a coordinator closing her own
+   * thread would tell nobody and prove nothing.
+   */
+  const decisionsFor = async (threadId: string) => {
+    const { rows } = await listNotifications(repA);
+    return rows
+      .filter((row) => row.typeKey === NOTIFICATION_TYPES.decisionEndedWork)
+      .map((row) => row.payload)
+      .filter(
+        (payload): payload is DecisionPayload => payload?.kind === "decision",
+      )
+      .filter((payload) => payload.recordId === threadId);
+  };
+
+  const commentsOn = async (threadId: string): Promise<string[]> =>
+    (
+      await db
+        .select({ body: comments.body })
+        .from(comments)
+        .where(
+          and(
+            eq(comments.recordType, "quotation_thread"),
+            eq(comments.recordId, threadId),
+          ),
+        )
+    ).map((row) => row.body);
+
+  for (const [act, key, run] of [
+    [
+      "rejected",
+      "quotation_rejected",
+      (id: string, reason: string) => rejectThread(coordinator, id, reason),
+    ],
+    [
+      "cancelled",
+      "quotation_cancelled",
+      (id: string, reason: string) => cancelThread(coordinator, id, reason),
+    ],
+  ] as const) {
+    const closing = await createQuotationThread(
+      repA,
+      { projectId: project.id, companyId: company.id, contactId: null },
+      { stock: "riyadh" },
+      [
+        {
+          supplierId: supplier.id,
+          classId: productClass.id,
+          fireRatingId: fireRating.id,
+          customColour: "168",
+          thicknessId: thickness.id,
+          widthM: "1.0000",
+          lengthM: "1.0000",
+          quantityPcs: "3.0000",
+          unitPrice: "100.00",
+        },
+      ],
+      [],
+    );
+    const reason = `${stamp} the customer went with somebody else — ${act}`;
+    await run(closing.id, reason);
+
+    const bodies = await commentsOn(closing.id);
+    check(
+      `*** a ${act} quotation's reason becomes a comment on the thread *** [S62]`,
+      bodies.length === 1 && bodies[0] === reason,
+      `${bodies.length} comment(s): ${bodies.join(" | ")}`,
+    );
+
+    const [told] = await decisionsFor(closing.id);
+    check(
+      `*** …and it reaches the rep who raised it *** [S128]`,
+      told?.decision === key && told?.reason === reason,
+      `got ${JSON.stringify(told)}`,
+    );
+    check(
+      `…as a link, since the rep can still open their own thread [S112]`,
+      told?.recordViewable === true &&
+        told?.href === `/quotations/${closing.id}`,
+      `viewable=${told?.recordViewable} href=${told?.href}`,
+    );
+
+    // **No mention beside it** `S92`. `returnForEdit` tags the raiser because
+    // the tag is the only thing that reaches them; here the news item IS the
+    // telling, and a mention would ring a second bell reading "Mentioned you"
+    // for the same sentence.
+    const [mentions] = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(commentMentions)
+      .innerJoin(comments, eq(comments.id, commentMentions.commentId))
+      .where(
+        and(
+          eq(comments.recordType, "quotation_thread"),
+          eq(comments.recordId, closing.id),
+        ),
+      );
+    check(
+      `…and the comment carries NO mention — one act, one bell [S92]`,
+      (mentions?.total ?? 0) === 0,
+      `${mentions?.total} mention(s)`,
+    );
+  }
 
   // Nothing is cleaned up: FACET does not delete history `[12 §7]`, and this
   // script does not get an exception. Every row it writes is prefixed with the

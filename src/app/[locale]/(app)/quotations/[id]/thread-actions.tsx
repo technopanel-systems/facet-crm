@@ -33,6 +33,10 @@ import { selectClasses } from "../line-fields";
  */
 
 type PlainAction = () => Promise<FormState>;
+type ReasonAction = (
+  state: FormState,
+  formData: FormData,
+) => Promise<FormState>;
 
 function Feedback({ state }: { state: FormState }) {
   const t = useTranslations();
@@ -66,7 +70,7 @@ function Panel({
   );
 }
 
-/** A one-button action with no fields — accept, reject, return, revise. */
+/** A one-button action with no fields — accept, revise. */
 function PlainButton({
   action,
   label,
@@ -83,6 +87,62 @@ function PlainButton({
       <div>
         <Button type="submit" size="sm" variant={variant} disabled={pending}>
           {pending ? t("common.saving") : label}
+        </Button>
+      </div>
+      <Feedback state={state} />
+    </form>
+  );
+}
+
+/**
+ * `S62` `S128` — an act that ends the rep's work, with the reason it requires.
+ *
+ * **A child component owning its own `useActionState`, and that is
+ * load-bearing.** Every form in this app whose hook is created in the component
+ * that renders it answers a no-JavaScript POST; the ones that hoist it to a
+ * parent rendering the form conditionally never send response headers at all
+ * (`WORKFLOW §5`). `RefuseForm` on the dispatch screen is the same shape for
+ * the same reason, and `S72`'s slice measured it rather than assuming.
+ *
+ * The two forms above this — cancel and return — keep their parent-owned hooks.
+ * Changing them is `WORKFLOW §5`'s own session, not this one's.
+ */
+function ReasonForm({
+  action,
+  act,
+  field,
+  label,
+  submitLabel,
+}: {
+  action: ReasonAction;
+  /** A DOM handle for `verify:routes`, which may not read a translated
+   *  string to tell two forms apart (`CLAUDE.md`). Separate from `field`:
+   *  they were one prop and the walk looked for the act while the markup
+   *  carried the field name. */
+  act: string;
+  /** What the action reads out of the FormData. */
+  field: string;
+  label: string;
+  submitLabel: string;
+}) {
+  const t = useTranslations();
+  const [state, submit, pending] = useActionState(action, emptyFormState);
+  return (
+    <form action={submit} className="flex flex-col gap-2" data-act={act}>
+      <Label htmlFor={field} className="text-start text-sm font-medium">
+        {label}
+      </Label>
+      <Textarea
+        id={field}
+        name={field}
+        rows={2}
+        dir="auto"
+        required
+        className="text-start"
+      />
+      <div>
+        <Button type="submit" size="sm" variant="destructive" disabled={pending}>
+          {pending ? t("common.saving") : submitLabel}
         </Button>
       </div>
       <Feedback state={state} />
@@ -237,22 +297,37 @@ export function ThreadActions({
           {/* Internal approval, not the customer's commitment `[16 §5]` — the
               hint says so, because this is the button people will read as
               "won". */}
+          {/* Internal approval takes no reason: an acceptance ends nobody's
+              work. */}
           {open ? (
             <Panel
               title={t("quotations.actions.accept")}
               hint={t("quotations.actions.acceptHint")}
             >
-              <div className="flex flex-wrap items-center gap-2">
-                <PlainButton
-                  action={acceptThreadAction.bind(null, threadId)}
-                  label={t("quotations.actions.accept")}
-                />
-                <PlainButton
-                  action={rejectThreadAction.bind(null, threadId)}
-                  label={t("quotations.actions.reject")}
-                  variant="destructive"
-                />
-              </div>
+              <PlainButton
+                action={acceptThreadAction.bind(null, threadId)}
+                label={t("quotations.actions.accept")}
+              />
+            </Panel>
+          ) : null}
+
+          {/* `S62` `S128` — **rejection now carries a reason**, so it is its
+              own panel rather than a bare button beside accept. It had none at
+              all: no field, no column, nothing but an audit row, so a rep whose
+              quotation was rejected was never told and could not find out.
+              The reason becomes a comment on the thread and reaches them. */}
+          {open ? (
+            <Panel
+              title={t("quotations.actions.reject")}
+              hint={t("quotations.actions.rejectHint")}
+            >
+              <ReasonForm
+                action={rejectThreadAction.bind(null, threadId)}
+                act="reject"
+                field="rejectionReason"
+                label={t("quotations.fields.rejectionReason")}
+                submitLabel={t("quotations.actions.reject")}
+              />
             </Panel>
           ) : null}
 

@@ -86,6 +86,7 @@ import {
 // `comments.ts` about the import cycle this closes, and why it is safe.
 import { insertComment } from "@/lib/comments";
 import {
+  NOTIFICATION_TYPES,
   QUOTATION_THREAD_END_STATES,
   QUOTATION_VERSION_ORIGINS,
   QUOTATION_VERSION_STATUSES,
@@ -99,6 +100,10 @@ import {
   type SmacVerification,
   type Stock,
 } from "@/lib/enums";
+// `S128` — the telling. `comments.ts` already imports `raise`, so this module
+// reached it indirectly through `insertComment`; naming it here is what lets a
+// decision that writes no comment still tell somebody.
+import { raise, type DecisionKind } from "@/lib/notifications";
 import { RuleError } from "@/lib/validation";
 
 export type QuotationThread = typeof quotationThreads.$inferSelect;
@@ -1803,12 +1808,35 @@ export async function createRevision(
   });
 }
 
-/** Shared body for the three coordinator end states. */
+/**
+ * Shared body for the three coordinator end states.
+ *
+ * **`reason` is what `S62` and `S128` both hang on, and it does two things in
+ * one place.** `S62`: *returning, rejecting or cancelling requires a written
+ * reason, which becomes a comment on the thread.* `S128`: that reason *reaches
+ * everyone whose work it ends — the rep who raised it*. Doing both here rather
+ * than in each caller is what stops rejection and cancellation drifting apart
+ * again; `AUDIT 1` found the three acts behaving three different ways, with one
+ * of the three matching the rule.
+ *
+ * `acceptThread` passes none, and rightly: an acceptance ends nobody's work.
+ *
+ * **The comment carries NO mention, and that is deliberate.** `returnForEdit`
+ * tags the raiser because the tag is the only thing that reaches them — a
+ * returned quotation appears in no queue at all `[22 §6.11]`. Here the news
+ * item IS the telling, and `S92` names it as its own bell item; a mention
+ * beside it would raise a second bell reading "Mentioned you" for the same
+ * sentence.
+ *
+ * Both are written inside this transaction, so a reason cannot survive a
+ * decision that rolled back, nor a decision leave nobody told.
+ */
 async function setEndState(
   session: AuthSession,
   threadId: string,
   endState: QuotationThreadEndState,
   extra: Partial<typeof quotationThreads.$inferInsert> = {},
+  reason?: { body: string; decision: DecisionKind },
 ): Promise<void> {
   await assertCoordinator(session, threadId);
 
@@ -1838,6 +1866,38 @@ async function setEndState(
       before: { endState: before.endState },
       after: { endState: after.endState },
     });
+
+    if (!reason) return;
+
+    // `S62` — the reason becomes a comment on the THREAD, never the version:
+    // `comments_record_type` refuses `quotation_version` on purpose, because
+    // the conversation belongs to the thread rather than to one superseded
+    // version of it. Same placement `returnForEdit` already uses.
+    await insertComment(tx, log, session, {
+      recordType: "quotation_thread",
+      recordId: threadId,
+      body: reason.body,
+      mentions: [],
+    });
+
+    // `S128` — and the recipient is `raised_by_user_id`, the rep who holds the
+    // thread NOW: `19 §1` rewrites it on handover precisely so that whoever
+    // inherited the work is the one told about it. A coordinator closing her
+    // own thread is not told about her own decision, which is `addMentions`'
+    // self-drop written out, since `raise` does not do it.
+    if (before.raisedByUserId !== session.user.id) {
+      await raise(tx, log, {
+        typeKey: NOTIFICATION_TYPES.decisionEndedWork,
+        recipientUserId: before.raisedByUserId,
+        payload: {
+          decision: reason.decision,
+          reason: reason.body,
+          recordType: "quotation_thread",
+          recordId: threadId,
+          decidedByUserId: session.user.id,
+        },
+      });
+    }
   });
 }
 
@@ -1858,35 +1918,77 @@ export async function acceptThread(
   await setEndState(session, threadId, "accepted");
 }
 
-/** Rejection belongs to the quotation; loss belongs to the project `[07 C5]`. */
+/**
+ * Rejection belongs to the quotation; loss belongs to the project `[07 C5]`.
+ *
+ * **A written reason is required** `S62` `S128`, and until this slice there was
+ * none — no parameter, no column, no field on the screen — so a rejection left
+ * nothing behind but an audit row recording the end-state change. `AUDIT 1`
+ * called it the worst of `S62`'s three acts, because cancellation at least
+ * persisted its reason somewhere a person could find it.
+ *
+ * **No `rejection_reason` column, deliberately.** `S62` says the reason
+ * *becomes a comment on the thread*, which is a home somebody actually reads; a
+ * column beside it would be a second home for one sentence, and
+ * `quotation_threads.cancelled_at` is what an unread second home looks like
+ * (`WORKFLOW §5`). The comment is the record, the notification is the telling,
+ * and the audit row keeps both permanently `S112` `S107`.
+ */
 export async function rejectThread(
   session: AuthSession,
   threadId: string,
+  reason: string,
 ): Promise<void> {
-  await setEndState(session, threadId, "rejected");
+  const body = reason.trim();
+  if (!body) {
+    throw new RuleError(
+      "quotations.errors.rejectionReasonRequired",
+      "rejectionReason",
+    );
+  }
+  await setEndState(
+    session,
+    threadId,
+    "rejected",
+    {},
+    { body, decision: "quotation_rejected" },
+  );
 }
 
 /**
  * Cancellation is coordinator-only `[07 C4]` and **a written reason is
  * required** `[10 §8]`: it kills a signed quotation, and the reason is the one
  * field that makes the audit entry worth reading.
+ *
+ * **It becomes a comment too now** `S62`, and it reaches the rep `S128`. The
+ * column stays — the thread screen reads it — but a reason sitting only in a
+ * column is what `S128` calls *the same as no reason at all*: the rep would
+ * learn that a signed quotation had been killed by opening a screen they have
+ * no reason to open. `AUDIT 1` recorded exactly that.
  */
 export async function cancelThread(
   session: AuthSession,
   threadId: string,
   reason: string,
 ): Promise<void> {
-  if (!reason.trim()) {
+  const body = reason.trim();
+  if (!body) {
     throw new RuleError(
       "quotations.errors.cancellationReasonRequired",
       "cancellationReason",
     );
   }
-  await setEndState(session, threadId, "cancelled", {
-    cancelledByUserId: session.user.id,
-    cancelledAt: new Date(),
-    cancellationReason: reason.trim(),
-  });
+  await setEndState(
+    session,
+    threadId,
+    "cancelled",
+    {
+      cancelledByUserId: session.user.id,
+      cancelledAt: new Date(),
+      cancellationReason: body,
+    },
+    { body, decision: "quotation_cancelled" },
+  );
 }
 
 /**

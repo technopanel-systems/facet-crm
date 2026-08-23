@@ -367,6 +367,22 @@ export type DormancyOutcome = (typeof DORMANCY_OUTCOMES)[number];
  * owed. So it is `record.handed_over`'s shape `[21 §5]` — news, dismissible —
  * and if a mention implies work, that work raises its own notification through
  * the normal path.
+ *
+ * **`S92`'s two added items are the seventh and eighth, and both are news.**
+ * *A bell carries news only, never work* — *the news also carries credit
+ * granted to you (`S129`), and a decision that ended your work (`S128`)*.
+ * Nothing is waiting on the person told by either, which is the same sentence
+ * `S92` uses to say why neither belongs on `S87`'s list. Both pass `21 §2`'s
+ * two-limb test: named in `SPEC.md` and raised by real code in the slice that
+ * added them — `cancelDispatch`, `refuseDispatchRequest`, `rejectThread` and
+ * `cancelThread` for the first, `setCreditSplit` for the second.
+ *
+ * **Both are act-now and NOT persistent**, `mention.received`'s shape and for
+ * its reason: `21 §4` gives persistence only to a type whose condition can
+ * clear, and neither of these has one. A refusal has already happened; a share
+ * of credit has already been given. There is nothing to do but read it. That is
+ * also what keeps them clear of the persistence machinery `S91` deletes — see
+ * the note above `DecisionPayload` in `src/lib/notifications.ts`.
  */
 export const NOTIFICATION_TYPES = {
   recordAssigned: "record.assigned",
@@ -374,6 +390,8 @@ export const NOTIFICATION_TYPES = {
   shareGranted: "share.granted",
   followUpDigest: "followup.digest",
   mentionReceived: "mention.received",
+  decisionEndedWork: "decision.ended_work",
+  creditGranted: "credit.granted",
 } as const;
 
 export type NotificationTypeName = keyof typeof NOTIFICATION_TYPES;

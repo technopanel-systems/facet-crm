@@ -165,7 +165,7 @@ report (S37), which parks a company rather than a project.
 **S30.** A project is visible **only to its owner or someone explicitly shared on
 it**. Seeing a company does not reveal its projects.
 
-**S31. [BUILD]** A project is **won when a dispatch against it is approved**.
+**S31.** A project is **won when a dispatch against it is approved**.
 That is a real event and cannot be manufactured. Before that, a rep may mark a
 project **committed** — the customer has agreed, verbally or otherwise. That is
 the rep's own judgement, and no conversion figure treats it as won. **S65** is
@@ -181,15 +181,14 @@ The Arabic term for the customer's commitment is **ملتزم**, from التزا
 is the word the accept hint already uses to say what an internal accept is not.
 It does not reuse اعتماد, which labels the coordinator's accept.
 
-**Won and committed ship.** Won is derived at read time from the same
-approved-dispatch predicate that credits a target (S72) and is stored nowhere,
-so the column that used to claim it by hand is gone from the vocabulary
-entirely — no route can set it. Committed is the rep's own flag, set and
-cleared by them, and is ranked below won and lost wherever a state is printed.
-**Cancellation does not ship**: it is S73's second half, and until it exists
-nothing un-wins a project or takes credit back. When it does, it amends nothing
-here — a dispatch leaving `approved` un-wins and de-credits in one act, which
-is why the derivation is not stored.
+Won is derived at read time from the same approved-dispatch predicate that
+credits a target (S72) and is **stored nowhere**. That is what makes
+cancellation one act rather than two: a dispatch leaving `approved` un-wins the
+project and de-credits the month together, with no second writer to keep in
+step and nothing that could disagree with the dispatches it summarises. The
+column that used to claim a win by hand is gone from the vocabulary entirely —
+no route can set it. Committed is the rep's own flag, set and cleared by them,
+and is ranked below won and lost wherever a state is printed.
 
 
 ---
@@ -368,18 +367,21 @@ approves it.** She is the one who deals with SMAC and with finance. An approved
 dispatch is the only event that credits a target — not the request, and not the
 SMAC number that follows.
 
-**S73. [BUILD]** A dispatch cannot be approved without a payment method.
+**S73.** A dispatch cannot be approved without a payment method. The
+coordinator records the method as part of approving, and no route to `approved`
+bypasses it — the request form never asks, the database refuses a row without
+one, and that is true of a free entry as much as of one raised from a quotation.
+
 **Approval is final.** If something is wrong afterwards — finance refuses, the
-customer changes — the dispatch is **cancelled**, never un-approved. A
-cancelled dispatch stays visible on the record it belonged to, carries a
-reason, and is **never revived**: a new dispatch is raised instead. It credits
-nothing and wins nothing (S31). The **first sentence ships**: the coordinator
-records the method as part of approving, and no route to `approved` bypasses
-it — the request form never asks, the database refuses a row without one, and
-that is true of a free entry as much as of one raised from a quotation.
-Approval is also already final, because nothing un-approves. **Cancellation
-does not exist** — no state, no reason, no act — so a dispatch that must be
-undone today cannot be.
+customer changes — the dispatch is **cancelled**, never un-approved. **The
+coordinator cancels**, the same person who approves and refuses (S72, S124);
+she is the one who deals with SMAC and with finance, and a cancellation is one
+of them changing their mind. A cancelled dispatch stays visible on the record it
+belonged to, carries a reason, and is **never revived**: a new dispatch is
+raised instead. It keeps everything approval gave it — the stamps, the payment
+method, the SMAC number and its difference flag (S120) — and it credits nothing
+and wins nothing (S31). The reason reaches the rep and anyone whose credit it
+takes back (S128).
 
 **S74.** **The project is recorded on the dispatch itself.** When the
 quotation has a project, the dispatch takes it. When the quotation has none, the
@@ -492,9 +494,10 @@ one, and a revived request is treated as new. A rep who wants to withdraw a
 submitted request asks the coordinator to refuse it — there is no separate act.
 A revived request returns to the **rep**, unsubmitted, and they edit and submit
 it as they would a new one (S125). All of that ships but the **timing**: a
-refused request leaves the working lists **at refusal**, not once the rep has
-been told, because S128 is not built. Whether being told ever gates it is still
-open, and the alternative needs a read state, which S91 forbids.
+refused request leaves the working lists **at refusal**, which is now the same
+moment the rep is told (S128) rather than one the telling could gate. Whether
+being told should ever *gate* it is still open, and the alternative needs a read
+state, which S91 forbids.
 
 **S124.** **The coordinator refuses a dispatch request**, the same
 person who approves one. A refusal carries a reason and archives the request
@@ -558,8 +561,15 @@ how much they did.
 **S129. [BUILD]** **A rep is told when they are given a share of someone else's
 credit** — the split case S80 confirms at approval, never the ordinary 100% of
 S78, which needs no telling. A split is a dated row with an author (S110), so
-the event exists; nothing surfaces it today. Being told it was taken back
-(S128) without ever being told it was given is not disclosure.
+the event exists. Being told it was taken back (S128) without ever being told it
+was given is not disclosure.
+
+**The telling ships; the moment this rule names does not.** A rep is told when a
+split naming them is written — the dated row, by its one writer. What does not
+exist is **S80's confirmation at approval**: S80 is unbuilt and S79 still keeps
+the split on the project rather than the quotation, so nothing yet decides
+credit at the moment a dispatch is approved. When it does, it writes that same
+dated row and the telling follows it.
 
 ---
 
@@ -617,9 +627,10 @@ you*, *you have been shared a record*. A handover raises one summary, not one
 per record. The news also carries **credit granted to you (S129)**, and **a
 decision that ended your work (S128)** — a refusal, a rejection, a cancellation.
 Both are news: nothing is waiting on the person told, so neither belongs on the
-list. Both named items are raised today, and a handover already raises one
-summary rather than one per record. The two added items — S128 and S129 — are
-not, and the narrowing to news only is not: the digest still carries work.
+list. All four items are raised today, and a handover raises one summary rather
+than one per record. **The narrowing to news only is what does not ship**: the
+digest still carries work, and it leaves with the rest of the machinery S91
+deletes.
 
 **S93.** **Friday and Saturday are the weekend for everyone.** Saturday work is
 recorded and never required.
@@ -680,7 +691,7 @@ gave up on them. Archiving is gated by the delete-approval flag (S8). That gate
 is not built. `canApproveDeletion` has no reader anywhere today (S8), and
 archiving is gated by `canAssign` instead.
 
-**S128. [BUILD]** **A decision that ends someone's work reaches them.** A
+**S128.** **A decision that ends someone's work reaches them.** A
 refused dispatch request (S124), a cancelled or rejected quotation (S62), and a
 **cancelled dispatch (S73)** each carry a written reason, and that reason
 reaches **everyone whose work it ends** — the rep who raised it, and any rep

@@ -41,6 +41,12 @@
  *      `S118` rides along on the same form: the stock is posted, refused when
  *      cleared, and read back off the detail screen in both locales.
  *
+ *      It also drives `S73`'s **cancellation** and `S62`'s **rejection with a
+ *      reason**, both of which are POSTs no in-process script can reach: the
+ *      empty-reason path must answer 200 with a field error rather than a 500,
+ *      the reason must round-trip onto the record, and a cancelled dispatch
+ *      must offer nothing further — *never revived*.
+ *
  *      Since `S126` the thread is **issued** in the middle of that chain, and
  *      the POST that used to work before it is driven as a refusal instead —
  *      a paid but unissued quotation is not offered, and a hand-made POST
@@ -2593,6 +2599,186 @@ async function main(): Promise<void> {
         refused.status === 200,
         `got ${refused.status} ${refused.location}`,
       );
+
+      /* --- 11. cancelling an approved dispatch [S73], [S128] ----------- */
+
+      /**
+       * `S73` — *approval is final; if something is wrong afterwards the
+       * dispatch is cancelled, never un-approved*, and *never revived*.
+       *
+       * **Driven on the SECOND dispatch, not the one section 7 approved.**
+       * Sections 8 and 9 read that one: `S74`'s write-back and `S26`'s derived
+       * `data-dispatched` figure both hang off it, and cancelling it would
+       * empty the figure section 9 exists to render for the first time.
+       *
+       * **The telling is not asserted here.** `again` was posted by the
+       * coordinator, so she is the raiser, and `cancelDispatch` drops a
+       * self-directed row. Who is told is `verify:slice3` §29's — including
+       * the co-credited rep, which no HTTP walk can reach. What belongs here
+       * is the boundary no in-process script crosses: the form renders for
+       * her and not for the rep, the reason round-trips, and the empty-reason
+       * path comes back as a message rather than a 500.
+       */
+      if (again.status === 303) {
+        const secondPath = again.location.replace(BASE, "");
+        const secondDraft = await get(coordJar, secondPath);
+        const secondSubmit = actForm(secondDraft.body, "submit");
+        if (secondSubmit) {
+          await post(coordJar, secondPath, envelope(secondSubmit));
+          const secondSubmitted = await get(coordJar, secondPath);
+          const secondApprove = actForm(secondSubmitted.body, "approve");
+          if (secondApprove) {
+            const secondApproveFields = envelope(secondApprove);
+            secondApproveFields.set("paymentMethod", "cash_in_office");
+            secondApproveFields.set("paymentNote", "");
+            await post(coordJar, secondPath, secondApproveFields);
+          }
+        }
+
+        const approvedSecond = await get(coordJar, secondPath);
+        const cancelForm = actForm(approvedSecond.body, "cancel");
+        check(
+          `${locale}: the cancel control renders on an APPROVED dispatch [S73]`,
+          approvedSecond.body.includes('data-status="approved"') &&
+            Boolean(cancelForm),
+          `status markup ${approvedSecond.body.includes('data-status="approved"')}`,
+        );
+        // `D53` — an unavailable act is not rendered. The rep may not cancel;
+        // the founder's decision is that only internal sales may.
+        check(
+          `${locale}: …and not for the rep, who may not cancel [S73], [D53]`,
+          !actForm((await get(repJar, secondPath)).body, "cancel"),
+        );
+
+        if (cancelForm) {
+          // **The empty-reason path first**, and it is the one that matters:
+          // `S128` needs a reason to carry, and a cancellation with none must
+          // come back as a message on the field rather than a 500 from the
+          // rule throwing, or a 303 that wrote a row the database would then
+          // refuse. This is the only assertion of that shape anywhere — no
+          // in-process script crosses the action boundary.
+          const empty = envelope(cancelForm);
+          empty.set("reason", "   ");
+          const refusedCancel = await post(coordJar, secondPath, empty);
+          check(
+            `${locale}: *** a cancellation with no reason answers 200, not 303 or 500 *** [S73], [S128]`,
+            refusedCancel.status === 200,
+            `got ${refusedCancel.status} ${refusedCancel.location}`,
+          );
+          check(
+            `${locale}: …and the dispatch is still approved, not half-cancelled [S73]`,
+            (await get(coordJar, secondPath)).body.includes(
+              'data-status="approved"',
+            ),
+          );
+
+          const reason = `${locale}-${stamp} finance refused the transfer`;
+          const cancelFields = envelope(cancelForm);
+          cancelFields.set("reason", reason);
+          const cancelled = await post(coordJar, secondPath, cancelFields);
+          check(
+            `${locale}: *** cancelling answers 200 *** [S73]`,
+            cancelled.status === 200,
+            `got ${cancelled.status} ${cancelled.location}`,
+          );
+
+          const afterCancel = await get(coordJar, secondPath);
+          check(
+            `${locale}: *** the dispatch reads cancelled *** [S73]`,
+            afterCancel.body.includes('data-status="cancelled"'),
+          );
+          // `S73` — *it stays visible on the record it belonged to, carries a
+          // reason*. Read back off the screen, in both locales, which is what
+          // makes it the rep's copy rather than a column.
+          check(
+            `${locale}: *** and carries its reason, on the record *** [S73], [S128]`,
+            afterCancel.body.includes("data-cancellation-reason") &&
+              afterCancel.body.includes(reason),
+          );
+          // *Never revived*: nothing is offered on it to anybody, which is the
+          // screen half of the five refusals `verify:slice3` §29 drives.
+          check(
+            `${locale}: …and offers NOTHING further — never revived [S73], [D53]`,
+            !afterCancel.body.includes('data-slot="request-actions"'),
+          );
+          // `D6` — colour describes elapsed time, never outcome. A cancelled
+          // dispatch is a state of a record, not a warning, so the card
+          // carrying its reason draws no destructive tone at all.
+          check(
+            `${locale}: …and the reason card is not coloured as a warning [D6]`,
+            (afterCancel.body.match(
+              /<div[^>]*data-slot="cancellation"[\s\S]*?data-cancellation-reason/,
+            )?.[0] ?? "").includes("destructive") === false,
+          );
+        }
+      }
+
+      /* --- 12. rejecting a quotation, with a reason [S62], [S128] ------ */
+
+      /**
+       * `S62` — *rejecting requires a written reason, which becomes a comment
+       * on the thread*, and until this slice `rejectThread` took none at all:
+       * no parameter, no column, no control. It was the one of `S62`'s three
+       * acts with nothing behind it.
+       *
+       * **A thread of its own**, because the one above is accepted and every
+       * end state is final. Raised from the same form fields section 1 built,
+       * so this costs one POST.
+       */
+      const rejectRaise = await post(
+        repJar,
+        `/${locale}/quotations/new`,
+        quotationFields,
+      );
+      if (rejectRaise.status === 303) {
+        const rejectPath = rejectRaise.location.replace(BASE, "");
+        const rejectPage = await get(coordJar, rejectPath);
+        const rejectForm = actForm(rejectPage.body, "reject");
+        check(
+          `${locale}: the reject control asks for a reason now [S62], [S128]`,
+          Boolean(rejectForm) &&
+            (rejectForm ?? "").includes('name="rejectionReason"'),
+        );
+
+        if (rejectForm) {
+          const emptyReject = envelope(rejectForm);
+          emptyReject.set("rejectionReason", "   ");
+          const refusedReject = await post(coordJar, rejectPath, emptyReject);
+          check(
+            `${locale}: *** a rejection with no reason answers 200, not 303 or 500 *** [S62]`,
+            refusedReject.status === 200,
+            `got ${refusedReject.status} ${refusedReject.location}`,
+          );
+          check(
+            `${locale}: …and the quotation is still open, not half-rejected [S62]`,
+            !(await get(coordJar, rejectPath)).body.includes("data-end-state="),
+          );
+
+          const rejectReason = `${locale}-${stamp} the customer went elsewhere`;
+          const rejectFields = envelope(rejectForm);
+          rejectFields.set("rejectionReason", rejectReason);
+          const rejected = await post(coordJar, rejectPath, rejectFields);
+          check(
+            `${locale}: *** rejecting answers 200 *** [S62]`,
+            rejected.status === 200,
+            `got ${rejected.status} ${rejected.location}`,
+          );
+
+          const afterReject = await get(repJar, rejectPath);
+          check(
+            `${locale}: *** the thread reads rejected *** [S62]`,
+            afterReject.body.includes('data-end-state="rejected"'),
+          );
+          // `S62` — *which becomes a comment on the thread*. The rep opens
+          // this screen and the reason is in the conversation, which is the
+          // half `AUDIT 1` found missing on two of the three acts.
+          check(
+            `${locale}: *** and the reason is on the thread as a comment *** [S62], [S128]`,
+            afterReject.body.includes('data-slot="comment"') &&
+              afterReject.body.includes(rejectReason),
+          );
+        }
+      }
     }
 
     // `S118` — the same stock, rendered in both locales, must read

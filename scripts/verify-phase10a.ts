@@ -281,7 +281,7 @@ async function main(): Promise<void> {
 
   /* --- 1. The seed [21 §2], [07 D5] --------------------------------- */
 
-  console.log("\n1. The seed: five notification types, and all five thresholds");
+  console.log("\n1. The seed: seven notification types, and all five thresholds");
 
   const types = await db.select().from(notificationTypes);
   if (types.length === 0) {
@@ -306,6 +306,13 @@ async function main(): Promise<void> {
     // `record.handed_over`'s reason `[21 §4]`: being mentioned has no condition
     // that can clear.
     { key: NOTIFICATION_TYPES.mentionReceived, tier: "act_now", persistent: false },
+    // `S92`'s two added items — `S128` and `S129`. Both act-now and NOT
+    // persistent: the decision has already happened and the credit has already
+    // been given, so neither has a condition that could clear `[21 §4]`. That
+    // is also what keeps them clear of the persistence machinery `S91` deletes,
+    // and it is why §11 below does not have to gain a rule for either.
+    { key: NOTIFICATION_TYPES.decisionEndedWork, tier: "act_now", persistent: false },
+    { key: NOTIFICATION_TYPES.creditGranted, tier: "act_now", persistent: false },
   ];
 
   for (const want of expected) {
@@ -345,10 +352,17 @@ async function main(): Promise<void> {
    * What the number guards is unchanged, and it is why it must track the seed
    * exactly rather than be relaxed: a seeded type with no producer. Move it
    * only alongside one, in either direction.
+   *
+   * **It is seven now**, and both additions moved it alongside their producers
+   * in the same slice, which is the rule above rather than an exception to it.
+   * `S92` names them: *the news also carries credit granted to you (`S129`),
+   * and a decision that ended your work (`S128`)*. `decision.ended_work` is
+   * raised by `cancelDispatch`, `refuseDispatchRequest`, `rejectThread` and
+   * `cancelThread`; `credit.granted` by `setCreditSplit`.
    */
   check(
-    "exactly five notification types — 25 §11's, less the one S67 retired [21 §2], [25 §11]",
-    types.length === 5,
+    "exactly seven notification types — 25 §11's six, less S67's, plus S92's two [21 §2], [S92]",
+    types.length === 7,
     `got ${types.map((type) => type.key).join(", ")}`,
   );
 

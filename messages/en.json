@@ -171,7 +171,9 @@
       "recordHandedOver": "Work handed over to you",
       "shareGranted": "Shared with you",
       "followUpDigest": "Daily follow-ups",
-      "mentionReceived": "Mentioned you"
+      "mentionReceived": "Mentioned you",
+      "decisionEndedWork": "A decision ended your work",
+      "creditGranted": "Credit shared with you"
     },
     "followUpKind": {
       "quotation_no_response": "Quotation, no response",
@@ -386,7 +388,8 @@
       "stock": "Stock",
       "verification": "Reference checked",
       "grandTotal": "Total",
-      "projectNone": "No project"
+      "projectNone": "No project",
+      "rejectionReason": "Why it is being rejected"
     },
     "detail": {
       "details": "Details",
@@ -447,6 +450,7 @@
       "accept": "Accept",
       "acceptHint": "Internal approval — the signatures are in. This is not the customer's commitment.",
       "reject": "Reject",
+      "rejectHint": "A written reason is required. It goes on the thread as a comment and reaches the rep.",
       "cancel": "Cancel quotation",
       "cancelHint": "A written reason is required.",
       "revise": "Create a revision",
@@ -471,6 +475,7 @@
       "coordinatorOnly": "Only the sales coordinator can do that.",
       "cancellationReasonRequired": "Cancelling needs a written reason.",
       "returnReasonRequired": "Say what needs changing. The reason goes to the rep as a comment.",
+      "rejectionReasonRequired": "Say why you are rejecting it. The reason goes to the rep as a comment.",
       "paymentFirst": "Confirm the payment first.",
       "noSuppliers": "No product suppliers have been set up yet, so a line cannot be saved.",
       "companyNotVisible": "That company cannot be found, or it is not one of yours."
@@ -522,6 +527,8 @@
       "turn": "Whose move",
       "refusalReason": "Why it is being refused",
       "refusalReasonPlaceholder": "Say what is wrong, so the rep can fix it",
+      "cancellationReason": "Why it is being cancelled",
+      "cancellationReasonPlaceholder": "Say what went wrong. The rep and anyone it credited are told.",
       "stock": "Stock",
       "shipment": "Shipment",
       "cargoDestination": "Destination",
@@ -565,7 +572,10 @@
       "stockHint": "Where this is drawn from. It may differ from the quotation's.",
       "shipmentHint": "South and Dammam have no trucks, so a dispatch from either goes on the customer's own truck.",
       "cargoDestinationHint": "Where the third party is taking it. Optional.",
-      "actionsApproved": "This dispatch is approved and credits its target. Add the SMAC number when SMAC issues it."
+      "actionsApproved": "This dispatch is approved and credits its target. Add the SMAC number when SMAC issues it.",
+      "cancelled": "Cancelled",
+      "cancelledNotice": "This dispatch was approved and has since been cancelled. It credits nothing and wins nothing, and it is never revived.",
+      "cancelHint": "Cancelling is final. The dispatch stays on the record with its reason, stops counting, and cannot be revived — raise a new one instead. The rep and anyone it credited are told."
     },
     "difference": {
       "flag": "Differs from the quotation",
@@ -588,7 +598,8 @@
       "submit": "Submit to internal sales",
       "approve": "Approve",
       "refuse": "Refuse",
-      "revive": "Revive"
+      "revive": "Revive",
+      "cancel": "Cancel this dispatch"
     },
     "errors": {
       "companyNotOnThread": "The company does not match the quotation.",
@@ -621,7 +632,9 @@
       "cargoDestinationOnly": "Only a Cargo shipment carries a destination.",
       "smacNumberTaken": "Another dispatch already carries that SMAC number.",
       "smacNumberOnly": "Only internal sales may write the SMAC dispatch number.",
-      "notApproved": "The SMAC number is written after approval, not before."
+      "notApproved": "Only an approved dispatch can be numbered or cancelled.",
+      "cancelOnly": "Only internal sales may cancel a dispatch.",
+      "cancellationReasonRequired": "Say why it is being cancelled. The rep and anyone it credited are told."
     },
     "request": "Request a dispatch",
     "requestTitle": "Request a dispatch",
@@ -631,7 +644,8 @@
       "draft": "Draft",
       "submitted": "Awaiting approval",
       "approved": "Approved",
-      "refused": "Refused"
+      "refused": "Refused",
+      "cancelled": "Cancelled"
     },
     "turn": {
       "yours": "Your turn",
@@ -959,7 +973,23 @@
       "clearsInteractionAgainstCompany": "Clears when you log an interaction with the company.",
       "mention": "{name} mentioned you in a comment.",
       "mentionUnknown": "Somebody mentioned you in a comment.",
-      "mentionLink": "Open the record"
+      "mentionLink": "Open the record",
+      "decision": {
+        "dispatch_refused": "{name} refused your dispatch request.",
+        "dispatch_cancelled": "{name} cancelled a dispatch. It no longer counts towards anyone's month.",
+        "quotation_rejected": "{name} rejected your quotation.",
+        "quotation_cancelled": "{name} cancelled your quotation."
+      },
+      "decisionUnknown": {
+        "dispatch_refused": "Your dispatch request was refused.",
+        "dispatch_cancelled": "A dispatch was cancelled. It no longer counts towards anyone's month.",
+        "quotation_rejected": "Your quotation was rejected.",
+        "quotation_cancelled": "Your quotation was cancelled."
+      },
+      "decisionLink": "Open the record",
+      "decisionStandsAlone": "The record is not yours to open. The reason above is the whole of it.",
+      "credit": "{name} gave you a {percentage}% share of the credit on this project.",
+      "creditUnknown": "You were given a {percentage}% share of the credit on this project."
     },
     "actions": {
       "markRead": "Mark read",

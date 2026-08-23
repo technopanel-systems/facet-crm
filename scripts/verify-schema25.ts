@@ -1913,13 +1913,17 @@ async function requestStatesHold(): Promise<void> {
       count(*) filter (where status = 'submitted')::int as submitted,
       count(*) filter (where status = 'draft')::int as draft,
       count(*) filter (where status = 'refused')::int as refused,
+      count(*) filter (where status = 'cancelled')::int as cancelled,
       count(*) filter (
-        where (status = 'approved') is distinct from (approved_at is not null)
-           or (status = 'approved') is distinct from (approved_by_user_id is not null)
+        where (status in ('approved', 'cancelled')) is distinct from (approved_at is not null)
+           or (status in ('approved', 'cancelled')) is distinct from (approved_by_user_id is not null)
       )::int as bad_approval,
       count(*) filter (
         where (status = 'refused') is distinct from (refusal_reason is not null)
       )::int as bad_reason,
+      count(*) filter (
+        where (status = 'cancelled') is distinct from (cancellation_reason is not null)
+      )::int as bad_cancellation,
       count(*) filter (
         where (status = 'draft') is distinct from (submitted_at is null)
       )::int as bad_submitted
@@ -1930,17 +1934,25 @@ async function requestStatesHold(): Promise<void> {
     submitted: number;
     draft: number;
     refused: number;
+    cancelled: number;
     bad_approval: number;
     bad_reason: number;
+    bad_cancellation: number;
     bad_submitted: number;
   }[];
 
   console.log(
     `  --    ${rows.total} dispatch(es): ${rows.approved} approved, ` +
-      `${rows.submitted} submitted, ${rows.draft} draft, ${rows.refused} refused`,
+      `${rows.submitted} submitted, ${rows.draft} draft, ` +
+      `${rows.refused} refused, ${rows.cancelled} cancelled`,
   );
+  // `S73` — **a cancelled dispatch keeps its approval stamps**, because
+  // approval is final and a cancellation is not an un-approve. That is why the
+  // predicate names both states rather than `approved` alone, and why the
+  // widening cannot make a cancelled dispatch count: no figure reads these
+  // columns, they all compose `approvedDispatches()`.
   check(
-    "no row's approval stamps disagree with its status [S72]",
+    "no row's approval stamps disagree with its status [S72], [S73]",
     rows.bad_approval === 0,
     `${rows.bad_approval} disagree`,
   );
@@ -1948,6 +1960,11 @@ async function requestStatesHold(): Promise<void> {
     "refused, and only refused, carries a reason [S124]",
     rows.bad_reason === 0,
     `${rows.bad_reason} disagree`,
+  );
+  check(
+    "cancelled, and only cancelled, carries a cancellation reason [S73], [S128]",
+    rows.bad_cancellation === 0,
+    `${rows.bad_cancellation} disagree`,
   );
   check(
     "a draft has not been submitted, and everything else has [S72]",
@@ -2055,6 +2072,45 @@ async function requestStatesHold(): Promise<void> {
     counted.every((row) => approvedIds.has(row.id)),
     `${counted.filter((row) => !approvedIds.has(row.id)).length} leaked`,
   );
+
+  /**
+   * `S31` `S73` — **a cancelled dispatch credits nothing and wins nothing**,
+   * over every row ever written rather than the one `verify:slice3` §29 makes.
+   *
+   * The two assertions above are already true of it by construction, since
+   * `approvedDispatches()` is `status = 'approved'` — so this is the assertion
+   * that would fail if anybody ever widened that predicate to read
+   * `approved_at is not null`, which a cancelled dispatch still carries. It is
+   * cheap and it guards the exact mistake the widened
+   * `dispatches_approval_stamps` CHECK makes possible.
+   */
+  const [cancelledRows] = (await db.execute(sql`
+    select
+      count(*)::int as n,
+      coalesce(sum(l.sqm), 0)::numeric(14, 4) as sqm
+    from dispatches d
+    left join dispatch_lines l on l.dispatch_id = d.id
+    where d.status = 'cancelled'
+  `)) as unknown as { n: number; sqm: string }[];
+  console.log(
+    `  --    ${cancelledRows.n} cancelled dispatch(es), ${cancelledRows.sqm} m2 that must count nowhere`,
+  );
+  const cancelledIds = new Set(
+    (
+      (await db.execute(sql`
+        select id from dispatches where status = 'cancelled'
+      `)) as unknown as { id: string }[]
+    ).map((row) => row.id),
+  );
+  check(
+    "*** no cancelled dispatch reaches the credit reader, on any row *** [S31], [S73]",
+    counted.every((row) => !cancelledIds.has(row.id)),
+    `${counted.filter((row) => cancelledIds.has(row.id)).length} leaked`,
+  );
+  // The win half is `verify:slice3`'s: §29 drives the un-winning and its
+  // closing block re-derives every project's `won` against a hand-written
+  // `status = 'approved'` truth, which is the same claim asked of the reader
+  // rather than of the data. Asserting it twice here would prove arithmetic.
 }
 
 /**

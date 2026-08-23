@@ -21,6 +21,7 @@ import { emptyFormState, type FormState } from "@/lib/validation";
 
 import {
   approveDispatchRequestAction,
+  cancelDispatchAction,
   refuseDispatchRequestAction,
   reviveDispatchRequestAction,
   setDispatchSmacNumberAction,
@@ -34,8 +35,13 @@ import {
  * |---|---|---|
  * | `draft` | edit `S125`, submit | — |
  * | `submitted` | — | edit `S125` `S62`, approve, refuse `S124` |
- * | `approved` | — | write the SMAC number `S121` |
+ * | `approved` | — | write the SMAC number `S121`, cancel `S73` |
  * | `refused` | — | revive `S122` |
+ * | `cancelled` | — | — |
+ *
+ * The last row is why this component returns `null` for a cancelled dispatch:
+ * nothing is offered to anybody, and rendering an empty panel would say there
+ * is something to do here.
  *
  * **An unavailable act is not rendered** `D53` — never a disabled control and
  * never a message. Every action re-checks its rule on the server `S109`, so
@@ -45,6 +51,12 @@ import {
  * changes no figure. *A dispatch is approved, then numbered*, and the number is
  * explicitly not a condition of the approval — so it is its own control here,
  * never a field on the approve form.
+ *
+ * **Cancelling is not an edit either, and there is no un-approve** `S73`. *If
+ * something is wrong afterwards the dispatch is cancelled, never un-approved*,
+ * and *a new dispatch is raised instead* — so the row's last state offers
+ * nothing to anybody, which is why `cancelled` has an empty column above and no
+ * branch below.
  *
  * **There is no approve on the list**, deliberately, and it is a rule rather
  * than a layout choice: `S72` says the coordinator *checks it* and approves it,
@@ -212,6 +224,53 @@ function ApproveForm({ action }: { action: ReasonAction }) {
 }
 
 /**
+ * `S73` — **the cancellation, with its reason.**
+ *
+ * A child component owning its own `useActionState`, for `RefuseForm`'s
+ * reason, and destructive rather than outline because it is the one act here
+ * that takes square metres out of somebody's month `S85` and un-wins a project
+ * `S31`. That is a property of the ACT, not of the record's state: `D6` keeps
+ * colour for elapsed time, and the cancelled dispatch itself carries none — see
+ * the card on the detail screen and its plain `outline` status badge.
+ *
+ * The reason is required here, again in the action, and a third time by
+ * `dispatches_cancellation_reason` at the database. It is what `S128` carries
+ * to the rep and to anyone whose credit it takes back `S80`, so a cancellation
+ * without one is the hole the rule exists to close.
+ */
+function CancelForm({ action }: { action: ReasonAction }) {
+  const t = useTranslations();
+  const [state, cancel, pending] = useActionState(action, emptyFormState);
+  return (
+    <form action={cancel} className="flex flex-col gap-2" data-act="cancel">
+      <Label htmlFor="reason" className="text-start text-sm font-medium">
+        {t("dispatches.fields.cancellationReason")}
+      </Label>
+      <Textarea
+        id="reason"
+        name="reason"
+        rows={2}
+        dir="auto"
+        className="text-start"
+        placeholder={t("dispatches.fields.cancellationReasonPlaceholder")}
+        required
+      />
+      <div>
+        <Button
+          type="submit"
+          size="sm"
+          variant="destructive"
+          disabled={pending}
+        >
+          {pending ? t("common.saving") : t("dispatches.actions.cancel")}
+        </Button>
+      </div>
+      <Feedback state={state} />
+    </form>
+  );
+}
+
+/**
  * `S121` — **the SMAC dispatch number**, written after approval.
  *
  * *It is not a condition of approval; a dispatch is approved, then numbered.*
@@ -269,7 +328,7 @@ export function RequestActions({
   smacDispatchNumber,
 }: {
   dispatchId: string;
-  status: "draft" | "submitted" | "approved" | "refused";
+  status: "draft" | "submitted" | "approved" | "refused" | "cancelled";
   /** `S125` — who raised it, which is who edits it while it is a draft. */
   isRaiser: boolean;
   /** Presentation only — every action re-checks the flag on the server. */
@@ -287,10 +346,20 @@ export function RequestActions({
   // edit: the number is written after approval and gates nothing.
   const canNumber = status === "approved" && isCoordinator;
 
+  // `S73` — *approval is final*, so the only thing left to do with an approved
+  // dispatch that has gone wrong is cancel it. The founder's decision on who:
+  // the coordinator, the same flag as approve, refuse, revive and the number.
+  const canCancel = status === "approved" && isCoordinator;
+
   // A refused request offers nothing to anyone but the coordinator who may
   // revive it `S122`. Rendering an empty panel would say there is something to
   // do here.
-  if (!canEdit && !canNumber && !(status === "refused" && isCoordinator)) {
+  if (
+    !canEdit &&
+    !canNumber &&
+    !canCancel &&
+    !(status === "refused" && isCoordinator)
+  ) {
     return null;
   }
 
@@ -360,6 +429,19 @@ export function RequestActions({
             action={setDispatchSmacNumberAction.bind(null, dispatchId)}
             current={smacDispatchNumber}
           />
+        ) : null}
+
+        {/* `S73` — the only act on an approved dispatch that changes a figure,
+            and the last one it will ever take: a cancellation is never revived
+            and a new dispatch is raised instead. The hint says so before the
+            click, as the submit hint does. */}
+        {canCancel ? (
+          <>
+            <CancelForm action={cancelDispatchAction.bind(null, dispatchId)} />
+            <p className="text-muted-foreground text-start text-xs">
+              {t("dispatches.detail.cancelHint")}
+            </p>
+          </>
         ) : null}
 
         {status === "refused" && isCoordinator ? (

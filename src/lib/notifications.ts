@@ -37,6 +37,17 @@
  * the one function a scheduled job will call when Phase 12 adds one, with no
  * second code path. It took that shape from the quotation expiry sweep, which
  * `S67` deleted along with the state it wrote.
+ *
+ * **`S92`'s two added items — `S128` and `S129` — use only what `S91` keeps.**
+ * `S91` deletes the tiers, the persistence flags, the per-anchor resolution
+ * conditions and the daily digest (`SPEC §15`); what survives is the delivery
+ * core — this module's `raise` inside the caller's transaction,
+ * `listNotifications`, `unresolvedCount` and `markRead`. Neither new type has a
+ * `RESOLUTION_RULES` row, a sweep branch, a digest date or an anchor, so
+ * nothing they stand on is on that list, and the waiting-list slice cannot take
+ * them with it (`WORKFLOW §5`). The two seeded rows do carry `tier` and
+ * `is_persistent` — but that is seed DATA, and when those columns go the rows
+ * stay and the news still reads.
  */
 
 import { and, count, desc, eq, isNull, or, sql } from "drizzle-orm";
@@ -47,6 +58,7 @@ import {
   companies,
   notificationTypes,
   notifications,
+  projects,
   quotationThreads,
   users,
 } from "@/db/schema";
@@ -146,6 +158,113 @@ export type MentionPayload = {
   href: string | null;
 };
 
+/**
+ * `S128` — **the record kinds a decision can end work on.** Two, because the
+ * rule names four acts across two records: a refused or cancelled dispatch
+ * `S124` `S73`, and a rejected or cancelled quotation `S62`.
+ *
+ * `satisfies` proves both are kinds `canOpenRecord` can answer for, which is
+ * what `decisionPayload` needs to decide whether to draw a link. Deliberately
+ * NOT `NotificationAnchorType`: these never become an anchor — see below.
+ */
+const DECISION_RECORD_TYPES = [
+  "dispatch",
+  "quotation_thread",
+] as const satisfies readonly ViewableRecordType[];
+
+export type DecisionRecordType = (typeof DECISION_RECORD_TYPES)[number];
+
+/** `S128`'s four acts, as one closed vocabulary. */
+export const DECISION_KINDS = [
+  "dispatch_refused",
+  "dispatch_cancelled",
+  "quotation_rejected",
+  "quotation_cancelled",
+] as const;
+
+export type DecisionKind = (typeof DECISION_KINDS)[number];
+
+/**
+ * `S128` — what a `decision.ended_work` row carries. **The reason is stored
+ * here, and that is the rule rather than an optimisation.**
+ *
+ * *Where the person told cannot see the record — a co-credited rep has no sight
+ * of the dispatch itself — the message carries the reason and stands alone. It
+ * is not a link into something they cannot open.* `S128` names itself a
+ * deliberate exception to `S112`, which is otherwise unchanged: an audit row is
+ * never shown without joining back to the record and applying its visibility.
+ * Here the rep's own credit was taken, so the reason reaches them even where
+ * the record does not.
+ *
+ * So `reason` is rendered whichever way `recordViewable` comes out. That is the
+ * one place this type differs from `MentionPayload`, which withholds its body
+ * exactly when the record is closed — a comment is the record's content; a
+ * reason for ending somebody's work is theirs.
+ *
+ * **It is also the only copy that survives.** `dispatches.refusal_reason` is
+ * CLEARED on revival `S122`, and a rejected quotation has no reason column at
+ * all — `S62` makes the comment on the thread its home, and a second column
+ * would be a second home for one sentence. Reading the reason back through the
+ * record at render time would therefore find nothing on the first and apply the
+ * record's visibility on both.
+ *
+ * **No anchor, for `MentionPayload`'s reason.** `notifications_live_key` is a
+ * partial unique index over every unresolved row carrying a `record_id`, and
+ * nothing resolves a non-persistent type — so an anchored decision would
+ * deliver the first one against a record and silently drop every later one.
+ * `dispatch` is not in `ANCHOR_TYPES` for that reason and not for want of
+ * `canOpenRecord` support.
+ *
+ * Ids are stored; names, viewability and the link are resolved on read, above
+ * `HandoverPayload`'s reason. `recordViewable` is re-derived every time: a
+ * dispatch can be handed on and a share revoked between the decision and the
+ * reading of it.
+ */
+export type DecisionPayload = {
+  kind: "decision";
+  decision: DecisionKind;
+  /** Shown whether or not the record is `recordViewable` `[S128]`. */
+  reason: string;
+  recordType: DecisionRecordType;
+  recordId: string;
+  decidedByUserId: string;
+  decidedByName: string | null;
+  recordViewable: boolean;
+  /** Only set when the reader may still open it `[20 §8.2]`. */
+  href: string | null;
+};
+
+/**
+ * `S129` — what a `credit.granted` row carries.
+ *
+ * *A rep is told when they are given a share of someone else's credit* — the
+ * split case, never `S78`'s ordinary 100%, which needs no telling.
+ *
+ * **The ordinary `S112` rule applies here, not `S128`'s exception.** That
+ * exception is written for credit *taken back*: the rep's own square metres
+ * left their month, so the reason reaches them even where the record does not.
+ * A share *given* takes nothing, and a rep given one need not hold the project
+ * `S30` — so the project's name and the link follow `MentionPayload`, present
+ * only while `canOpenRecord` passes. The percentage and the date are the rep's
+ * own credit rather than the project's data, and are shown either way.
+ *
+ * Both names are carried rather than one: a project still has a name pair, and
+ * `lookupName` is the screen's to call with its locale.
+ */
+export type CreditPayload = {
+  kind: "credit";
+  projectId: string;
+  effectiveFrom: string;
+  /** As stored on the generation's row — two decimals `[18 §5]`. */
+  percentage: string;
+  setByUserId: string;
+  setByName: string | null;
+  recordViewable: boolean;
+  projectNameEn: string | null;
+  projectNameAr: string | null;
+  href: string | null;
+};
+
 export type NotificationRow = {
   id: string;
   typeKey: string;
@@ -177,7 +296,7 @@ export type NotificationRow = {
   /** Only set when the viewer may still open it `[20 §8.2]`. */
   anchorViewable: boolean;
   anchorLabel: string | null;
-  payload: HandoverPayload | MentionPayload | null;
+  payload: HandoverPayload | MentionPayload | DecisionPayload | CreditPayload | null;
   digestDate: string | null;
   /** How many follow-ups the digest covered, by kind. */
   digestCounts: Record<string, number> | null;
@@ -676,12 +795,18 @@ async function decorate(
 async function decodePayload(
   session: AuthSession,
   row: RawNotification,
-): Promise<HandoverPayload | MentionPayload | null> {
+): Promise<HandoverPayload | MentionPayload | DecisionPayload | CreditPayload | null> {
   if (row.typeKey === NOTIFICATION_TYPES.recordHandedOver) {
     return handoverPayload(row.payload);
   }
   if (row.typeKey === NOTIFICATION_TYPES.mentionReceived) {
     return mentionPayload(session, row.payload);
+  }
+  if (row.typeKey === NOTIFICATION_TYPES.decisionEndedWork) {
+    return decisionPayload(session, row.payload);
+  }
+  if (row.typeKey === NOTIFICATION_TYPES.creditGranted) {
+    return creditPayload(session, row.payload);
   }
   return null;
 }
@@ -807,10 +932,132 @@ async function mentionPayload(
 }
 
 /**
+ * `S128` — the decision payload, with the record re-checked on every read and
+ * **the reason shown either way**.
+ *
+ * The visibility question decides the LINK and nothing else. `S128` is explicit
+ * that where the person told cannot see the record the message carries the
+ * reason and stands alone, so a closed record costs the href and leaves the
+ * sentence intact. `mentionPayload` withholds its body in the same position and
+ * for the opposite reason — see the note above `DecisionPayload`.
+ *
+ * The name of whoever decided is read now rather than stored, above
+ * `HandoverPayload`'s reason: `19 §6` makes the account editable, and a
+ * notification naming somebody's old spelling forever is the drift `04 C1`
+ * warns about.
+ */
+async function decisionPayload(
+  session: AuthSession,
+  value: unknown,
+): Promise<DecisionPayload | null> {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const recordId = record.recordId;
+  const decidedByUserId = record.decidedByUserId;
+  const reason = record.reason;
+  const recordType = DECISION_RECORD_TYPES.find(
+    (type) => type === record.recordType,
+  );
+  const decision = DECISION_KINDS.find((kind) => kind === record.decision);
+  if (
+    typeof recordId !== "string" ||
+    typeof decidedByUserId !== "string" ||
+    typeof reason !== "string" ||
+    !recordType ||
+    !decision
+  ) {
+    return null;
+  }
+
+  const viewable = await canOpenRecord(session, recordType, recordId);
+
+  const [decidedBy] = await db
+    .select({ name: users.name })
+    .from(users)
+    .where(eq(users.id, decidedByUserId))
+    .limit(1);
+
+  return {
+    kind: "decision",
+    decision,
+    reason,
+    recordType,
+    recordId,
+    decidedByUserId,
+    decidedByName: decidedBy?.name ?? null,
+    recordViewable: viewable,
+    href: viewable ? recordHref(recordType, recordId) : null,
+  };
+}
+
+/**
+ * `S129` — the credit payload, following `mentionPayload` exactly.
+ *
+ * The project's name and the link are present only while `canOpenRecord`
+ * passes: `S30` keeps a project to its owner and whoever is shared on it, and a
+ * rep given a share of credit need not be either. `S128`'s stand-alone
+ * exception does not reach here — it is written for credit taken back, and this
+ * is credit given.
+ *
+ * The percentage and the effective date come out of the payload rather than
+ * being re-read: `S110` makes a split a dated row and a later generation
+ * supersedes this one, so re-reading would tell the rep about a share they no
+ * longer hold instead of the one they were given.
+ */
+async function creditPayload(
+  session: AuthSession,
+  value: unknown,
+): Promise<CreditPayload | null> {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const projectId = record.projectId;
+  const setByUserId = record.setByUserId;
+  const effectiveFrom = record.effectiveFrom;
+  const percentage = record.percentage;
+  if (
+    typeof projectId !== "string" ||
+    typeof setByUserId !== "string" ||
+    typeof effectiveFrom !== "string" ||
+    typeof percentage !== "string"
+  ) {
+    return null;
+  }
+
+  const viewable = await canOpenRecord(session, "project", projectId);
+
+  const [setBy] = await db
+    .select({ name: users.name })
+    .from(users)
+    .where(eq(users.id, setByUserId))
+    .limit(1);
+
+  const [project] = viewable
+    ? await db
+        .select({ nameEn: projects.nameEn, nameAr: projects.nameAr })
+        .from(projects)
+        .where(eq(projects.id, projectId))
+        .limit(1)
+    : [];
+
+  return {
+    kind: "credit",
+    projectId,
+    effectiveFrom,
+    percentage,
+    setByUserId,
+    setByName: setBy?.name ?? null,
+    recordViewable: viewable,
+    projectNameEn: project?.nameEn ?? null,
+    projectNameAr: project?.nameAr ?? null,
+    href: viewable ? recordHref("project", projectId) : null,
+  };
+}
+
+/**
  * Where a record lives. The twin of `_components/anchors.ts`, which cannot be
  * imported here — it is a screen module, and this one is read by the sweep.
  */
-function recordHref(recordType: CommentRecordType, id: string): string {
+function recordHref(recordType: ViewableRecordType, id: string): string {
   if (recordType === "quotation_thread") return `/quotations/${id}`;
   if (recordType === "project") return `/projects/${id}`;
   if (recordType === "contact") return `/contacts/${id}`;

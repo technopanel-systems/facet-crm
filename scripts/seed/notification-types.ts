@@ -1,5 +1,6 @@
 /**
- * The seeded notification types — `21 §2`'s five, and `25 §11`'s sixth.
+ * The seeded notification types — `21 §2`'s five, `25 §11`'s sixth, and
+ * `S92`'s seventh and eighth.
  *
  * `10 §10` makes the type a **lookup, not an enum in code**: the trigger list
  * stays open and adding a type must be data, not a migration. That is why this
@@ -112,6 +113,53 @@ export const NOTIFICATION_TYPE_SEED: NotificationTypeSeed[] = [
     key: NOTIFICATION_TYPES.mentionReceived,
     nameEn: "Mentioned you",
     nameAr: "أشار إليك",
+    tier: "act_now",
+    isPersistent: false,
+  },
+  {
+    // `S128` — *a decision that ends someone's work reaches them*, and `S92`
+    // carries it as news: *a refusal, a rejection, a cancellation*. One type
+    // for all four acts, because `S92` names one item and the four differ only
+    // in which record ended — which travels in `payload`, as the kind does.
+    //
+    // Act-now: it is directed at one person about one thing, and a daily
+    // summary of "your dispatch was cancelled last Tuesday" is the latency the
+    // rule exists to remove. NOT persistent `[21 §4]`, for `mention.received`'s
+    // reason — the decision has already happened, there is no condition left to
+    // clear, and a badge the rep can never clear is what makes the tier get
+    // ignored.
+    //
+    // Raised with **no anchor**, and that is `mention.received`'s reason plus
+    // one of its own: `notifications_live_key` covers every unresolved row
+    // carrying a `record_id` and nothing resolves a non-persistent type, so a
+    // second decision against the same record would be swallowed for good. The
+    // one of its own is `S128`'s — *where the person told cannot see the
+    // record, the message carries the reason and stands alone*. An anchor is a
+    // link into something a co-credited rep cannot open.
+    key: NOTIFICATION_TYPES.decisionEndedWork,
+    nameEn: "A decision ended your work",
+    nameAr: "قرار أنهى عملك",
+    tier: "act_now",
+    isPersistent: false,
+  },
+  {
+    // `S129` — *a rep is told when they are given a share of someone else's
+    // credit*, the split case `S80` confirms at approval, never `S78`'s
+    // ordinary 100%, which needs no telling.
+    //
+    // **Raised by `setCreditSplit`, which is the dated row with an author
+    // `S110` that `S129` itself names as the event that already exists.**
+    // `S80`'s prompt at approval does not — `dispatches.ts` deliberately
+    // imports no split writer `[07 D3]`, `[12 §1]` — so `S129` keeps its marker
+    // and says which half is true (`WORKFLOW §7`). When that prompt lands it
+    // calls this same writer and the telling comes free.
+    //
+    // Act-now and NOT persistent, for the type above's reasons. No anchor
+    // either: a rep given a share need not hold the project `S30`, so the
+    // record travels in `payload` and is re-checked on read.
+    key: NOTIFICATION_TYPES.creditGranted,
+    nameEn: "Credit shared with you",
+    nameAr: "تمت مشاركة رصيد معك",
     tier: "act_now",
     isPersistent: false,
   },

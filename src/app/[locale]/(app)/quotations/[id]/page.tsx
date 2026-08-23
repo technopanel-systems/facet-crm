@@ -144,7 +144,10 @@ export default async function QuotationDetailPage({
         reference={live.smacReference ?? undefined}
         action={
           thread.endState ? (
+            // A DOM marker, so `verify:routes` can tell the three end states
+            // apart without reading a translated string (`CLAUDE.md`).
             <Badge
+              data-end-state={thread.endState}
               variant={
                 thread.endState === "rejected" || thread.endState === "cancelled"
                   ? "destructive"

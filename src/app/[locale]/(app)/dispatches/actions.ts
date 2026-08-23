@@ -7,6 +7,7 @@ import { redirect } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
 import {
   approveDispatchRequest,
+  cancelDispatch,
   refuseDispatchRequest,
   requestDispatch,
   reviveDispatchRequest,
@@ -30,7 +31,7 @@ import { readProductLine } from "../quotations/line-form";
 const MAX_LINES = 40;
 
 /**
- * The six acts of `S72`, one action each.
+ * The seven acts of `S72` `S73`, one action each.
  *
  * **Every action calls `requireSession()` itself.** A server action is a
  * separately reachable POST endpoint; no layout wraps it, so the gate cannot be
@@ -276,6 +277,44 @@ export async function refuseDispatchRequestAction(
   }
   revalidatePath("/dispatches");
   revalidatePath(`/dispatches/${id}`);
+  return {};
+}
+
+/**
+ * **The coordinator cancels an approved dispatch**, with a reason `S73`.
+ *
+ * *Approval is final*, so this is not an un-approve and there is no route back:
+ * the dispatch keeps its stamps, its payment method and its number, and stops
+ * counting. Which means the same four screens go stale as at approval —
+ * `/targets` because the square metres leave the rep's month `S85`, `/projects`
+ * because the project it won is un-won `S31`, and `/quotations` because the
+ * source thread's dispatched figure moves `S77`. The write-back `S74` performed
+ * at approval is NOT undone: the quotation keeps the project it gained, because
+ * `S74` records where the work was, not whether it shipped.
+ */
+export async function cancelDispatchAction(
+  id: string,
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const session = await requireSession();
+  const fields = readFields(formData);
+  const reason = fields.text("reason", {
+    required: true,
+    max: COMMENT_BODY_MAX,
+  });
+  if (!fields.ok || !reason) return fields.state;
+
+  try {
+    await cancelDispatch(session, id, reason);
+  } catch (error) {
+    return ruleErrorState(error, fields.values);
+  }
+  revalidatePath("/dispatches");
+  revalidatePath(`/dispatches/${id}`);
+  revalidatePath("/targets");
+  revalidatePath("/quotations");
+  revalidatePath("/projects");
   return {};
 }
 
