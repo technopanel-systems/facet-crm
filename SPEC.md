@@ -394,13 +394,16 @@ quotation** · **from a quotation, with edits** · **as a free entry with no
 quotation at all**. The second is the normal case after negotiation. **A
 dispatch that names a project wins it on approval (S31); one that names none
 wins nothing**, which is why the project is asked for even when it is not
-refused. All three routes exist today: a dispatch raised from a quotation
-arrives with its lines and is kept or edited (S116), and a free entry types
-them. The approval act exists too (S72), and **so does winning on approval**
-(S31). What does not is the free entry's project: that route names none — it is
-never asked, and the column is written null — so it wins nothing, which is the
-rule's own answer for a dispatch naming no project but not yet its answer for
-one that would.
+refused. A **free-entry dispatch may name a project** — the rep is asked, and
+may leave it empty. Where it names one, approving it wins that project (S31);
+where it does not, it wins nothing. All three routes exist today: a dispatch
+raised from a quotation arrives with its lines and is kept or edited (S116),
+and a free entry types them. The approval act exists too (S72), and **so does
+winning on approval** (S31). What does not is **the asking**: the free-entry
+route offers no project at all — no control, no options loaded, and the column
+written null — so a free entry can only ever be the empty case, and the half
+of this rule that lets a rep name one has nothing behind it yet.
+
 
 
 **S76. [CHANGE]** The coordinator **sees projects and contacts**, because both
