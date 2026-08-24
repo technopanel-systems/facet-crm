@@ -91,10 +91,12 @@ combobox, the view-mode switch and the board's scroll.
   layout, never a `can()` in a client component `D50`; the data layer re-checks either way
   `S109`, so the UI is never the gate.
 - **Structure** — `page.tsx`, `new/`, `[id]/`, `[id]/edit/`, `actions.ts`, `thing-form.tsx`.
-  The rail is `D49`'s seven items, with Reports, Coverage, Follow-ups, Notifications and
-  Performance **not** top-level, so **a new screen usually belongs inside an existing
-  section** `D49`, and nothing renders until something is behind it `D51`. (`GROUPS` still
-  holds the older six — the shell slice builds it to `D49`.)
+  The rail is `D49`'s **seven items plus user management for those who hold it**, with
+  Reports, Coverage, Follow-ups, Notifications and Performance **not** top-level, so **a new
+  screen usually belongs inside an existing section** `D49`, and nothing renders until
+  something is behind it `D51`. **Performance and Targets are one item, Targets** `D49`.
+  (`GROUPS` still holds the older six, carries Performance and has neither Activity nor
+  Targets — the shell slice builds it to `D49`.)
 
 ## Archetypes and building blocks
 
@@ -109,7 +111,9 @@ is** `D25`, each header naming the group and its count.
   `Turn`/`TurnPanel` (`_components/turn`); **the turn panel is the screen's most important
   element** `D24`; `DetailRow` survives only for a totals block.
 - *Form* — `FormShell` (`form-field`), shaped by `D24`, phone-first `D55`; `wide` is for
-  repeating rows only. *Dashboard* — `D24`, contents `D32`–`D41`.
+  repeating rows only. *Dashboard* — `D24`, and **one screen of blocks** `D64`: no rep
+  dashboard and no manager dashboard, six blocks in a fixed order, each qualified by a
+  permission flag. Contents `D32`–`D41`, `D65`–`D68`.
 
 **Two numeric treatments**: magnitudes, money, counts and dates take the `numeric` prop on
 `TableHead`/`TableCell`/`Fact` — mono **and** end-aligned together `D11` `D24`; identifiers
@@ -168,9 +172,11 @@ do not drag** `D29`. Build order `D31`.
   field** `S12` `S19`: a company or contact renders `row.name`. `lookupName` covers what
   still carries a pair — the lookup tables and projects; `bilingualName` is gone.
 
-Screen contents when you need them: rep dashboard `D32`–`D37` · manager `D38`–`D41` · rollup
-`D42`–`D44` · stream, Log button, private note `D45`–`D47` · comments on quotation threads
-and projects only `D48` `S114` · responsive `D55` `D56` · deliberately not built `D58` `D21`.
+Screen contents when you need them: the dashboard's block model `D64` · its no-flag case
+`D32`–`D37` · what a flag adds `D38`–`D41` · the coordinator `D65` · Marketing and the
+Executive `D67` `D68` · where a dispatch's difference is seen `D66` · rollup `D42`–`D44` ·
+stream, Log button, private note `D45`–`D47` · comments on quotation threads and projects
+only `D48` `S114` · responsive `D55` `D56` · deliberately not built `D58` `D21`.
 
 ## Before calling a screen done
 

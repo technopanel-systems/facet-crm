@@ -277,7 +277,39 @@ only if someone asks twice.
 
 ---
 
-## 8. The rep's dashboard — "what should I work on today?"
+## 8. The dashboard — one screen of blocks
+
+**D64. The dashboard is one screen of blocks in a fixed order, and a block
+appears when the person's flags qualify it.** A role in FACET is a row of
+permission flags and never a name in code (CLAUDE.md), so there is no rep
+dashboard and no manager dashboard to build — there would be nothing to name
+them after. There is **one** dashboard, and six blocks:
+
+| Block | Appears when | Contents |
+|---|---|---|
+| My target and pace | a target row exists for this person | `D32` |
+| Requests waiting on me | `can_approve_quotation` or `can_dispatch` | `D65` |
+| My waiting list | always | `D33`–`D36` |
+| The team table | `sees_all_reps` | `D39` |
+| Waiting on the coordinator | `sees_all_reps` | `D40` |
+| Needs a decision | `can_assign` | `D41` |
+
+**The order is fixed** and does not vary by who is looking. A block that does
+not qualify is absent, not disabled and not empty `D53`.
+
+**The first block is the exception, in two ways.** Its condition is data rather
+than a flag — a target row exists for this person `S83`, `S84` — and it is the
+only block a flag *widens* instead of revealing: holding `sees_all_reps` reads
+it at company scope, which is `D38` and not a seventh block.
+
+**A person holding none of the flags gets the target and the waiting list**,
+which is exactly the rep's screen. So `D32`–`D37` are this rule's **no-flag
+case** rather than a design of their own, and `D38`–`D41` are what a flag adds.
+This is also what gives Marketing `D67` and the Executive `D68` a sensible
+screen without anyone designing one.
+
+All five flags named above are columns on `roles` today. None of the six blocks
+is built.
 
 **D32. The signature panel is the target with a pace line.** Dispatched square
 metres this month as a large mono figure, of the target; a bar filled to
@@ -287,17 +319,68 @@ last month.
 
 **Paid-not-yet-out is not one of them.** Payment is recorded on the dispatch
 (S70) and no route to approved bypasses it (S72, S73), so no interval exists
-between paid and dispatched for a figure to measure. Whether a third figure
-stands beside those two, and what it measures instead, is **OPEN — not chosen**.
+between paid and dispatched for a figure to measure. **Nothing stands in its
+place — two side figures, not three.** That closes the `OPEN — not chosen` this
+rule carried (`WORKFLOW §5 AD6`). `D42`'s funnel stage is the same argument
+about a different screen and is deliberately **still open**: the rollup is
+decided with the screen in front of the founder, not here.
 
 **D33. The counts strip** is a plain quartered row inside one card, not four
-KPI cards. Companies gone quiet · quotations on you · projects not moved ·
-on hold resuming this week. Each is a link into the waiting list, filtered.
+KPI cards. **Four tiles over six conditions** — `FOLLOW_UP_KINDS` has six, and
+six equal-weight tiles where four would do is the thing `D21` names outright:
 
-**D34. The waiting list** is the wide column. Grouped Overdue / Due soon, oldest
-first. Each row: a one-letter kind mark (Q, C, P), the record, one line of why,
-elapsed time coloured by lateness, and **the action as a button on the row** —
-Log, Confirm, Open. The exit door is on the row.
+| Tile | The kinds it counts |
+|---|---|
+| Quotations | `quotation_no_response` · `quotation_returned` |
+| Gone quiet | `company_quiet` · `catalogue_no_response` |
+| Not moved | `project_stage_unchanged` |
+| Your dates | `date_due` |
+
+**No condition is dropped.** Each tile is a link into the waiting list, filtered
+to its own kinds. `S89`'s fifth condition — a dispatch request sitting with the
+coordinator — is deliberately not here: it belongs to `D64`'s **Requests
+waiting on me** block, where it can be acted on, not to a count. Following the
+old four dropped two live conditions and following the code breached `D21`;
+this is the shape that does neither (`WORKFLOW §5 AD5`).
+
+***On hold resuming this week* is gone.** It was never a follow-up kind — on
+hold is a **suppression**, not a condition — so no tile could have counted it.
+The real gap it was standing in for is recorded in `WORKFLOW §5` rather than
+lost with the tile.
+
+**D34. The waiting list** is the wide column, and it is in **two sections**.
+
+**Today · you planned this** holds the `date_due` rows — the dates the rep set
+himself — **grouped by the anchor record**: within a group the oldest date
+first, and between groups the group's oldest date decides. That is still
+oldest-first overall `S87`, without meeting the same customer at rows 2, 6 and
+9, which is what makes a list feel like busywork.
+
+**Slipping** holds the other five kinds.
+
+**The action follows the row**, because two actions cannot cover four anchors:
+**Log** on a company or a project row, **Open** on a quotation or a dispatch
+row, and **Plan** on anything in Slipping — Plan sets a follow-up date and
+moves the row into a day. **Confirm is gone**: confirming a payment is a step
+inside the quotation, not a row action. The exit door is still on the row.
+
+Each row also carries a **one-letter kind mark — C, P, Q and D**, four rather
+than three because `S86` puts dispatch requests on the list as a fourth anchor
+and `S88`/`S89` make one sitting with the coordinator first-class
+(`WORKFLOW §5 AD22`). Then the record, one line of why, and elapsed time
+coloured by lateness `D6`.
+
+**The list is worked down by ranking, never emptied, and the shape follows from
+that.** A rep with 200 companies cannot clear a 30-day quiet list — it would
+take 9 to 10 touches every working day, which is out of reach. So the two
+sections exist to help him *decide*, not to tally: the planned section is what
+he already chose, and Slipping is what he is choosing between. An empty Slipping
+is not the goal, and `D52` says so.
+
+**Only part of this has an `S` rule behind it.** `S87` gives one list oldest
+first and `S90` gives *parked* as an exit; **that a planned row is shown in a
+section of its own, and that the act on a slipping row is called Plan**, are
+decisions this rule makes. `SPEC.md` has not been asked and does not say them.
 
 **D35. The week strip** on the narrow side: seven days, two bars per day —
 logged (red) and system events on your records (blue). Friday and Saturday
@@ -310,11 +393,18 @@ check.
 **D37.** Nothing on the rep's dashboard is company-wide. No team figures, no
 other reps, no executive analytics.
 
+**This is a flag rule, not a role rule** `D64`. Sales Rep holds no flags at all,
+which is why the screen narrows to one person's own figures; **`sees_all_reps`
+is what widens it** — it reads the target block at company scope `D38` and adds
+the team table `D39`. Nothing here is keyed to the word "rep".
+
 ---
 
-## 9. The manager's dashboard — "where do I need to intervene?"
+## 9. The blocks a flag adds
 
-**D38.** The **same signature panel**, at company scope. Same pace line.
+**D38.** The **same signature panel**, at company scope. Same pace line. This is
+not a block of its own: it is `D64`'s first block **read wider**, and
+`sees_all_reps` is what widens it.
 
 **D39. The team table**: one row per rep — a small pace bar with the tick, m²
 dispatched of target, waiting-on-them as two counts (overdue in red, due soon
@@ -324,11 +414,56 @@ conversation, not a formula."* Activity and target sit side by side and are
 never combined into a score.
 
 **D40. "Waiting on the coordinator"** — the bottleneck card, because the
-coordinator is one person and the quotation chain runs through her.
+coordinator is one person and **both chains run through her**: the quotation
+chain, and since `S72` and `S124` the dispatch chain too. It is a block on
+`sees_all_reps` `D64`, the same flag as the team table — a manager watching one
+person's queue is the same act as watching the team's.
 
 **D41. "Needs a decision"** — duplicates (S22) and archive requests (S105). The
 two things the system routes to a manager, on one card, nowhere else. This is
-what makes the manager's version of the waiting list different.
+what makes the manager's version of the waiting list different. It is `D64`'s
+block on `can_assign`.
+
+**D65. The coordinator's dashboard leads with Requests: one heading, two
+columns.** Quotation requests needing issuing on one side, dispatch requests
+needing a decision on the other, **oldest first in each**. They sit beside each
+other rather than interleaved because they are different work — issuing is a
+task, deciding a dispatch is a judgement — and a single merged queue would ask
+her to switch between the two on every row. Below it, a plain count of her day:
+approved · issued · refused.
+
+**She typically carries no target and no pace line**, because she does not sell.
+Where she does carry one — `S127` lets her raise and approve against her own
+company, and `S78` credits the rep named on the dispatch — `D64`'s first block
+shows it exactly as it shows anyone's. Nothing here special-cases her.
+
+**No `S` rule stands behind the two columns.** `S88` puts a dispatch request on
+her own list and `S89` orders it by when it was submitted; that quotation and
+dispatch requests are shown **side by side under one heading** is a decision
+this rule makes, and `SPEC.md` does not say it.
+
+**D66. A dispatch's difference from its quotation is recorded, never flagged to
+the coordinator.** The company treats a quotation as a **price, not a
+commitment**; the dispatch is the absolute figure. The rep links the latest
+version by default and may reach an earlier one, and the difference is computed
+against whichever he linked `S120`. **Roughly half of all dispatches already
+differ**, and a warning that fires half the time is not a warning — it is a
+thing people learn to click past.
+
+So the difference surfaces **on the project and in the monthly rollup** `D43`,
+where a gap is the thing being measured `S77`, and **not on her queue** `D65`.
+`S120` and `S77` already compute it and already show it to the rep, the
+coordinator and the manager on the dispatch itself; this rule decides only
+**where it is seen as a signal** and answers *nowhere on the queue*.
+
+**D67. Marketing** gets `D64`'s no-flag blocks — the target and the waiting
+list — plus **Needs a decision** via `can_assign`. Marketing holds companies as
+a rep does `S9`, so the no-flag case is already the right screen. Short because
+nobody holds the role yet.
+
+**D68. The Executive** gets **the team table** and nothing else. No target, no
+queue, nothing to approve: the question is how the company is doing, not what is
+waiting. Short for the same reason as `D67`.
 
 ---
 
@@ -387,9 +522,23 @@ dispatch.
 
 **D49.** The rail carries **Waiting on me** (with a count), then Companies,
 Projects, Quotations, Dispatches under *Work*; Activity and Targets under
-*Team*; user management for those who hold it. Seven items. Reports, Coverage,
+*Team*. **Seven items — plus user management for those who hold it.** The count
+was always right and the sentence was wrong: user management is conditional
+`D50`, so it was never one of the seven, and running it into the same list read
+as eight named against seven counted (`WORKFLOW §5 AD14`). Reports, Coverage,
 Follow-ups, Notifications and Performance are **not top-level** — they are the
 waiting list and the stream, filtered.
+
+**Performance and Targets are one item, called Targets.** One table, one row per
+rep, **the goal and the attainment together** — they were never two questions,
+and splitting them put a rep's number on one screen and what it was measured
+against on another. The edit control renders **per row** for `can_set_targets`.
+Merging them is what frees the seventh slot for Activity.
+
+**The built rail is not this rail.** It carries **Performance**, which this rule
+lists as *not top-level*, and has neither **Activity** nor **Targets**
+(`src/components/app-rail.tsx`). This rule decides the target state; the screen
+that matches it is a later slice.
 
 **D50.** The rail is hidden by a permission boolean passed from the layout, never
 by a `can()` call in a client component. Hiding a link is cosmetic; the route
@@ -403,8 +552,15 @@ control that does nothing is worse than no control.
 ## 14. Empty, error and permission states
 
 **D52.** An empty list says what would make it non-empty and offers the action.
-*"Nothing is waiting on you. That is the goal."* *"No companies yet — add the
-first one, or import from a spreadsheet."*
+*"Nothing planned for today — plan one from Slipping."* *"No companies yet —
+add the first one, or import from a spreadsheet."*
+
+**The waiting list as a whole is not one of these.** This rule used to give
+*"Nothing is waiting on you. That is the goal."* as its example, and `D34` now
+says that state is one a rep with a real book never reaches — the list is
+worked down by ranking, never emptied. The **planned** section is the half that
+genuinely empties, so it is the half that carries the empty state, and its
+action is the one `D34` gives a slipping row: Plan.
 
 **D53.** A permission-denied route is `notFound()`. FACET does not tell someone
 a thing exists that they may not see.
