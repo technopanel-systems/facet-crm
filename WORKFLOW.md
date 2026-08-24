@@ -145,11 +145,11 @@ Session 22 runs **last** of these, so it sweeps up whatever Phase 1b orphans.
 
 | # | Session | Rules |
 |---|---|---|
-| 23 | The shell — seven-item rail, tokens, layout cap, theme, permission boolean | `D5`–`D23` `D46` `D47` |
-| 24 | **The waiting list, rep scope** — and the notification tiers, persistence flags, per-anchor resolution and digest machinery come out in the same slice. The list now carries **dispatch requests as a fourth kind of item** (`S86`, `S89`) | `S86`–`S95` `D29`–`D34` |
-| 25 | The waiting list, manager scope, and "Needs a decision". **The coordinator has her own queue** (`S88`) | `D35`–`D38` `S88` |
-| 26 | Grouped lists with per-object lead cells — companies, projects, quotations | `D22`–`D24` |
-| 27 | The stream — replaces `/reports` and `/activity`; comments narrowed to threads and projects | `S114` `D42`–`D45` |
+| 23 | The shell — seven-item rail, tokens, layout cap, theme, permission boolean | `D5`–`D23` `D49` `D50` |
+| 24 | **The waiting list, rep scope** — and the notification tiers, persistence flags, per-anchor resolution and digest machinery come out in the same slice. The list now carries **dispatch requests as a fourth kind of item** (`S86`, `S89`) | `S86`–`S95` `D32`–`D37` |
+| 25 | The waiting list, manager scope, and "Needs a decision". **The coordinator has her own queue** (`S88`) | `D38`–`D41` `S88` |
+| 26 | Grouped lists with per-object lead cells — companies, projects, quotations | `D25`–`D27` |
+| 27 | The stream — replaces `/reports` and `/activity`; comments narrowed to threads and projects | `S114` `D45`–`D48` |
 
 > **AUDIT 2 — the interface.** See §6.
 
@@ -170,11 +170,11 @@ Nothing below is optional before real users touch it.
 
 | # | Session | Rules |
 |---|---|---|
-| 34 | The board view for projects | `D25` `D26` |
-| 35 | The monthly rollup | `D39`–`D41` |
+| 34 | The board view for projects | `D28` `D29` |
+| 35 | The monthly rollup | `D42`–`D44` |
 | 36 | Password reset; holiday calendar; thresholds into `settings`; the three dead flags made live | `S8` `S11` `S94` |
-| 37 | Phone pass — rep screens at 375px | `D52` `D53` |
-| 38 | RTL pass — every screen, both locales | `D54` |
+| 37 | Phone pass — rep screens at 375px | `D55` `D56` |
+| 38 | RTL pass — every screen, both locales | `D57` |
 
 > **AUDIT 3 — pre-pilot.** See §6.
 
@@ -310,6 +310,111 @@ scripts running. `B1` and `B3` are shapes read from the code, not failures
 constructed. Migration bodies were not read — the end state was checked in
 `pg_catalog` and in the rows, so a migration that reached the right result by a
 wrong route would not appear here.
+
+**Added by AUDIT DESIGN (§6), ranked by consequence.** `DESIGN.md` D1–D63
+against itself, against `SPEC.md`, against `src/`, against
+`.claude/skills/facet-ui/SKILL.md` and against
+`docs/design/facet-concept-v5-premium.html`, on **24 Aug 2026**. Read from
+files only — no database query, no verify script, no rendered screen.
+
+**The tally is the finding.** Of 63 rules, **17 hold**, **17 are partly true**,
+**26 describe something that does not exist**, and **3 are not buildable
+statements** (`D1`, `D3`, `D31`). `DESIGN.md` has no marker convention, so
+`D46` (built) and `D42` (no such screen) are typographically identical, and
+`SPEC §7`'s rule — *a rule that is only partly built says so in its own text* —
+has no equivalent here. The full per-rule classification is in the audit's
+report; the rows below are what has to be decided or corrected.
+
+**Holds (17):** `D4` `D10` `D11` `D22` `D23` `D37` `D46` `D47` `D50` `D51`
+`D53` `D54` `D57` `D59` `D60` `D61` `D63`.
+**Partly true (17):** `D2` `D5` `D6` `D9` `D12` `D20` `D21` `D24` `D27` `D32`
+`D33` `D34` `D39` `D52` `D55` `D58` `D62`.
+**Nothing makes it true (26):** `D7` `D8` `D13`–`D19` `D25` `D26` `D28`–`D30`
+`D35` `D36` `D38` `D40`–`D45` `D48` `D49` `D56` — the last three
+**contradicted** rather than merely absent.
+
+**Two rows are roots rather than incidents.** `AD3` is why `D8`, `D13`–`D19`
+are unbuilt as a set — the stylesheet is a different generation of the design.
+`AD11` is why the file cannot be marked rule by rule until a founder decides
+which generation wins.
+
+**`AD1` is already corrected**, in `§4` above, and is recorded here so the
+correction is checkable.
+
+| What | Where | Disposition |
+|---|---|---|
+| **`AD1`. `WORKFLOW §4`'s session plan cited the wrong `D` rules — nine rows, twelve citations, every one exactly three low.** Session 23's *"seven-item rail … permission boolean"* pointed at `D46` `D47`, which are the Log button and the private note. Session 37's *"phone pass"* pointed at `D52` `D53`, which are empty states and `notFound()`. Session 38's *"RTL pass"* pointed at `D54`, which is *there is no skeleton state*. **Not drift** — `git show 12689b4:DESIGN.md` has `D52` as the empty list and `D25` as grouped lists exactly as today, so `bd3a943` wrote them wrong. `§4`'s prose citations and all 24 backticked `D` citations in `src/` and `scripts/` are correct; only this table was. Every Phase 2 and Phase 4 session would have opened the wrong screen's rule | `WORKFLOW.md` §4 rows 23, 24, 25, 26, 27, 34, 35, 37, 38 | **Done, in this audit.** `D46`→`D49`, `D47`→`D50`, `D29`–`D34`→`D32`–`D37`, `D35`–`D38`→`D38`–`D41`, `D22`–`D24`→`D25`–`D27`, `D42`–`D45`→`D45`–`D48`, `D25`→`D28`, `D26`→`D29`, `D39`–`D41`→`D42`–`D44`, `D52`→`D55`, `D53`→`D56`, `D54`→`D57`. The `D5`–`D23` range on row 23 is unchanged — it is correct as written |
+| **`AD2`. `D8`'s effect tokens do not exist, and the `facet-ui` skill hands all of them to a build session as live.** `globals.css` has `--surface`, `--surface-2` and `--shadow`. It has **no** `--canvas-glow`, `--surface-solid`, `--line-hi`, `--brand-grad`, `--brand-glow`, `--shadow-lift`, `--blur`. `--surface-3`, which `D5`'s table names, is in neither the stylesheet nor the v5 concept — it is v4's. The skill's Effects table names nine tokens; **seven do not exist**, and its palette table lists `--surface-3` as *"inset-within-inset"*. The skill's own header rule — *an enumeration copied from a rule goes stale silently* — has fired on its own table. This is why `D8` `D13` `D14` `D15` `D16` `D18` `D19` are unbuilt together | `src/app/globals.css`, `.claude/skills/facet-ui/SKILL.md:41-46,62-68`, `DESIGN.md` `D5` `D8` | Phase 1c decides the tokens; the skill changes in the same commit as the rules, per its own header |
+| **`AD3`. `DESIGN.md` carries two generations of the design in adjacent sections, and they disagree about what a surface is.** `D5`'s table gives `--surface` as `#1D1A18`/`#FFFFFF` and `--rail` as `#0E0C0B`/`#171311`. `D14` says *"The card is a translucent surface. `--surface` at ~72% opacity"*; `D8` says *"translucent card and inset surfaces"*; `D21` forbids *"glassmorphism on elements other than cards and the two bars"*, which presumes both have it. A hex cannot be 72%. **`D5`'s table is concept v4's palette** — every value matches `docs/design/archive/facet-concept-v4-dashboards.html:18,28`, `--surface-3` included — while `D8`'s tokens are v5's. The code implements v4. The root of `AD2` and of much of the unbuilt set | `DESIGN.md` `D5` `D8` `D14` `D21`, `docs/design/` | Founder decision in Phase 1c — which generation is the design |
+| **`AD4`. `D41` names four things routed to a manager; two have no `S` rule and one rests on a deleted mechanism.** Duplicates `S22` ✓ and archive requests `S105` ✓. **Credit approvals: no rule** — `S80` puts the credit question on the *coordinator* at approval, `SPEC §15` records `companies.has_credit_terms` dropped (*"a credit customer is the `handled by finance` payment method `S71`, not a flag beside a gate"*), and `§4` session 30 is struck out as **Removed**. The concept still draws the card. **Shares: `S96` says there is nothing to route** — a manager initiates a share; nothing arrives to decide. `D41` is what *"makes the manager's version of the waiting list different"*, and half of it does not exist | `DESIGN.md` `D41`, `SPEC.md` `S71` `S80` `S96`, `SPEC §15` | Founder decision — what a manager actually decides, then `D41` says it |
+| **`AD5`. `D33`'s counts strip cannot express what the data layer computes, and the screen that tried breaches `D21`.** `D33` names four: *companies gone quiet · quotations on you · projects not moved · on hold resuming this week*. `FOLLOW_UP_KINDS` has **six**, and `D33` names no tile for `catalogue_no_response`, for the second quotation kind, or for `S89`'s *dispatch request sitting with the coordinator*, which `S72`/`S88` made first-class. The dashboard renders **six separate bordered cards** — simultaneously the *"four KPI cards"* `D33` forbids and the *"six equal-weight tiles where four would do"* `D21` forbids. Following `D33` drops two live conditions; following the code breaches `D21` | `DESIGN.md` `D33` `D21`, `src/lib/enums.ts:431-438`, `src/app/[locale]/(app)/page.tsx:132-147` | Phase 1c, with `S89` in hand |
+| **`AD6`. `D32`'s "paid, not yet out" and `D42`'s "paid" funnel stage name a state `S70`–`S73` removed.** Since `S70` payment is recorded **on the dispatch**; since `S72`/`S73` the coordinator records the method *as part of approving* and *"no route to `approved` bypasses it"*. There is no interval between paid and dispatched for a figure to measure, and `D42`'s note — *"dispatched can exceed paid because credit customers ship first"* — is the `has_credit_terms` gate `SPEC §15` deleted. `D42`'s *approved* is separately ambiguous: `S72` gave that word to the dispatch, while the concept's funnel puts it between quoted and paid, i.e. `S65`'s accepted, which `S65` forbids any funnel figure from treating as won | `DESIGN.md` `D32` `D42`, `SPEC.md` `S65` `S70` `S72` `S73` | Phase 1c — the signature panel and the rollup are rewritten against the dispatch model |
+| **`AD7`. `D48`'s second sentence is false and `D48` carries no marker.** *"Nothing renders a comments card on a company, contact or dispatch."* `CommentBox` renders on **five** screens. The behaviour is already this section's `S114`/`D48` row and `A1`; **the `D48` half has never been recorded**. `S114` at least admits one gap in its own text — `D48` reads as finished | `DESIGN.md` `D48`, the five `[id]/page.tsx` screens | Session 27 fixes the behaviour; the rule needs the same marker decision as `A1` |
+| **`AD8`. `D56` describes the opposite of what ships, in both halves.** *"secondary columns are **hidden, not scrolled**. The rail becomes a bottom sheet."* `Table` is `overflow-x-auto` and **no** page hides a column at any breakpoint — grep for `hidden md:`/`md:table-cell` returns zero. The rail below `md` is a horizontally scrollable strip, and the code defends it: *"no Sheet component, no new dependency, no JavaScript."* A reasoned choice against a rule it does not cite | `DESIGN.md` `D56`, `src/components/ui/table.tsx:11`, `src/components/app-rail.tsx:127,145-147` | Session 37 — decide which is right before building to either |
+| **`AD9`. Three status→colour maps ship against `D6`; this section records one.** The recorded one is `quotations/[id]/page.tsx:146-157`. Two more: `quotations/page.tsx:30-32` + `:177`, the same map on the **list** as a separate function; and `_components/project-state.tsx:43`, `lost`→`destructive`, rendered on the projects list, the project detail and the company page's projects card — whose own comment says *"whether a status→colour map belongs here at all is a `D6` question this rule did not open."* A fourth candidate: `dispatches/[id]/page.tsx:283` renders `approved` as `default`, solid brand red on a state, which `D7` also forbids | `src/app/[locale]/(app)/quotations/page.tsx:30-32`, `_components/project-state.tsx:43`, `dispatches/[id]/page.tsx:283` | Widens the existing `D6` row above — same session |
+| **`AD10`. The chain says the coordinator owes the move at `paid`; `S72` gives it to the rep.** `OWNERS.paid = "coordinator"`, commented *"Paid unlocks dispatch, which the coordinator records."* `S72`: *"A rep requests a dispatch; the coordinator checks it and approves it."* It renders today — `chain.turn.coordinator.paid` = *"Waiting on the coordinator · dispatch"* — on `/quotations`' whose-move column, in the chain strip and in the turn panel. `D2` makes whose-move the one rule every screen is judged against and `D27`/`D29` pin it to this file, so a `D` rule stands behind a stale answer. `schema.ts:1715` notes the rung *"no longer gates a dispatch"* without following it to the owner | `src/lib/chain.ts:74-88`, `messages/*.json` `chain.turn.coordinator.paid` | Its own fix — one map entry and one message, but it changes what three screens say |
+| **`AD11`. `D15` says the brand gradient has exactly five uses; `D17` names a sixth.** *"…and the dispatched segment of a rollup bar. **Nowhere else.**"* against *"A row's action button fills with the brand gradient on hover."* The concept implements both (`.act:hover`). `D16`'s original defect in the other direction — the count is right and a second rule adds to the list | `DESIGN.md` `D15` `D17` | Phase 1c — one of the two moves |
+| **`AD12`. `D16` says nothing else glows; `D27` gives the current chain dot a soft ring.** `D16`'s own five include *"a soft ring on the pace badge"*, so *soft ring* is this document's word for a glow. `D27`: *"the current dot amber with a soft ring."* Sixth, and built — `chain-strip.tsx:165` renders `ring-4 ring-tone-amber` | `DESIGN.md` `D16` `D27`, `src/app/[locale]/(app)/_components/chain-strip.tsx:165` | Phase 1c |
+| **`AD13`. `D18` and `D19` give opposite instructions for the same breakpoint.** `D18`: *"Below 980px … every blurred surface falls back to `--surface-solid` **with no filter**."* `D19`: *"the blur radius is **reduced rather than removed** on small screens (18px desktop, 8px below 980px)."* Their headlines disagree too. `D8` cites `--surface-solid` to `D19`, the rule that does *not* put it below 980px. The skill takes `D18`'s side silently. Neither is built: one `backdrop-blur-md` (12px, so neither 18 nor 8) on the header, no media query, no `prefers-reduced-transparency` anywhere in `src/` | `DESIGN.md` `D18` `D19` `D8`, `.claude/skills/facet-ui/SKILL.md:66`, `src/app/[locale]/(app)/layout.tsx:78` | Phase 1c — one of the two goes |
+| **`AD14`. `D49` enumerates eight rail items and says seven.** *"Waiting on me …, Companies, Projects, Quotations, Dispatches …; Activity and Targets …; user management for those who hold it. **Seven items.**"* Eight named. `D16`'s original defect, still present, and the skill restates *"the rail is `D49`'s seven items."* Separately the built rail is a different rail: it carries **Performance**, which `D49` explicitly lists as *not* top-level, and carries neither Activity nor Targets. The skill flags this in a parenthetical; `DESIGN.md` does not | `DESIGN.md` `D49`, `.claude/skills/facet-ui/SKILL.md:91`, `src/components/app-rail.tsx:35-52` | Session 23 builds the rail; the count is Phase 1c's |
+| **`AD15`. `D7` mandates contact violet; `D21` forbids violet.** *"company blue, project amber, quotation red, contact violet, dispatch green"* against *"Purple, violet or cyan accents."* Unresolvable as written. In code `D7` is wholly unbuilt — no identity colour appears on a rail marker, a title spine or a card edge — and the concept renders the forbidden thing: `.av.v` is a `#664A9A → #2E1E4C` violet avatar gradient | `DESIGN.md` `D7` `D21`, `docs/design/facet-concept-v5-premium.html:93` | Phase 1c |
+| **`AD16`. `D25` names a quotation group the one definition of chain ownership cannot produce.** *"Quotations group as your move / waiting on the coordinator / **waiting on the customer**."* `ChainOwner` is `"rep" \| "coordinator" \| null`, and by `D27` that file is the single definition which *"derives nothing"*. `waitingPayment` is owed by the **rep** — `S65` makes accepted internal approval and the rep confirms payment. There is no customer owner, and `D26`'s own quotation examples do not have one. Session 26 cannot build the third group | `DESIGN.md` `D25` `D26` `D27`, `src/lib/chain.ts:72-88` | Session 26 needs this settled first |
+| **`AD17`. `D28` makes the board the projects default; `D31` builds it second.** *"`?view=board` (default for projects)"* against *"table and stream first. Board second."* Until the board ships the projects list has a default `D28` does not name. Neither exists — no `?view=` anywhere in `src/`, which is `AUDIT 1b`'s finding confirmed | `DESIGN.md` `D28` `D31` | Sessions 26 and 34 |
+| **`AD18`. `D62` cites a rule `DESIGN.md` does not contain.** *"This is the converse of the `dir=\"ltr\"` rule, which only ever covered LTR content."* There is no `D` rule for `dir=\"ltr\"`. It lives only in the skill. `D62` was written to promote a skill-only lesson into DESIGN — `D59`–`D63`'s whole purpose — and left its own counterpart behind. 133 `dir=\"ltr\"` sites in `src/` obey a rule that is not in an authority file | `DESIGN.md` `D62`, `.claude/skills/facet-ui/SKILL.md:158` | Phase 1c — one sentence, and it is the class `D59`–`D63` exists to close |
+| **`AD19`. `D20` names three JavaScript exceptions; one exists and is used for two things it does not name.** The view-mode switch and the board's horizontal scroll do not exist. `Combobox` is used for the city list in three forms **and** for a **project** picker and a **company** picker. The skill restates it as *"the one documented exception `D20`, for the ~200-item city list"* — false in both directions | `DESIGN.md` `D20`, `quotations/quotation-form.tsx:125`, `reports/report-form.tsx:155`, `.claude/skills/facet-ui/SKILL.md:146-147` | Phase 1c |
+| **`AD20`. `D58` forbids inline cell editing; it ships on `/performance`.** `TargetRow` renders an `<Input>` plus a save button **inside a `<TableCell>`**. `D58`'s other six — drag-and-drop, bulk selection, saved views, command palette, charts beyond bars, toasts — all hold | `DESIGN.md` `D58`, `src/app/[locale]/(app)/_components/attainment-table.tsx:98-105` | Decide whether `D58` means it; the control is otherwise correct |
+| **`AD21`. `D52`'s second half is unbuilt in all 21 places and `D52` reads as done.** *"An empty list says what would make it non-empty **and offers the action**."* All 21 are a bare `<p class=\"…border-dashed…\">`; **none renders an action**, and the strings are *"No companies yet."*, *"Nothing logged yet."*, *"Nothing is waiting."* `D60`'s placement half is built and correct | `DESIGN.md` `D52`, `messages/en.json`, 21 sites | Phase 1c marks it; the sweep that writes the strings is its own |
+| **`AD22`. `D34`'s three kind marks are one short of `S86`'s four anchors.** *"a one-letter kind mark (Q, C, P)"*; `S86` puts **dispatch requests** on the list as a fourth kind and `S88`/`S89` make one sitting with the coordinator first-class. The concept already draws a `D` mark. `D34`'s three actions — *Log, Confirm, Open* — likewise have no approve/refuse. `D40`'s reason for the bottleneck card is narrow for the same cause: *"the **quotation** chain runs through her"*, when since `S72`/`S124` the dispatch chain does too | `DESIGN.md` `D34` `D40`, `SPEC.md` `S86` `S88` `S89`, `docs/design/facet-concept-v5-premium.html:348` | Sessions 24 and 25 |
+| **`AD23`. `D45`'s one stream is four screens.** *"'What happened' is **one stream**, not five screens."* Today: `/reports`, `/activity`, `/companies/[id]/timeline`, `/projects/[id]/timeline`. Of `D45`'s four filters — *who, what kind, outcome, signals raised* — `/reports` has type and outcome; who and signals do not exist. `D30`'s three activity views do not exist | `DESIGN.md` `D45` `D30` | Session 27 |
+| **`AD24`. `D9`'s radii are not the code's.** Cards render 14px (`rounded-xl`) against *"12px cards, 16px large cards"*; badges render 32px (`rounded-4xl`) against *"20px pills"*. Controls at 10px are right. `globals.css:78-83` defends 14px by citing `22 §1`, an archived document | `DESIGN.md` `D9`, `src/app/globals.css:78-83`, `src/components/ui/badge.tsx` | Untidiness — Phase 1c or session 23 |
+| **`AD25`. `D12` is met on its floor and missed on its title and its base.** Nothing is under 10.5px ✓. `PageHeader` is 24px ✓ but `DetailHeader` is `text-[25px]`, taking the concept's number over the rule's. *"base 14px / 1.5"* is set nowhere — no `font-size` on `body`, so 14px is achieved per component and an unsized element renders 16px. Section labels use `tracking-wider` (.05em) in tables and `tracking-widest` (.1em) in the rail, neither being `.09em` | `DESIGN.md` `D12`, `src/components/page-header.tsx:65`, `src/app/globals.css:200-207` | Untidiness |
+| **`AD26`. `D17`'s three motions are unbuilt and `prefers-reduced-motion` is honoured nowhere.** No media query, no `motion-reduce` variant anywhere in `src/`, against *"`prefers-reduced-motion` is respected and is the path that gets tested."* The only motion that ships is `transition-colors`, which `D17` does not name and `D21`'s last clause therefore forbids | `DESIGN.md` `D17` `D21`, `src/` | Untidiness until session 23 |
+| **`AD27`. Six tokens in `globals.css` have no `D` rule and three are dead.** `--blue-600`, `--amber-600`, `--green-600` are **declared and never read**; `--success`/`--success-foreground` are aliased to `--color-success` with **no consumer**; `--glow` is **declared in both themes and never read**, and is misnamed against `D8`'s `--brand-glow`. `Badge`'s four tone variants `red`/`blue`/`amber`/`green` have **zero call sites**. `--red-500`, `--red-600`, `--brand-ink`, `--rail-text`, `--rail-text-strong`, `--rail-active` are read but named by no `D` rule | `src/app/globals.css:98-105,158-159,136,197`, `src/components/ui/badge.tsx:25-28` | Untidiness — a dead-structure question, not a design one. With the next sweep |
+| **`AD28`. Patterns in use that no `D` rule names.** Three two-stop avatar gradients with hexes typed straight into components — `#7A1020`, `#8A3244`, `#4A1622`, `#31527F`, `#1B2F4C` — against the skill's *"never type a hex into a component"*; `text-destructive` as the colour of form errors and the required asterisk, which `D6`'s *"colour describes how long something has waited"* does not permit or name; the `Absent` component's deliberately-not-yet treatment; the `numeric` prop's mono-**and**-end-aligned pairing, which is the skill's invention rather than `D11`'s; `ListPagination`'s documented refusal to apply `num` to *"Showing 1–7 of 7"* against `D11`'s *"every number"*; and `TOUCH_INPUT_CLASS`, a phone-first affordance applied to one of `D55`'s four named screens | `src/components/app-rail.tsx:130,171`, `_components/turn.tsx:112`, `src/components/form-field.tsx:86,98`, `src/components/page-header.tsx:186`, `_components/list-controls.tsx:230-233`, `src/lib/enums.ts:441` | Phase 1c decides which deserve a rule. `D59`–`D63` are the precedent |
+| **`AD29`. The skill's `--brand-glow` row reads as four items under a "five uses" label.** *"**five uses**: primary button and app mark · the pace badge's ring · today's cell in the week strip · the target fill's bloom"* — five only if the first is read as two. `D16`'s original error restated in the file whose header rule exists to prevent it | `.claude/skills/facet-ui/SKILL.md:68` | With the skill's rewrite, after Phase 1c |
+| **`AD30`. The skill's pre-flight grep does not cover two of its own table's entries.** Item 7 greps `ml-\|mr-\|pl-\|pr-\|text-left\|text-right\|border-l-\|border-r-` and omits `left-*` and `right-*`, which the Use/Never table lists. Zero today either way | `.claude/skills/facet-ui/SKILL.md:33,180` | With the skill's rewrite |
+| **`AD31`. `dispatches/page.tsx:48` cites `D28` for something `D28` does not say.** *"One query parameter, no second screen"* on a **status filter**; `D28` is specifically `?view=` on Projects and Quotations and states no general principle. The only mis-citation found: all 24 other backticked `D` citations in `src/` and `scripts/` resolve and are used correctly, and every `D` and `S` citation in `SKILL.md` resolves | `src/app/[locale]/(app)/dispatches/page.tsx:48` | Untidiness |
+| **`AD32`. `D22`'s ranges are met except in two components.** `Card data-size=\"sm\"` is 12px against a 15px floor; `RecordRow` and `TimelineRow` are `py-2.5` (10px) against 11–12px. Read from the markup, not by eye | `src/components/ui/card.tsx:15`, `src/components/page-header.tsx:220`, `src/components/timeline.tsx:115,168` | Untidiness — AUDIT 2 confirms by eye |
+| **`AD33`. `D26`'s dispatch clause cites a `[BUILD]` rule and covers two of four states.** It cites `S88`, which is `[BUILD]`, for behaviour that ships under `S72`. It answers for a submitted request and an approved dispatch, and has nothing for a draft (owes its rep, `S86`) or a refusal (closed). The code renders all four, so the rule is narrower than the screen | `DESIGN.md` `D26`, `src/app/[locale]/(app)/dispatches/page.tsx:245-263` | Phase 1c — one clause |
+
+**The concept against `DESIGN.md`** — `AUDIT 1b` found three glows in
+`facet-concept-v5-premium.html` that `D16` does not permit. There is a
+**fourth**: `.nav .count` carries `box-shadow:0 2px 8px rgba(242,86,107,.4)`
+(line 89), a brand-coloured bloom on the rail count badge — a judgement call,
+but neither `--shadow` nor anything `D8` names. Beyond `D15`'s five, the
+concept uses `--brand-grad` four more times: `.mark` (line 81), **`.tab.on`
+`border-image` (line 111, which `D15` forbids outright — *"not on borders"*)**,
+`.tile .spark i.hi` (159) and `.act:hover` (173, which is `AD11`). Four
+gradients and eight shadows have no token at all — `.big` paints a gradient
+**onto text** via `background-clip` (137), `.fill::after` a sheen (143),
+`.reason .rb` a fading amber bar (213), four avatar gradients (91–93); five
+one-pixel inset highlights sit on `.search`, `.seg button.on`, `.kind` and
+`.av`, where `D8` gives `--line-hi` to *a card* and `D14` says the card texture
+is *"used on every card, identically"*; three inset depth shadows on `.track`,
+`.mbar` and `.gbar`. The concept also renders a **global search with a `⌘K`
+hint** (232), which `D51` and `D58` each forbid. Its own unread tokens
+`--brand-2` and `--ease` are real design decisions — a second brand hue, and
+the motion easing `D17` never states — that no `D` rule carries.
+
+**What AUDIT DESIGN could not check.** **Everything requiring sight — that is
+`AUDIT 2`'s, and none of it is inferred above.** No screen was rendered, in
+either theme or either locale, at any width. Specifically unjudged: whether the
+neutrals read warm on a real display (`D4` — hex channel order only); whether
+spacing reads generous (`D22` — numbers read out of the markup, which is
+`AD32`'s caveat); whether any hover state changes nothing or an icon is centred
+above a heading (`D21`); whether anything wraps at 1366 or 1440 (`D23`);
+whether a screen answers `D3`'s question in five seconds; whether the design
+looks correct with blur off (`D18`); whether the rail's mobile strip is usable
+(`D56`). **Not run:** `typecheck`, `lint`, `build`, `check:messages` or any
+verify script — an audit changes nothing and none was needed to read a file.
+**Not queried:** the database; every count here is from files, and the comment
+counts behind `AD7` are `AUDIT 1b`'s. **Not read:** migration bodies,
+`docs/archive/`, `legacy/`; `docs/design/superseded/` is empty, so the v5
+concept and the three files in `docs/design/archive/` are the whole design
+record. **Judgement calls, flagged as such:** whether `.nav .count`'s coloured
+shadow is a glow; whether `transition-colors` is motion under `D17` (`AD26`);
+whether `dispatches/[id]:283`'s solid-brand `approved` badge is a status→colour
+map (`AD9`).
 
 ---
 
