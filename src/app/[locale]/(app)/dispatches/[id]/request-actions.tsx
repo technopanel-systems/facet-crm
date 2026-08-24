@@ -114,15 +114,22 @@ function PlainButton({
 /**
  * `S124` — the refusal, with its reason.
  *
- * **A child component, and that is load-bearing rather than tidiness.** Every
- * form in this app whose `useActionState` is created in the component that
- * renders it answers a no-JavaScript POST; the three that hoist it to a parent
- * which renders the form conditionally never send response headers at all —
- * `confirmPaymentAction` and the two participant forms (`WORKFLOW §5`), whose
- * cause was still open. Written as a parent-owned hook this form reproduced it
- * exactly, including on the empty-reason path that writes nothing, which rules
- * out the standing "the panel is unmounted by its own success" explanation.
- * Written this way it answers in milliseconds.
+ * **The action arrives already bound, and that is load-bearing rather than
+ * tidiness.** A form whose `.bind()` is evaluated by the component that calls
+ * `useActionState` never answers a no-JavaScript POST: the write lands and no
+ * response headers follow (`WORKFLOW §5`). Bound one level up, at the call
+ * site, the same form answers in milliseconds.
+ *
+ * **Where the hook lives is not the rule — where the BIND happens is.** This
+ * comment used to say the hook had to be created in the component that renders
+ * the form. That was measured and is wrong: the participant forms already owned
+ * their hooks and hung anyway, and hoisting the `.bind()` to a `const` inside
+ * the hook's own component still hung. Eight forms were fixed by moving the
+ * bind alone, and `verify:routes` §17 now drives every one of them.
+ *
+ * Written as a parent-owned hook this form reproduced the hang exactly,
+ * including on the empty-reason path that writes nothing — which is what ruled
+ * out the old "the panel is unmounted by its own success" explanation.
  */
 function RefuseForm({ action }: { action: ReasonAction }) {
   const t = useTranslations();
@@ -162,11 +169,10 @@ function RefuseForm({ action }: { action: ReasonAction }) {
  * than merely checked: there is no path to `approved` that does not pass
  * through this form.
  *
- * **A child component owning its own `useActionState`**, for `RefuseForm`'s
- * reason and with more at stake: this action writes. Every form in this app
- * whose hook is created in the component that renders it answers a
- * no-JavaScript POST; the three that hoist it to a parent rendering the form
- * conditionally never send response headers at all (`WORKFLOW §5`).
+ * **The action arrives already bound**, for `RefuseForm`'s reason and with more
+ * at stake: this action writes. A `.bind()` evaluated by the component that
+ * calls `useActionState` costs the form its reply entirely (`WORKFLOW §5`);
+ * bound by the caller, it answers.
  *
  * **The rep never sees this.** `S70` puts the method in the coordinator's head
  * — *because she is the one who confirms it with finance* — so it is not a
@@ -226,7 +232,7 @@ function ApproveForm({ action }: { action: ReasonAction }) {
 /**
  * `S73` — **the cancellation, with its reason.**
  *
- * A child component owning its own `useActionState`, for `RefuseForm`'s
+ * A child component taking its action already bound, for `RefuseForm`'s
  * reason, and destructive rather than outline because it is the one act here
  * that takes square metres out of somebody's month `S85` and un-wins a project
  * `S31`. That is a property of the ACT, not of the record's state: `D6` keeps

@@ -6,11 +6,16 @@ import { useTranslations } from "next-intl";
 import { RecordRow } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import type { ProjectCompanyRow } from "@/lib/projects";
-import { emptyFormState } from "@/lib/validation";
+import { emptyFormState, type FormState } from "@/lib/validation";
 
 import { addProjectCompanyAction, removeProjectCompanyAction } from "../actions";
 
 import type { CompanyOption } from "../project-companies-field";
+
+/** Removal reads no form data — the link is bound in `ProjectLinks`. */
+type PlainAction = () => Promise<FormState>;
+/** The add form does read one field, so it takes the state and the data. */
+type FieldAction = (state: FormState, formData: FormData) => Promise<FormState>;
 
 /**
  * The participants on a project detail page, plus one form to add another.
@@ -25,6 +30,14 @@ import type { CompanyOption } from "../project-companies-field";
  * square metres are exactly what that reader came for, and neither the add form
  * nor a remove button is rendered for them `D51`. Both actions refuse in the
  * data layer regardless `S109`.
+ *
+ * **Both actions are bound HERE and passed down as props**, and that is the fix
+ * for `WORKFLOW §5`'s hang rather than tidiness. Bound inside the component
+ * that calls `useActionState`, neither form ever answered a no-JavaScript POST:
+ * the write landed and no response headers followed. Measured on this build —
+ * `10s` abort before, `111ms` after — and the bind site is the whole
+ * difference: hoisting it to a `const` in the same component still hung, so it
+ * is not the inline expression, it is which component evaluates it.
  */
 export function ProjectLinks({
   projectId,
@@ -54,7 +67,7 @@ export function ProjectLinks({
           {links.map((link) => (
             <LinkRow
               key={link.id}
-              projectId={projectId}
+              remove={removeProjectCompanyAction.bind(null, projectId, link.id)}
               link={link}
               canRemove={mayEdit && links.length > 1}
             />
@@ -64,7 +77,7 @@ export function ProjectLinks({
 
       {mayEdit && addable.length > 0 ? (
         <AddLinkForm
-          projectId={projectId}
+          add={addProjectCompanyAction.bind(null, projectId)}
           companies={addable}
         />
       ) : null}
@@ -78,17 +91,18 @@ export function ProjectLinks({
  * follows as a sibling row instead of growing one.
  */
 function LinkRow({
-  projectId,
+  remove,
   link,
   canRemove,
 }: {
-  projectId: string;
+  /** Already bound to the project and this link by the parent `WORKFLOW §5`. */
+  remove: PlainAction;
   link: ProjectCompanyRow;
   canRemove: boolean;
 }) {
   const t = useTranslations();
   const [removeState, removeAction, removing] = useActionState(
-    removeProjectCompanyAction.bind(null, projectId, link.id),
+    remove,
     emptyFormState,
   );
 
@@ -132,7 +146,10 @@ function LinkRow({
         }
         action={
           canRemove ? (
-            <form action={removeAction}>
+            // `data-act` is a DOM handle for `verify:routes`, which may not
+            // read a translated string to find a form (`CLAUDE.md`). This one
+            // carries no field of its own, so there was nothing else to match.
+            <form action={removeAction} data-act="remove-participant">
               <Button type="submit" size="xs" variant="ghost" disabled={removing}>
                 {t("projects.detail.removeCompany")}
               </Button>
@@ -150,21 +167,20 @@ function LinkRow({
 }
 
 function AddLinkForm({
-  projectId,
+  add,
   companies,
 }: {
-  projectId: string;
+  /** Already bound to the project by the parent `WORKFLOW §5`. */
+  add: FieldAction;
   companies: CompanyOption[];
 }) {
   const t = useTranslations();
-  const [state, action, pending] = useActionState(
-    addProjectCompanyAction.bind(null, projectId),
-    emptyFormState,
-  );
+  const [state, action, pending] = useActionState(add, emptyFormState);
 
   return (
     <form
       action={action}
+      data-act="add-participant"
       className="flex flex-wrap items-end gap-2 border-t pt-4"
     >
       <select

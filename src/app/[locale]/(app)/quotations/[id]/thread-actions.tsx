@@ -95,17 +95,22 @@ function PlainButton({
 }
 
 /**
- * `S62` `S128` — an act that ends the rep's work, with the reason it requires.
+ * An act that ends somebody's work, with the reason it requires — `S62` `S128`
+ * for rejection, `[10 §8]` for cancellation, `[25 §13]` for a return to the rep.
  *
- * **A child component owning its own `useActionState`, and that is
- * load-bearing.** Every form in this app whose hook is created in the component
- * that renders it answers a no-JavaScript POST; the ones that hoist it to a
- * parent rendering the form conditionally never send response headers at all
- * (`WORKFLOW §5`). `RefuseForm` on the dispatch screen is the same shape for
- * the same reason, and `S72`'s slice measured it rather than assuming.
+ * **The action arrives already bound, and that is load-bearing.** A form whose
+ * `.bind()` is evaluated by the component that calls `useActionState` never
+ * answers a no-JavaScript POST: the write lands and no response headers follow
+ * (`WORKFLOW §5`). Bound one level up, at the call site, the same form answers
+ * in milliseconds. Measured on this build, not assumed — and measured against
+ * the other candidate too: hoisting the `.bind()` to a `const` inside the
+ * hook's own component still hung, so what matters is which component
+ * evaluates it, not whether the expression sits inside the hook call.
  *
- * The two forms above this — cancel and return — keep their parent-owned hooks.
- * Changing them is `WORKFLOW §5`'s own session, not this one's.
+ * Cancellation and the return to the rep were each their own copy of this
+ * markup with a parent-owned hook. Both are this component now: one form, three
+ * callers, and the two that were hand-rolled gain the `dir="auto"` `D62` wants
+ * on a field that may hold either script.
  */
 function ReasonForm({
   action,
@@ -113,6 +118,7 @@ function ReasonForm({
   field,
   label,
   submitLabel,
+  variant = "destructive",
 }: {
   action: ReasonAction;
   /** A DOM handle for `verify:routes`, which may not read a translated
@@ -122,16 +128,21 @@ function ReasonForm({
   act: string;
   /** What the action reads out of the FormData. */
   field: string;
-  label: string;
+  /** Omitted where the panel title is the only heading the field ever had. */
+  label?: string;
   submitLabel: string;
+  /** Returning for edit is not a destructive act; rejecting and cancelling are. */
+  variant?: "destructive" | "outline";
 }) {
   const t = useTranslations();
   const [state, submit, pending] = useActionState(action, emptyFormState);
   return (
     <form action={submit} className="flex flex-col gap-2" data-act={act}>
-      <Label htmlFor={field} className="text-start text-sm font-medium">
-        {label}
-      </Label>
+      {label ? (
+        <Label htmlFor={field} className="text-start text-sm font-medium">
+          {label}
+        </Label>
+      ) : null}
       <Textarea
         id={field}
         name={field}
@@ -141,8 +152,108 @@ function ReasonForm({
         className="text-start"
       />
       <div>
-        <Button type="submit" size="sm" variant="destructive" disabled={pending}>
+        <Button type="submit" size="sm" variant={variant} disabled={pending}>
           {pending ? t("common.saving") : submitLabel}
+        </Button>
+      </div>
+      <Feedback state={state} />
+    </form>
+  );
+}
+
+/**
+ * `S126` — the coordinator issues the version, naming what SMAC called it.
+ *
+ * Its own component for `ReasonForm`'s reason: the action is bound by the
+ * caller, one level above the hook (`WORKFLOW §5`).
+ */
+function IssueForm({ action }: { action: ReasonAction }) {
+  const t = useTranslations();
+  const [state, submit, pending] = useActionState(action, emptyFormState);
+  return (
+    <form action={submit} className="flex flex-col gap-2" data-act="issue">
+      <div className="grid gap-3 sm:grid-cols-[2fr_1fr_auto] sm:items-end">
+        <div className="flex flex-col gap-1.5">
+          <Label
+            htmlFor="smacReference"
+            className="text-muted-foreground text-start text-xs"
+          >
+            {t("quotations.fields.reference")}
+          </Label>
+          <Input
+            id="smacReference"
+            name="smacReference"
+            dir="ltr"
+            required
+            placeholder="9592"
+            className="text-start"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label
+            htmlFor="verification"
+            className="text-muted-foreground text-start text-xs"
+          >
+            {t("quotations.fields.verification")}
+          </Label>
+          {/* Typed by a human, so it can be wrong `[04 A2]`. */}
+          <select
+            id="verification"
+            name="verification"
+            defaultValue="unverified"
+            className={selectClasses}
+          >
+            {SMAC_VERIFICATIONS.map((value) => (
+              <option key={value} value={value}>
+                {t(`enums.smacVerification.${value}`)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <Button type="submit" size="sm" disabled={pending}>
+          {pending ? t("common.saving") : t("common.confirm")}
+        </Button>
+      </div>
+      <Feedback state={state} />
+    </form>
+  );
+}
+
+/**
+ * The rep's tick, with a date, because the rep receives the payment `[07 C3]`.
+ *
+ * Its own component for `ReasonForm`'s reason — and this is the form
+ * `WORKFLOW §5` named first: it is the one that has never answered a raw POST
+ * since session 4.
+ */
+function PaymentForm({ action }: { action: ReasonAction }) {
+  const t = useTranslations();
+  const [state, submit, pending] = useActionState(action, emptyFormState);
+  return (
+    <form
+      action={submit}
+      className="flex flex-col gap-2"
+      data-act="confirm-payment"
+    >
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1.5">
+          <Label
+            htmlFor="confirmedOn"
+            className="text-muted-foreground text-start text-xs"
+          >
+            {t("common.date")}
+          </Label>
+          <Input
+            id="confirmedOn"
+            name="confirmedOn"
+            type="date"
+            dir="ltr"
+            required
+            className="text-start"
+          />
+        </div>
+        <Button type="submit" size="sm" disabled={pending}>
+          {pending ? t("common.saving") : t("common.confirm")}
         </Button>
       </div>
       <Feedback state={state} />
@@ -170,22 +281,11 @@ export function ThreadActions({
 }) {
   const t = useTranslations();
 
-  const [issueState, issue, issuing] = useActionState(
-    issueVersionAction.bind(null, threadId),
-    emptyFormState,
-  );
-  const [cancelState, cancel, cancelling] = useActionState(
-    cancelThreadAction.bind(null, threadId),
-    emptyFormState,
-  );
-  const [paymentState, confirm, confirming] = useActionState(
-    confirmPaymentAction.bind(null, threadId),
-    emptyFormState,
-  );
-  const [returnState, returnEdit, returning] = useActionState(
-    returnForEditAction.bind(null, threadId),
-    emptyFormState,
-  );
+  // **No `useActionState` here.** Every form below owns its own hook and
+  // receives its action already bound — `WORKFLOW §5`'s hang, measured on this
+  // build: the four hooks this component used to hold answered no raw POST at
+  // all, and the two that were already children answered in milliseconds on
+  // the very same page.
 
   // A revision's origin says which route produced it `[07 C2]`: the
   // coordinator editing directly, or the rep asking for a change. There was a
@@ -213,51 +313,7 @@ export function ThreadActions({
                 number: nextVersionNumber - 1,
               })}
             >
-              <form action={issue} className="flex flex-col gap-2">
-                <div className="grid gap-3 sm:grid-cols-[2fr_1fr_auto] sm:items-end">
-                  <div className="flex flex-col gap-1.5">
-                    <Label
-                      htmlFor="smacReference"
-                      className="text-muted-foreground text-start text-xs"
-                    >
-                      {t("quotations.fields.reference")}
-                    </Label>
-                    <Input
-                      id="smacReference"
-                      name="smacReference"
-                      dir="ltr"
-                      required
-                      placeholder="9592"
-                      className="text-start"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label
-                      htmlFor="verification"
-                      className="text-muted-foreground text-start text-xs"
-                    >
-                      {t("quotations.fields.verification")}
-                    </Label>
-                    {/* Typed by a human, so it can be wrong `[04 A2]`. */}
-                    <select
-                      id="verification"
-                      name="verification"
-                      defaultValue="unverified"
-                      className={selectClasses}
-                    >
-                      {SMAC_VERIFICATIONS.map((value) => (
-                        <option key={value} value={value}>
-                          {t(`enums.smacVerification.${value}`)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <Button type="submit" size="sm" disabled={issuing}>
-                    {issuing ? t("common.saving") : t("common.confirm")}
-                  </Button>
-                </div>
-                <Feedback state={issueState} />
-              </form>
+              <IssueForm action={issueVersionAction.bind(null, threadId)} />
             </Panel>
           ) : null}
 
@@ -266,31 +322,16 @@ export function ThreadActions({
               title={t("quotations.actions.returnForEdit")}
               hint={t("quotations.actions.returnForEditHint")}
             >
-              <form action={returnEdit} className="flex flex-col gap-2">
-                {/* Required `[25 §13]` — the reason IS the return. It becomes a
-                    comment on the thread rather than a field of its own, so the
-                    rep reads what to fix where the conversation already is. */}
-                <Textarea
-                  id="reason"
-                  name="reason"
-                  rows={2}
-                  required
-                  className="text-start"
-                />
-                <div>
-                  <Button
-                    type="submit"
-                    size="sm"
-                    variant="outline"
-                    disabled={returning}
-                  >
-                    {returning
-                      ? t("common.saving")
-                      : t("quotations.actions.returnForEdit")}
-                  </Button>
-                </div>
-                <Feedback state={returnState} />
-              </form>
+              {/* Required `[25 §13]` — the reason IS the return. It becomes a
+                  comment on the thread rather than a field of its own, so the
+                  rep reads what to fix where the conversation already is. */}
+              <ReasonForm
+                action={returnForEditAction.bind(null, threadId)}
+                act="return"
+                field="reason"
+                submitLabel={t("quotations.actions.returnForEdit")}
+                variant="outline"
+              />
             </Panel>
           ) : null}
 
@@ -336,28 +377,14 @@ export function ThreadActions({
               title={t("quotations.actions.cancel")}
               hint={t("quotations.actions.cancelHint")}
             >
-              <form action={cancel} className="flex flex-col gap-2">
-                {/* Required `[10 §8]` — it kills a signed quotation, and the
-                    reason is what makes the audit entry worth reading. */}
-                <Textarea
-                  id="cancellationReason"
-                  name="cancellationReason"
-                  rows={2}
-                  required
-                  className="text-start"
-                />
-                <div>
-                  <Button
-                    type="submit"
-                    size="sm"
-                    variant="destructive"
-                    disabled={cancelling}
-                  >
-                    {cancelling ? t("common.saving") : t("quotations.actions.cancel")}
-                  </Button>
-                </div>
-                <Feedback state={cancelState} />
-              </form>
+              {/* Required `[10 §8]` — it kills a signed quotation, and the
+                  reason is what makes the audit entry worth reading. */}
+              <ReasonForm
+                action={cancelThreadAction.bind(null, threadId)}
+                act="cancel"
+                field="cancellationReason"
+                submitLabel={t("quotations.actions.cancel")}
+              />
             </Panel>
           ) : null}
         </section>
@@ -382,38 +409,14 @@ export function ThreadActions({
           </Panel>
         ) : null}
 
-        {/* The rep's tick, with a date, because the rep receives the payment
-            `[07 C3]`. This — with acceptance for processing — is where the
-            customer actually commits `[16 §5]`. */}
+        {/* With acceptance for processing, this is where the customer actually
+            commits `[16 §5]`. */}
         {!paymentConfirmed && endState !== "cancelled" && endState !== "rejected" ? (
           <Panel
             title={t("quotations.actions.confirmPayment")}
             hint={t("quotations.actions.confirmPaymentHint")}
           >
-            <form action={confirm} className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <Label
-                    htmlFor="confirmedOn"
-                    className="text-muted-foreground text-start text-xs"
-                  >
-                    {t("common.date")}
-                  </Label>
-                  <Input
-                    id="confirmedOn"
-                    name="confirmedOn"
-                    type="date"
-                    dir="ltr"
-                    required
-                    className="text-start"
-                  />
-                </div>
-                <Button type="submit" size="sm" disabled={confirming}>
-                  {confirming ? t("common.saving") : t("common.confirm")}
-                </Button>
-              </div>
-              <Feedback state={paymentState} />
-            </form>
+            <PaymentForm action={confirmPaymentAction.bind(null, threadId)} />
           </Panel>
         ) : null}
 

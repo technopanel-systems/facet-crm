@@ -95,12 +95,24 @@ function RowError({ state }: { state: FormState }) {
 function ProductLine({
   threadId,
   line,
+  removeLine,
   options,
   locale,
   editable,
 }: {
   threadId: string;
   line: LineRow;
+  /**
+   * Already bound by `ThreadLines` — `WORKFLOW §5`'s hang. Bound here instead,
+   * this form answered no raw POST at all; bound by the caller it answers in
+   * milliseconds. Measured on this build.
+   *
+   * `update` below keeps its own `.bind()` deliberately. Its form renders only
+   * behind `open`, so it never reaches the HTML without JavaScript and the hang
+   * cannot be reproduced against it — and an unverifiable change is worse than
+   * none. `WORKFLOW §5` carries the row.
+   */
+  removeLine: () => Promise<FormState>;
   options: ProductOptions;
   locale: string;
   editable: boolean;
@@ -112,7 +124,7 @@ function ProductLine({
     emptyFormState,
   );
   const [removeState, remove, removing] = useActionState(
-    removeQuotationLineAction.bind(null, threadId, line.id),
+    removeLine,
     emptyFormState,
   );
 
@@ -170,7 +182,7 @@ function ProductLine({
             >
               {t("common.edit")}
             </Button>
-            <form action={remove}>
+            <form action={remove} data-act="remove-line">
               <Button
                 type="submit"
                 size="xs"
@@ -209,6 +221,7 @@ function ProductLine({
 function ServiceLine({
   threadId,
   service,
+  removeService,
   services,
   lines,
   locale,
@@ -216,6 +229,16 @@ function ServiceLine({
 }: {
   threadId: string;
   service: ServiceRow;
+  /**
+   * Already bound by `ThreadLines`, for `ProductLine`'s reason — and this row
+   * is why "it does not reproduce" is not a reason to leave the shape alone.
+   * Bound in here it answered a raw POST while it was the only service line on
+   * the thread, and hung on every attempt once a second row rendered: `7` of
+   * `8`, then `3` of `4`, answering only on the last row remaining. So the
+   * shape is what hangs, and whether a given page reproduces it today is a
+   * property of the data, not of the code. `WORKFLOW §5`.
+   */
+  removeService: () => Promise<FormState>;
   services: NamedOption[];
   lines: LineRow[];
   locale: string;
@@ -228,7 +251,7 @@ function ServiceLine({
     emptyFormState,
   );
   const [removeState, remove, removing] = useActionState(
-    removeServiceLineAction.bind(null, threadId, service.id),
+    removeService,
     emptyFormState,
   );
 
@@ -276,7 +299,7 @@ function ServiceLine({
             >
               {t("common.edit")}
             </Button>
-            <form action={remove}>
+            <form action={remove} data-act="remove-service">
               <Button type="submit" size="xs" variant="ghost" disabled={removing}>
                 {t("common.remove")}
               </Button>
@@ -387,6 +410,8 @@ export function ThreadLines({
             key={line.id}
             threadId={threadId}
             line={line}
+            // Bound HERE, not in the row — `WORKFLOW §5`.
+            removeLine={removeQuotationLineAction.bind(null, threadId, line.id)}
             options={options}
             locale={locale}
             editable={editable}
@@ -454,6 +479,12 @@ export function ThreadLines({
                 key={service.id}
                 threadId={threadId}
                 service={service}
+                // Bound HERE, not in the row — `WORKFLOW §5`.
+                removeService={removeServiceLineAction.bind(
+                  null,
+                  threadId,
+                  service.id,
+                )}
                 services={services}
                 lines={lines}
                 locale={locale}

@@ -62,10 +62,23 @@
  *      working. Sections 2 and 3 carry the route half: the two `new` forms and
  *      the two edit routes answer 404 for that identity and 200 for the others.
  *
+ *  17. **Every `useActionState` form answers a raw POST at all**
+ *      (`WORKFLOW §5`). Eight of them wrote their row and then never sent
+ *      response headers — 303 seconds and no reply on the one measured to the
+ *      end. Every other section asserts what a POST *did*, which is why this
+ *      survived from session 4: the write always landed. Each POST here
+ *      carries an abort, so a hang is a named failure rather than a stalled
+ *      run, and each takes the refusal path where the form has one, so a
+ *      stall cannot be blamed on a successful write.
+ *
  * This was 11 sections until feature slice 6: the old item 11 (the
  * message-key scan) is now section 12, and section 11 above — the
  * follow-up-date replay — existed in the code for a phase but was never
  * added to this list. Not a renumbering; a correction `[26 §4]`.
+ *
+ * Section 16 — a rep raising a dispatch and the coordinator refusing it — is
+ * likewise in the code and not in this list. 17 is listed the day it is
+ * written; 16 belongs to whoever next touches it.
  *
  * **Sections 13 and 14 sit after the key scan.** Section 12 is written to
  * cover everything fetched before it, and section 12 keeps the number
@@ -1821,39 +1834,14 @@ async function main(): Promise<void> {
        * evidence of which rule refused is in that markup.
        */
       const post = async (jar: Jar, path: string, body: FormData) => {
-        const response = await fetch(`${BASE}${path}`, {
-          method: "POST",
-          headers: { cookie: header(jar), origin: BASE },
-          body,
-          redirect: "manual",
-        });
-        store(jar, response);
-        return {
-          status: response.status,
-          location: response.headers.get("location") ?? "",
-          body: await response.text(),
-        };
-      };
-
-      /**
-       * POST a form whose response this script deliberately does not wait for.
-       *
-       * **`confirmPaymentAction` never answers a raw form POST**, and that is
-       * neither this slice's doing nor a rule this section is about: the same
-       * request stalls identically on a quotation that has a project, on a
-       * build with none of S50 or S74 in it, and on the comment composer's
-       * neighbour it does not stall at all. The write lands — the row is
-       * updated, and the page renders in 150ms afterwards — so what is broken
-       * is the response to the no-JavaScript path of that one action.
-       *
-       * So the POST is really sent, and what follows asserts the STATE it
-       * produced rather than the answer it did not give. Left as a plain
-       * check below, not swallowed: if the payment ever fails to land, the
-       * next assertion says so.
-       */
-      const fireAndForget = async (jar: Jar, path: string, body: FormData) => {
+        // **Bounded, so a stall is a named failure rather than a hung run.**
+        // This chain used to carry a second helper that posted and declined to
+        // wait, because two of its forms never answered at all; section 17 now
+        // asserts that they do, and nothing here may quietly tolerate silence
+        // again. `status: 0` is the sentinel — no call site expects it, so
+        // every one of them fails on it with the status printed.
         const abort = new AbortController();
-        const timer = setTimeout(() => abort.abort(), 5000);
+        const timer = setTimeout(() => abort.abort(), 8000);
         try {
           const response = await fetch(`${BASE}${path}`, {
             method: "POST",
@@ -1863,8 +1851,13 @@ async function main(): Promise<void> {
             signal: abort.signal,
           });
           store(jar, response);
+          return {
+            status: response.status,
+            location: response.headers.get("location") ?? "",
+            body: await response.text(),
+          };
         } catch {
-          // The stall described above. The GET that follows is the assertion.
+          return { status: 0, location: "", body: "" };
         } finally {
           clearTimeout(timer);
         }
@@ -2093,7 +2086,19 @@ async function main(): Promise<void> {
       if (!paymentForm) continue;
       const paymentFields = envelope(paymentForm);
       paymentFields.set("confirmedOn", "2026-08-18");
-      await fireAndForget(repJar, threadPath, paymentFields);
+      // **This POST is waited for.** It was not, for four sessions: the form
+      // never sent response headers, so the helper that stood here aborted at
+      // 5s and this chain asserted only the state left behind. The bind moved
+      // to the call site and it answers; section 17 is where that is the
+      // assertion, and here it is simply no longer excused.
+      const paidPost = await post(repJar, threadPath, paymentFields);
+      check(
+        `${locale}: the payment POST answers [WORKFLOW §5]`,
+        paidPost.status === 200,
+        paidPost.status === 0
+          ? "NO REPLY within 8s — the hang is back"
+          : `got ${paidPost.status}`,
+      );
 
       // What the POST actually did, read back off the screen: the form is
       // offered only while the payment is unconfirmed, so its absence is the
@@ -2173,7 +2178,15 @@ async function main(): Promise<void> {
       const issueFields = envelope(issueForm);
       issueFields.set("smacReference", `${stamp}-${locale}`);
       issueFields.set("verification", "unverified");
-      await fireAndForget(coordJar, threadPath, issueFields);
+      // Waited for, as the payment above `WORKFLOW §5`.
+      const issuePost = await post(coordJar, threadPath, issueFields);
+      check(
+        `${locale}: the issue POST answers [WORKFLOW §5]`,
+        issuePost.status === 200,
+        issuePost.status === 0
+          ? "NO REPLY within 8s — the hang is back"
+          : `got ${issuePost.status}`,
+      );
 
       /* --- 4. the coordinator's form marks it as having no project ------ */
 
@@ -3207,6 +3220,320 @@ async function main(): Promise<void> {
         (await get(repJar, `${path}/edit`)).status === 200 &&
           Boolean(actForm(back.body, "submit")),
       );
+    }
+  }
+
+  console.log(
+    "\n17. Every `useActionState` form ANSWERS a raw POST [WORKFLOW §5]",
+  );
+  {
+    // **The assertion is that a reply arrives at all.** Eight forms in this app
+    // wrote their row and then never sent response headers: the request sat
+    // open until the client gave up — 303 seconds on the one measured to the
+    // end, with no status and no body, ever. Nothing in the suite could see it,
+    // because every other section asserts what a POST *did*, and this is a
+    // defect in what it *answers*. That is how it survived from session 4.
+    //
+    // The cause is the **bind site**, measured rather than argued: a form whose
+    // `.bind()` is evaluated by the same component that calls `useActionState`
+    // hangs; bound one level up, at the call site, and passed in as a prop, the
+    // same form answers in about 150ms. Hoisting the `.bind()` to a `const`
+    // inside the hook's own component was measured too, and still hung — so it
+    // is not the inline expression, it is which component evaluates it. Why
+    // that is so is **not** established; only which shape answers.
+    //
+    // **A form that answers today is not proof the shape is sound.** The
+    // service-line remove answered while it was the only such row on the page,
+    // and hung on every attempt once a second row rendered — 7 of 8, then 3 of
+    // 4. So this drives the repeated-row case too: a participant row is offered
+    // only where a project has two or more `S27`, which makes
+    // `remove-participant` the multi-row shape by construction.
+    //
+    // Timeouts, not bare `await`: a hang would otherwise stall the whole run,
+    // so every POST here carries an abort and a missed reply is a named failure
+    // carrying its elapsed time.
+    const repJar = jars["rep-a@example.test"];
+    const coordJar = jars["coordinator@example.test"];
+
+    /** Every id a list page links to, in document order. */
+    const idsOf = (body: string, section: string, locale: string): string[] => [
+      ...new Set(
+        [
+          ...body.matchAll(
+            new RegExp(`href="/${locale}/${section}/([0-9a-f-]{36})"`, "g"),
+          ),
+        ].map((match) => match[1]),
+      ),
+    ];
+
+    /** Every `$ACTION…` input of one form, unescaped, as a browser sends it. */
+    const envelope = (form: string): FormData => {
+      const fields = new FormData();
+      for (const input of form.matchAll(/<input[^>]*>/g)) {
+        const name = input[0].match(/name="([^"]+)"/)?.[1];
+        if (!name?.startsWith("$ACTION")) continue;
+        fields.append(
+          name,
+          unescapeHtml(input[0].match(/value="([^"]*)"/)?.[1] ?? ""),
+        );
+      }
+      return fields;
+    };
+
+    const actForm = (body: string, act: string): string | undefined =>
+      body.match(new RegExp(`<form[^>]*data-act="${act}"[\\s\\S]*?</form>`))?.[0];
+
+    /** How many participant rows a project detail page renders. */
+    const participantCount = (body: string): number =>
+      [...body.matchAll(/data-participant="/g)].length;
+
+    /** The one `RecordRow` belonging to a company — its remove form is inside. */
+    const rowFor = (body: string, companyId: string): string =>
+      body
+        .split("<li")
+        .find((chunk) => chunk.includes(`data-participant="${companyId}"`)) ?? "";
+
+    /**
+     * POST and insist on a reply. `null` is the hang this section exists for.
+     *
+     * 8 seconds is far outside the ~150ms each of these takes when it is well,
+     * and far inside the 303 a real hang costs.
+     */
+    const answered = async (
+      jar: Jar,
+      path: string,
+      body: FormData,
+    ): Promise<{ status: number; body: string; ms: number } | null> => {
+      const abort = new AbortController();
+      const timer = setTimeout(() => abort.abort(), 8000);
+      const started = Date.now();
+      try {
+        const response = await fetch(`${BASE}${path}`, {
+          method: "POST",
+          headers: { cookie: header(jar), origin: BASE },
+          body,
+          redirect: "manual",
+          signal: abort.signal,
+        });
+        const text = await response.text();
+        store(jar, response);
+        return { status: response.status, body: text, ms: Date.now() - started };
+      } catch {
+        return null;
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+
+    /** One form, one assertion: it replied, with the status a re-render has. */
+    const drives = async (
+      label: string,
+      jar: Jar,
+      path: string,
+      form: string,
+      fields: Record<string, string> = {},
+    ): Promise<void> => {
+      const body = envelope(form);
+      for (const [name, value] of Object.entries(fields)) body.set(name, value);
+      const result = await answered(jar, path, body);
+      check(
+        `${label} answers a raw POST [WORKFLOW §5]`,
+        result !== null && result.status === 200,
+        result === null
+          ? "NO REPLY within 8s — the hang is back"
+          : `got ${result.status} in ${result.ms}ms`,
+      );
+    };
+
+    for (const locale of ["en", "ar"] as const) {
+      /* --- the rep's payment tick, on the write-nothing path ----------- */
+
+      // An empty date is refused by `readFields` before anything is written,
+      // and that is the point: the hang was never the panel being unmounted by
+      // its own success. It reproduced on paths that wrote nothing at all.
+      let paymentDriven = false;
+      const repThreads = await get(repJar, `/${locale}/quotations`);
+      for (const threadId of idsOf(repThreads.body, "quotations", locale)) {
+        const path = `/${locale}/quotations/${threadId}`;
+        const form = actForm((await get(repJar, path)).body, "confirm-payment");
+        if (!form) continue;
+        await drives(`${locale}: *** confirmPayment ***`, repJar, path, form, {
+          confirmedOn: "",
+        });
+        paymentDriven = true;
+        break;
+      }
+      check(
+        `${locale}: an unpaid quotation is reachable for the payment form`,
+        paymentDriven,
+        "nothing offered confirm-payment",
+      );
+
+      /* --- the participant forms, added then taken back off ------------ */
+
+      // Add and remove in one pass, on the same row, so the fixtures end where
+      // they started. A participant removed and never replaced would eventually
+      // leave a project down to the one company `S27` will not remove, the row
+      // would stop rendering, and this assertion would decay into a silent skip
+      // — the way three of `verify-slice3`'s did.
+      let participantsDriven = false;
+      const projects = await get(repJar, `/${locale}/projects`);
+      for (const projectId of idsOf(projects.body, "projects", locale)) {
+        const path = `/${locale}/projects/${projectId}`;
+        const page = await get(repJar, path);
+        const add = actForm(page.body, "add-participant");
+        if (!add) continue;
+
+        const before = participantCount(page.body);
+        await drives(
+          `${locale}: *** addProjectCompany, no company ***`,
+          repJar,
+          path,
+          add,
+          { companyId: "" },
+        );
+
+        // A real one now, so the removal below has a row of its own to take off
+        // and the count comes back to where it started `S27`.
+        const companyId = add.match(/<option value="([0-9a-f-]{36})"/)?.[1];
+        if (!companyId) {
+          check(`${locale}: the add form offers a company`, false);
+          break;
+        }
+        await drives(
+          `${locale}: *** addProjectCompany, a real one ***`,
+          repJar,
+          path,
+          add,
+          { companyId },
+        );
+        const grown = await get(repJar, path);
+        check(
+          `${locale}: …and the participant landed [S27]`,
+          participantCount(grown.body) === before + 1,
+          `${before} → ${participantCount(grown.body)}`,
+        );
+
+        // The remove row is offered only where there are two or more `S27`, so
+        // this is the repeated-component case by construction.
+        const remove = actForm(rowFor(grown.body, companyId), "remove-participant");
+        if (!remove) {
+          check(`${locale}: the new participant's row offers removal [S27]`, false);
+          break;
+        }
+        await drives(
+          `${locale}: *** removeProjectCompany ***`,
+          repJar,
+          path,
+          remove,
+        );
+        const shrunk = await get(repJar, path);
+        check(
+          `${locale}: …and the count is back where it started [S27]`,
+          participantCount(shrunk.body) === before,
+          `${before} → ${participantCount(shrunk.body)}`,
+        );
+        participantsDriven = true;
+        break;
+      }
+      check(
+        `${locale}: a project with an add-participant form is reachable`,
+        participantsDriven,
+      );
+
+      /* --- the coordinator's three, and the line rows ------------------ */
+
+      // Empty required fields throughout: each of these is a refusal that
+      // writes nothing, so a stall cannot be blamed on what the action did.
+      const wanted: Array<[string, Record<string, string>]> = [
+        ["issue", { smacReference: "", verification: "unverified" }],
+        ["cancel", { cancellationReason: "" }],
+        ["return", { reason: "" }],
+        ["remove-line", {}],
+      ];
+      const driven = new Set<string>();
+      let exceptionsChecked = false;
+      const coordThreads = await get(coordJar, `/${locale}/quotations`);
+      for (const threadId of idsOf(coordThreads.body, "quotations", locale)) {
+        const path = `/${locale}/quotations/${threadId}`;
+        const page = await get(coordJar, path);
+        for (const [act, fields] of wanted) {
+          if (driven.has(act)) continue;
+          const form = actForm(page.body, act);
+          if (!form) continue;
+          driven.add(act);
+          await drives(`${locale}: *** ${act} ***`, coordJar, path, form, fields);
+        }
+
+        // **The four deliberate exceptions, asserted absent.** `WORKFLOW §5`
+        // keeps a row saying these four keep their `.bind()` inside the hook's
+        // own component because none of them can reach the HTML: each renders
+        // behind client state — `open` on a row, `addingLine` and
+        // `addingService` on the section. That row is only true while it stays
+        // true, so this is where it is checked rather than asserted in prose.
+        // The page reached here is editable by construction: `remove-line` is
+        // offered nowhere else, so the toggles WOULD be rendering if they ever
+        // rendered server-side.
+        // Its own flag, deliberately NOT a member of `driven`: that set's
+        // size is the loop's break condition, and a fifth member would end the
+        // scan before a service line is looked for.
+        if (actForm(page.body, "remove-line") && !exceptionsChecked) {
+          exceptionsChecked = true;
+          const hidden: Array<[string, boolean]> = [
+            ["addQuotationLine", page.body.includes('"new-line-supplierId"')],
+            ["addServiceLine", page.body.includes('"new-service-serviceTypeId"')],
+            [
+              "updateQuotationLine",
+              /id="line-[0-9a-f-]{36}-supplierId"/.test(page.body),
+            ],
+            [
+              "updateServiceLine",
+              /id="service-[0-9a-f-]{36}-serviceTypeId"/.test(page.body),
+            ],
+          ];
+          for (const [name, present] of hidden) {
+            check(
+              `${locale}: ${name}'s form stays behind client state [WORKFLOW §5]`,
+              !present,
+              "it reaches the HTML — bind it at the call site",
+            );
+          }
+        }
+
+        // The service row is driven where the fixtures happen to carry one.
+        // **Not a failure when they do not**: the add-service control sits
+        // behind client state, so nothing this script can post creates one, and
+        // asserting its presence would be a permanent red line rather than a
+        // regression guard. Said out loud rather than skipped in silence.
+        if (!driven.has("remove-service")) {
+          const service = actForm(page.body, "remove-service");
+          if (service) {
+            driven.add("remove-service");
+            await drives(
+              `${locale}: *** removeServiceLine ***`,
+              coordJar,
+              path,
+              service,
+            );
+          }
+        }
+        if (driven.size === wanted.length + 1) break;
+      }
+      for (const [act] of wanted) {
+        check(
+          `${locale}: the ${act} form is reachable for the coordinator`,
+          driven.has(act),
+        );
+      }
+      check(
+        `${locale}: an editable thread was reached, so the four exceptions were checked`,
+        exceptionsChecked,
+      );
+      if (!driven.has("remove-service")) {
+        console.log(
+          `  note  ${locale}: no thread carried a service line — removeServiceLine not driven`,
+        );
+      }
     }
   }
 }
