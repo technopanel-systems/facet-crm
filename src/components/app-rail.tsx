@@ -124,7 +124,7 @@ export function AppRail({
   };
 
   return (
-    <aside className="bg-rail flex flex-col gap-0.5 px-3 py-3 md:sticky md:top-0 md:h-svh md:w-59 md:flex-none md:py-4">
+    <aside className="bg-rail glass flex flex-col gap-0.5 px-3 py-3 md:sticky md:top-0 md:h-svh md:w-59 md:flex-none md:py-4">
       <div className="hidden items-center gap-2.5 px-2 pt-1 pb-4 md:flex">
         <div
           className="grid size-8 flex-none place-items-center rounded-lg bg-[linear-gradient(140deg,var(--red-500),#7A1020)] text-sm font-bold text-white"

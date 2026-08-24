@@ -61,7 +61,7 @@ export default async function AppLayout({
   const { session, follow, unresolved } = await shellCounts();
 
   return (
-    <div className="bg-canvas flex min-h-svh flex-col md:flex-row">
+    <div className="flex min-h-svh flex-col md:flex-row">
       <AppRail
         canManageUsers={can(session, "canManageUsers")}
         todayCount={follow.total}
@@ -75,7 +75,7 @@ export default async function AppLayout({
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Sticky, blur and border stay on <header> — it is a stretched flex
             item, so the rule spans the full viewport minus the rail. */}
-        <header className="border-line bg-canvas/85 sticky top-0 z-20 border-b backdrop-blur-md">
+        <header className="border-line bg-canvas/85 glass sticky top-0 z-20 border-b">
           <div className="flex w-full max-w-330 flex-wrap items-center justify-end gap-3 px-6.5 py-2.75">
             <Link
               href="/notifications"

@@ -170,7 +170,7 @@ export async function ListCard({
   return (
     <div
       data-slot="list-card"
-      className="border-line bg-card overflow-hidden rounded-xl border shadow-(--shadow)"
+      className="card-face glass"
     >
       {children}
       <ListPagination

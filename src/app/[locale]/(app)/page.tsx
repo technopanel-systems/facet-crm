@@ -136,7 +136,7 @@ export default async function TodayPage({
           <Link
             key={kind}
             href={`/follow-ups?kind=${kind}`}
-            className="bg-card border-line hover:border-line-strong rounded-xl border p-4 text-start shadow-(--shadow) transition-colors"
+            className="card-face glass hover:border-line-strong p-4 text-start transition-colors"
           >
             <Badge variant="outline">{t(`enums.followUpKind.${kind}`)}</Badge>
             <p className="num mt-2 text-2xl font-semibold tracking-tight">

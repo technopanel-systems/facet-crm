@@ -41,14 +41,16 @@ list or cap changes, this file changes in the same commit.
 | Token | For |
 |---|---|
 | `--canvas` · `--rail` | page ground · rail ground, dark in both themes |
-| `--surface` `--surface-2` `--surface-3` | card, inset, inset-within-inset |
+| `--surface` `--surface-2` | card, inset — both translucent `D14`, each with a solid counterpart for `D19` |
 | `--line` `--line-strong` · `--text` `--text-muted` `--text-faint` | dividers · body, secondary, faint |
 | `--brand` · `--a-{red,blue,amber,green}-bg`/`-fg` | brand red · the four tone pairs |
 
 **Colour means elapsed time, never outcome** `D6` — past due red, due soon amber, otherwise
 faint, and **no status→colour map**: `accepted` keeps a plain pill, since a green pill is
-where "internal approval, never a won deal" `S65` gets lost. The five **identity colours**
-appear on the rail marker, a page title's spine and a card's edge, **nowhere else** `D7`.
+where "internal approval, never a won deal" `S65` gets lost. The **four** identity
+colours — company blue, project amber, quotation red, dispatch green — appear on the rail
+marker, a page title's spine and a card's edge, **nowhere else** `D7`. Contact violet is
+gone: `D21` forbids violet, and a rule may not mandate what another forbids.
 
 **IBM Plex Sans**, **Sans Arabic** on `html[lang="ar"]`, **Mono for every number** `D10`;
 every number is mono and tabular through one class, **`num`** `D11`; scale `D12`, and
@@ -62,15 +64,17 @@ else is a **defect**, not a flourish `D8`.
 | Token | Where it may be used |
 |---|---|
 | `--canvas-glow` | the two fixed radial gradients on the page background — the only background gradient in the product `D13` |
-| `--surface` + `--blur` + `--line-hi` + `--shadow`/`--shadow-lift` | the card texture, identical on every card; resting and hovered depth `D14` `D8` |
-| `--surface-solid` | the fallback below 980px and under `prefers-reduced-transparency` `D18` `D19` |
-| `--brand-grad` | **five uses**: primary button · active rail marker · target bar fill · rail count badge · dispatched segment of a rollup bar `D15` |
-| `--brand-glow` | **five uses**: primary button and app mark · the pace badge's ring · today's cell in the week strip · the target fill's bloom `D16` |
+| `--surface` + `--blur` + `--line-hi` + `--shadow`/`--shadow-lift` | the card texture, identical on every card; resting and hovered depth `D14` `D8`. It is the **`card-face glass`** utility pair in `globals.css`, worn by `Card`, `ListCard` and the dashboard tiles — a fourth card surface wears that pair, never its own copy |
+| `--blur` alone | the rail and the header. Nothing else `D8` `D21` — the **`glass`** utility |
+| `--surface-solid` `--surface-2-solid` `--rail-solid` | what each blurred surface becomes under `prefers-reduced-transparency` `D19`. Below 980px the blur is **reduced to 8px, never removed** `D19` |
+| `--brand-grad` | **six uses**: primary button · active rail marker · target bar fill · rail count badge · dispatched segment of a rollup bar `D15` · a row's action button filling on hover `D17` |
+| `--brand-glow` | **six uses**: primary button · app mark · the pace badge's ring · today's cell in the week strip · the target fill's bloom `D16` · the current chain dot's soft ring `D27` |
 
 Motion is the closed list in `D17`, `prefers-reduced-motion` is the tested path, radius is
-`D9`, and `D21` names the forbidden tells. **JavaScript stays near zero** `D20`: depth is
-CSS, filters are GET forms in the URL, the theme is a server-read cookie, and the only
-exceptions are the city combobox, the view-mode switch and the board's scroll.
+`D9` — which records the code at 10/14 and deliberately did not move it — and `D21` names
+the forbidden tells. **JavaScript stays near zero** `D20`: depth is CSS, filters are GET
+forms in the URL, the theme is a server-read cookie, and the only exceptions are the city
+combobox, the view-mode switch and the board's scroll.
 
 ## Page and permission shape
 
@@ -175,7 +179,7 @@ and projects only `D48` `S114` · responsive `D55` `D56` · deliberately not bui
 3. Is every number `num`, mono and tabular, and nothing under 10.5px? `D11` `D12`
 4. Is colour only elapsed time, and identity colour only in `D7`'s three places? `D6` `D7`
 5. Is every effect one of its token's named uses? `D13`–`D17` `D21`
-6. Does it look right with blur off `D18` `D19`, and did you test `prefers-reduced-motion`? `D17`
+6. Does it look right with blur off `D19`, and did you test `prefers-reduced-motion`? `D17`
 7. Is the physical-utility grep still zero `D57` `S113` —
    `ml-|mr-|pl-|pr-|text-left|text-right|border-l-|border-r-`?
 8. Driven in **both locales** `D57`, at **1366 and 1440 first** `D23`?

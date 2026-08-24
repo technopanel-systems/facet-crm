@@ -27,7 +27,7 @@ more than the first.
 
 ---
 
-## 2. Palette — warm black, unchanged
+## 2. Palette — warm black
 
 **D4.** Every neutral carries a **red undertone, never blue**. The greys are
 mixed toward the brand red so the interface reads as ink, not slate. A neutral
@@ -36,25 +36,42 @@ that drifts blue is a bug.
 **D5.** **Both themes are designed, not inverted.** Dark is the default. Light is
 not dark with lightness flipped. The rail is dark in both.
 
+**A surface is translucent** `D14`, so a surface token is an `rgba` and not a
+hex. Each of the three blurred surfaces carries a solid counterpart, and those
+are the only thing `D19`'s reduced-transparency path substitutes.
+
 | Token | Dark | Light |
 |---|---|---|
-| `--canvas` | `#151211` | `#F8F6F4` |
-| `--surface` | `#1D1A18` | `#FFFFFF` |
-| `--surface-2` | `#252120` | `#FAF8F6` |
-| `--surface-3` | `#2C2725` | `#F1EDE9` |
-| `--line` | `#302B29` | `#E8E3DE` |
-| `--line-strong` | `#403A37` | `#D6CFC9` |
-| `--text` | `#F0EBE8` | `#1A1614` |
-| `--text-muted` | `#A29996` | `#6B615C` |
-| `--text-faint` | `#756C69` | `#9A908A` |
-| `--rail` | `#0E0C0B` | `#171311` |
+| `--canvas` | `#0F0D0C` | `#F5F2EF` |
+| `--surface` | `rgba(30,26,24,.72)` | `rgba(255,255,255,.78)` |
+| `--surface-2` | `rgba(40,35,32,.6)` | `rgba(255,255,255,.55)` |
+| `--surface-solid` | `#1B1816` | `#FFFFFF` |
+| `--surface-2-solid` | `#232120` | `#F3EFEB` |
+| `--line` | `rgba(255,255,255,.07)` | `rgba(26,22,20,.07)` |
+| `--line-strong` | `rgba(255,255,255,.12)` | `rgba(26,22,20,.13)` |
+| `--text` | `#F3EEEB` | `#1A1614` |
+| `--text-muted` | `#A69D99` | `#6B615C` |
+| `--text-faint` | `#786F6B` | `#9A908A` |
+| `--rail` | `rgba(9,8,7,.85)` | `rgba(23,19,17,.94)` |
+| `--rail-solid` | `#0E0C0B` | `#171311` |
+| `--rail-text` | `#8F8683` | `#B5ABA6` |
+| `--rail-text-strong` | `#FFF8F5` | `#FFFFFF` |
+| `--rail-active` | `rgba(255,255,255,.05)` | `rgba(255,255,255,.07)` |
 | `--brand` | `#F2566B` | `#C8102E` |
-| `--a-red-bg` / `-fg` | `#2E1418` / `#F98A98` | `#FDF1F2` / `#C8102E` |
-| `--a-blue-bg` / `-fg` | `#141F31` / `#7FADEE` | `#EEF4FC` / `#2B5CA8` |
-| `--a-amber-bg` / `-fg` | `#2B1F0C` / `#E3A63E` | `#FDF4E6` / `#B45309` |
-| `--a-green-bg` / `-fg` | `#0F2417` / `#57C57E` | `#EFF9F1` / `#15803D` |
+| `--a-red-bg` / `-fg` | `rgba(242,86,107,.14)` / `#FF8FA0` | `rgba(200,16,46,.09)` / `#C8102E` |
+| `--a-blue-bg` / `-fg` | `rgba(127,173,238,.14)` / `#8FB8F0` | `rgba(43,92,168,.09)` / `#2B5CA8` |
+| `--a-amber-bg` / `-fg` | `rgba(227,166,62,.14)` / `#EBB35A` | `rgba(180,83,9,.1)` / `#B45309` |
+| `--a-green-bg` / `-fg` | `rgba(87,197,126,.14)` / `#6FD08F` | `rgba(21,128,61,.09)` / `#15803D` |
 
-The full mapping onto shadcn's semantic tokens is already in code and stays.
+These are `docs/design/facet-concept-v5-premium.html`'s values. The table held
+concept v4's opaque hexes until the token slice, which is why nothing made
+`D8` or `D13`–`D19` true (`WORKFLOW §5 AD3`). `--surface-3` is gone: it was
+v4's, and neither v5 nor the stylesheet ever had one.
+
+The full mapping onto shadcn's semantic tokens is already in code and stays,
+with one exception. **`--popover` takes `--surface-solid`**: a popup is neither
+a card nor one of the two bars, so `D21` forbids blurring it, and a translucent
+surface with nothing blurred behind it is unreadable.
 
 **D6.** **Colour describes how long something has waited, never how good the
 outcome is.** Past due is red, due soon is amber, otherwise faint. There is
@@ -62,9 +79,14 @@ outcome is.** Past due is red, due soon is amber, otherwise faint. There is
 the first place "internal approval, never a won deal" gets lost.
 
 **D7.** **Object identity colours** exist — company blue, project amber,
-quotation red, contact violet, dispatch green — and appear **only** on the rail
-marker, a page title's spine, and a card's edge. Never on a state, never on a
-pill, never on text. Object type is not a status.
+quotation red, dispatch green — and appear **only** on the rail marker, a page
+title's spine, and a card's edge. Never on a state, never on a pill, never on
+text. Object type is not a status.
+
+**Four, not five: contact violet is gone.** `D21` forbids violet, and a rule may
+not mandate what another forbids (`WORKFLOW §5 AD15`). `D21`'s ban stands
+unchanged; a contact's lead cell is its name and position `D26`, which needs no
+colour of its own.
 
 **D8. Effect tokens.** These carry the visual system and are listed here so
 they are inspectable rather than scattered as inline values.
@@ -73,15 +95,20 @@ they are inspectable rather than scattered as inline values.
 |---|---|
 | `--canvas-glow` | the two fixed radial gradients on the page background |
 | `--surface` / `--surface-2` | translucent card and inset surfaces |
-| `--surface-solid` | the reduced-blur rule (D19) |
+| `--surface-solid` / `--surface-2-solid` / `--rail-solid` | the reduced-transparency fallbacks (D19) |
 | `--line-hi` | the one-pixel top-edge highlight on a card |
-| `--brand-grad` | red→orange, five uses only (D15) |
-| `--brand-glow` | five uses only (D16) |
+| `--brand-grad` | red→orange, six uses only (D15, D17) |
+| `--brand-glow` | six uses only (D16, D27) |
 | `--shadow` / `--shadow-lift` | resting and hovered depth |
 | `--blur` | 18px + saturation, cards and bars only |
 
 **D9. Radius:** 12px cards, 16px large cards, 8–10px controls, 20px pills.
 Nothing sharper, nothing rounder.
+
+**The code is 10px and 14px**, not 12 and 16, and the token slice deliberately
+left it alone — a radius is a component pass, not a token one, and moving it in
+passing would have made `WORKFLOW §5 AD24` unfindable. Controls at 10px are
+already right.
 
 ---
 
@@ -118,15 +145,20 @@ section, never as a blob.
 (`--line-hi`), and a deep soft shadow with an inner top light. That combination
 is the product's texture and it is used on every card, identically.
 
-**D15. The brand gradient has exactly five uses.** `--brand-grad` appears on:
+**D15. The brand gradient has exactly six uses.** `--brand-grad` appears on:
 the primary button, the active rail marker, the target bar's fill, the rail
-count badge, and the dispatched segment of a rollup bar. Nowhere else. Not on
-text, not on pills, not on borders.
+count badge, the dispatched segment of a rollup bar, and **a row's action button
+filling on hover** `D17`. Nowhere else. Not on text, not on pills, not on
+borders. The count said five while `D17` already named the sixth
+(`WORKFLOW §5 AD11`).
 
-**D16. Glow has exactly five uses.** `--brand-glow` on the primary button and
-the app mark; a soft ring on the pace badge; a ring on today's cell in the week
-strip; the target fill's bloom. Nothing else glows. A glow is emphasis, and
-everything emphasised is nothing emphasised.
+**D16. Glow has exactly six uses.** `--brand-glow` on the primary button; the
+app mark; a soft ring on the pace badge; a ring on today's cell in the week
+strip; the target fill's bloom; and **the current chain dot's soft ring**
+`D27`, which already ships. Nothing else glows. A glow is emphasis, and
+everything emphasised is nothing emphasised. The count said five over a list
+that read as four or six depending on how its first item was split, and `D27`
+had been adding to it unannounced (`WORKFLOW §5 AD12`, `AD29`).
 
 **D17. Motion is small, fast and explains something.** A view change fades and
 rises 6px over 350ms. A count tile lifts 2px on hover. A row's action button
@@ -135,19 +167,23 @@ transitions, no scroll reveals, no skeleton shimmer, no counting numbers, no
 bouncing. `prefers-reduced-motion` is respected and is the path that gets
 tested.
 
-**D18. Blur is capped for performance.** `backdrop-filter` is GPU work, and
-FACET runs on phones over a tunnel from a Windows PC. Below 980px, and under
-`prefers-reduced-transparency`, every blurred surface falls back to
-`--surface-solid` with no filter. The design must look correct with blur off —
-check it that way before calling a screen done.
+**D18.** *Deleted.* It gave the opposite instruction to `D19` for the same
+breakpoint — fall back with no filter, against reduce the radius — and `D19`
+won (`WORKFLOW §5 AD13`). Its one surviving idea, that the design must look
+correct with blur off, is `D19`'s last sentence. The number is kept and never
+reused, so no citation shifts.
 
 **D19. Looks win; performance is tuned afterwards.** Of everything in D13-D16,
 only `backdrop-filter` costs real work - gradients, shadows and glow are
 effectively free. So the effects stay on everywhere, including phones, and the
 blur radius is reduced rather than removed on small screens (18px desktop, 8px
-below 980px). Under `prefers-reduced-transparency`, surfaces fall back to
-`--surface-solid`. If a screen ever measures slow on a real phone, the fix is to
-lower that one number - never to strip the design.
+below 980px). **Never removed.** Under `prefers-reduced-transparency`, every
+blurred surface takes its solid counterpart — `--surface` → `--surface-solid`,
+`--surface-2` → `--surface-2-solid`, `--rail` → `--rail-solid` — and `--blur`
+is `none`. Three tokens, one rule, all three in `D8`. If a screen ever measures
+slow on a real phone, the fix is to lower that one number - never to strip the
+design. **The design must look correct with blur off** — check it that way
+before calling a screen done.
 
 **D20. JavaScript stays near zero regardless of how the surface looks.** Depth
 is CSS. Filters are GET forms in the URL. Native `<select>`. The theme is a
