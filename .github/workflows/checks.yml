@@ -1,0 +1,66 @@
+# FACET — continuous integration.
+#
+# Runs the four static checks WORKFLOW §3 step 6 asks of every session.
+# Twenty-three sessions ran them because a prompt said so; nothing enforced it.
+# This does — a session that forgets is caught at main, not two sessions later.
+#
+#
+# WHAT THIS DOES NOT RUN — read the green tick narrowly.
+#
+# The ten verify scripts — verify:slice2, verify:slice3, verify:phase9,
+# verify:phase10a, verify:phase11, verify:followups, verify:comments,
+# verify:sharing, verify:schema25, verify:routes — are deliberately absent.
+#
+# Each needs a live PostgreSQL with all 28 migrations applied and the role,
+# lookup, settings, notification-type and dev-fixture seeds loaded. Each is
+# invoked as `tsx --env-file=.env`, which hard-fails when no .env exists — and
+# .env is gitignored, so CI would have to write one. verify:routes needs more
+# still: the built app served by `npm run start`, driven over HTTP in both
+# locales, as three different roles, replaying real form POSTs.
+#
+# That is a database service, a seed chain and a server lifecycle. It was left
+# out on purpose, not forgotten.
+#
+# So a green tick here means: the code compiles, lints, builds, and its EN and
+# AR message files agree. It does NOT mean any behaviour was verified. The ten
+# verify scripts remain the session's own to run, per WORKFLOW §3.
+
+name: checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # package.json declares no `engines` field, so this pins what the
+      # development machine runs. Move the two together.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: npm
+
+      - run: npm ci
+
+      # The order WORKFLOW §3 step 6 lists. `build` is not optional: typecheck
+      # has passed while a client component imported a data module.
+      #
+      # No secrets, and none should creep in. Every route is server-rendered on
+      # demand, and src/env.ts reads DATABASE_URL and AUTH_SECRET through
+      # getters, so a build never touches either. If this step ever starts
+      # demanding AUTH_SECRET, the likely cause is the NextAuth config in
+      # src/auth/index.ts having been unwrapped from its function — see the
+      # comment there before adding a repository secret.
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
+      - run: npm run check:messages

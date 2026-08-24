@@ -52,6 +52,9 @@ discussed".
 5. **Approve in Claude Code.** It builds.
 6. **Run the checks:** `typecheck` · `lint` · `build` · `check:messages` ·
    `verify:routes`. All five, every time. `build` is not optional.
+   CI (`.github/workflows/checks.yml`) re-runs the first four on push and on
+   pull request, so a session that forgets them is caught at main rather than
+   two sessions later. The ten verify scripts stay the session's own to run.
 7. **Update `SPEC.md` / `DESIGN.md`.** When a `[CHANGE]` or `[BUILD]` rule
    ships, delete its marker — the rule is now simply true. **The spec is a
    living file, not a record of intent.** If it drifts from the code, the whole
