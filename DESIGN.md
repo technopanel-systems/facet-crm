@@ -246,8 +246,13 @@ only if someone asks twice.
 **D32. The signature panel is the target with a pace line.** Dispatched square
 metres this month as a large mono figure, of the target; a bar filled to
 achievement; a **vertical tick at today's position in the month**. Above the
-tick is ahead, below is behind. Beside it, three small figures: paid-not-yet-out
-(and what that would make the percentage), awaiting signature, last month.
+tick is ahead, below is behind. Beside it, small figures: awaiting signature,
+last month.
+
+**Paid-not-yet-out is not one of them.** Payment is recorded on the dispatch
+(S70) and no route to approved bypasses it (S72, S73), so no interval exists
+between paid and dispatched for a figure to measure. Whether a third figure
+stands beside those two, and what it measures instead, is **OPEN — not chosen**.
 
 **D33. The counts strip** is a plain quartered row inside one card, not four
 KPI cards. Companies gone quiet · quotations on you · projects not moved ·
@@ -285,18 +290,24 @@ never combined into a score.
 **D40. "Waiting on the coordinator"** — the bottleneck card, because the
 coordinator is one person and the quotation chain runs through her.
 
-**D41. "Needs a decision"** — duplicates, archive requests, credit approvals,
-shares. The four things the system routes to a manager, on one card, nowhere
-else. This is what makes the manager's version of the waiting list different.
+**D41. "Needs a decision"** — duplicates (S22) and archive requests (S105). The
+two things the system routes to a manager, on one card, nowhere else. This is
+what makes the manager's version of the waiting list different.
 
 ---
 
 ## 10. The monthly rollup — "what happened, and why?"
 
-**D42.** Four figures across the top in square metres: quoted · approved · paid
-· dispatched, each with its count. Beside them: lost, and still open. A note
-under it stating that quoted counts each thread's latest live version once, and
-that dispatched can exceed paid because credit customers ship first.
+**D42.** Figures across the top in square metres: quoted · approved ·
+dispatched, each with its count. Beside them: lost, and still open. A note under
+it stating that quoted counts each thread's latest live version once.
+
+**Paid is not a stage.** Payment is recorded on the dispatch (S70) and no route
+to approved bypasses it (S72, S73), so there is no interval between paid and
+dispatched for the funnel to measure, and "dispatched can exceed paid because
+credit customers ship first" was the credit-terms flag SPEC §15 deleted.
+Whether a figure stands in its place, and what the rollup measures instead, is
+**OPEN — not chosen**.
 
 **D43. Quoted vs dispatched, by rep** — a two-segment bar per rep, red for
 dispatched, grey for the gap. Sliced by rep as the first cut, per the founder.

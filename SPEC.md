@@ -450,6 +450,14 @@ settle. The figures are shown to the rep, the coordinator and the manager,
 **below square metres in prominence** — square metres are what a rep is
 measured on (S83, S85). VAT is 15%, as S57.
 
+**The line money ships; the dispatch's own total does not.** Every dispatch line
+carries a unit price, a line total and a VAT amount, none of them nullable and
+all three at S57's rate, and the dispatch screen shows all three to the rep, the
+coordinator and the manager, below square metres. What does not exist is the
+figure over the dispatch: it names no total excluding VAT, no VAT total and no
+grand total the way a quotation version does, and nothing sums the lines into
+one.
+
 **S118.** A quotation is drawn from **one stock**: Riyadh, Malham, South or
 Dammam. The stock is on the quotation because SMAC's inventory needs it — FACET
 holds no inventory, only the name. The rep chooses it when raising, from a fixed
@@ -735,16 +743,25 @@ joining back to the real record and applying its visibility.
 **S113.** **Every user-facing string goes through the translation layer** (EN +
 AR), and layout uses logical utilities so RTL works.
 
-**S114.** **Comments exist on quotation threads and projects only.** Not on
-companies, contacts or dispatches — the timeline already carries those. An unread
-comment appears on the waiting list, so it cannot be missed. Comments ship. The
+**S114. [CHANGE]** **Comments exist on quotation threads and projects only.**
+Not on companies, contacts or dispatches — the timeline already carries those.
+An unread comment appears on the waiting list, so it cannot be missed.
+
+**The rule is the target; the code admits five kinds.** A company, a contact and
+a dispatch each take a comment today, at every layer — the record-type check in
+the database, the record-type list, the visibility filter and the comment card
+on all five screens — and comments sit on all three this rule forbids.
+Narrowing to two removes three branches and the rows behind them. It is a
+disclosure question rather than tidying: a comment follows its anchor (S131), so
+a comment on a company reaches everyone holding a share of that company, and
+S38 gives a report's note a narrower audience than that. Comments ship. The
 unread-comment surfacing does not — it needs the waiting list (S87).
 
 **S115.** **File attachments are Super Admin only** — a logo or general image.
 Rep file uploads are a possible later addition. There is no attachment feature
 yet, so this restricts nothing today.
 
-**S123. [BUILD]** **Who created a record is a measure.** The normal case is the
+**S123.** **Who created a record is a measure.** The normal case is the
 rep creating their own companies, contacts, projects, quotations and dispatch
 requests. A record **created for a rep by the coordinator or a manager**, and a
 request the **coordinator had to edit before approving**, are both recorded and

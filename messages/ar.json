@@ -206,17 +206,16 @@
     "turn": {
       "yours": {
         "requested": "دورك — أصدرها في سماك",
-        "waitingSignature": "دورك — احصل على التوقيع",
-        "paid": "دورك — سجّل الشحن"
+        "waitingSignature": "دورك — احصل على التوقيع"
       },
       "coordinator": {
         "requested": "بانتظار منسق المبيعات — الإصدار في سماك",
-        "waitingSignature": "بانتظار منسق المبيعات — التوقيعات",
-        "paid": "بانتظار منسق المبيعات — الشحن"
+        "waitingSignature": "بانتظار منسق المبيعات — التوقيعات"
       },
       "rep": {
         "new": "بانتظار {name} — رفع عرض سعر",
-        "waitingPayment": "بانتظار {name} — تأكيد الدفع"
+        "waitingPayment": "بانتظار {name} — تأكيد الدفع",
+        "paid": "بانتظار {name} — طلب الشحن"
       },
       "none": {
         "dispatched": "لا شيء معلّق — تم الشحن",

@@ -81,8 +81,10 @@ const OWNERS: Record<ChainPosition, ChainOwner> = {
   // Internal approval is in. The customer commits by paying, and the rep is
   // the one who confirms that `[16 §5]` — `accepted` is never a won deal.
   waitingPayment: "rep",
-  // Paid unlocks dispatch `[07 C3]`, which the coordinator records.
-  paid: "coordinator",
+  // Paid; the rep raises the dispatch request and the coordinator checks and
+  // approves it `S72`. The first move is the rep's — the coordinator owes
+  // nothing until a request exists, so the rung cannot be hers.
+  paid: "rep",
   dispatched: null,
   closed: null,
 };

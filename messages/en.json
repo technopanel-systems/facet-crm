@@ -206,17 +206,16 @@
     "turn": {
       "yours": {
         "requested": "Your turn — issue it in SMAC",
-        "waitingSignature": "Your turn — get it signed",
-        "paid": "Your turn — record the dispatch"
+        "waitingSignature": "Your turn — get it signed"
       },
       "coordinator": {
         "requested": "Waiting on the coordinator — issue in SMAC",
-        "waitingSignature": "Waiting on the coordinator — signatures",
-        "paid": "Waiting on the coordinator — dispatch"
+        "waitingSignature": "Waiting on the coordinator — signatures"
       },
       "rep": {
         "new": "Waiting on {name} — raise a quotation",
-        "waitingPayment": "Waiting on {name} — confirm payment"
+        "waitingPayment": "Waiting on {name} — confirm payment",
+        "paid": "Waiting on {name} — request the dispatch"
       },
       "none": {
         "dispatched": "Nothing outstanding — dispatched",
