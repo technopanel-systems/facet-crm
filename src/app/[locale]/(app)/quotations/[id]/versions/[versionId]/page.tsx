@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
+import { formatSqm } from "@/lib/decimal";
 import { requireSession } from "@/lib/authz";
 import { getQuotationVersion } from "@/lib/quotations";
 
@@ -203,7 +204,7 @@ export default async function QuotationVersionPage({
             <dl>
               <DetailRow label={t("quotations.detail.totalSqm")}>
                 <span dir="ltr">
-                  {version.totalSqm ?? dash} {t("common.sqm")}
+                  {version.totalSqm ? formatSqm(version.totalSqm) : dash} {t("common.sqm")}
                 </span>
               </DetailRow>
               <DetailRow label={t("quotations.detail.totalExclVat")}>

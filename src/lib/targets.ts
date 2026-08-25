@@ -92,6 +92,22 @@ export function nextPeriodStart(period: string): string {
   return `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`;
 }
 
+/**
+ * The first day of the **previous** month — the mirror of `nextPeriodStart`.
+ *
+ * `D32`'s *last month* side figure reads the same `achievementForPeriod` one
+ * period back rather than growing a query of its own, so there is one
+ * definition of where a month begins and ends and one of how achievement is
+ * derived from dispatches `S85`.
+ */
+export function previousPeriodStart(period: string): string {
+  const [year, month] = periodStart(period).split("-").map(Number);
+  const rolls = month === 1;
+  const previousYear = rolls ? year - 1 : year;
+  const previousMonth = rolls ? 12 : month - 1;
+  return `${previousYear}-${String(previousMonth).padStart(2, "0")}-01`;
+}
+
 /** The current month in Riyadh, as `YYYY-MM-01`. The app's timezone is fixed
  *  and a period is a month there, not an instant. */
 export function currentPeriod(): string {

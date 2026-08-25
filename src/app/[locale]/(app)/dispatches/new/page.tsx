@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "@/i18n/navigation";
+import { formatSqm } from "@/lib/decimal";
 import { can, listActiveUsers, requireSession } from "@/lib/authz";
 import {
   listDispatchProjectOptions,
@@ -166,7 +167,7 @@ export default async function NewDispatchPage({
             : null;
           return {
             id: thread.id,
-            label: `${thread.smacReference} · ${projectLabel ?? thread.companyName} · ${t("dispatches.fields.dispatchedSoFar")} ${thread.dispatchedSqm}`,
+            label: `${thread.smacReference} · ${projectLabel ?? thread.companyName} · ${t("dispatches.fields.dispatchedSoFar")} ${formatSqm(thread.dispatchedSqm)}`,
             companyLabel: thread.companyName,
             raisedByName: thread.raisedByName,
             quotedSqm: thread.quotedSqm,

@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
+import { formatSqm } from "@/lib/decimal";
 import { can, listCompanyBookHolders, requireSession } from "@/lib/authz";
 import { getCompany, listCompanyReps } from "@/lib/companies";
 import { listContacts } from "@/lib/contacts";
@@ -430,7 +431,11 @@ export default async function CompanyDetailPage({
                       // a project cannot read as won here and open there.
                       meta={t(projectStateKey(project))}
 
-                      when={project.sqmExpected ?? undefined}
+                      when={
+                        project.sqmExpected
+                          ? formatSqm(project.sqmExpected)
+                          : undefined
+                      }
                     />
                   ))}
                 </ul>

@@ -9,6 +9,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
+import {
+  formatSqm,
+  formatWholeSqm,
+  percentOf,
+  roundSqm,
+  SQM_SCALE,
+} from "@/lib/decimal";
 import type { AchievementRow } from "@/lib/targets";
 
 import { setTargetAction } from "../targets/actions";
@@ -66,9 +73,16 @@ export async function AttainmentTable({
               {row.userName}
             </TableCell>
             {/* Null is NOT zero `[07 D1]`: someone with no row is not
-                measured this month, which a `0` would misreport. */}
+                measured this month, which a `0` would misreport.
+
+                Every figure in this table is a SUM or a TARGET, so every one
+                of them rounds to whole square metres `D32`. A quotation or
+                dispatch LINE does not — that is a document line, and it
+                reconciles against what SMAC issued `S5`. */}
             <TableCell numeric dir="ltr">
-              {row.targetSqm ?? (
+              {row.targetSqm ? (
+                formatSqm(row.targetSqm)
+              ) : (
                 <span className="text-muted-foreground font-sans" dir="auto">
                   {t("targets.fields.notMeasured")}
                 </span>
@@ -79,20 +93,28 @@ export async function AttainmentTable({
                 href={`/dispatches?userId=${row.userId}`}
                 className="hover:underline"
               >
-                {row.achievedSqm}
+                {formatSqm(row.achievedSqm)}
               </Link>
             </TableCell>
-            {/* `07 C6` — the direct route, countable. */}
+            {/* `07 C6` — the direct route, countable.
+
+                **Direct is derived from the other two, not rounded on its
+                own.** `linked + direct` is exactly `achieved` in the data;
+                rounding all three independently can gain or lose a metre, and
+                a breakdown that does not add up to the figure two columns to
+                its left is a defect nobody would think to look for. */}
             <TableCell numeric className="text-xs" dir="ltr">
-              {t("targets.fields.linkedShort")} {row.linkedSqm}
+              {t("targets.fields.linkedShort")} {formatSqm(row.linkedSqm)}
               {" · "}
-              {t("targets.fields.directShort")} {row.directSqm}
+              {t("targets.fields.directShort")}{" "}
+              {formatWholeSqm(roundSqm(row.achievedSqm) - roundSqm(row.linkedSqm))}
             </TableCell>
+            {/* `percentOf`, not `Number(a) / Number(b)`: the dashboard panel
+                shows this same percentage `D32`, and two derivations of it is
+                how a figure and the percentage beside it start disagreeing. */}
             <TableCell numeric dir="ltr">
               {row.targetSqm
-                ? `${Math.round(
-                    (Number(row.achievedSqm) / Number(row.targetSqm)) * 100,
-                  )}%`
+                ? `${percentOf(row.achievedSqm, row.targetSqm, SQM_SCALE)}%`
                 : t("common.none")}
             </TableCell>
             {maySetTargets ? (

@@ -20,7 +20,13 @@ import {
 import { chainState } from "@/lib/chain";
 import { listCompanyOptions } from "@/lib/companies";
 import { getCreditSplitInForce } from "@/lib/credit-splits";
-import { fromScaled, SQM_SCALE, toScaled, ZERO } from "@/lib/decimal";
+import {
+  formatSqm,
+  fromScaled,
+  SQM_SCALE,
+  toScaled,
+  ZERO,
+} from "@/lib/decimal";
 import { listDispatches } from "@/lib/dispatches";
 import { lookupName, pickName } from "@/lib/lookups";
 import { getProject } from "@/lib/projects";
@@ -255,7 +261,7 @@ export default async function ProjectDetailPage({
                   {t("projects.chain.quoted")}
                 </dt>
                 <dd className="num mt-0.5 text-sm font-semibold" dir="ltr">
-                  {quotedSqm} {t("common.sqm")}
+                  {formatSqm(quotedSqm ?? "0")} {t("common.sqm")}
                 </dd>
               </div>
               <div className="text-start">
@@ -264,7 +270,7 @@ export default async function ProjectDetailPage({
                 </dt>
                 <dd className="num mt-0.5 text-sm font-semibold" dir="ltr">
                   {project.sqmExpected ? (
-                    `${project.sqmExpected} ${t("common.sqm")}`
+                    `${formatSqm(project.sqmExpected)} ${t("common.sqm")}`
                   ) : (
                     <span className="text-muted-foreground">{dash}</span>
                   )}
@@ -294,7 +300,9 @@ export default async function ProjectDetailPage({
               {project.ownerName}
             </Fact>
             <Fact label={t("projects.fields.sqmExpected")}>
-              <span dir="ltr">{project.sqmExpected ?? dash}</span>
+              <span dir="ltr">
+                {project.sqmExpected ? formatSqm(project.sqmExpected) : dash}
+              </span>
             </Fact>
             <Fact label={t("common.region")}>
               {project.region ? t(`enums.region.${project.region}`) : dash}

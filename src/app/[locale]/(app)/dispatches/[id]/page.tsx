@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { Timeline } from "@/components/timeline";
 import { Link } from "@/i18n/navigation";
+import { formatSqm } from "@/lib/decimal";
 import { can, requireSession } from "@/lib/authz";
 import { getDispatch } from "@/lib/dispatches";
 import { lookupName } from "@/lib/lookups";
@@ -117,7 +118,7 @@ export default async function DispatchPage({
           of approval. */}
       <DetailHeader
         name={dispatch.companyName}
-        state={`${day(dispatch.dispatchDate)} · ${dispatch.sqm} ${t("common.sqm")}`}
+        state={`${day(dispatch.dispatchDate)} · ${formatSqm(dispatch.sqm)} ${t("common.sqm")}`}
         reference={dispatch.smacDispatchNumber ?? undefined}
       />
 
@@ -238,7 +239,7 @@ export default async function DispatchPage({
                 A magnitude, so mono and end-aligned together `D11` `D24`. */}
             <Fact label={t("dispatches.fields.sqm")} name="sqm" numeric>
               <span dir="ltr">
-                {dispatch.sqm} {t("common.sqm")}
+                {formatSqm(dispatch.sqm)} {t("common.sqm")}
               </span>
             </Fact>
             <Fact label={t("dispatches.fields.dispatchDate")}>
@@ -500,7 +501,7 @@ export default async function DispatchPage({
                   numeric
                 >
                   <span dir="ltr">
-                    {dispatch.quotedSqm} {t("common.sqm")}
+                    {formatSqm(dispatch.quotedSqm)} {t("common.sqm")}
                   </span>
                 </Fact>
                 <Fact
@@ -509,7 +510,8 @@ export default async function DispatchPage({
                   numeric
                 >
                   <span dir="ltr">
-                    {dispatch.dispatchedAgainstVersionSqm} {t("common.sqm")}
+                    {formatSqm(dispatch.dispatchedAgainstVersionSqm ?? "0")}{" "}
+                    {t("common.sqm")}
                   </span>
                 </Fact>
                 <Fact
@@ -518,7 +520,7 @@ export default async function DispatchPage({
                   numeric
                 >
                   <span dir="ltr">
-                    {dispatch.sqm} {t("common.sqm")}
+                    {formatSqm(dispatch.sqm)} {t("common.sqm")}
                   </span>
                 </Fact>
               </>

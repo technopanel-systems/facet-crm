@@ -12,6 +12,14 @@
  * the failure this prevents; `src/lib/quotations.ts` imports from here rather
  * than keeping its own copy.
  *
+ * **`formatSqm` and `percentOf` are display, and they live here on purpose.**
+ * A summary figure rounds to whole square metres `D32`, and doing that as
+ * scaled `bigint` beside the arithmetic that produced it is what keeps the
+ * rule above true — a formatter written elsewhere would reach for
+ * `Number(value)` and put the figure the business is measured on through a
+ * float. They take and return strings and read no locale, so the line below
+ * still holds.
+ *
  * This module reaches nothing: no database, no session, no translations. That
  * is deliberate — it is pure arithmetic and `scripts/verify-slice3.ts` asserts
  * it as a pure function with no fixtures at all.
@@ -54,6 +62,68 @@ export function fromScaled(value: bigint, scale: number): string {
   const fraction = (magnitude % divisor).toString().padStart(scale, "0");
   const sign = negative ? "-" : "";
   return scale === 0 ? `${sign}${whole}` : `${sign}${whole}.${fraction}`;
+}
+
+/**
+ * A **summary** square-metre figure as whole metres, grouped — `D11`, `D32`.
+ *
+ * `674.8080` → `675`, `800.0000` → `800`, `5800.0000` → `5,800`. Half-up, on
+ * scaled `bigint` through `divideRounded`, so the module's own rule holds: no
+ * square-metre figure is ever a float.
+ *
+ * **A sum or a target rounds; a line does not.** A quotation or dispatch line's
+ * `sqm` and its `quantity × width × length` factors keep their four decimals —
+ * a document line reconciles against what SMAC issued `S5`, and `2.9768`
+ * becoming `3` breaks that. Form inputs stay raw for the same reason.
+ *
+ * **`Intl.NumberFormat` is deliberately not used.** Under `ar` it renders
+ * Arabic-Indic digits, which is not what `D11`'s mono tabular treatment or the
+ * `dir="ltr"` wrappers around every figure assume. The separator is a literal
+ * comma and the digits are ASCII, in both locales.
+ *
+ * `null` never reaches here: `targetSqm: null` means *not measured*, never
+ * zero `[07 D1]`, so a caller keeps its own `?? dash`.
+ */
+export function formatSqm(value: string): string {
+  return formatWholeSqm(roundSqm(value));
+}
+
+/**
+ * The same display, for a figure a caller has already rounded — a difference
+ * between two whole-metre figures, or a part derived so that the parts add up
+ * to the total shown beside them. Rounding each part independently can gain or
+ * lose a metre against their own sum, which is `divideEqually`'s argument in
+ * `[18 §5]` applied to display rather than to credit.
+ */
+export function formatWholeSqm(whole: bigint): string {
+  const negative = whole < ZERO;
+  const digits = (negative ? -whole : whole).toString();
+  const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return negative ? `-${grouped}` : grouped;
+}
+
+/**
+ * Whole square metres, half-up — the same rounding `formatSqm` displays, as a
+ * number rather than a string so a caller can subtract two figures that are
+ * actually on screen. `D32`'s pace gap is 675 − 655, never 674.808 − 654.545.
+ */
+export function roundSqm(value: string): bigint {
+  return divideRounded(toScaled(value, SQM_SCALE), pow10(SQM_SCALE));
+}
+
+/**
+ * `value` as a whole-number percentage of `of`, half-up and never a float.
+ *
+ * Both are decimal strings at `scale`; pass `0` for two plain integers. **The
+ * one definition** of the percentage `D32`'s panel and `/targets` both show — a
+ * second one is how an achieved figure and the percentage beside it end up
+ * disagreeing. Returns `0` when `of` is zero or negative, which is the only
+ * case a percentage cannot answer.
+ */
+export function percentOf(value: string, of: string, scale: number): number {
+  const divisor = toScaled(of, scale);
+  if (divisor <= ZERO) return 0;
+  return Number(divideRounded(toScaled(value, scale) * BigInt(100), divisor));
 }
 
 /** Half-up, on the magnitude, sign restored. Bankers' rounding would be a

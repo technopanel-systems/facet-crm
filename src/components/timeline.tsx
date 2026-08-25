@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
+import { formatSqm } from "@/lib/decimal";
 import type { TimelineEvent, TimelineLink } from "@/lib/timeline";
 
 /**
@@ -236,7 +237,7 @@ function detailText(event: TimelineEvent, t: Translate): string {
         ? t(category)
         : event.detail;
   }
-  if (event.kind === "dispatched") return `${event.detail} ${t("common.sqm")}`;
+  if (event.kind === "dispatched") return `${formatSqm(event.detail)} ${t("common.sqm")}`;
   return event.detail;
 }
 

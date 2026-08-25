@@ -373,7 +373,14 @@ function firstId(body: string, section: string): string | null {
  * them — section 14 asserts that directly — while `/companies` still is.
  */
 const MARKERS: Record<string, readonly string[]> = {
-  "/": ['data-slot="today-queue"', 'data-slot="today-waiting"'],
+  // `D69`'s row renders for everyone whatever flags they hold, so the marker
+  // identity is a valid prober for it. The target panel is NOT here: it appears
+  // only where a target row exists `D64`, and section 18 asserts it as the rep.
+  "/": [
+    'data-slot="today-queue"',
+    'data-slot="today-waiting"',
+    'data-slot="today-shortcuts"',
+  ],
   "/companies": ['data-slot="list-card"', 'data-slot="table-head"'],
   "/quotations": ['data-slot="list-card"'],
   // One name field `S12` — the input is `name`, not a locale-suffixed pair.
@@ -3576,6 +3583,116 @@ async function main(): Promise<void> {
       }
     }
   }
+
+  console.log(
+    "\n18. The top of the dashboard — whole square metres, the pace tick, the shortcuts row [D32], [D69]",
+  );
+  {
+    const rep = jars["rep-a@example.test"];
+
+    for (const locale of ["en", "ar"]) {
+      const { body } = await get(rep, `/${locale}`);
+
+      /* `D69` — the first element, two controls, nothing new behind either. */
+      check(
+        `${locale}: the search posts to THIS locale's companies list [D69]`,
+        body.includes(`action="/${locale}/companies"`),
+        // An unprefixed action is the failure this asserts: `localePrefix:
+        // "always"` sends a bare `/companies` to the English list.
+        body.match(/action="[^"]*companies[^"]*"/)?.[0] ?? "no action",
+      );
+      check(
+        `${locale}: the field is the companies list's own \`q\` [D69]`,
+        /<input[^>]*name="q"[^>]*>/.test(body) &&
+          /<input[^>]*type="search"[^>]*>/.test(body),
+      );
+      check(
+        `${locale}: the Log button opens the report form with NO record [D69]`,
+        // `?companyId=` here would be the company-page button's job `S32`.
+        body.includes(`href="/${locale}/reports/new"`),
+      );
+
+      /* `D32` — the panel, and the figure that used to read `674.8080`. */
+      check(
+        `${locale}: the target panel renders for the rep [D32]`,
+        body.includes('data-slot="today-target"'),
+      );
+
+      // **The positive assertion, scoped to a marker and anchored at both
+      // ends.** "the body contains 800" would pass against `800.0000`, which is
+      // the exact defect this slice fixes, so the shape is what is asserted:
+      // digits and separators, no decimal point, nothing else.
+      for (const slot of ["today-achieved", "today-target-sqm"] as const) {
+        const value = attrOf(body, slot, "data-sqm");
+        check(
+          `${locale}: ${slot} is whole square metres [D32]`,
+          value !== null && /^\d{1,3}(,\d{3})*$/.test(value),
+          value === null ? "marker absent" : value,
+        );
+      }
+
+      const pct = attrOf(body, "today-pace", "data-pct");
+      const gap = attrOf(body, "today-pace", "data-gap");
+      check(
+        `${locale}: the pace line reports a percentage of the month [D32]`,
+        pct !== null && /^\d{1,3}$/.test(pct) && Number(pct) <= 100,
+        pct ?? "absent",
+      );
+      check(
+        `${locale}: …and the distance in whole square metres [D32]`,
+        gap !== null && /^\d{1,3}(,\d{3})*$/.test(gap),
+        gap ?? "absent",
+      );
+      // **The derived figure asserted at the reader that draws it.** The tick's
+      // position and the percentage the line reports are one number; drawn from
+      // two, the panel would say 82% and point somewhere else.
+      check(
+        `${locale}: the tick is drawn at the percentage the line reports [D32]`,
+        pct !== null &&
+          new RegExp(
+            `data-slot="today-tick"[^>]*calc\\(${pct}% - 1px\\)`,
+          ).test(body),
+      );
+      check(
+        `${locale}: both side figures render [D32]`,
+        body.includes('data-slot="today-side"'),
+      );
+    }
+
+    /* **The rounding asserted at every reader, not one** (`CLAUDE.md`). A
+       four-decimal text node is what a raw `numeric(14,4)` renders as. */
+    const RAW_SQM = />\s*\d+\.\d{4}\s*</;
+    for (const route of ["/", "/targets", "/performance", "/dispatches"]) {
+      const { body } = await get(rep, `/en${route === "/" ? "" : route}`);
+      check(
+        `${route} carries no raw four-decimal figure [D32]`,
+        !RAW_SQM.test(body),
+        body.match(RAW_SQM)?.[0] ?? "",
+      );
+    }
+
+    /* **And the other half of the same claim.** A sweep that rounded every m²
+       figure would pass the four checks above and quietly break a document
+       line, which reconciles against what SMAC issued `S5`. So a dispatch's
+       LINES must still carry their decimals. */
+    const list = await get(rep, "/en/dispatches");
+    const id = firstId(list.body, "dispatches");
+    if (!id) {
+      console.log("  note  the rep sees no dispatch — line decimals not driven");
+    } else {
+      const detail = await get(rep, `/en/dispatches/${id}`);
+      check(
+        "a dispatch's LINES keep their four decimals [S5], [S116]",
+        RAW_SQM.test(detail.body),
+      );
+    }
+  }
+}
+
+/** One `data-` attribute off the element carrying `data-slot="…"`. */
+function attrOf(body: string, slot: string, attr: string): string | null {
+  const tag = body.match(new RegExp(`<[a-z]+[^>]*data-slot="${slot}"[^>]*>`));
+  return tag?.[0].match(new RegExp(`${attr}="([^"]*)"`))?.[1] ?? null;
 }
 
 /**

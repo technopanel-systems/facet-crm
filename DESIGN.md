@@ -316,14 +316,99 @@ case** rather than a design of their own, and `D38`–`D41` are what a flag adds
 This is also what gives Marketing `D67` and the Executive `D68` a sensible
 screen without anyone designing one.
 
-All five flags named above are columns on `roles` today. None of the six blocks
-is built.
+All five flags named above are columns on `roles` today. **One of the six blocks
+is built** — *My target and pace*, to `D32` entire, including the pace tick and
+both side figures. The other five are not, and `D65`'s **Requests waiting on
+me** is the one currently standing in for something else: `/` renders a
+notifications list under that heading, which is not this block.
+
+**D69. The dashboard opens with a search field and a Log button, and nothing
+else.** They are the page's **first element**, above the greeting and above this
+rule's first block — and they are **not a seventh block**: they render for
+everyone whatever flags they hold, so there is no condition for `D64` to test,
+and its count of six is unchanged.
+
+**Exactly two controls.** A visually hidden submit button is not one and is kept
+deliberately — a single-field form submits on Enter, but the hidden button
+covers IME composition and the mobile keyboards that do not fire one.
+
+The field is a plain GET form submitting to `/companies?q=`, the search that
+already matches a company name **or a phone** — a shortcut to a screen, never a
+second search, so `D51` is satisfied and nothing new sits behind it. `D20`
+holds: no client JavaScript. It is the one cross-route GET form in the product,
+which makes it the one that must carry the locale in its action.
+
+The button is `D15`'s primary gradient and opens the report form with **no
+record preselected** — `S33`'s form, which asks for the company itself.
+**Everything in FACET is downstream of a rep bothering to record something**, so
+logging must be reachable from the first screen without finding a company first.
+**`S32`'s placement stands unchanged**: the Log button on the company page opens
+**pre-filled** and remains the main entry point `D46`; this one opens **empty**.
+Two placements doing two jobs, not a duplicate.
 
 **D32. The signature panel is the target with a pace line.** Dispatched square
 metres this month as a large mono figure, of the target; a bar filled to
-achievement; a **vertical tick at today's position in the month**. Above the
-tick is ahead, below is behind. Beside it, small figures: awaiting signature,
-last month.
+achievement; a **vertical tick at today's position in the month**. Fill past the
+tick is ahead, fill short of it is behind. **Beneath** the bar, small figures:
+awaiting signature, last month.
+
+**The panel appears only where a target row exists** `D64`, `S83`. Someone not
+measured this month has no target to be ahead or behind of, so the block is
+**absent** — not an empty bar and not a zero `D53` — and its two side figures go
+with it. That is the screen a new rep sees on their first day.
+
+**Square metres render as whole metres**, here and everywhere a figure is a
+**sum or a target**: 675 of 800, never 674.8080 of 800.0000. A quotation or
+dispatch **line** keeps its four decimals — that is a document line and it
+reconciles against what SMAC issued `S5`.
+
+**Expected to date is working days, and today counts.** Working days done this
+month over the working days in it — Sunday to Thursday, the week
+`working-days.ts` already owns for `S87`'s thresholds and `D35` already draws.
+On the 25th of a 22-working-day August that is 18 of 22: **82%**. Counting only
+the days already finished tops out below 100%, which would make the last day of
+every month read *ahead of pace* while the rep was short. Counting today makes
+the fraction **reach 100% on the last working day and hold there through any
+trailing Friday and Saturday** — a rep who hits target on Thursday sees a full
+bar and the tick at the end all weekend, which is correct and is stated here
+rather than discovered. Calendar days are the other candidate and are wrong for
+this: a rep dispatches on working days, so a calendar denominator would show
+them slipping every weekend and catching up every Monday.
+
+**No public holiday is skipped.** `working-days.ts` skips none and records a
+holiday calendar as `OPEN — not chosen`; this rule **inherits** that rather than
+answering it a second time. Through Eid the tick advances while nothing ships.
+A calendar denominator is equally blind, so that is not a cost of counting
+working days — `WORKFLOW §5` carries the row.
+
+**Both percentages render** — achievement in the bar's legend, expected-to-date
+in the pace line. *84% means nothing until you can see that the month expects
+82%.* The pace line then gives the distance in square metres, and **that
+distance is not derived from the percentage**: it subtracts the two whole-metre
+figures already on the screen, so a rep checking it by hand gets the same
+number. 800 × 82% is 656 while the expected figure is 655, because the
+percentage is itself rounded and is display-only. Both are computed per request
+in Riyadh on a `force-dynamic` page, so the tick cannot go stale at midnight.
+
+**The pace line takes no colour** `D6`. Ahead-of-pace is an outcome, and colour
+in FACET describes how long something has waited, never how good the outcome is.
+The words *ahead* and *behind* carry it. There is no green in that vocabulary
+and this rule does not add one.
+
+**The bar is 8px, `--radius-lg` ends, `--brand-grad` fill** — `D15`'s third use.
+**The tick is a 2px bar and never a glow**: `D16`'s six are spoken for. It takes
+`--text` on the empty track and `--canvas` inside the fill, because one colour
+cannot read against both a translucent inset and a saturated red-orange gradient
+in both themes. That is a colour chosen by side, not a second effect, so `D21`
+stands.
+
+**Awaiting signature is a COUNT of quotation threads, never a sum of their
+square metres.** `S68`: quotations are never summed, because one project quoted
+three times at 2,000 m² is the same 2,000 counted three times, and summing it
+inflates the pipeline. The position comes from `chainState()` and nowhere else,
+as `D27` and `D29` already read it. **Last month** is the previous period's
+achievement against the previous period's target, from the same derivation as
+this month's `S85`.
 
 **Paid-not-yet-out is not one of them.** Payment is recorded on the dispatch
 (S70) and no route to approved bypasses it (S72, S73), so no interval exists

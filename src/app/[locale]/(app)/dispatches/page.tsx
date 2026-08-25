@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
+import { formatSqm } from "@/lib/decimal";
 import { requireSession } from "@/lib/authz";
 import { asDispatchStatus, listDispatches } from "@/lib/dispatches";
 
@@ -197,7 +198,7 @@ export default async function DispatchesPage({
                   </TableCell>
                   <TableCell className="text-start">{row.userName}</TableCell>
                   <TableCell numeric dir="ltr">
-                    {row.sqm} {t("common.sqm")}
+                    {formatSqm(row.sqm)} {t("common.sqm")}
                   </TableCell>
                   <TableCell className="text-start">
                     {/* `S120` — the marker sits under the reference it is

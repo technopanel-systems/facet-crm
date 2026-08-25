@@ -1102,7 +1102,16 @@
     "needsYou": "{count, plural, one {أمر واحد يحتاج إليك اليوم} two {أمران يحتاجان إليك اليوم} few {# أمور تحتاج إليك اليوم} many {# أمراً يحتاج إليك اليوم} other {# أمر يحتاج إليك اليوم}}",
     "target": {
       "label": "هدف {month} · المُسلَّم",
-      "of": "من {target} م²"
+      "of": "من {target} م²",
+      "pace": {
+        "ahead": "مضى {pct}% من الشهر · متقدّم على الوتيرة بـ {sqm} م²",
+        "behind": "مضى {pct}% من الشهر · متأخّر عن الوتيرة بـ {sqm} م²",
+        "onPace": "مضى {pct}% من الشهر · على الوتيرة"
+      },
+      "awaitingSignature": "بانتظار التوقيع",
+      "awaitingSignatureUnit": "عروض أسعار",
+      "lastMonth": "الشهر الماضي",
+      "lastMonthOf": "{pct}% من {target} م²"
     },
     "queue": {
       "title": "ما يحتاج إليك اليوم",

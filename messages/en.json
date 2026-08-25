@@ -1102,7 +1102,16 @@
     "needsYou": "{count, plural, one {# thing needs you today} other {# things need you today}}",
     "target": {
       "label": "{month} target · dispatched",
-      "of": "of {target} m²"
+      "of": "of {target} m²",
+      "pace": {
+        "ahead": "{pct}% of the month gone · ahead of pace by {sqm} m²",
+        "behind": "{pct}% of the month gone · behind pace by {sqm} m²",
+        "onPace": "{pct}% of the month gone · on pace"
+      },
+      "awaitingSignature": "Awaiting signature",
+      "awaitingSignatureUnit": "quotations",
+      "lastMonth": "Last month",
+      "lastMonthOf": "{pct}% of {target} m²"
     },
     "queue": {
       "title": "What needs you today",

@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 
 import { RecordRow } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { formatSqm } from "@/lib/decimal";
 import type { ProjectCompanyRow } from "@/lib/projects";
 import { emptyFormState, type FormState } from "@/lib/validation";
 
@@ -138,9 +139,12 @@ function LinkRow({
         // `RecordRow` renders this mono and tabular `D11`. Absent, not zero:
         // a participant with no dispatch shows nothing `S26`.
         when={
-          dispatched ? (
+          // Narrowed on the value rather than on `dispatched`, which carries
+          // the same `!== null` test three lines up — one boolean cannot tell
+          // the type checker what it knows.
+          link.dispatchedSqm !== null ? (
             <span data-dispatched={link.companyId}>
-              {link.dispatchedSqm} {t("common.sqm")}
+              {formatSqm(link.dispatchedSqm)} {t("common.sqm")}
             </span>
           ) : undefined
         }

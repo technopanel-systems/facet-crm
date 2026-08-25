@@ -46,6 +46,7 @@ import {
 } from "drizzle-orm";
 import { QueryBuilder, type AnyPgColumn } from "drizzle-orm/pg-core";
 
+import { chainState } from "@/lib/chain";
 import { db } from "@/db";
 import {
   companies,
@@ -319,6 +320,45 @@ export async function listQuotationThreads(
     .where(where);
 
   return { rows, total: totals?.total ?? 0, page };
+}
+
+/**
+ * How many visible quotation threads are **waiting on a signature** — `D32`'s
+ * first side figure.
+ *
+ * **A count, never a sum.** `S68`: quotations are never added up, because one
+ * project quoted three times at 2,000 m² is the same 2,000 counted three times.
+ * The square metres of these threads are deliberately not returned.
+ *
+ * The position comes from `chainState()` — the one definition `D27` — on the
+ * same three fields `/quotations` reads for its own turn column, so the
+ * dashboard cannot disagree with the list it links to. Restating the ladder in
+ * SQL would be the second derivation that module exists to prevent.
+ *
+ * **Unpaginated, and that is the cost of one definition.** It reads every
+ * visible thread's live version — three small columns — and grows linearly
+ * with the reader's book: fine at one rep's ~60 companies, and the same
+ * ceiling `listQuotationFormOptions` and `listDispatchableThreads` carry
+ * (`WORKFLOW §5`). A `sees_all_reps` identity reads the whole company.
+ */
+export async function awaitingSignatureCount(
+  session: AuthSession,
+): Promise<number> {
+  const rows = await db
+    .select({
+      versionStatus: quotationVersions.status,
+      endState: quotationThreads.endState,
+      paymentConfirmedAt: quotationThreads.paymentConfirmedAt,
+    })
+    .from(quotationThreads)
+    .innerJoin(
+      quotationVersions,
+      eq(quotationVersions.threadId, quotationThreads.id),
+    )
+    .where(and(visibleQuotationThreadsFilter(session), liveVersionFilter()));
+
+  return rows.filter((row) => chainState(row).position === "waitingSignature")
+    .length;
 }
 
 export type QuotationProjectOption = {

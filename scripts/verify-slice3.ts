@@ -22,6 +22,8 @@
  *      does not rewrite earlier credit `[07 D3]`. The central claim.
  *   8. The generation refusals `[18 §3]`, `[18 §4]`.
  *   9. Equal division loses nothing `[18 §5]` — pure, no database.
+ *  9b. A summary square-metre figure rounds half-up `D32` — pure, and the
+ *      of-which parts still add up to the figure beside them.
  *  10. Targets are rows, never edits `[07 D1]`, `[10 §6]`.
  *  11. Achievement never reads the quotation `[08 D4]`, `[12 §10]`, `[16 §5]`.
  *  12. Visibility `[18 §2]` — including the negative half: names yes, records
@@ -138,7 +140,11 @@ import {
   PERCENT_SCALE,
   SQM_SCALE,
   divideEqually,
+  formatSqm,
+  formatWholeSqm,
   fromScaled,
+  percentOf,
+  roundSqm,
   toScaled,
 } from "@/lib/decimal";
 import {
@@ -1175,6 +1181,71 @@ async function main(): Promise<void> {
       total === "100.00",
       `got ${total}`,
     );
+  }
+
+  /* --- 9b. The display rounding, pure [D32] ---------------------- */
+
+  console.log(
+    "\n9b. A summary square-metre figure rounds half-up [D32] — no database",
+  );
+  {
+    const shown: [string, string][] = [
+      ["674.8080", "675"],
+      ["800.0000", "800"],
+      ["5800.0000", "5,800"],
+      ["1234567.8900", "1,234,568"],
+      ["0.5000", "1"],
+      ["0.4999", "0"],
+      ["0.0000", "0"],
+      // The line figure this must NOT be applied to, proved as arithmetic:
+      // a document line reconciles against what SMAC issued `S5`.
+      ["2.9768", "3"],
+      ["-12.6000", "-13"],
+    ];
+    for (const [raw, expected] of shown) {
+      check(
+        `${raw} shows as ${expected}`,
+        formatSqm(raw) === expected,
+        `got ${formatSqm(raw)}`,
+      );
+    }
+
+    // **The parts must add up to the total shown beside them.** Rounding each
+    // one independently gains a metre here — 101 + 101 against 201 — which is
+    // why `/targets` derives the second part instead of rounding it.
+    const achieved = "201.0000";
+    const linked = "100.5000";
+    const direct = "100.5000";
+    const derived = roundSqm(achieved) - roundSqm(linked);
+    check(
+      "the of-which parts add up to the achieved figure [D32]",
+      roundSqm(linked) + derived === roundSqm(achieved),
+      `${formatSqm(linked)} + ${formatWholeSqm(derived)} vs ${formatSqm(achieved)}`,
+    );
+    check(
+      "  …where rounding each part on its own would not [D32]",
+      roundSqm(linked) + roundSqm(direct) !== roundSqm(achieved),
+      `${formatSqm(linked)} + ${formatSqm(direct)} vs ${formatSqm(achieved)}`,
+    );
+
+    // `D32`'s pace percentage and `/targets`' attainment percentage are one
+    // function; a second would be how the two screens start disagreeing.
+    const percents: [string, string, number, number][] = [
+      ["674.8080", "800.0000", SQM_SCALE, 84],
+      ["704.0000", "800.0000", SQM_SCALE, 88],
+      // Working days done over working days in the month, at scale 0.
+      ["18", "22", 0, 82],
+      ["22", "22", 0, 100],
+      // The only case a percentage cannot answer.
+      ["5", "0", 0, 0],
+    ];
+    for (const [value, of, scale, expected] of percents) {
+      check(
+        `${value} of ${of} is ${expected}%`,
+        percentOf(value, of, scale) === expected,
+        `got ${percentOf(value, of, scale)}`,
+      );
+    }
   }
 
   /* --- 10. Targets are rows, never edits [07 D1], [10 §6] -------- */

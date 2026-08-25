@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
+import { formatSqm } from "@/lib/decimal";
 import { can, requireSession } from "@/lib/authz";
 import { chainState } from "@/lib/chain";
 import { listDispatches } from "@/lib/dispatches";
@@ -343,7 +344,7 @@ export default async function QuotationDetailPage({
             <dl>
               <DetailRow label={t("quotations.detail.totalSqm")}>
                 <span dir="ltr">
-                  {live.totalSqm ?? dash} {t("common.sqm")}
+                  {live.totalSqm ? formatSqm(live.totalSqm) : dash} {t("common.sqm")}
                 </span>
               </DetailRow>
               <DetailRow label={t("quotations.detail.totalExclVat")}>

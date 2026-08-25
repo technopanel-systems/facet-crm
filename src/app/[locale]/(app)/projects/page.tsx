@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
+import { formatSqm } from "@/lib/decimal";
 import { requireSession } from "@/lib/authz";
 import { hasUsableCompany } from "@/lib/companies";
 import { lookupName, pickName } from "@/lib/lookups";
@@ -105,7 +106,7 @@ export default async function ProjectsPage({
                   </TableCell>
                   <TableCell className="text-start">{row.ownerName}</TableCell>
                   <TableCell numeric dir="ltr">
-                    {row.sqmExpected ?? t("common.none")}
+                    {row.sqmExpected ? formatSqm(row.sqmExpected) : t("common.none")}
                   </TableCell>
                   <TableCell className="text-start">
                     {pickName(locale, row.cityNameEn, row.cityNameAr) ??
