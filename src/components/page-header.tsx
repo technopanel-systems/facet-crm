@@ -203,6 +203,7 @@ export function Absent({ children }: { children: ReactNode }) {
 export function RecordRow({
   title,
   href,
+  mark,
   meta,
   when,
   whenClassName,
@@ -210,6 +211,12 @@ export function RecordRow({
 }: {
   title: ReactNode;
   href?: string;
+  /**
+   * A lead glyph before the name — `D34`'s one-letter kind mark on the waiting
+   * list. Optional, because the five other callers answer "what kind of thing
+   * is this" from the card they sit in.
+   */
+  mark?: ReactNode;
   meta?: ReactNode;
   when?: ReactNode;
   /** The lateness colour, where the caller has one `[22 §4]`. */
@@ -218,6 +225,7 @@ export function RecordRow({
 }) {
   return (
     <li className="border-line flex items-center gap-3 border-b py-2.5 last:border-b-0">
+      {mark ? <span className="flex-none">{mark}</span> : null}
       <span className="min-w-0 flex-1 text-start">
         <span className="block truncate text-[13.5px] font-semibold">
           {href ? (

@@ -110,7 +110,12 @@ import {
   visibleQuotationThreadsFilter,
   type AuthSession,
 } from "@/lib/authz";
-import { FOLLOW_UP_KINDS, type FollowUpKind } from "@/lib/enums";
+import {
+  FOLLOW_UP_GROUPS,
+  FOLLOW_UP_KINDS,
+  type FollowUpGroup,
+  type FollowUpKind,
+} from "@/lib/enums";
 import { onHoldByCompany, today } from "@/lib/reports";
 import { getFollowUpThresholds, type FollowUpThresholds } from "@/lib/settings";
 import { RuleError } from "@/lib/validation";
@@ -119,7 +124,6 @@ import {
   riyadhDayOf,
   shiftDays,
   shiftWorkingDays,
-  workingDaysBetween,
 } from "@/lib/working-days";
 
 export const FOLLOW_UP_PAGE_SIZE = 25;
@@ -162,10 +166,19 @@ export type FollowUpRow = {
   ownerNames: string[];
   /** The calendar day the clock started. */
   since: string;
-  /** Working days for the two thresholds `07 D5` states that way, else calendar. */
+  /**
+   * How long it has waited, in **calendar days, for every kind** `D34`.
+   *
+   * It used to be working days for the three thresholds `07 D5` states that
+   * way and calendar days for the rest, which put `78 working days` and
+   * `117 days` on adjacent rows of one list. `D34` works the list down **by
+   * ranking**, and two units cannot be ranked against each other by eye.
+   *
+   * **The thresholds are untouched.** Each source still applies its own in
+   * SQL, in whatever unit `07 D5` states it in — this is the elapsed figure a
+   * person reads, not the test that put the row here.
+   */
   ageDays: number;
-  /** True when `ageDays` counts working days rather than calendar days. */
-  inWorkingDays: boolean;
   thresholdDays: number;
 };
 
@@ -196,6 +209,12 @@ function threadLabelAr(parts: ThreadLabelParts): string | null {
 }
 
 export type FollowUpOptions = {
+  /**
+   * One of `D33`'s four tiles. Two of them cover two kinds each, so this is
+   * **not** a second spelling of `kind` — it is the only way to ask for the
+   * pair, and the counts strip links with it.
+   */
+  group?: FollowUpGroup;
   kind?: FollowUpKind;
   q?: string;
   page?: number;
@@ -322,8 +341,7 @@ async function quotationNoResponse(
       companyName: row.companyName,
       ownerNames: [],
       since,
-      ageDays: workingDaysBetween(since, now),
-      inWorkingDays: true,
+      ageDays: calendarDaysBetween(since, now),
       thresholdDays: thresholds.quotationNoResponse,
     };
   });
@@ -466,8 +484,7 @@ async function quotationReturned(
       companyName: row.companyName,
       ownerNames: [],
       since,
-      ageDays: workingDaysBetween(since, now),
-      inWorkingDays: true,
+      ageDays: calendarDaysBetween(since, now),
       thresholdDays: thresholds.quotationReturned,
     };
   });
@@ -534,8 +551,7 @@ async function catalogueNoResponse(
     companyName: row.companyName,
     ownerNames: [],
     since: row.sentOn,
-    ageDays: workingDaysBetween(row.sentOn, now),
-    inWorkingDays: true,
+    ageDays: calendarDaysBetween(row.sentOn, now),
     thresholdDays: thresholds.catalogueNoResponse,
   }));
 }
@@ -666,7 +682,6 @@ async function projectStageUnchanged(
       ownerNames: [],
       since,
       ageDays: calendarDaysBetween(since, now),
-      inWorkingDays: false,
       thresholdDays: thresholds.projectStageUnchanged,
     };
   });
@@ -765,7 +780,6 @@ async function companyQuiet(
       ownerNames: [],
       since,
       ageDays: calendarDaysBetween(since, now),
-      inWorkingDays: false,
       thresholdDays: row.qualifiedId
         ? thresholds.qualified
         : thresholds.unqualified,
@@ -867,13 +881,12 @@ async function manualDateDue(session: AuthSession): Promise<FollowUpRow[]> {
 
   /** Every row is due by construction, so the age runs from the date itself. */
   const row = (
-    partial: Omit<FollowUpRow, "kind" | "ownerNames" | "ageDays" | "inWorkingDays" | "thresholdDays">,
+    partial: Omit<FollowUpRow, "kind" | "ownerNames" | "ageDays" | "thresholdDays">,
   ): FollowUpRow => ({
     ...partial,
     kind: "date_due",
     ownerNames: [],
     ageDays: calendarDaysBetween(partial.since, now),
-    inWorkingDays: false,
     // There is no threshold: the rep's date IS the condition `[25 §18]`.
     thresholdDays: 0,
   });
@@ -1212,8 +1225,43 @@ const EMPTY_COUNTS = (): Record<FollowUpKind, number> =>
     number
   >;
 
+export type FollowUpScope = {
+  /** **Every** open follow-up this identity may see, oldest first. */
+  rows: FollowUpRow[];
+  total: number;
+  counts: Record<FollowUpKind, number>;
+  thresholds: FollowUpThresholds;
+};
+
 /**
- * Every open follow-up the caller may see, oldest first.
+ * The whole derivation, unpaginated — one `gather` for every caller that needs
+ * more than one slice of it.
+ *
+ * **`/` is why this is exported.** `D34` puts the rep's own dates in a section
+ * of their own, and those rows sort **last**: a planned date is days old where
+ * a quiet company is months old. Reading the dashboard's two sections off page
+ * one would show a rep an empty planned section while four dates were due —
+ * silently, which is the failure `CLAUDE.md` records for filtering after
+ * pagination. Taking a second page instead would mean a second `gather`, on
+ * the commonest read in the application.
+ *
+ * It costs nothing extra: `gather` already builds every row and `followUps`
+ * already threw the surplus away.
+ */
+export async function followUpScope(
+  session: AuthSession,
+): Promise<FollowUpScope> {
+  const thresholds = await getFollowUpThresholds();
+  const rows = await gather(session, thresholds);
+
+  const counts = EMPTY_COUNTS();
+  for (const row of rows) counts[row.kind] += 1;
+
+  return { rows, total: rows.length, counts, thresholds };
+}
+
+/**
+ * Every open follow-up the caller may see, oldest first — filtered and paged.
  *
  * `counts` is over the whole scope, not the page, so the kind filter can show
  * what it would reveal before it is applied.
@@ -1222,13 +1270,17 @@ export async function followUps(
   session: AuthSession,
   options: FollowUpOptions = {},
 ): Promise<FollowUpResult> {
-  const thresholds = await getFollowUpThresholds();
-  const all = await gather(session, thresholds);
+  const { rows: all, counts, thresholds } = await followUpScope(session);
 
-  const counts = EMPTY_COUNTS();
-  for (const row of all) counts[row.kind] += 1;
+  // `D33`'s grouping is resolved against the kinds the group names, so a tile
+  // showing 9 lands on a list of 9. `gather` has already produced every row —
+  // this narrows before the page slice below, never after it.
+  const inGroup = options.group
+    ? new Set<FollowUpKind>(FOLLOW_UP_GROUPS[options.group])
+    : null;
 
   const filtered = all
+    .filter((row) => !inGroup || inGroup.has(row.kind))
     .filter((row) => !options.kind || row.kind === options.kind)
     .filter((row) => matchesSearch(row, options.q));
 

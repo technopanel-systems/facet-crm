@@ -1,7 +1,5 @@
 import { getFormatter, getTranslations, setRequestLocale } from "next-intl/server";
 
-import { RecordRow } from "@/components/page-header";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,9 +16,11 @@ import {
   toScaled,
   ZERO,
 } from "@/lib/decimal";
-import { FOLLOW_UP_KINDS } from "@/lib/enums";
-import { lookupName } from "@/lib/lookups";
-import { listNotifications } from "@/lib/notifications";
+import {
+  FOLLOW_UP_GROUP_NAMES,
+  FOLLOW_UP_GROUPS,
+  type FollowUpKind,
+} from "@/lib/enums";
 import { awaitingSignatureCount } from "@/lib/quotations";
 import {
   achievementForPeriod,
@@ -31,24 +31,34 @@ import {
 import { cn } from "@/lib/utils";
 import { isWorkingDay, riyadhDayOf } from "@/lib/working-days";
 
-import { anchorHref } from "./_components/anchors";
+import { RequestsBlock } from "./_components/requests-block";
 import { shellCounts } from "./_components/shell-counts";
-import { toneClass, turnTone } from "./_components/turn";
+import { WaitingList } from "./_components/waiting-list";
 
 export const dynamic = "force-dynamic";
 
-/** How much of the queue the dashboard shows before deferring to `/follow-ups`. */
-const QUEUE_ROWS = 6;
+/** How much of Slipping the dashboard shows before deferring to `/follow-ups`. */
+const SLIPPING_ROWS = 6;
+
+/** The same, for each of `D65`'s two columns. */
+const REQUEST_ROWS = 5;
 
 /**
  * Today `[22 §3]` — the dashboard archetype, and the screen that replaced the
  * system-status page at `/`.
  *
  * **It composes existing modules and writes no query and no predicate of its
- * own.** `followUps()`, `unresolvedCount()`, `listNotifications()`,
- * `achievementForPeriod()` and `awaitingSignatureCount()` are each called
- * exactly as their own screens call them; the follow-ups derivation is shared
- * with the rail through `shellCounts()` so `/` computes it once.
+ * own.** `followUpScope()`, `achievementForPeriod()`, `awaitingSignatureCount()`
+ * and — inside `D65`'s block — `listQuotationThreads()` and `listDispatches()`
+ * are each called exactly as their own screens call them; the follow-ups
+ * derivation is shared with the rail through `shellCounts()` so `/` computes it
+ * once, and `D34`'s two sections are cut from that one scope rather than from a
+ * page of it.
+ *
+ * **It renders no notifications.** It used to, under `D65`'s heading — 25 rows
+ * of *"A decision ended your work"* on a rep's screen — and `D64` names that
+ * outright as the block standing in for something else. News belongs to the
+ * bell `S92`; work belongs to the list.
  *
  * **It does not call `sweepNotifications()`.** That is a write path and it stays
  * on `/notifications`, where it already lives. The home page is the commonest
@@ -78,10 +88,13 @@ export default async function TodayPage({
 
   const { session, follow } = await shellCounts();
   const period = currentPeriod();
-  const [attainment, notifications] = await Promise.all([
-    achievementForPeriod(session, period),
-    listNotifications(session, { page: 1 }),
-  ]);
+  const attainment = await achievementForPeriod(session, period);
+
+  // `D64` — the block appears when either flag qualifies it, and `D65`'s two
+  // columns then follow their own. Read once here so the page can decide
+  // whether the block exists at all before it costs two queries.
+  const mayIssue = session.user.role.canApproveQuotation;
+  const mayDecide = session.user.role.canDispatch;
 
   // `sees_all_reps` gets every measured rep back; everyone else gets exactly
   // their own row. Either way the panel is about the person reading it.
@@ -102,11 +115,6 @@ export default async function TodayPage({
         awaitingSignatureCount(session),
       ])
     : [undefined, 0];
-
-  // The same one definition the bell and `/notifications` read `[21 §4]`.
-  const waiting = notifications.rows.filter((row) => row.waiting);
-
-  const queue = follow.rows.slice(0, QUEUE_ROWS);
 
   return (
     <div className="flex flex-col gap-6">
@@ -184,142 +192,86 @@ export default async function TodayPage({
         />
       ) : null}
 
-      {/* The concept KPI row: auto-fit minmax(178px,1fr), so a fifth tile
-          would wrap of its own accord rather than needing a new breakpoint. */}
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(178px,1fr))] gap-3">
-        {FOLLOW_UP_KINDS.map((kind) => (
-          <Link
-            key={kind}
-            href={`/follow-ups?kind=${kind}`}
-            className="card-face glass hover:border-line-strong p-4 text-start transition-colors"
-          >
-            <Badge variant="outline">{t(`enums.followUpKind.${kind}`)}</Badge>
-            <p className="num mt-2 text-2xl font-semibold tracking-tight">
-              <span dir="ltr">{follow.counts[kind]}</span>
-            </p>
-          </Link>
-        ))}
-      </div>
+      {/* `D64`'s second block, between the target and the waiting list.
+          **Absent**, not empty and not disabled `D53`, for anyone holding
+          neither flag — which today is every rep *and* the manager, whose own
+          blocks `D39`-`D41` are not built. */}
+      {mayIssue || mayDecide ? (
+        <RequestsBlock session={session} locale={locale} limit={REQUEST_ROWS} />
+      ) : null}
 
-      <div className="grid items-start gap-4 lg:grid-cols-[1.25fr_1fr]">
-        <Card data-slot="today-queue">
-          <CardHeader className="flex flex-row items-center justify-between gap-4">
-            <CardTitle className="text-start text-sm">
-              {t("today.queue.title")}
-            </CardTitle>
-            {follow.total > queue.length ? (
-              <Button asChild size="xs" variant="ghost">
-                <Link href="/follow-ups">
-                  {t("today.queue.seeAll", { count: follow.total })}
-                </Link>
-              </Button>
-            ) : null}
-          </CardHeader>
-          <CardContent>
-            {queue.length === 0 ? (
-              <p className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-                {t("today.queue.empty")}
-              </p>
-            ) : (
-              <ul className="flex flex-col">
-                {queue.map((row) => (
-                  <RecordRow
-                    key={`${row.kind}:${row.anchorId}`}
-                    href={anchorHref(row.anchorType, row.anchorId)}
-                    title={lookupName({ nameEn: row.anchorNameEn, nameAr: row.anchorNameAr }, locale)}
-                    meta={`${t(`enums.followUpKind.${row.kind}`)}${
-                      row.ownerNames.length > 0
-                        ? ` · ${row.ownerNames.join(", ")}`
-                        : ""
-                    }`}
-                    // Elapsed time, coloured by lateness `[22 §4]`. Every row
-                    // here is past its threshold by construction —
-                    // `follow-ups.ts` put it in the queue for that reason — so
-                    // the tone reads that fact through the same helper the
-                    // lists use rather than hard-coding red, as this row used
-                    // to. The one row that is due rather than late is a
-                    // `date_due` on the day it arrives: its threshold is zero,
-                    // so age zero means the rep's date is today, not that they
-                    // are behind `[25 §18]`. No threshold is derived here —
-                    // this reads the age the data layer already computed.
-                    whenClassName={toneClass(
-                      turnTone({
-                        overdue: row.ageDays > 0,
-                        dueSoon: row.ageDays === 0,
-                      }),
-                    )}
-                    when={
-                      // Working days for the thresholds stated that way,
-                      // calendar days for the rest `[21 §8]` — and its own
-                      // phrase at zero, which only `date_due` reaches
-                      // `[25 §18]`.
-                      row.ageDays === 0
-                        ? t("followUps.fields.dueToday")
-                        : row.inWorkingDays
-                          ? t("followUps.fields.workingDays", {
-                              count: row.ageDays,
-                            })
-                          : t("followUps.fields.days", { count: row.ageDays })
-                    }
-                  />
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+      <CountsStrip counts={follow.counts} />
 
-        <Card data-slot="today-waiting">
-          <CardHeader className="flex flex-row items-center justify-between gap-4">
-            <CardTitle className="text-start text-sm">
-              {t("today.waiting.title")}
-            </CardTitle>
-            <Button asChild size="xs" variant="ghost">
-              <Link href="/notifications">{t("today.waiting.seeAll")}</Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {waiting.length === 0 ? (
-              <p className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-                {t("today.waiting.empty")}
-              </p>
-            ) : (
-              <ul className="flex flex-col">
-                {waiting.map((row) => (
-                  // A link only while the viewer may still open it `[20 §8.2]`:
-                  // a share can be revoked and a company handed on, and the row
-                  // outlives either. `RecordRow` links the TITLE, so an
-                  // unopenable row passes no href and renders as plain text.
-                  //
-                  // A mention carries no anchor `[25 §11]` — its record is in
-                  // the payload, already visibility-checked there — so the two
-                  // routes to a link are read in one place here.
-                  <RecordRow
-                    key={row.id}
-                    href={
-                      row.payload?.kind === "mention"
-                        ? (row.payload.href ?? undefined)
-                        : row.anchorViewable && row.anchorId && row.anchorType
-                          ? anchorHref(row.anchorType, row.anchorId)
-                          : undefined
-                    }
-                    title={
-                      row.typeName
-                        ? t(`enums.notificationType.${row.typeName}`)
-                        : row.typeKey
-                    }
-                    meta={
-                      row.payload?.kind === "mention"
-                        ? (row.payload.authorName ?? undefined)
-                        : (row.anchorLabel ?? undefined)
-                    }
-                  />
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {/* `D34` takes the **whole** scope: its planned section holds the rows
+          that sort last, so a page of the queue would show it empty. */}
+      <WaitingList
+        rows={follow.rows}
+        locale={locale}
+        slippingLimit={SLIPPING_ROWS}
+      />
     </div>
+  );
+}
+
+/**
+ * `D33` — **a plain quartered row inside one card, not four KPI cards.**
+ *
+ * **Four tiles over six conditions, and no condition is dropped.** The two
+ * pairs live in `FOLLOW_UP_GROUPS`; this sums the counts the derivation
+ * already returned and adds none of its own. Six equal-weight tiles is what
+ * `D21` names outright, and it is what stood here — six bordered `card-face`
+ * links, which was also four cards too many.
+ *
+ * **Each tile links into the waiting list, filtered to its own kinds** `D33`.
+ * The link carries `?group=`, not `?kind=`, because two of the four cover two
+ * kinds and a tile showing 9 must land on a list of 9.
+ *
+ * **The rules are drawn by the cells, not the container** `D61` — the strip
+ * wraps to two rows on a laptop, and a container-drawn grid paints the empty
+ * track as a solid block. The wrapper clips the first cell's outer edges.
+ *
+ * `S89`'s fifth condition — a dispatch request sitting with the coordinator —
+ * is deliberately absent: `D33` puts it in `D65`'s block, where it can be
+ * acted on, rather than in a count.
+ */
+async function CountsStrip({
+  counts,
+}: {
+  counts: Record<FollowUpKind, number>;
+}) {
+  const t = await getTranslations();
+
+  return (
+    <Card data-slot="today-counts" className="overflow-hidden py-0">
+      <div className="-ms-px -mt-px grid grid-cols-2 lg:grid-cols-4">
+        {FOLLOW_UP_GROUP_NAMES.map((group) => {
+          const total = FOLLOW_UP_GROUPS[group].reduce(
+            (sum, kind) => sum + counts[kind],
+            0,
+          );
+          return (
+            <Link
+              key={group}
+              href={`/follow-ups?group=${group}`}
+              data-slot="today-count"
+              data-group={group}
+              data-count={total}
+              className="border-line hover:bg-surface-2 border-s border-t px-4 py-4 text-start transition-colors"
+            >
+              <p className="text-faint text-[10.5px] font-semibold tracking-[.09em] uppercase">
+                {t(`today.counts.${group}`)}
+              </p>
+              <p
+                className="num mt-1.5 text-2xl font-semibold tracking-tight"
+                dir="ltr"
+              >
+                {total}
+              </p>
+            </Link>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 
@@ -470,6 +422,7 @@ async function TargetPanel({
           achievementPct={achievementPct}
           pacePct={pacePct}
           target={formatSqm(target)}
+          achieved={formatSqm(measured.achievedSqm)}
         />
 
         <div
@@ -540,34 +493,74 @@ function SideFigure({
  * red-orange gradient in both themes. That is one ternary off a comparison the
  * panel already makes, not a new effect, so `D21` is untouched.
  *
- * **The percentage is not clamped; only the fill is.** A rep at 120% reads
- * 120% and sees a full bar — clamping the figure would quietly report a miss.
+ * **The percentage is never clamped**, and since `D32`'s overage rule the fill
+ * is not clamped either — it is **rescaled**. 819 of 800 used to draw exactly
+ * the same full bar as 800 of 800, so the one thing a rep most wants to see
+ * was the one thing the bar could not say.
+ *
+ * **The track's scale is the target until achievement passes it**, and then it
+ * is the achievement. The solid fill runs to where the target sits; the excess
+ * continues past it in the same `--brand-grad` at lower opacity. That is not a
+ * seventh use of the gradient `D15` — it is the target bar's fill, continued,
+ * and the opacity step is what marks where the target was.
+ *
+ * **The tick divides by the same scale**, or the pace mark would drift off the
+ * day it means the moment a rep went past target.
  */
 function Progress({
   achievementPct,
   pacePct,
   target,
+  achieved,
 }: {
   achievementPct: number;
   pacePct: number;
   target: string;
+  /** The achieved figure, for the legend's end once it outgrows the target. */
+  achieved: string;
 }) {
-  const fillPct = Math.min(100, Math.max(0, achievementPct));
-  const tickOnFill = fillPct >= pacePct;
+  const reached = Math.max(0, achievementPct);
+  // 100 means "the target"; anything beyond it stretches the track instead of
+  // being thrown away.
+  const scale = Math.max(100, reached);
+  const fillPct = (Math.min(100, reached) / scale) * 100;
+  const overPct = (Math.max(0, reached - 100) / scale) * 100;
+  const tickPct = (pacePct / scale) * 100;
+  const tickOnFill = Math.min(100, reached) >= pacePct;
 
   return (
     <div className="flex flex-col gap-1.5">
       <div
+        data-slot="today-bar"
+        // What 100% of the track means — the target, or the achievement once
+        // it has outgrown it. The tick divides by this, so a reader asserting
+        // the tick's position has the same number the panel used.
+        data-scale={scale}
         className="bg-surface-2 border-line relative h-2 overflow-hidden rounded-lg border"
         role="progressbar"
-        aria-valuenow={fillPct}
+        // The real figure against the real scale, so a screen reader hears
+        // "819 of 800" rather than the clamped 100 the bar used to report.
+        aria-valuenow={reached}
         aria-valuemin={0}
-        aria-valuemax={100}
+        aria-valuemax={scale}
       >
         <div
           className="absolute inset-y-0 start-0 rounded-lg bg-(image:--brand-grad)"
           style={{ inlineSize: `${fillPct}%` }}
         />
+        {/* Past the target `D32`. Same fill, lower opacity — the step is the
+            target mark, so nothing new is drawn to say where it was. */}
+        {overPct > 0 ? (
+          <div
+            data-slot="today-overage"
+            data-pct={achievementPct}
+            className="absolute inset-y-0 rounded-e-lg bg-(image:--brand-grad) opacity-45"
+            style={{
+              insetInlineStart: `${fillPct}%`,
+              inlineSize: `${overPct}%`,
+            }}
+          />
+        ) : null}
         <div
           data-slot="today-tick"
           aria-hidden
@@ -575,14 +568,16 @@ function Progress({
             "absolute inset-y-0 w-0.5",
             tickOnFill ? "bg-canvas" : "bg-foreground",
           )}
-          style={{ insetInlineStart: `calc(${pacePct}% - 1px)` }}
+          style={{ insetInlineStart: `calc(${tickPct}% - 1px)` }}
         />
       </div>
-      {/* The concept's `.legend`: mono, faint, the scale under the bar. */}
+      {/* The concept's `.legend`: mono, faint, **the scale** under the bar —
+          so once the bar outgrows the target the end names what it now runs
+          to. The target itself stays on the line above, beside the figure. */}
       <div className="num text-faint flex justify-between text-[11px]" dir="ltr">
         <span>0</span>
         <span>{achievementPct}%</span>
-        <span>{target}</span>
+        <span>{overPct > 0 ? achieved : target}</span>
       </div>
     </div>
   );

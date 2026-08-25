@@ -86,7 +86,6 @@
     "projectEndState": {
       "lost": "خاسر"
     },
-
     "companyRepOrigin": {
       "self_registered": "تسجيل ذاتي",
       "assigned": "مُسنَد"
@@ -335,7 +334,6 @@
       "committed": "ملتزم",
       "open": "مفتوح"
     },
-
     "detail": {
       "details": "التفاصيل",
       "companies": "الشركات",
@@ -1013,7 +1011,6 @@
       "age": "مدة الانتظار",
       "allKinds": "كل المتابعات",
       "days": "{count} يوم",
-      "workingDays": "{count} يوم عمل",
       "dueToday": "مستحقة اليوم"
     },
     "detail": {
@@ -1034,6 +1031,19 @@
     "errors": {
       "notYours": "هذا السجل ليس لك لتحديد متابعة عليه.",
       "pastDate": "لا يمكن أن يكون موعد المتابعة في الماضي."
+    },
+    "why": {
+      "quotation_no_response": "صدر العرض ولم يردّ العميل",
+      "quotation_returned": "أُعيد للتعديل ولم يُعدَّل بعد",
+      "catalogue_no_response": "أُرسل الكتالوج ولم يصل ردّ",
+      "project_stage_unchanged": "لم يحرّكه شيء",
+      "company_quiet": "لم يسجّل أحد شيئًا على هذا العميل",
+      "date_due": "خطّطت للعودة إلى هذا في {date}"
+    },
+    "actions": {
+      "open": "فتح",
+      "plan": "تخطيط",
+      "planFor": "المتابعة في"
     }
   },
   "dormancy": {
@@ -1113,17 +1123,29 @@
       "lastMonth": "الشهر الماضي",
       "lastMonthOf": "{pct}% من {target} م²"
     },
-    "queue": {
-      "title": "ما يحتاج إليك اليوم",
-      "empty": "لا شيء تجاوز المهلة.",
-      "seeAll": "عرض الكل ({count})"
+    "needsYouZero": "لا شيء يحتاج إليك اليوم",
+    "counts": {
+      "quotations": "عروض الأسعار",
+      "quiet": "توقّف التواصل",
+      "notMoved": "لم يتحرّك",
+      "yourDates": "مواعيدك"
     },
-    "waiting": {
-      "title": "بانتظارك",
-      "empty": "لا شيء بالانتظار.",
+    "list": {
+      "title": "قائمة ما ينتظرك",
+      "planned": "اليوم · خطّطت لهذا",
+      "plannedEmpty": "لا شيء مخطّط لليوم — خطّط لواحد من المتأخّرة.",
+      "slipping": "المتأخّرة",
+      "slippingEmpty": "لا شيء متأخّر.",
+      "seeAll": "عرض الكل {count}"
+    },
+    "requests": {
+      "title": "طلبات تنتظرك",
+      "quotations": "للإصدار",
+      "quotationsEmpty": "لا يوجد عرض سعر ينتظر الإصدار.",
+      "dispatches": "للبتّ فيها",
+      "dispatchesEmpty": "لا يوجد طلب صرف ينتظر قرارًا.",
       "seeAll": "عرض الكل"
-    },
-    "needsYouZero": "لا شيء يحتاج إليك اليوم"
+    }
   },
   "performance": {
     "title": "الأداء",

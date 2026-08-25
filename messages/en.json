@@ -86,7 +86,6 @@
     "projectEndState": {
       "lost": "Lost"
     },
-
     "companyRepOrigin": {
       "self_registered": "Registered",
       "assigned": "Assigned"
@@ -335,7 +334,6 @@
       "committed": "Committed",
       "open": "Open"
     },
-
     "detail": {
       "details": "Details",
       "companies": "Companies",
@@ -1013,7 +1011,6 @@
       "age": "Waiting",
       "allKinds": "All follow-ups",
       "days": "{count} days",
-      "workingDays": "{count} working days",
       "dueToday": "Due today"
     },
     "detail": {
@@ -1034,6 +1031,19 @@
     "errors": {
       "notYours": "That record is not yours to set a follow-up on.",
       "pastDate": "A follow-up date cannot be in the past."
+    },
+    "why": {
+      "quotation_no_response": "Issued, and the customer has not come back",
+      "quotation_returned": "Sent back for edits and not changed since",
+      "catalogue_no_response": "A catalogue went out and drew no reply",
+      "project_stage_unchanged": "Nothing has moved this on",
+      "company_quiet": "Nobody has logged anything against this customer",
+      "date_due": "You planned to come back to this on {date}"
+    },
+    "actions": {
+      "open": "Open",
+      "plan": "Plan",
+      "planFor": "Follow up on"
     }
   },
   "dormancy": {
@@ -1113,17 +1123,29 @@
       "lastMonth": "Last month",
       "lastMonthOf": "{pct}% of {target} m²"
     },
-    "queue": {
-      "title": "What needs you today",
-      "empty": "Nothing is past its threshold.",
+    "needsYouZero": "Nothing needs you today",
+    "counts": {
+      "quotations": "Quotations",
+      "quiet": "Gone quiet",
+      "notMoved": "Not moved",
+      "yourDates": "Your dates"
+    },
+    "list": {
+      "title": "Your waiting list",
+      "planned": "Today · you planned this",
+      "plannedEmpty": "Nothing planned for today — plan one from Slipping.",
+      "slipping": "Slipping",
+      "slippingEmpty": "Nothing is slipping.",
       "seeAll": "See all {count}"
     },
-    "waiting": {
-      "title": "Waiting on you",
-      "empty": "Nothing is waiting.",
+    "requests": {
+      "title": "Requests waiting on you",
+      "quotations": "To issue",
+      "quotationsEmpty": "No quotation is waiting to be issued.",
+      "dispatches": "To decide",
+      "dispatchesEmpty": "No dispatch request is waiting for a decision.",
       "seeAll": "See all"
-    },
-    "needsYouZero": "Nothing needs you today"
+    }
   },
   "performance": {
     "title": "Performance",

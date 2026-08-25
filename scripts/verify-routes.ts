@@ -23,9 +23,10 @@
  *      anywhere, because no in-process script crosses the action boundary.
  *  10. The sharing panel `S96` `S99` `S100` grants and revokes for real, and
  *      the rep who may not share is not offered the form.
- *  11. The next follow-up date `OPEN — no rule` is set and cleared for real, over
+ *  11. The next follow-up date `D34` `25 §18` is set and cleared for real, over
  *      HTTP, in both locales — the manual date that outranks the automatic
- *      clock, replayed the same way section 7 replays a lost project.
+ *      clock, replayed the same way section 7 replays a lost project. Section
+ *      19 drives the same act from a waiting-list row.
  *  12. No screen renders anything shaped like an unresolved message key.
  *  13. Registering a company replays `S13`, `S14`, `S15`: a POST with no phone
  *      is refused as a message rather than a 500; no form asks for a region at
@@ -70,6 +71,17 @@
  *      carries an abort, so a hang is a named failure rather than a stalled
  *      run, and each takes the refusal path where the form has one, so a
  *      stall cannot be blamed on a successful write.
+ *  19. **The dashboard** — `D33`'s four tiles over six conditions, linked by
+ *      group so a tile showing N lands on a list of N; `D34`'s two sections,
+ *      its kind mark and its Plan control, driven for real from a row and then
+ *      cleared so the walk leaves the dataset where it found it; and `D65`'s
+ *      Requests block asserted ABSENT for the rep and the manager and present
+ *      with both columns for the coordinator. Walked as all three identities
+ *      in both locales, because a flag-gated block is only ever wrong for the
+ *      identity nobody drove.
+ *
+ * Section 18 — `D69`'s two controls and `D32`'s panel — is in the code and was
+ * never in this list either; 19 is listed the day it is written.
  *
  * This was 11 sections until feature slice 6: the old item 11 (the
  * message-key scan) is now section 12, and section 11 above — the
@@ -376,9 +388,15 @@ const MARKERS: Record<string, readonly string[]> = {
   // `D69`'s row renders for everyone whatever flags they hold, so the marker
   // identity is a valid prober for it. The target panel is NOT here: it appears
   // only where a target row exists `D64`, and section 18 asserts it as the rep.
+  // `D69`'s row, `D33`'s strip and `D34`'s list all render for everyone
+  // whatever flags they hold, so the marker identity is a valid prober for
+  // each. `today-queue` and `today-waiting` were the flat queue and the
+  // notifications card `D64` called out; both are gone. `today-requests` is
+  // deliberately NOT here — `D65`'s block is flag-gated, and section 19
+  // asserts it appears for exactly one of the three identities.
   "/": [
-    'data-slot="today-queue"',
-    'data-slot="today-waiting"',
+    'data-slot="today-counts"',
+    'data-slot="today-waiting-list"',
     'data-slot="today-shortcuts"',
   ],
   "/companies": ['data-slot="list-card"', 'data-slot="table-head"'],
@@ -1306,19 +1324,6 @@ async function main(): Promise<void> {
       // The envelope scraper of section 9, for the reason recorded there: a
       // bound action's inputs carry no `value` attribute, and its JSON must be
       // HTML-unescaped or the replay reads as a stale deployment `[23]`.
-      const envelopeOf = (form: string): FormData => {
-        const fields = new FormData();
-        for (const input of form.matchAll(/<input[^>]*>/g)) {
-          const name = input[0].match(/name="([^"]+)"/)?.[1];
-          if (!name?.startsWith("$ACTION")) continue;
-          fields.append(
-            name,
-            unescapeHtml(input[0].match(/value="([^"]*)"/)?.[1] ?? ""),
-          );
-        }
-        return fields;
-      };
-
       const post = async (body: FormData): Promise<number> => {
         const response = await fetch(`${BASE}/${locale}/companies/${id}`, {
           method: "POST",
@@ -1434,10 +1439,14 @@ async function main(): Promise<void> {
     }
   }
 
-  // `OPEN — no rule`: nothing in SPEC or DESIGN covers a manually set next
-  // follow-up date; archived as `[25 §18]`. `S91` may delete the machinery
-  // outright in the waiting-list rebuild.
-  console.log("\n11. The next follow-up date, set and cleared for real [OPEN — no rule]");
+  // **No longer `OPEN — no rule`.** `D34` names the act — *Plan sets a
+  // follow-up date and moves the row into a day* — so the date has a design
+  // rule behind it now, even though `SPEC.md` still does not say it, which
+  // `D34` states about itself. This section drives the PANEL; section 19
+  // drives the waiting-list row. `S91` may still delete the machinery.
+  console.log(
+    "\n11. The next follow-up date, set and cleared for real [D34], [25 §18]",
+  );
   {
     // **`verify:followups` drives `setNextFollowUp`; this drives the FORM.**
     // The two do not overlap: the in-process script never touches
@@ -1445,19 +1454,6 @@ async function main(): Promise<void> {
     // and the panel is on three screens, so a marker check on each is the only
     // thing that catches one wired up wrong.
     const jar = jars["manager@example.test"];
-
-    const envelopeOf = (form: string): FormData => {
-      const fields = new FormData();
-      for (const input of form.matchAll(/<input[^>]*>/g)) {
-        const name = input[0].match(/name="([^"]+)"/)?.[1];
-        if (!name?.startsWith("$ACTION")) continue;
-        fields.append(
-          name,
-          unescapeHtml(input[0].match(/value="([^"]*)"/)?.[1] ?? ""),
-        );
-      }
-      return fields;
-    };
 
     // The panel hangs on all three anchors `25 §18` names, so all three are
     // walked rather than one standing in for the others.
@@ -2947,10 +2943,61 @@ async function main(): Promise<void> {
         "…and the manager keeps the edit control the coordinator lacks",
         asManager.body.includes(`/en/projects/${projectId}/edit"`),
       );
-      check(
-        "the participants render for the coordinator — what S76 is for [S26]",
-        asCoordinator.body.includes("data-participant="),
-      );
+      /**
+       * **The participants, on a project that HAS participants.**
+       *
+       * This used to read `data-participant=` off whatever `firstId` returned,
+       * which made it a lottery: `S50` allows a project with no live company
+       * link, `verify:slice3` and `verify:phase10a` each leave several behind,
+       * and `/projects` is newest-first — so the residue of any other verify
+       * script sorts to the top and the check fails on a screen that is
+       * correct. Measured: 11 such projects, all from one afternoon's runs.
+       *
+       * **The subject is chosen from the MANAGER's view**, never the
+       * coordinator's, or the choice would presuppose what is being asserted.
+       * The claim is then the biconditional `S76` actually makes — she reads
+       * every project *in full* — so it is the same COUNT, not merely
+       * non-empty.
+       */
+      const candidates = [
+        ...new Set(
+          [
+            ...(await get(coordJar, "/en/projects")).body.matchAll(
+              /href="\/en\/projects\/([0-9a-f-]{36})"/gi,
+            ),
+          ].map((m) => m[1]),
+        ),
+      ].slice(0, 8);
+
+      let withParticipants: { id: string; manager: number } | null = null;
+      for (const id of candidates) {
+        const seen = (
+          (await get(managerJar, `/en/projects/${id}`)).body.match(
+            /data-participant=/g,
+          ) ?? []
+        ).length;
+        if (seen > 0) {
+          withParticipants = { id, manager: seen };
+          break;
+        }
+      }
+
+      if (!withParticipants) {
+        console.log(
+          "  note  no project among the first 8 carries a participant",
+        );
+      } else {
+        const seen = (
+          (await get(coordJar, `/en/projects/${withParticipants.id}`)).body.match(
+            /data-participant=/g,
+          ) ?? []
+        ).length;
+        check(
+          "the coordinator reads every participant the manager does — what S76 is for [S26], [S76]",
+          seen === withParticipants.manager,
+          `manager ${withParticipants.manager} · coordinator ${seen}`,
+        );
+      }
     }
   }
 
@@ -3646,12 +3693,22 @@ async function main(): Promise<void> {
       // **The derived figure asserted at the reader that draws it.** The tick's
       // position and the percentage the line reports are one number; drawn from
       // two, the panel would say 82% and point somewhere else.
+      //
+      // Since `D32`'s overage rule the track's scale is the target **or** the
+      // achievement, whichever is larger, and the tick divides by it — so this
+      // reads the scale the bar published rather than assuming 100. A rep at
+      // 102% whose tick still sat at a bare 82% is the regression it catches.
+      const scale = attrOf(body, "today-bar", "data-scale");
+      const tick = body.match(
+        /data-slot="today-tick"[^>]*calc\(([\d.]+)% - 1px\)/,
+      )?.[1];
       check(
-        `${locale}: the tick is drawn at the percentage the line reports [D32]`,
+        `${locale}: the tick divides by the bar's own scale [D32]`,
         pct !== null &&
-          new RegExp(
-            `data-slot="today-tick"[^>]*calc\\(${pct}% - 1px\\)`,
-          ).test(body),
+          scale !== null &&
+          tick !== undefined &&
+          Math.abs(Number(tick) - (Number(pct) / Number(scale)) * 100) < 1e-9,
+        `pace ${pct}% · scale ${scale} · tick ${tick ?? "absent"}`,
       );
       check(
         `${locale}: both side figures render [D32]`,
@@ -3687,8 +3744,250 @@ async function main(): Promise<void> {
       );
     }
   }
-}
 
+  console.log(
+    "\n19. The dashboard — D33's strip, D34's two sections, D65's block",
+  );
+  {
+    /**
+     * **The two changes that are about who sees what are walked as all three
+     * identities**, because a flag-gated block is only ever wrong for the
+     * identity nobody drove. `can_approve_quotation` and `can_dispatch` are
+     * held by the Sales Coordinator alone today, so she is the positive case
+     * and the rep and the manager are the negative ones.
+     */
+    const IDENTITIES = [
+      { email: "rep-a@example.test", requests: false },
+      { email: "coordinator@example.test", requests: true },
+      { email: "manager@example.test", requests: false },
+    ] as const;
+
+    for (const who of IDENTITIES) {
+      const jar = jars[who.email];
+      const label = who.email.split("@")[0];
+
+      for (const locale of ["en", "ar"] as const) {
+        const { body } = await get(jar, `/${locale}`);
+
+        /* `D33` — four tiles over six conditions, inside ONE card. */
+        const tiles = [
+          ...body.matchAll(/<a[^>]*data-slot="today-count"[^>]*>/g),
+        ].map((m) => m[0]);
+        check(
+          `${label} ${locale}: the counts strip is four tiles, not six [D33] [D21]`,
+          tiles.length === 4,
+          `${tiles.length} tiles`,
+        );
+        check(
+          `${label} ${locale}: they sit inside one card, not four [D33]`,
+          (body.match(/data-slot="today-counts"/g) ?? []).length === 1,
+        );
+        // **`?group=`, never `?kind=`** — two of the four cover two kinds, so
+        // a tile showing 9 that linked by kind would land on a shorter list.
+        check(
+          `${label} ${locale}: every tile links into the list by GROUP [D33]`,
+          tiles.length === 4 &&
+            tiles.every((tile) =>
+              /href="\/(?:en|ar)\/follow-ups\?group=\w+"/.test(tile),
+            ),
+        );
+
+        /* `D34` — two sections, and both of them always. */
+        for (const slot of ["today-planned", "today-slipping"] as const) {
+          check(
+            `${label} ${locale}: ${slot} renders [D34]`,
+            body.includes(`data-slot="${slot}"`),
+          );
+        }
+
+        /* `D34` — the mark is C, P or Q. `D` waits for `S86`'s anchor. */
+        const marks = [
+          ...body.matchAll(/data-slot="waiting-mark"[^>]*data-mark="([^"]*)"/g),
+        ].map((m) => m[1]);
+        check(
+          `${label} ${locale}: every row's kind mark is one of C P Q [D34]`,
+          marks.every((mark) => ["C", "P", "Q"].includes(mark)),
+          [...new Set(marks)].join(",") || "no rows",
+        );
+
+        /* `D34` — Plan is offered on Slipping and on nothing else. */
+        check(
+          `${label} ${locale}: the planned section offers no Plan control [D34]`,
+          !between(body, "today-planned", "today-slipping").includes(
+            'data-slot="today-plan-form"',
+          ),
+        );
+
+        /* `D64`, `D65` — the block appears exactly on the flags. */
+        check(
+          `${label} ${locale}: the Requests block ${
+            who.requests ? "renders" : "is ABSENT"
+          } [D64] [D65]`,
+          body.includes('data-slot="today-requests"') === who.requests,
+        );
+        if (who.requests) {
+          for (const slot of [
+            "today-requests-quotations",
+            "today-requests-dispatches",
+          ] as const) {
+            check(
+              `${label} ${locale}: ${slot} renders [D65]`,
+              body.includes(`data-slot="${slot}"`),
+            );
+          }
+        }
+        // The notifications card `D64` called out is gone from every screen.
+        check(
+          `${label} ${locale}: no notifications list stands under a heading [D64]`,
+          !body.includes('data-slot="today-waiting"'),
+        );
+
+        /* `D32` — the overage, as a biconditional, so the identity that must
+           NOT have one is asserted as hard as the one that must. */
+        if (body.includes('data-slot="today-target"')) {
+          const scale = Number(attrOf(body, "today-bar", "data-scale"));
+          check(
+            `${label} ${locale}: the overage renders exactly when the bar outgrew the target [D32]`,
+            body.includes('data-slot="today-overage"') === scale > 100,
+            `scale ${scale}`,
+          );
+        }
+      }
+    }
+
+    /* **A tile showing N lands on a list of N** — the whole reason the link
+       carries a group and not a kind. Driven on the largest tile. */
+    {
+      const jar = jars["rep-a@example.test"];
+      const { body } = await get(jar, "/en");
+      const tiles = [
+        ...body.matchAll(
+          /data-slot="today-count"[^>]*data-group="([^"]*)"[^>]*data-count="([^"]*)"/g,
+        ),
+      ].map((m) => ({ group: m[1], count: Number(m[2]) }));
+      const biggest = tiles.sort((a, b) => b.count - a.count)[0];
+      if (!biggest || biggest.count === 0) {
+        console.log("  --    rep-a has no follow-up to land on");
+      } else {
+        const list = await get(jar, `/en/follow-ups?group=${biggest.group}`);
+        // One header row, then the page. `FOLLOW_UP_PAGE_SIZE` is 25.
+        const rows =
+          (list.body.match(/data-slot="table-row"/g) ?? []).length - 1;
+        check(
+          `the "${biggest.group}" tile lands on a list of its own size [D33]`,
+          rows === Math.min(25, biggest.count),
+          `tile ${biggest.count} · list ${rows}`,
+        );
+      }
+    }
+
+    /* **Plan, driven for real, and then put back.**
+     *
+     * `D34` says Plan *moves the row into a day*. The day that can be asserted
+     * on this request is **today**: `25 §18` suppresses an anchor whose date
+     * is still ahead, so a future date would make the row vanish rather than
+     * cross, and *"it is no longer in Slipping"* would then pass on a row that
+     * had simply gone. Today's date is the one value that makes `manualDateDue`
+     * raise it and step 3 supersede the automatic kind — a row in the planned
+     * section, which is the claim `D34` actually makes.
+     *
+     * It then **clears the date from the record's own panel**, so the walk
+     * leaves the dataset where it found it. That is `project-links`'
+     * add-then-remove shape and it is here for the reason `WORKFLOW §5`
+     * records against §17: a section that eats its own precondition passes
+     * once per database and then fails for ever.
+     */
+    {
+      const jar = jars["rep-a@example.test"];
+      const before = await get(jar, "/en");
+      const firstRow = after(before.body, "today-slipping").match(
+        /<li[^>]*>[\s\S]*?<\/li>/,
+      )?.[0];
+      const href = firstRow?.match(/href="([^"]*)"/)?.[1];
+      const form = firstRow?.match(
+        /<form[^>]*data-slot="today-plan-form"[\s\S]*?<\/form>/,
+      )?.[0];
+
+      if (!firstRow || !href || !form) {
+        console.log("  --    rep-a has no slipping row to plan");
+      } else {
+        check(
+          "a slipping row carries the Plan form and its date field [D34]",
+          form.includes('name="nextFollowUpAt"'),
+        );
+        // The control refuses a past date rather than offering one the server
+        // will reject — the visible half of `25 §18`'s refusal.
+        check(
+          "…and cannot offer a date the server would refuse [D34], [25 §18]",
+          /min="\d{4}-\d{2}-\d{2}"/.test(form),
+          form.match(/min="[^"]*"/)?.[0] ?? "no min",
+        );
+
+        const envelope = envelopeOf(form);
+        check(
+          "…and it carries a bound action envelope, with no client JS [D20]",
+          [...envelope.keys()].some((key) => key.startsWith("$ACTION")),
+        );
+
+        // The calendar day in Riyadh, which is what the server compares to.
+        envelope.set(
+          "nextFollowUpAt",
+          new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Asia/Riyadh",
+            dateStyle: "short",
+          }).format(new Date()),
+        );
+
+        const posted = await fetch(`${BASE}/en`, {
+          method: "POST",
+          headers: { cookie: header(jar), origin: BASE },
+          body: envelope,
+          redirect: "manual",
+        });
+        store(jar, posted);
+        check(
+          "the Plan POST is answered [D20]",
+          posted.status === 200 || posted.status === 303,
+          String(posted.status),
+        );
+
+        const moved = await get(jar, "/en");
+        check(
+          "the planned row crossed into Today · you planned this [D34]",
+          between(moved.body, "today-planned", "today-slipping").includes(
+            `href="${href}"`,
+          ),
+        );
+        check(
+          "…and left Slipping [D34]",
+          !after(moved.body, "today-slipping").includes(`href="${href}"`),
+        );
+
+        /* Put it back, from the record's own panel. */
+        const clear = (await get(jar, href)).body.match(
+          /<form[^>]*data-slot="next-follow-up-clear"[\s\S]*?<\/form>/,
+        )?.[0];
+        if (!clear) {
+          console.log(`  note  no clear form — the date is LEFT SET on ${href}`);
+        } else {
+          const undo = await fetch(`${BASE}${href}`, {
+            method: "POST",
+            headers: { cookie: header(jar), origin: BASE },
+            body: envelopeOf(clear),
+            redirect: "manual",
+          });
+          store(jar, undo);
+          check(
+            "clearing the date returns the row to Slipping [D34], [25 §18]",
+            after((await get(jar, "/en")).body, "today-slipping").includes(
+              `href="${href}"`,
+            ),
+          );
+        }
+      }
+    }
+  }
+}
 /** One `data-` attribute off the element carrying `data-slot="…"`. */
 function attrOf(body: string, slot: string, attr: string): string | null {
   const tag = body.match(new RegExp(`<[a-z]+[^>]*data-slot="${slot}"[^>]*>`));
@@ -3805,3 +4104,39 @@ main()
     console.error(error);
     process.exit(1);
   });
+
+
+/**
+ * Everything after the element carrying `data-slot="…"`, so an assertion can
+ * be scoped to one section of a screen rather than to the whole page.
+ *
+ * `D34` puts two lists on one card, and *"the row is no longer in Slipping"*
+ * is only a claim if the substring searched is Slipping — against the whole
+ * body it passes the moment the row moves *anywhere*, including into the
+ * section it was supposed to leave.
+ */
+function after(body: string, slot: string): string {
+  const at = body.indexOf(`data-slot="${slot}"`);
+  return at === -1 ? "" : body.slice(at);
+}
+
+/** The same, bounded by the next section's marker. */
+function between(body: string, from: string, to: string): string {
+  const segment = after(body, from);
+  const end = segment.indexOf(`data-slot="${to}"`);
+  return end === -1 ? segment : segment.slice(0, end);
+}
+
+/** Every `$ACTION…` input of one form, unescaped, as a browser sends it. */
+function envelopeOf(form: string): FormData {
+  const fields = new FormData();
+  for (const input of form.matchAll(/<input[^>]*>/g)) {
+    const name = input[0].match(/name="([^"]+)"/)?.[1];
+    if (!name?.startsWith("$ACTION")) continue;
+    fields.append(
+      name,
+      unescapeHtml(input[0].match(/value="([^"]*)"/)?.[1] ?? ""),
+    );
+  }
+  return fields;
+}

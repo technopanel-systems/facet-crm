@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 
 import { requireSession } from "@/lib/authz";
 import { setNextFollowUp } from "@/lib/follow-ups";
-import { readFields, ruleErrorState, type FormState } from "@/lib/validation";
+import {
+  emptyFormState,
+  readFields,
+  ruleErrorState,
+  type FormState,
+} from "@/lib/validation";
 
 /**
  * The rep's own follow-up date `[25 §18]` — one POST, and its clear.
@@ -67,6 +72,29 @@ export async function setNextFollowUpAction(
   // No redirect: the panel is on the screen the form is already on, and the
   // revalidated page shows the new date in place — `grantShareAction`'s shape.
   return {};
+}
+
+/**
+ * `D34`'s **Plan** — the same act, from a waiting-list row.
+ *
+ * **An adapter, not a second write path.** It calls the action above and
+ * discards its `FormState`, because React hands a plain `<form action>` only
+ * the `FormData` and wants `void` back: the panel's version is driven by
+ * `useActionState`, and `D20` keeps the row's version free of client
+ * JavaScript entirely. Every gate — `canViewRecord`, the past-date refusal,
+ * the audit row, the revalidation — is the one already written above.
+ *
+ * **A refusal is therefore silent, and the row simply stays in Slipping.**
+ * That is the cost of a control with nowhere to render an error; the row not
+ * moving is itself legible, and the input carries `min` so the reachable
+ * refusal — a past date — cannot be offered in the first place.
+ */
+export async function planFollowUpAction(
+  recordType: string,
+  recordId: string,
+  formData: FormData,
+): Promise<void> {
+  await setNextFollowUpAction(recordType, recordId, emptyFormState, formData);
 }
 
 /**

@@ -316,11 +316,19 @@ case** rather than a design of their own, and `D38`–`D41` are what a flag adds
 This is also what gives Marketing `D67` and the Executive `D68` a sensible
 screen without anyone designing one.
 
-All five flags named above are columns on `roles` today. **One of the six blocks
-is built** — *My target and pace*, to `D32` entire, including the pace tick and
-both side figures. The other five are not, and `D65`'s **Requests waiting on
-me** is the one currently standing in for something else: `/` renders a
-notifications list under that heading, which is not this block.
+All five flags named above are columns on `roles` today. **Three of the six
+blocks are built** — *My target and pace*, to `D32` entire, including the pace
+tick, both side figures and the overage segment; *Requests waiting on me*, to
+`D65`'s two columns; and *My waiting list*, to `D33` and `D34`. The
+notifications list that stood under `D65`'s heading is gone: it was news `S92`,
+not work, and on a rep's screen it was twenty-five rows of it.
+
+**The three that are not built are `D39`, `D40` and `D41`** — the blocks
+`sees_all_reps` and `can_assign` add. A manager therefore gets the target and
+the waiting list and nothing else today, which is the same screen a rep gets;
+that is `D64` behaving correctly on the flags that exist, not a gap in this
+rule. `D65`'s **day count** — *approved · issued · refused* — is the one part of
+a built block still missing, and is a row in `WORKFLOW §5`.
 
 **D69. The dashboard opens with a search field and a Log button, and nothing
 else.** They are the page's **first element**, above the greeting and above this
@@ -402,6 +410,19 @@ cannot read against both a translucent inset and a saturated red-orange gradient
 in both themes. That is a colour chosen by side, not a second effect, so `D21`
 stands.
 
+**Beating the target must not look like meeting it.** The bar used to clamp its
+fill at 100%, so 819 of 800 drew exactly the same full bar as 800 of 800 — the
+one thing a rep most wants to see was the one thing the bar could not say. So
+**the track's scale is the target until achievement passes it, and then it is
+the achievement**: the solid fill runs to where the target sits, and the excess
+continues past it in **the same `--brand-grad` at lower opacity**. That is not a
+seventh use of the gradient `D15` — it is the target bar's fill, continued — and
+the opacity step is what marks where the target was, so nothing new is drawn to
+say it. **The pace tick divides by the same scale**, or it would drift off the
+day it means the moment a rep went past target. The legend under the bar names
+the scale, so its end names the achievement once the bar has outgrown the
+target; the target itself is on the line above, beside the figure.
+
 **Awaiting signature is a COUNT of quotation threads, never a sum of their
 square metres.** `S68`: quotations are never summed, because one project quoted
 three times at 2,000 m² is the same 2,000 counted three times, and summing it
@@ -449,6 +470,12 @@ first, and between groups the group's oldest date decides. That is still
 oldest-first overall `S87`, without meeting the same customer at rows 2, 6 and
 9, which is what makes a list feel like busywork.
 
+**The group is the customer, not the row.** One record carries one follow-up
+date, so grouping by the anchor itself would give groups of one and *"within a
+group the oldest date first"* would have nothing to order. The rows this exists
+for are the three that land on one company — its own row, its project's and its
+quotation's — which are one phone call, not three.
+
 **Slipping** holds the other five kinds.
 
 **The action follows the row**, because two actions cannot cover four anchors:
@@ -462,6 +489,19 @@ than three because `S86` puts dispatch requests on the list as a fourth anchor
 and `S88`/`S89` make one sitting with the coordinator first-class
 (`WORKFLOW §5 AD22`). Then the record, one line of why, and elapsed time
 coloured by lateness `D6`.
+
+**Elapsed reads in calendar days, for every kind.** It used to read in whichever
+unit the row's own threshold was stated in, which put *78 working days* and
+*117 days* on adjacent rows of one list. This list is **worked down by ranking**,
+and two units cannot be ranked against each other by eye. Calendar days is also
+the unit the customer's silence is actually measured in. **The thresholds are
+untouched** — each is still applied in the unit `07 D5` states it in, and
+`/follow-ups` still names them that way in its own line. What changed is the
+figure a person reads, not the test that put the row on the list.
+
+**The kind mark has three letters until it has four.** `D` needs `S86`'s
+dispatch anchor, which is not on the list yet, and a letter nothing can render
+is unused structure rather than a head start.
 
 **The list is worked down by ranking, never emptied, and the shape follows from
 that.** A rep with 200 companies cannot clear a 30-day quiet list — it would
@@ -529,6 +569,17 @@ approved · issued · refused.
 Where she does carry one — `S127` lets her raise and approve against her own
 company, and `S78` credits the rep named on the dispatch — `D64`'s first block
 shows it exactly as it shows anyone's. Nothing here special-cases her.
+
+**Each column follows its own flag.** `D64` decides whether the block appears —
+`can_approve_quotation` **or** `can_dispatch` — and this decides what is inside
+it: the issuing column on `can_approve_quotation`, the deciding column on
+`can_dispatch`. A holder of only one flag would otherwise read a column of their
+own records under a heading claiming to be a queue, because the visibility
+filters scope a list rather than emptying it. **A column nobody may act on is
+worse than no column.** Today the Sales Coordinator is the only role holding
+either flag, so she is the only identity the block appears for at all; a rep and
+a manager get no such block, which is `D64`'s *absent, not disabled and not
+empty*.
 
 **No `S` rule stands behind the two columns.** `S88` puts a dispatch request on
 her own list and `S89` orders it by when it was submitted; that quotation and

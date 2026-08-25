@@ -438,6 +438,45 @@ export const FOLLOW_UP_KINDS = [
 ] as const;
 export type FollowUpKind = (typeof FOLLOW_UP_KINDS)[number];
 
+/**
+ * `D33` — the four tiles the counts strip shows over those six conditions.
+ *
+ * **No condition is dropped; they are grouped.** Six equal-weight tiles where
+ * four would do is the thing `D21` names outright, and the two pairs below are
+ * the two places a rep reads one question rather than two: a quotation that has
+ * gone unanswered and one sent back for edits are both *the quotation is
+ * stuck*, and a company that has gone quiet and a catalogue that drew no reply
+ * are both *nobody is talking to this customer*.
+ *
+ * **It is a grouping, never a second definition.** `FOLLOW_UP_KINDS` stays the
+ * one list `follow-ups.ts` derives; this maps four names onto it and the
+ * `satisfies` below makes a kind added to that list without a home here a
+ * type error rather than a tile that silently under-counts.
+ */
+export const FOLLOW_UP_GROUPS = {
+  quotations: ["quotation_no_response", "quotation_returned"],
+  quiet: ["company_quiet", "catalogue_no_response"],
+  notMoved: ["project_stage_unchanged"],
+  yourDates: ["date_due"],
+} as const satisfies Record<string, readonly FollowUpKind[]>;
+
+/**
+ * The four names, **derived from the map above rather than restated** — the
+ * shape `chain.ts` uses for `CHAIN_POSITIONS`. A second literal list is a
+ * second definition, and the one that drifts is always the copy.
+ */
+export type FollowUpGroup = keyof typeof FOLLOW_UP_GROUPS;
+export const FOLLOW_UP_GROUP_NAMES = Object.keys(
+  FOLLOW_UP_GROUPS,
+) as FollowUpGroup[];
+
+/** Narrowed against the list, never cast — a URL is user input. */
+export function asFollowUpGroup(
+  value: string | undefined,
+): FollowUpGroup | undefined {
+  return FOLLOW_UP_GROUP_NAMES.find((name) => name === value);
+}
+
 /** `[20 §12]` — a lobby, not a desk. Applied only to the log form. */
 export const TOUCH_INPUT_CLASS = "h-11 text-base";
 

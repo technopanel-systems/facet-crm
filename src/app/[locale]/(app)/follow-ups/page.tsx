@@ -13,7 +13,11 @@ import {
 } from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
-import { FOLLOW_UP_KINDS } from "@/lib/enums";
+import {
+  asFollowUpGroup,
+  FOLLOW_UP_GROUP_NAMES,
+  FOLLOW_UP_GROUPS,
+} from "@/lib/enums";
 import { followUps } from "@/lib/follow-ups";
 import { lookupName } from "@/lib/lookups";
 import { cn } from "@/lib/utils";
@@ -50,23 +54,27 @@ export default async function FollowUpsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ q?: string; page?: string; kind?: string }>;
+  searchParams: Promise<{ q?: string; page?: string; group?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const { q, page, kind } = await searchParams;
+  const { q, page, group } = await searchParams;
 
   const session = await requireSession();
   const t = await getTranslations();
   const format = await getFormatter();
 
   const currentPage = Number(page) || 1;
-  const activeKind = FOLLOW_UP_KINDS.find((value) => value === kind);
+  // `D33`'s four, not `FOLLOW_UP_KINDS`' six — the counts strip links here
+  // with `?group=`, and a tile showing 9 must land on a list of 9. The
+  // per-kind option survives on `followUps()` for the verify script, which
+  // asks one condition at a time; no screen offers it.
+  const activeGroup = asFollowUpGroup(group);
 
   const { rows, total, counts, thresholds } = await followUps(session, {
     q,
     page: currentPage,
-    kind: activeKind,
+    group: activeGroup,
   });
 
   // The private `withParams` that used to live here is now `FilterNav`'s, so
@@ -100,22 +108,25 @@ export default async function FollowUpsPage({
 
       <FilterNav
         basePath={basePath}
-        name="kind"
-        active={activeKind}
+        name="group"
+        active={activeGroup}
         query={q}
         options={[
           { label: t("followUps.fields.allKinds") },
-          ...FOLLOW_UP_KINDS.map((value) => ({
+          ...FOLLOW_UP_GROUP_NAMES.map((value) => ({
             value,
-            label: t(`enums.followUpKind.${value}`),
-            count: counts[value],
+            label: t(`today.counts.${value}`),
+            count: FOLLOW_UP_GROUPS[value].reduce(
+              (sum, kind) => sum + counts[kind],
+              0,
+            ),
           })),
         ]}
       />
 
       {rows.length === 0 ? (
         <p className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-          {q || activeKind
+          {q || activeGroup
             ? t("followUps.emptyFiltered")
             : t("followUps.empty")}
         </p>
@@ -207,18 +218,16 @@ export default async function FollowUpsPage({
                     )}
                     dir="ltr"
                   >
-                    {/* Working days for the thresholds stated that way,
-                        calendar days for the rest `[21 §8]` — and its own
-                        phrase at zero, which only `date_due` reaches: a rep's
-                        date that arrived today has waited no days, and "0
-                        days" in this column reads as a defect `[25 §18]`. */}
+                    {/* **One unit for the whole list** `D34` — calendar days
+                        for every kind, so two rows can be ranked against each
+                        other by eye. The thresholds are untouched and are
+                        still stated in their own units in the line above.
+                        Zero has its own phrase, which only `date_due`
+                        reaches: a rep's date that arrived today has waited no
+                        days, and "0 days" reads as a defect `[25 §18]`. */}
                     {row.ageDays === 0
                       ? t("followUps.fields.dueToday")
-                      : row.inWorkingDays
-                        ? t("followUps.fields.workingDays", {
-                            count: row.ageDays,
-                          })
-                        : t("followUps.fields.days", { count: row.ageDays })}
+                      : t("followUps.fields.days", { count: row.ageDays })}
                   </TableCell>
                   <TableCell className="text-start">
                     {row.companyId ? (

@@ -254,6 +254,26 @@ export async function listQuotationThreads(
     q?: string;
     projectId?: string;
     companyId?: string;
+    /**
+     * `D65`'s first column — the requests **needing issuing**, oldest first.
+     *
+     * **The predicate is `chain.ts`'s, not a second one.** A thread whose live
+     * version is still `requested` sits at chain position `requested`, and
+     * `chainOwner` says that position is owed by the **coordinator** `[07 C2]`
+     * — she builds the real quotation in SMAC. `D27` makes that file the only
+     * ladder, so this composes its answer in SQL rather than restating it.
+     *
+     * **A returned-for-edit version is deliberately still here.** `S72`'s
+     * queue and `quotationReturned` in `follow-ups.ts` disagree about those:
+     * the follow-up chases the rep until they touch the lines, while the chain
+     * says a `requested` version is hers. Following the chain is the founder's
+     * call for this slice — a second ladder in this module is exactly the trap
+     * `chain.ts` exists to prevent — and the tension is a row in `WORKFLOW §5`.
+     *
+     * **A queue is oldest first** `S87`, so this orders ascending, the same
+     * way `listDispatches` orders its submitted scope.
+     */
+    awaitingIssue?: boolean;
     page?: number;
   } = {},
 ): Promise<{
@@ -266,6 +286,12 @@ export async function listQuotationThreads(
     visibleQuotationThreadsFilter(session),
     liveVersionFilter(),
     searchFilter(options.q),
+    options.awaitingIssue
+      ? and(
+          eq(quotationVersions.status, "requested"),
+          isNull(quotationThreads.endState),
+        )
+      : undefined,
     options.projectId
       ? eq(quotationThreads.projectId, options.projectId)
       : undefined,
@@ -304,7 +330,11 @@ export async function listQuotationThreads(
 
   const rows = await base()
     .where(where)
-    .orderBy(desc(quotationThreads.createdAt))
+    .orderBy(
+      options.awaitingIssue
+        ? asc(quotationThreads.createdAt)
+        : desc(quotationThreads.createdAt),
+    )
     .limit(PAGE_SIZE)
     .offset((page - 1) * PAGE_SIZE);
 
