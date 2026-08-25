@@ -3710,6 +3710,21 @@ async function main(): Promise<void> {
           Math.abs(Number(tick) - (Number(pct) / Number(scale)) * 100) < 1e-9,
         `pace ${pct}% · scale ${scale} · tick ${tick ?? "absent"}`,
       );
+      // **The legend's end is the TARGET, whatever the scale is.** It read the
+      // achievement for one commit after the overage landed, so an
+      // overachieving rep saw `963` under a bar of 963 — every rep exactly on
+      // target and none ahead, which is the defect the rescale existed to fix.
+      const legendEnd = (
+        body.match(
+          /<span[^>]*data-slot="today-legend-end"[^>]*>([^<]*)</,
+        )?.[1] ?? ""
+      ).trim();
+      check(
+        `${locale}: the bar's legend ends at the target, not at the scale [D32]`,
+        legendEnd !== "" &&
+          legendEnd === attrOf(body, "today-target-sqm", "data-sqm"),
+        `legend ${legendEnd} · target ${attrOf(body, "today-target-sqm", "data-sqm")}`,
+      );
       check(
         `${locale}: both side figures render [D32]`,
         body.includes('data-slot="today-side"'),
@@ -3808,6 +3823,31 @@ async function main(): Promise<void> {
           `${label} ${locale}: every row's kind mark is one of C P Q [D34]`,
           marks.every((mark) => ["C", "P", "Q"].includes(mark)),
           [...new Set(marks)].join(",") || "no rows",
+        );
+
+        /* `D6` — **colour is elapsed time, and zero has not elapsed.** The
+           three-tone scale gives `soon` at zero, not `late`: a date that
+           arrived today is due, not overdue. Asserted against `data-when`, the
+           number the colour was chosen from, so this is a claim about the
+           derivation rather than about the words "Due today" — and it holds in
+           Arabic, where those words are not those words. */
+        const elapsed = [
+          ...body.matchAll(
+            /<span[^>]*data-when="(\d+)"[^>]*class="([^"]*)"/g,
+          ),
+        ].map((m) => ({ age: Number(m[1]), cls: m[2] }));
+        const zero = elapsed.filter((e) => e.age === 0);
+        check(
+          `${label} ${locale}: no row at zero days elapsed is painted late [D6]`,
+          zero.every((e) => !e.cls.includes("text-tone-red-fg")),
+          `${zero.length} row(s) at zero`,
+        );
+        check(
+          `${label} ${locale}: …and every row past zero is [D6]`,
+          elapsed
+            .filter((e) => e.age > 0)
+            .every((e) => e.cls.includes("text-tone-red-fg")),
+          `${elapsed.filter((e) => e.age > 0).length} row(s) past zero`,
         );
 
         /* `D34` — Plan is offered on Slipping and on nothing else. */

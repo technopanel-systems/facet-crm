@@ -207,6 +207,7 @@ export function RecordRow({
   meta,
   when,
   whenClassName,
+  whenData,
   action,
 }: {
   title: ReactNode;
@@ -221,6 +222,14 @@ export function RecordRow({
   when?: ReactNode;
   /** The lateness colour, where the caller has one `[22 §4]`. */
   whenClassName?: string;
+  /**
+   * A stable DOM handle on the elapsed figure, emitted as `data-when`. `Fact`
+   * carries a `name` prop for the same reason: `verify:routes` may not import
+   * `src/`, and the figure's only other handle is a translated string. It is
+   * what lets the colour be asserted **against the number that chose it** —
+   * `D6` at zero is a claim about a derivation, not about a label.
+   */
+  whenData?: string;
   action?: ReactNode;
 }) {
   return (
@@ -244,6 +253,7 @@ export function RecordRow({
       </span>
       {when ? (
         <span
+          data-when={whenData}
           className={cn(
             "num flex-none text-[11.5px] font-semibold",
             whenClassName ?? "text-faint",

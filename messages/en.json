@@ -1038,7 +1038,7 @@
       "catalogue_no_response": "A catalogue went out and drew no reply",
       "project_stage_unchanged": "Nothing has moved this on",
       "company_quiet": "Nobody has logged anything against this customer",
-      "date_due": "You planned to come back to this on {date}"
+      "date_due": "Planned for {date}"
     },
     "actions": {
       "open": "Open",

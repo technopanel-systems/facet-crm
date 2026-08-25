@@ -176,6 +176,9 @@ export async function WaitingList({
             ? t("followUps.why.date_due", { date: day(entry.since) })
             : t(`followUps.why.${entry.kind}`)
         }
+        // The number the colour was chosen from, so `D6` can be asserted
+        // against the derivation rather than against the word "Due today".
+        whenData={String(entry.ageDays)}
         whenClassName={toneClass(
           turnTone({
             overdue: entry.ageDays > 0,
@@ -248,18 +251,26 @@ export async function WaitingList({
                 <li key={rowKey(group[0])} className="flex flex-col">
                   {/* A header only where there is something to group `D25`. A
                       lone row is its own customer, and a header repeating that
-                      row's name is noise rather than structure. */}
+                      row's name is noise rather than structure.
+
+                      **`dir="auto"` goes on the NAME, never on this block**
+                      `D62`. On the block it flipped the whole header to RTL
+                      for an Arabic customer — so on an English page it sat at
+                      the far inline-end reading as a stray label, and `ms-1.5`
+                      put the count's gap on the far side of the number, which
+                      is how the count came to run into the name. Direction is
+                      a property of the value; the header is not the value. */}
                   {group.length > 1 && group[0].companyName ? (
-                    <span
+                    <p
                       data-slot="today-planned-group"
-                      dir="auto"
-                      className="text-faint mt-2 text-[11px] font-semibold"
+                      className="text-faint mt-3 mb-0.5 text-start text-[10.5px] font-semibold"
                     >
-                      {group[0].companyName}
-                      <span className="num ms-1.5" dir="ltr">
+                      <span dir="auto">{group[0].companyName}</span>
+                      {" · "}
+                      <span className="num" dir="ltr">
                         {group.length}
                       </span>
-                    </span>
+                    </p>
                   ) : null}
                   <ul className="flex flex-col">
                     {group.map((entry) => row(entry, false))}

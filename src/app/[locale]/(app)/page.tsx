@@ -422,7 +422,6 @@ async function TargetPanel({
           achievementPct={achievementPct}
           pacePct={pacePct}
           target={formatSqm(target)}
-          achieved={formatSqm(measured.achievedSqm)}
         />
 
         <div
@@ -506,18 +505,19 @@ function SideFigure({
  *
  * **The tick divides by the same scale**, or the pace mark would drift off the
  * day it means the moment a rep went past target.
+ *
+ * **The legend's end stays the target through all of it.** The scale is
+ * geometry; the axis still measures the target, and a bar labelled with its own
+ * achievement reads as on-target at every figure.
  */
 function Progress({
   achievementPct,
   pacePct,
   target,
-  achieved,
 }: {
   achievementPct: number;
   pacePct: number;
   target: string;
-  /** The achieved figure, for the legend's end once it outgrows the target. */
-  achieved: string;
 }) {
   const reached = Math.max(0, achievementPct);
   // 100 means "the target"; anything beyond it stretches the track instead of
@@ -571,13 +571,14 @@ function Progress({
           style={{ insetInlineStart: `calc(${tickPct}% - 1px)` }}
         />
       </div>
-      {/* The concept's `.legend`: mono, faint, **the scale** under the bar —
-          so once the bar outgrows the target the end names what it now runs
-          to. The target itself stays on the line above, beside the figure. */}
+      {/* The concept's `.legend`: mono, faint, the scale under the bar. **The
+          end is the TARGET, always** — that is what the axis means, and the
+          overage is the segment drawn past it. Reading the achievement there
+          made the bar say 963 of 963, which is every rep exactly on target. */}
       <div className="num text-faint flex justify-between text-[11px]" dir="ltr">
         <span>0</span>
         <span>{achievementPct}%</span>
-        <span>{overPct > 0 ? achieved : target}</span>
+        <span data-slot="today-legend-end">{target}</span>
       </div>
     </div>
   );

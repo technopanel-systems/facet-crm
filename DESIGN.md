@@ -419,9 +419,13 @@ continues past it in **the same `--brand-grad` at lower opacity**. That is not a
 seventh use of the gradient `D15` — it is the target bar's fill, continued — and
 the opacity step is what marks where the target was, so nothing new is drawn to
 say it. **The pace tick divides by the same scale**, or it would drift off the
-day it means the moment a rep went past target. The legend under the bar names
-the scale, so its end names the achievement once the bar has outgrown the
-target; the target itself is on the line above, beside the figure.
+day it means the moment a rep went past target.
+
+**The legend's end stays the target.** The rescale is geometry and the axis
+still measures the target, so the figure under the bar's end does not follow the
+scale — a bar labelled with its own achievement reads *963 of 963*, which is
+every rep exactly on target and no rep ahead. The achievement is already the
+large figure above, and the percentage is already in the middle of the legend.
 
 **Awaiting signature is a COUNT of quotation threads, never a sum of their
 square metres.** `S68`: quotations are never summed, because one project quoted
@@ -475,6 +479,16 @@ date, so grouping by the anchor itself would give groups of one and *"within a
 group the oldest date first"* would have nothing to order. The rows this exists
 for are the three that land on one company — its own row, its project's and its
 quotation's — which are one phone call, not three.
+
+**The group header is the customer's name at the inline-start, above the rows
+it governs**, in the section headings' own weight and colour — with the count
+after a separator, never run against the name. It is a **value**, so it takes
+neither the uppercase nor the letter-spacing `D12` gives a section label: a
+name is not a label, and both would mangle one. **`dir="auto"` belongs on the
+name and not on the header** `D62` — on the header it turns the whole line RTL
+for an Arabic customer, which on an English page puts it at the far inline-end
+reading as a stray label. A group of one renders no header at all; there is
+nothing to group, and a header repeating its only row is noise.
 
 **Slipping** holds the other five kinds.
 

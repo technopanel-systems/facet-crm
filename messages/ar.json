@@ -1038,7 +1038,7 @@
       "catalogue_no_response": "أُرسل الكتالوج ولم يصل ردّ",
       "project_stage_unchanged": "لم يحرّكه شيء",
       "company_quiet": "لم يسجّل أحد شيئًا على هذا العميل",
-      "date_due": "خطّطت للعودة إلى هذا في {date}"
+      "date_due": "مخطّط في {date}"
     },
     "actions": {
       "open": "فتح",
