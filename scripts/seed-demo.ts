@@ -824,10 +824,13 @@ function planThreads(look: Lookups): void {
     }
     for (const at of row.revisions ?? []) {
       on(at, `thread ${row.key} revised`, async () => {
+        // `[07 C2]` — which route produced it. The coordinator editing
+        // directly is her own act, so it is her session as well as her origin.
+        const byCoordinator = row.revisedBy === "coordinator";
         await createRevision(
-          who(owner),
+          byCoordinator ? coordinator : who(owner),
           id(threadId, row.key, "thread"),
-          "rep_change_request",
+          byCoordinator ? "coordinator_direct_edit" : "rep_change_request",
         );
       });
     }

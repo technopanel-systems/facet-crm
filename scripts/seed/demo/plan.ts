@@ -607,6 +607,13 @@ export type ThreadRow = {
   returned?: number;
   /** `S66` — each entry supersedes the one before it. */
   revisions?: readonly number[];
+  /**
+   * Which route produced the revision `[07 C2]`. The rep asking for a change
+   * is the ordinary case; the coordinator editing directly is the other, and
+   * without one thread taking it `coordinator_direct_edit` would be an enum
+   * value nothing in the dataset can reach.
+   */
+  revisedBy?: "rep" | "coordinator";
   /** `S63` — the coordinator types the SMAC number back. */
   issued?: number;
   /** `S65` — internal approval, never a won deal. */
@@ -690,7 +697,7 @@ export const THREADS: readonly ThreadRow[] = [
   /* --- revised: v1 superseded, v2 issued `S66` `S68` ---------------- */
   { key: "T49", company: "شركة مرافئ الدمام للمقاولات", project: "P24", contact: true, stock: "dammam", sqm: 780, lines: 2, raised: 100, revisions: [92], issued: 87 },
   { key: "T50", company: "شركة صروح جدة للمقاولات", project: "P36", contact: true, stock: "riyadh", sqm: 2600, lines: 3, raised: 107, revisions: [101], issued: 96 },
-  { key: "T51", company: "مؤسسة الصرح للمقاولات", project: null, stock: "riyadh", sqm: 260, lines: 2, raised: 111, revisions: [103], issued: 98 },
+  { key: "T51", company: "مؤسسة الصرح للمقاولات", project: null, stock: "riyadh", sqm: 260, lines: 2, raised: 111, revisions: [103], revisedBy: "coordinator", issued: 98 },
   { key: "T52", company: "شركة أملاك المستقبل العقارية", project: "P06", contact: true, stock: "riyadh", sqm: 640, lines: 2, raised: 90, revisions: [83], issued: 77 },
 
   /* --- three versions, so "the latest live version" means something -- */
