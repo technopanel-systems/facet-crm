@@ -649,6 +649,26 @@ async function main(): Promise<void> {
       home.body.includes('aria-current="page"'),
     );
     for (const locale of ["en", "ar"]) {
+      // `D49`'s two items the rail used to lack. Asserted as locale-prefixed
+      // hrefs, never as labels: a translated string would pass while pointing
+      // at the wrong route, and the exact `href="…"` cannot match a detail
+      // page under the same section.
+      const rail = await get(jar, `/${locale}`);
+      for (const item of ["/activity", "/targets"] as const) {
+        check(
+          `  ${email} ${locale} rail carries ${item}`,
+          rail.body.includes(`href="/${locale}${item}"`),
+        );
+      }
+      // `D50`'s half: the link is hidden by a boolean the layout computes.
+      // `FORBIDDEN` above asserts the other half on the same path — the route
+      // answers 404 `D53` — so neither claim can pass on its own, and the
+      // identity that DOES hold it asserts the link is present.
+      const holdsUsers = !(FORBIDDEN[email] ?? []).includes("/users");
+      check(
+        `  ${email} ${locale} rail ${holdsUsers ? "shows" : "hides"} /users`,
+        rail.body.includes(`href="/${locale}/users"`) === holdsUsers,
+      );
       await walk(jar, email, locale);
     }
   }

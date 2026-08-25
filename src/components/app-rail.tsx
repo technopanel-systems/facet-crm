@@ -1,11 +1,13 @@
 "use client";
 
 import {
+  Activity,
   BarChart3,
   Building2,
   FileText,
   FolderOpen,
   House,
+  Target,
   Truck,
   Users,
 } from "lucide-react";
@@ -15,21 +17,29 @@ import { Link, usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
 /**
- * The rail `[22 §7]` — six items in two groups, plus Today.
+ * The rail `D49` — eight items in two groups, plus Today.
+ *
+ * **Eight, not `D49`'s seven, and deliberately.** `D49` merges Performance into
+ * Targets, and that is a screen change: moving the rail item before the screens
+ * merge would hide attainment from everyone who can reach it today. Performance
+ * therefore stays, **last in `track`** so that deleting it leaves `D49`'s order
+ * already correct. Session `28b` merges the two, and that is what takes the
+ * rail to seven — recorded in `WORKFLOW §5`.
  *
  * It replaced a twelve-item horizontal nav. Contacts, Reports, Coverage,
- * Follow-ups, Activity, Notifications and Targets stopped being top-level:
- * contacts live inside a company, coverage and targets merged into Performance,
- * and follow-ups and notifications became the Today count and the bell.
- * **Every one of those routes still works** — this was navigation, not routing.
+ * Follow-ups and Notifications are still not top-level: contacts live inside a
+ * company, coverage merged into Performance, and follow-ups and notifications
+ * became the Today count and the bell. **Every one of those routes still
+ * works** — this was navigation, not routing.
  *
- * `19 §4` still governs how it is gated: this component is `"use client"` and
- * cannot call `can()`, so the `(app)` layout computes the flags and passes them
- * down as booleans. It imports NOTHING from `@/lib/authz`, not even a type — a
+ * `D50` governs how it is gated: this component is `"use client"` and cannot
+ * call `can()`, so the `(app)` layout computes the flags and passes them down
+ * as booleans. It imports NOTHING from `@/lib/authz`, not even a type — a
  * type-only import is one careless edit away from becoming a value import that
  * ships the Postgres driver to the browser.
  *
- * Hiding a link is cosmetic. `/users` returns `notFound()` on its own.
+ * Hiding a link is cosmetic `D50`. `/users` returns `notFound()` on its own
+ * `D53`.
  */
 
 const GROUPS = [
@@ -45,6 +55,9 @@ const GROUPS = [
   {
     key: "track",
     items: [
+      { href: "/activity", key: "activity", Icon: Activity },
+      { href: "/targets", key: "targets", Icon: Target },
+      // Last, and temporary — see the header. `28b` deletes this line.
       { href: "/performance", key: "performance", Icon: BarChart3 },
       { href: "/users", key: "team", Icon: Users, requires: "canManageUsers" },
     ],
@@ -53,7 +66,7 @@ const GROUPS = [
 
 type RailFlags = {
   canManageUsers: boolean;
-  /** Follow-ups waiting on this identity — the Today badge `[21 §1]`. */
+  /** Follow-ups waiting on this identity — the Today badge `D49`. */
   todayCount: number;
   userName: string;
   roleLabel: string;
@@ -166,7 +179,16 @@ export function AppRail({
         })}
       </nav>
 
-      <div className="mt-auto hidden items-center gap-2.5 border-t border-white/10 pt-3.5 md:flex">
+      {/* `isolate` is not decoration — it is the fix for the avatar painting
+          over the name in Brave at 1366, dark (`WORKFLOW §5`). The measurement
+          is clean in headless Chrome at that exact configuration, so it is a
+          compositing difference, not a layout one: `glass` gives the <aside>
+          a `backdrop-filter`, which promotes it to its own layer, and Brave
+          composites that layer on the GPU where headless Chrome does it in
+          software. A footer with its own stacking context is not painted by
+          the aside's promoted layer. **`glass` stays** — `D8`, `D14` and `D21`
+          make the rail one of exactly two surfaces that may carry `--blur`. */}
+      <div className="relative isolate mt-auto hidden items-center gap-2.5 border-t border-white/10 pt-3.5 md:flex">
         <div
           className="grid size-8 flex-none place-items-center rounded-full bg-[linear-gradient(140deg,#8A3244,#4A1622)] text-xs font-semibold text-white"
           aria-hidden

@@ -91,12 +91,13 @@ combobox, the view-mode switch and the board's scroll.
   layout, never a `can()` in a client component `D50`; the data layer re-checks either way
   `S109`, so the UI is never the gate.
 - **Structure** — `page.tsx`, `new/`, `[id]/`, `[id]/edit/`, `actions.ts`, `thing-form.tsx`.
-  The rail is `D49`'s **seven items plus user management for those who hold it**, with
-  Reports, Coverage, Follow-ups, Notifications and Performance **not** top-level, so **a new
-  screen usually belongs inside an existing section** `D49`, and nothing renders until
-  something is behind it `D51`. **Performance and Targets are one item, Targets** `D49`.
-  (`GROUPS` still holds the older six, carries Performance and has neither Activity nor
-  Targets — the shell slice builds it to `D49`.)
+  The rail is `D49`'s **seven items plus user management for those who hold it**, in
+  *Sell* and *Track*, with Reports, Coverage, Follow-ups, Notifications and Performance
+  **not** top-level, so **a new screen usually belongs inside an existing section** `D49`,
+  and nothing renders until something is behind it `D51`. **Performance and Targets are one
+  item, Targets** `D49`. (`GROUPS` now carries Activity and Targets and holds **eight** —
+  Performance stays last in `track` until session `28b` merges the two screens, which is
+  what takes it to seven. Deliberate, temporary, and recorded in `WORKFLOW §5`.)
 
 ## Archetypes and building blocks
 

@@ -29,13 +29,13 @@ import { ThemeToggle } from "./_components/theme-toggle";
  * `requireSession()` itself and every mutation re-checks record visibility in
  * the data layer.
  *
- * `22 §7` replaced the horizontal nav with a rail. **This layout now owns the
- * content column** `[22 §6.1, closed]`: the concept's start-aligned 1320px page
- * area, its padding, and the `<main>` landmark. Pages carry only their own flow
- * — a `gap`, and a narrower measure where the archetype needs one.
+ * `D49` replaced the horizontal nav with a rail. **This layout owns the content
+ * column** `D23`: the start-aligned 1320px page area, its padding, and the
+ * `<main>` landmark. Pages carry only their own flow — a `gap`, and a narrower
+ * measure where the archetype needs one.
  *
- * **No `mx-auto`, deliberately.** Start-aligned is the proportion: the page area
- * hugs the rail rather than floating in the middle of a wide screen. A capped
+ * **No `mx-auto`, deliberately** `D23`. Start-aligned is the proportion: the
+ * page area hugs the rail rather than floating on a wide screen. A capped
  * block with no margin utility does this in both directions — over-constrained
  * resolution gives the slack to the inline end for the header's inner row, and
  * flex cross-axis `stretch` falls back to `flex-start` for `<main>`. Adding
@@ -105,8 +105,8 @@ export default async function AppLayout({
           </div>
         </header>
 
-        {/* The concept's `.page`: max-width 1320, padding 22px 26px 40px, and
-            no auto margin. `max-w-330` is 330 × 4px `[22 §6.1]`. */}
+        {/* `D23`'s column: max-width 1320, start-aligned, no auto margin.
+            `max-w-330` is 330 × 4px. Padding is `D22`. */}
         <main className="w-full max-w-330 flex-1 px-6.5 pt-5.5 pb-10">
           {children}
         </main>

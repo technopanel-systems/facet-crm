@@ -154,11 +154,21 @@
   --red-500: #e5233c;
 
   --canvas: #f5f2ef;
-  /* `D13` — two fixed radial gradients, red at 8% -10% and blue at 100% 0%,
-     both under 14%. The only background gradient in the product. */
+  /* `D13` — two fixed radial gradients, **red at the inline start and blue at
+     the inline end**, both under 14%. The only background gradient in the
+     product.
+
+     A percentage in `radial-gradient` is physical and knows nothing about
+     direction, so the two x positions are their own tokens and `[dir="rtl"]`
+     below swaps them. Written physically, Arabic put the red wash over the
+     content instead of behind the rail. Theme-independent, and declared here
+     rather than in both themes: only the colours differ between light and
+     dark, never the positions. */
+  --glow-x-red: 8%;
+  --glow-x-blue: 100%;
   --canvas-glow:
-    radial-gradient(1200px 600px at 8% -10%, rgba(200, 16, 46, 0.07), transparent 60%),
-    radial-gradient(900px 500px at 100% 0%, rgba(43, 92, 168, 0.06), transparent 55%);
+    radial-gradient(1200px 600px at var(--glow-x-red) -10%, rgba(200, 16, 46, 0.07), transparent 60%),
+    radial-gradient(900px 500px at var(--glow-x-blue) 0%, rgba(43, 92, 168, 0.06), transparent 55%);
 
   --surface: rgba(255, 255, 255, 0.78);
   --surface-2: rgba(255, 255, 255, 0.55);
@@ -242,9 +252,10 @@
 /* ── Dark (the default) ───────────────────────────────────────────────── */
 .dark {
   --canvas: #0f0d0c;
+  /* Same positions as light — `--glow-x-*` above — different colours `D13`. */
   --canvas-glow:
-    radial-gradient(1200px 600px at 8% -10%, rgba(229, 35, 60, 0.13), transparent 60%),
-    radial-gradient(900px 500px at 100% 0%, rgba(43, 92, 168, 0.09), transparent 55%);
+    radial-gradient(1200px 600px at var(--glow-x-red) -10%, rgba(229, 35, 60, 0.13), transparent 60%),
+    radial-gradient(900px 500px at var(--glow-x-blue) 0%, rgba(43, 92, 168, 0.09), transparent 55%);
 
   --surface: rgba(30, 26, 24, 0.72);
   --surface-2: rgba(40, 35, 32, 0.6);
@@ -288,6 +299,28 @@
   --shadow-lift:
     0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 20px 50px -20px rgba(0, 0, 0, 0.9);
   --blur: blur(18px) saturate(1.2);
+}
+
+/* ── RTL ──────────────────────────────────────────────────────────────── */
+
+/* `D13` `D57` — the glow reads logically, so Arabic mirrors it: the red sits at
+   the inline start, behind the rail, and the blue at the inline end. Only the
+   two positions flip; the colours are the theme's and are untouched, which is
+   why this is one block rather than a copy of `--canvas-glow` per theme.
+
+   `[dir="rtl"]` matches `<html dir>` from the locale layout, and carries the
+   same specificity as `:root`, so it must stay AFTER both theme blocks. It
+   deliberately does not mention `.dark`: `--canvas-glow` substitutes these
+   tokens wherever it resolves, so one declaration serves both themes. */
+[dir="rtl"] {
+  /* **108%, not the geometric mirror 92%.** The red ellipse is 1200px wide
+     against a ~1366px viewport, so at 92% its outer fade lands INSIDE the
+     frame and paints a hard vertical seam down the page with a lighter block
+     beside it. English is clean because 8% puts that edge off-frame to the
+     left; 108% is what puts it off-frame to the right. Found by eye in Arabic
+     at 1366 — the mirror was right on paper and wrong on screen. */
+  --glow-x-red: 108%;
+  --glow-x-blue: 0%;
 }
 
 /* `D19` — looks win; performance is tuned afterwards. Of everything in

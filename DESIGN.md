@@ -135,10 +135,18 @@ decoration**. The discipline that keeps this from becoming generic is simple and
 absolute: **every effect is a named token with a named list of places it may be
 used.** An effect used anywhere else is a defect, not a flourish.
 
-**D13. The canvas carries atmosphere.** Two fixed radial gradients — red at
-8% -10%, blue at 100% 0%, both under 14% opacity — on `--canvas-glow`. This is
-the only place a background gradient appears. Never on a card, never behind a
-section, never as a blob.
+**D13. The canvas carries atmosphere.** Two fixed radial gradients on
+`--canvas-glow`, both under 14% opacity — **red at the inline start, blue at
+the inline end**, the red 10% above the top edge. This is the only place a
+background gradient appears. Never on a card, never behind a section, never as
+a blob.
+
+**The positions are logical, not physical.** A percentage in `radial-gradient`
+knows nothing about direction, so written as `8%` and `100%` the red wash
+stayed on the left in Arabic — over the content, with the rail on the right
+lit by nothing. The concept was drawn in English and nobody had decided the
+physical position; the founder decided it here. The two x positions are their
+own tokens and `[dir="rtl"]` swaps them.
 
 **D14. The card is a translucent surface.** `--surface` at ~72% opacity,
 `--blur` (18px + slight saturation), a one-pixel top-edge highlight
@@ -520,14 +528,24 @@ dispatch.
 
 ## 13. Navigation
 
-**D49.** The rail carries **Waiting on me** (with a count), then Companies,
-Projects, Quotations, Dispatches under *Work*; Activity and Targets under
-*Team*. **Seven items — plus user management for those who hold it.** The count
-was always right and the sentence was wrong: user management is conditional
-`D50`, so it was never one of the seven, and running it into the same list read
-as eight named against seven counted (`WORKFLOW §5 AD14`). Reports, Coverage,
+**D49.** The rail carries **Today** (with a count), then Companies, Projects,
+Quotations, Dispatches under *Sell*; Activity and Targets under *Track*.
+**Seven items — plus user management for those who hold it.** The count was
+always right and the sentence was wrong: user management is conditional `D50`,
+so it was never one of the seven, and running it into the same list read as
+eight named against seven counted (`WORKFLOW §5 AD14`). Reports, Coverage,
 Follow-ups, Notifications and Performance are **not top-level** — they are the
 waiting list and the stream, filtered.
+
+**The first item is Today, not *Waiting on me*.** It is shorter, and since
+`D34` split the list into planned and slipping, *waiting on me* describes only
+half of what is on the screen.
+
+**The groups are *Sell* and *Track*, which is what the rail renders.** They
+were written here as *Work* and *Team*, and the rule moved rather than the
+code: *Track* is accurate for what is in the group, and *Team* would have
+collided with the user-management item, whose own label is already **Team** in
+both locales.
 
 **Performance and Targets are one item, called Targets.** One table, one row per
 rep, **the goal and the attainment together** — they were never two questions,
@@ -535,10 +553,13 @@ and splitting them put a rep's number on one screen and what it was measured
 against on another. The edit control renders **per row** for `can_set_targets`.
 Merging them is what frees the seventh slot for Activity.
 
-**The built rail is not this rail.** It carries **Performance**, which this rule
-lists as *not top-level*, and has neither **Activity** nor **Targets**
-(`src/components/app-rail.tsx`). This rule decides the target state; the screen
-that matches it is a later slice.
+**The built rail carries eight, and that is deliberate and temporary.**
+Activity and Targets are now on it. **Performance is still there too**, against
+this rule's *not top-level*, because merging it into Targets is a screen change
+and moving the rail item first would hide attainment from everyone who can
+reach it today. It sits **last in *Track***, so deleting it leaves this rule's
+order already correct. **Session `28b` merges the two screens, and that is what
+takes the rail to seven** (`WORKFLOW §4`, `§5`).
 
 **D50.** The rail is hidden by a permission boolean passed from the layout, never
 by a `can()` call in a client component. Hiding a link is cosmetic; the route
