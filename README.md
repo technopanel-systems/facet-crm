@@ -121,6 +121,7 @@ npm run db:seed       # roles, lookups, settings, notification types
 npm run db:studio     # browse data
 npm run db:push       # push schema without a migration — local scratch only
 npm run db:reset      # development only — destroy the volume and rebuild
+npm run seed:demo     # development only — a realistic dataset to look at
 ```
 
 Migrations under `drizzle/` **are committed**. They are the record of how
@@ -163,6 +164,35 @@ accumulated enough runs, while working perfectly.)
 npm run db:reset      # asks for confirmation; --yes to skip
 npm run dev:fixtures  # the test accounts the verify scripts drive
 ```
+
+### A database worth looking at
+
+`npm run seed:demo` builds one, and it is the answer to residue rather than a
+second way of making it. It clears the record tables, removes the fixture
+accounts and fixture roles the verify scripts leave behind — anything at
+`@example.test` that is not one of its own eight — and then replays about 650
+acts **through the real writers in `src/lib`**, oldest first, so nothing lands
+in a state the application cannot itself produce. Roughly 120 companies, 70
+contacts, 49 projects, 60 quotation threads and 48 dispatches, with Arabic
+company names and rep-written notes, spread across the last 120 days.
+
+```bash
+npm run seed:demo     # development only; needs DEV_FIXTURE_PASSWORD in .env
+```
+
+It needs one existing `can_manage_users` holder to create its eight accounts
+with, because `S10` says that is how a user comes to exist — `bootstrap:admin`
+is that holder, and it is never touched. It is idempotent: two runs produce the
+same counts.
+
+**It is also how `verify:routes` §17 is reset.** §17 consumes its own
+preconditions (`WORKFLOW §5`): one seed buys **six clean runs**, and the
+seventh fails ten checks that are about the data rather than the diff. Re-seed
+rather than diagnose.
+
+The one thing it does that a writer does not is move each batch's `created_at`
+and audit rows backwards, so a record can be four months old. Every column on
+both sides of that line is named in `scripts/seed/demo/clock.ts`.
 
 It runs `docker compose down -v`, `docker compose up -d`, waits for the `db`
 container's own healthcheck, then `db:migrate`, `db:seed` and

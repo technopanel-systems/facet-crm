@@ -321,15 +321,19 @@ const FORBIDDEN: Record<string, readonly string[]> = {
   // approving, which lives on a request's own screen and is asserted in §15.
   "rep-a@example.test": ["/users", "/users/new"],
   "manager@example.test": [],
-  // A project needs a company `S27` and a contact belongs to one `[07 A2]`,
-  // and the coordinator holds none — so both forms are `D53` 404s for them,
-  // and `S76` made the lists behind them worth reading anyway.
-  "coordinator@example.test": [
-    "/users",
-    "/users/new",
-    "/projects/new",
-    "/contacts/new",
-  ],
+  // **`/projects/new` and `/contacts/new` came off this list**, and the reason
+  // is the same one section 15 records at the New button. Both records need a
+  // company `S27` `[07 A2]`, so the form 404s for an identity holding none —
+  // which every coordinator was, until `seed:demo` gave her the book `S9`
+  // names her as a recipient of and `S127` needs her to have. The 404 was a
+  // property of the fixtures, never of the role, and asserting it here made a
+  // rule-legal dataset read as a broken screen. The walk now asserts the 200,
+  // and section 15 asserts the button and the route agree either way.
+  //
+  // `S76` is untouched by this: it says she may not **edit** a project or a
+  // contact, and the READ_ONLY walk below still holds her to that on every
+  // record she can see.
+  "coordinator@example.test": ["/users", "/users/new"],
 };
 
 /**
@@ -2864,13 +2868,29 @@ async function main(): Promise<void> {
         list.body.includes('data-slot="list-card"'),
         `status ${list.status}`,
       );
-      // `D51` — a New button that always fails is not rendered. The
-      // coordinator holds no company, and both records need one. Section 2
-      // already asserts the 404 behind it, from `FORBIDDEN`; this is the
-      // control, which is the half a route check cannot see.
+      // `D51` — **a New button that always fails is not rendered**, which is a
+      // claim about the button AGREEING with the route rather than about the
+      // button being absent. Both records need a company, so what decides it
+      // is whether this identity holds one.
+      //
+      // **It used to be asserted as absent, and that was a fact about the
+      // fixtures rather than about the rule.** No coordinator had ever held a
+      // company, so the button never rendered and the route always 404'd.
+      // `S9` names the coordinator as one of the four an assignment may hand a
+      // company to, `companyBookHolderFilter` admits the role, and `S127` lets
+      // her raise and approve a dispatch **against her own company** — so a
+      // coordinator with a book is the rule working, not the fixture drifting,
+      // and `seed:demo` gives her one. Asserted as the biconditional now, so
+      // it holds whether or not she happens to hold a company.
+      const newOffered = list.body.includes(`/en/${section}/new"`);
+      const newReachable =
+        (await get(coordJar, `/en/${section}/new`)).status === 200;
       check(
-        `…and offers them no New button, which would refuse [D51]`,
-        !list.body.includes(`/en/${section}/new"`),
+        `…and the New button agrees with the route [D51]`,
+        newOffered === newReachable,
+        `button ${newOffered ? "offered" : "absent"}, route ${
+          newReachable ? "200" : "404"
+        }`,
       );
       const managerList = await get(managerJar, `/en/${section}`);
       check(
