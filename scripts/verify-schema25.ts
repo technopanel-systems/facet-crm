@@ -421,6 +421,31 @@ const S70_S119_MOVED_COLUMNS = [
 const S70_S73_DROPPED_COLUMNS = ["companies.has_credit_terms"];
 
 /**
+ * `S133` — **payment is not a position on the chain, and not a column on a
+ * quotation.** `S70` records it on the dispatch and `S73` makes a method a
+ * condition of approving one, so no interval exists between paid and dispatched
+ * for either a rung or a stamp to occupy.
+ *
+ * `0022` moved the dispatch gate off `payment_confirmed_at` and said in its own
+ * comment that the column STAYS, because it was still the chain's `paid` rung
+ * `D29`. `S132` removed that rung, which was its last reader, and `0029` took
+ * all three columns with `confirmPayment` and `markAcceptedForProcessing` —
+ * `CLAUDE.md`: the old mechanism leaves in the slice that replaces it.
+ *
+ * Measured before `0029`, on a clean `seed:demo`: 60 threads, 15 carrying a
+ * payment, 3 accepted for processing. None was migrated anywhere — a payment on
+ * a quotation meant *the customer has committed*, and a payment on a dispatch
+ * means *how they are paying* `S70`, so copying one into the other would invent
+ * a fact. The audit log keeps its own copy of every write that ever set them
+ * `S112`.
+ */
+const S133_DROPPED_COLUMNS = [
+  "quotation_threads.payment_confirmed_at",
+  "quotation_threads.payment_confirmed_by_user_id",
+  "quotation_threads.accepted_for_processing_at",
+];
+
+/**
  * What `SPEC §15` "Dropped outright" removes: structure no rule asks for.
  * Same shape as the four lists above, separate for the same reason — one
  * decision, one migration, one claim, legible without git blame. These answer
@@ -639,6 +664,11 @@ async function main(): Promise<void> {
   // rewrote goes with them.
   for (const key of S70_S73_DROPPED_COLUMNS) {
     check(`${key} is gone [SPEC §15], [S70], [S73]`, !columns.has(key));
+  }
+
+  // `S133` — the three the `paid` rung was the last reader of.
+  for (const key of S133_DROPPED_COLUMNS) {
+    check(`${key} is gone [S133], [S132]`, !columns.has(key));
   }
 
   // `S67` — expiry is not a terminal state, and since `0018` not a fact
@@ -2369,27 +2399,26 @@ async function paymentAndShipmentHold(): Promise<void> {
   );
 
   // **The `S73` inversion, read from the database.** The old gate refused an
-  // approval whose thread had no `payment_confirmed_at`. Those rows are legal
-  // now — and the claim worth asserting is not that they exist, which would
-  // only be true when `verify:slice3` has run, but that **every one of them
-  // still answers the question that replaced it**. A row approved against an
-  // unconfirmed quotation and carrying no payment method would mean the old
-  // gate had been removed without the new one arriving.
-  const [linkedUnpaid] = (await db.execute(sql`
+  // approval whose thread had no `payment_confirmed_at`. That column is gone
+  // `S133` `0029`, so the join it needed cannot be written any more - and the
+  // claim it was making narrows to the half that survives: **every approved
+  // dispatch carries a payment method**, which is what replaced the gate. It
+  // is asserted over every row rather than over the linked ones alone,
+  // because `S73` binds the free-entry route too (`verify:slice3` 3b).
+  const [approvedMethod] = (await db.execute(sql`
     select
       count(*)::int as n,
       count(*) filter (where d.payment_method is null)::int as no_method
     from dispatches d
-    join quotation_threads t on t.id = d.quotation_thread_id
-    where d.status = 'approved' and t.payment_confirmed_at is null
+    where d.status = 'approved'
   `)) as unknown as { n: number; no_method: number }[];
   console.log(
-    `  --    ${linkedUnpaid.n} approved dispatch(es) against a quotation with no payment confirmation`,
+    `  --    ${approvedMethod.n} approved dispatch(es), on every S75 route`,
   );
   check(
-    "*** an unconfirmed quotation is no bar, and every one still carries a method *** [S73]",
-    linkedUnpaid.no_method === 0,
-    `${linkedUnpaid.no_method} carry none`,
+    "*** every approved dispatch carries a payment method *** [S73]",
+    approvedMethod.no_method === 0,
+    `${approvedMethod.no_method} carry none`,
   );
 
   // The five CHECKs, driven. Shaped from a real row so only the column under

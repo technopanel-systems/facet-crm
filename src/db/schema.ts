@@ -1216,16 +1216,16 @@ export const quotationThreads = pgTable(
      */
     cancelledByUserId: uuid("cancelled_by_user_id").references(() => users.id),
     cancellationReason: text("cancellation_reason"),
-    paymentConfirmedByUserId: uuid("payment_confirmed_by_user_id").references(
-      () => users.id,
-    ),
-    paymentConfirmedAt: timestamp("payment_confirmed_at", {
-      withTimezone: true,
-    }),
-    /** The rep's mark, which comes after payment `[04 flow 13]`. */
-    acceptedForProcessingAt: timestamp("accepted_for_processing_at", {
-      withTimezone: true,
-    }),
+    /**
+     * **There is no payment on a quotation** `S133`, since `0029`.
+     * `payment_confirmed_at`, `payment_confirmed_by_user_id` and
+     * `accepted_for_processing_at` were the gate `S72` replaced: `S70` records
+     * payment on the DISPATCH and `S73` makes a method a condition of approving
+     * one, so no interval exists between paid and dispatched for a column — or
+     * a chain position `S132` — to occupy. The three left with `confirmPayment`
+     * and `markAcceptedForProcessing` in the same slice, which is `CLAUDE.md`'s
+     * rule about a replaced mechanism.
+     */
     /**
      * `[25 §24]` — a quotation closes when the rep knows nothing more is
      * coming, or when the project is won or lost. Separate from `end_state`,
@@ -1706,11 +1706,12 @@ export const dispatches = pgTable(
      * request with none: `S70` puts this in her head, not theirs. What makes it
      * required is `dispatches_payment_method`, and only where `S73` requires it.
      *
-     * It replaces the gate that read `quotation_threads.payment_confirmed_at`,
+     * It replaced the gate that read `quotation_threads.payment_confirmed_at`,
      * which asked *has money arrived?* — a question `on_delivery` answers "no"
      * to and is still legitimate — and which a free entry, having no thread,
-     * never faced at all. That column stays and still means what it meant: it
-     * is the chain's `paid` rung `D29`. It no longer gates a dispatch.
+     * never faced at all. **That column is now gone** `S133` `0029`: with the
+     * gate moved here there was no interval left for it to describe, and `S132`
+     * dropped the chain rung that was its last reader.
      */
     paymentMethod: paymentMethodEnum("payment_method"),
     /** `S71` — *an optional note carries anything the list does not*. Guarded

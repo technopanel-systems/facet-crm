@@ -75,24 +75,35 @@ export default async function QuotationDetailPage({
   const dash = t("common.none");
 
   // No colour list `[17 §2]` — the colour is typed on the line.
-  const [suppliers, classes, fireRatings, thicknesses, services, dispatched] =
-    await Promise.all([
+  const [
+    suppliers,
+    classes,
+    fireRatings,
+    thicknesses,
+    services,
+    dispatched,
+    submitted,
+  ] = await Promise.all([
       listProductSuppliers(),
       listProductClasses(),
       listProductFireRatings(),
       listProductThicknesses(),
       listServiceTypes(),
-      // Whether anything has left the warehouse against this thread — the one
-      // input `getQuotationThread` cannot carry, because dispatch lives in its
-      // own table. No new query: `listDispatches` already filters by thread.
-      // Safe by construction — `visibleDispatchesFilter`'s thread-cascade term
-      // means whoever can see this thread can see the dispatches against it,
-      // so the node cannot read hollow to someone who ought to see it filled.
+      // The two inputs `getQuotationThread` cannot carry, because dispatch
+      // lives in its own table `S132`. No new join: `listDispatches` already
+      // filters by thread. Safe by construction — `visibleDispatchesFilter`'s
+      // thread-cascade term means whoever can see this thread can see the
+      // dispatches against it, so neither node can read hollow to someone who
+      // ought to see it filled.
       //
-      // **`status: "approved"`** `S72`. The sixth node means goods have moved,
-      // and a request sitting with the coordinator has moved nothing — without
-      // this scope a rep would advance their own chain by asking.
+      // **`approved` is `won`** `S31` `S72` — goods have moved.
       listDispatches(session, { threadId: id, status: "approved" }),
+      // **`submitted` is `ready to ship`** `S132` `S88` — the coordinator is
+      // checking it. A `draft` is deliberately not asked for: `S132` says a
+      // draft is the rep's own to edit `S125` and can sit for ever, so it is
+      // not a place the deal has reached, and without that scope a rep would
+      // advance his own chain by opening a form.
+      listDispatches(session, { threadId: id, status: "submitted" }),
     ]);
 
   // `25 §9` — one thread per record. A quotation has no derived events of its
@@ -114,11 +125,11 @@ export default async function QuotationDetailPage({
   const chain = chainState({
     versionStatus: live.status,
     endState: thread.endState,
-    paymentConfirmedAt: thread.paymentConfirmedAt,
     // `24 §"partial dispatches are the expected case"` — the question is
     // whether ANY has gone out, never how much. The remainder is deliberately
-    // never shown as a number `[25 §26]`.
+    // never shown as a number `D42`.
     hasDispatch: dispatched.total > 0,
+    hasSubmittedDispatch: submitted.total > 0,
   });
 
   // `S50` — a quotation may have no project. The project is what normally
@@ -184,10 +195,9 @@ export default async function QuotationDetailPage({
               chain.owedBy === null
                 ? undefined
                 : t("quotations.detail.turnSince", {
-                    date: format.dateTime(
-                      thread.paymentConfirmedAt ?? thread.createdAt,
-                      { dateStyle: "long" },
-                    ),
+                    date: format.dateTime(thread.createdAt, {
+                      dateStyle: "long",
+                    }),
                   })
             }
           />
@@ -242,31 +252,6 @@ export default async function QuotationDetailPage({
               {format.dateTime(thread.createdAt, { dateStyle: "medium" })}
             </Fact>
 
-            {/* Payment and acceptance-for-processing are where the CUSTOMER
-                commits `[16 §5]` — the end state above is internal approval. */}
-            <Fact label={t("quotations.detail.paymentConfirmedAt")}>
-              {thread.paymentConfirmedAt ? (
-                format.dateTime(thread.paymentConfirmedAt, {
-                  dateStyle: "medium",
-                })
-              ) : (
-                <span className="text-muted-foreground">
-                  {t("quotations.detail.notConfirmed")}
-                </span>
-              )}
-            </Fact>
-            {thread.paymentConfirmedByName ? (
-              <Fact label={t("quotations.detail.paymentConfirmedBy")}>
-                {thread.paymentConfirmedByName}
-              </Fact>
-            ) : null}
-            <Fact label={t("quotations.detail.acceptedForProcessing")}>
-              {thread.acceptedForProcessingAt
-                ? format.dateTime(thread.acceptedForProcessingAt, {
-                    dateStyle: "medium",
-                  })
-                : dash}
-            </Fact>
 
             {thread.endState === "cancelled" ? (
               <>
@@ -455,8 +440,6 @@ export default async function QuotationDetailPage({
             liveStatus={live.status}
             endState={thread.endState}
             nextVersionNumber={live.versionNumber + 1}
-            paymentConfirmed={Boolean(thread.paymentConfirmedAt)}
-            acceptedForProcessing={Boolean(thread.acceptedForProcessingAt)}
           />
         </CardContent>
       </Card>

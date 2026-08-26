@@ -65,7 +65,6 @@ import {
   eq,
   gte,
   inArray,
-  isNotNull,
   lt,
   lte,
   sql,
@@ -110,7 +109,6 @@ export type TimelineEventKind =
   | "company_added"
   | "quotation_raised"
   | "quotation_issued"
-  | "payment_confirmed"
   | "dispatched"
   | "comment";
 
@@ -410,50 +408,6 @@ async function quotationIssuedEvents(
   }));
 }
 
-async function paymentConfirmedEvents(
-  session: AuthSession,
-  scope: TimelineScope,
-  range?: DateRange,
-): Promise<TimelineEvent[]> {
-  const day = riyadhDay(quotationThreads.paymentConfirmedAt);
-  const rows = await db
-    .select({
-      id: quotationThreads.id,
-      day,
-      at: quotationThreads.paymentConfirmedAt,
-      // The rep receives the payment and ticks it `[07 C3]`.
-      actorUserId: quotationThreads.paymentConfirmedByUserId,
-      actorName: users.name,
-      companyId: quotationThreads.companyId,
-      projectId: quotationThreads.projectId,
-    })
-    .from(quotationThreads)
-    .leftJoin(users, eq(users.id, quotationThreads.paymentConfirmedByUserId))
-    .where(
-      and(
-        visibleQuotationThreadsFilter(session),
-        isNotNull(quotationThreads.paymentConfirmedAt),
-        anchorFilter(scope),
-        range ? gte(day, range.from) : undefined,
-        range ? lte(day, range.to) : undefined,
-      ),
-    );
-
-  return rows.map((row) => ({
-    key: `payment_confirmed:${row.id}`,
-    kind: "payment_confirmed" as const,
-    day: row.day,
-    // `isNotNull` above guarantees this; the type does not know it.
-    at: row.at ?? new Date(`${row.day}T00:00:00Z`),
-    actorUserId: row.actorUserId,
-    actorName: row.actorName,
-    companyId: row.companyId,
-    projectId: row.projectId,
-    detail: null,
-    link: { type: "quotation" as const, id: row.id },
-  }));
-}
-
 async function dispatchedEvents(
   session: AuthSession,
   scope: TimelineScope,
@@ -685,7 +639,6 @@ async function gather(
         companyAddedEvents(session, scope, range),
         quotationRaisedEvents(session, scope, range),
         quotationIssuedEvents(session, scope, range),
-        paymentConfirmedEvents(session, scope, range),
         dispatchedEvents(session, scope, range),
       ];
 

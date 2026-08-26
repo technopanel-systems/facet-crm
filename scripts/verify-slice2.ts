@@ -70,6 +70,7 @@ import {
   users,
 } from "@/db/schema";
 import type { AuthSession } from "@/lib/authz";
+import { chainState } from "@/lib/chain";
 import { getCompany } from "@/lib/companies";
 import { NOTIFICATION_TYPES, SAUDI_CODE } from "@/lib/enums";
 import { listCountries } from "@/lib/lookups";
@@ -84,7 +85,6 @@ import {
   getQuotationThread,
   issueVersion,
   listQuotationThreads,
-  markAcceptedForProcessing,
   rejectThread,
   removeQuotationLine,
   updateQuotationLine,
@@ -365,14 +365,13 @@ async function main(): Promise<void> {
     () => rejectThread(coordinator, thread.id, "   "),
   );
 
-  /* --- 6. Payment ordering --------------------------------------- */
+  /* --- 6. Payment is not on the quotation at all `S133` ------------ */
 
-  console.log("\n6. Payment before accepted-for-processing [04 flow 12–13]");
-  await refuses(
-    "accepted-for-processing is refused before payment",
-    "quotations.errors.paymentFirst",
-    () => markAcceptedForProcessing(repA, thread.id),
-  );
+  // This section refused accepted-for-processing before payment until
+  // `S133`. Both acts are gone, with the three columns behind them: `S70`
+  // records payment on the DISPATCH and `S73` makes a method a condition of
+  // approving one, so there is no ordering left on a quotation to assert.
+  // `verify:slice3` owns what replaced it - the payment method at approval.
 
   /* --- 7. Issue, then lines are frozen --------------------------- */
 
@@ -604,9 +603,18 @@ async function main(): Promise<void> {
   await acceptThread(coordinator, thread.id);
   detail = await getQuotationThread(repA, thread.id);
   check("end state is accepted", detail?.endState === "accepted");
+  // **What "not a won deal" is measured against now** `S133`. The old
+  // assertion read `paymentConfirmedAt === null`, which is unaskable since
+  // the column went. Winning is an approved dispatch `S31`, and `S132` puts
+  // an accepted thread at *with the customer* - a position, not a win - so
+  // the chain is what says it.
   check(
-    "and the customer has still not committed — no payment on this thread",
-    detail?.paymentConfirmedAt === null,
+    "and the chain reads with-the-customer, never won [S132]",
+    detail !== null &&
+      chainState({
+        versionStatus: detail.live.status,
+        endState: detail.endState,
+      }).position === "withCustomer",
   );
 
   /* --- 13. The audit trail ---------------------------------------- */

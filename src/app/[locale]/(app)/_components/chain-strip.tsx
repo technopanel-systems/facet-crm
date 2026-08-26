@@ -4,18 +4,22 @@ import { CHAIN_COLUMNS, chainOwner, type ChainState } from "@/lib/chain";
 import { cn } from "@/lib/utils";
 
 /**
- * `22 §6.6`'s chain strip — the concept's `.chain`, on the quotation thread and
- * on a project with exactly one live thread.
+ * `D26`'s chain strip — the concept's `.chain`, on the quotation thread and on
+ * a project with exactly one live thread.
  *
  * `TurnPanel` says whose move it is. The strip says the two things a sentence
  * cannot: **how far the deal has travelled**, and **what happens next**. Six
- * nodes, one per `25 §3` column, done filled, current ringed, future hollow.
+ * nodes, one per `S132` position, done filled, current ringed, future hollow.
+ *
+ * **The strip keeps the per-step owner; the board's header does not.** `D29`
+ * as amended takes the person off a column header because a pile's name already
+ * answers `D2`. Here there is no pile — a strip is one thread's journey — so
+ * naming whose move each step is remains the only way it is said.
  *
  * **It derives nothing.** Every position, every owner and the reached column
- * come from `src/lib/chain.ts`, which is the single definition — a second
- * derivation of the same six positions from the same three fields is the trap
- * `21 §7` names, and `22 §6.6` attached avoiding it as the condition on
- * building this at all.
+ * come from `src/lib/chain.ts`, which is the single definition `S132` — a
+ * second derivation of the same six positions is the trap `21 §7` names, and
+ * `D26` attached avoiding it as the condition on building this at all.
  */
 
 type StepState = "done" | "now" | "todo";
@@ -24,10 +28,9 @@ type StepState = "done" | "now" | "todo";
  * Where each node stands.
  *
  * **A node is ringed only while someone owes it**, which falls out of `owedBy`
- * rather than being a second rule: a dispatched thread has nobody to wait for,
- * so its last node is done rather than current, and a closed thread rings
- * nothing at all — `reached` says where it stopped, and it never completed
- * that step.
+ * rather than being a second rule: a won thread has nobody to wait for, so its
+ * last node is done rather than current, and a closed thread rings nothing at
+ * all — `reached` says where it stopped, and it never completed that step.
  */
 function stepStates(chain: ChainState): StepState[] {
   const reached = CHAIN_COLUMNS.indexOf(chain.reached);
@@ -122,13 +125,14 @@ export async function ChainStrip({
           <b className="text-foreground font-semibold">
             {t("chain.explain.title")}
           </b>{" "}
-          {/* `22 §4` puts the second person only where the reader IS that
+          {/* `D2` puts the second person only where the reader IS that
               person, and the coordinator opens this screen more than anyone:
-              she neither raises the request nor confirms the payment. Same
+              she neither raises the request nor chases the customer. Same
               condition `chainTurnKey` already splits the turn line on.
-              Neither half mentions credit terms — `25 §7`'s exception to
-              `07 C3`'s payment gate is unbuilt, and THIS is the sentence that
-              amends when it ships. */}
+              **Neither half mentions payment any more** `S133` — `S70` records
+              it on the dispatch and `S73` makes it a condition of approving
+              one, so the sentence says the coordinator approves what leaves
+              and records how the customer is paying, in one breath. */}
           {t(
             `chain.explain.body.${viewerIsCoordinator ? "coordinator" : "rep"}`,
           )}{" "}

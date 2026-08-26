@@ -361,15 +361,15 @@ export default async function CompanyDetailPage({
             empty={t("companies.detail.noQuotations")}
           >
             {quotations.rows.slice(0, RELATED_CARD_LIMIT).map((row) => {
-              // `D27` — the chain is `chain.ts`'s and nothing else. This does
-              // NOT pass `hasDispatch`, exactly as `/quotations` does not: a
-              // dispatched thread therefore reads as `paid` on both screens.
-              // One under-informed answer beats two different ones; the gap is
-              // recorded rather than closed on one screen only.
+              // `S132` — the chain is `chain.ts`'s and nothing else. This
+              // passes neither dispatch flag, exactly as `/quotations` does
+              // not: a thread that has shipped therefore reads as *with the
+              // customer* on both screens. One under-informed answer beats two
+              // different ones; the gap is recorded rather than closed on one
+              // screen only.
               const state = chainState({
                 versionStatus: row.versionStatus,
                 endState: row.endState,
-                paymentConfirmedAt: row.paymentConfirmedAt,
               });
               return (
                 <RecordRow

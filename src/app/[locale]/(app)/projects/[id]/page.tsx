@@ -101,22 +101,24 @@ export default async function ProjectDetailPage({
   // several get the flag, because a strip implies ONE position and a project
   // with three live threads does not have one.
   const only = live.length === 1 ? live[0] : null;
+  // The last two nodes, made real. `listDispatches` already filters by thread,
+  // and anyone who can see the thread can see its dispatches. The two statuses
+  // are `S132`'s own: `submitted` is *ready to ship*, where the coordinator is
+  // checking it `S88`, and `approved` is *won* `S31`. A `draft` is asked for by
+  // neither — `S132` refuses it as a position because it is the rep's own to
+  // edit `S125` and can sit for ever.
+  const [onlyApproved, onlySubmitted] = only
+    ? await Promise.all([
+        listDispatches(session, { threadId: only.id, status: "approved" }),
+        listDispatches(session, { threadId: only.id, status: "submitted" }),
+      ])
+    : [null, null];
   const onlyChain = only
     ? chainState({
         versionStatus: only.versionStatus,
         endState: only.endState,
-        paymentConfirmedAt: only.paymentConfirmedAt,
-        // The sixth node, made real. `listDispatches` already filters by
-        // thread, and anyone who can see the thread can see its dispatches.
-        // **Approved only** `S72` — the node says goods have moved, and a
-        // request waiting on the coordinator has moved none.
-        hasDispatch:
-          (
-            await listDispatches(session, {
-              threadId: only.id,
-              status: "approved",
-            })
-          ).total > 0,
+        hasDispatch: (onlyApproved?.total ?? 0) > 0,
+        hasSubmittedDispatch: (onlySubmitted?.total ?? 0) > 0,
       })
     : null;
 

@@ -260,10 +260,19 @@ function matchesSearch(row: FollowUpRow, query: string | undefined): boolean {
  * `quotation_threads` plus `visibleQuotationThreadsFilter`.
  *
  * **What counts as a response** is a reading of `07 D5`, stated here rather
- * than left in the query: the thread has not ended, payment has not been
- * confirmed, the version is still the live `issued` one — a revision would have
- * superseded it `[10 §4]` — and nobody has logged an interaction against the
- * company since it went out.
+ * than left in the query: the thread has not ended, the version is still the
+ * live `issued` one — a revision would have superseded it `[10 §4]` — and
+ * nobody has logged an interaction against the company since it went out.
+ *
+ * **There was a fourth term until `S133`**: `payment_confirmed_at is null`,
+ * which stopped the chase once the customer had paid. It went with the column,
+ * and **nothing replaced it**, deliberately. Measured before the deletion, it
+ * removed **0** rows — every paid thread also carried `end_state = 'accepted'`,
+ * and the `end_state is null` term above already drops those — so taking it out
+ * changed no behaviour, which is what made the deletion clean. Whether a
+ * SUBMITTED dispatch should stop a chase is a different and real question,
+ * worth 3 of the 15 threads in this pool, and it is a new rule rather than a
+ * replacement: `WORKFLOW §5` carries it with the measurement.
  */
 async function quotationNoResponse(
   session: AuthSession,
@@ -300,7 +309,6 @@ async function quotationNoResponse(
         visibleQuotationThreadsFilter(session),
         eq(auditLog.action, "quotation_version.issued"),
         isNull(quotationThreads.endState),
-        isNull(quotationThreads.paymentConfirmedAt),
         isNull(companies.archivedAt),
         isNull(companies.mergedIntoId),
         lte(issuedOn, cutoff),
@@ -438,7 +446,6 @@ async function quotationReturned(
         visibleQuotationThreadsFilter(session),
         eq(auditLog.action, "quotation_version.returned_for_edit"),
         isNull(quotationThreads.endState),
-        isNull(quotationThreads.paymentConfirmedAt),
         isNull(companies.archivedAt),
         isNull(companies.mergedIntoId),
         lte(returnedOn, cutoff),

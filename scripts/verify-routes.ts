@@ -1131,14 +1131,13 @@ async function main(): Promise<void> {
           shapes.add(shape);
 
           const label = `${shape} (${id.slice(0, 8)})`;
-          // Six nodes, one per `25 §3` column. A dropped column fails here.
+          // Six nodes, one per `S132` position. A dropped column fails here.
           check(`${label}: six steps`, strip.steps.length === 6, `got ${strip.steps.length}`);
-          // **A node is ringed only while someone owes it** — so a dispatched
-          // thread rings none, and a closed one rings none either, showing
-          // instead where it stopped.
+          // **A node is ringed only while someone owes it** — so a won thread
+          // rings none, and a closed one rings none either, showing instead
+          // where it stopped.
           const now = strip.steps.filter((state) => state === "now").length;
-          const owed =
-            strip.position !== "closed" && strip.position !== "dispatched";
+          const owed = strip.position !== "closed" && strip.position !== "won";
           check(`  it rings ${owed ? "one" : "no"} node`, now === (owed ? 1 : 0), `got ${now}`);
           if (strip.position === "closed") {
             check(
@@ -2163,49 +2162,39 @@ async function main(): Promise<void> {
         `got "${stockFact}"`,
       );
 
-      /* --- 3. paid, so it can be dispatched [S73] ----------------------- */
+      /* --- 3. the strip draws the position it is really in [S132] ------ */
 
-      const paymentForm = thread.body.match(
-        /<form[^>]*>(?:(?!<\/form>)[\s\S])*?name="confirmedOn"[\s\S]*?<\/form>/,
-      )?.[0];
-      check(`${locale}: the payment form is on the rep's screen`, Boolean(paymentForm));
-      if (!paymentForm) continue;
-      const paymentFields = envelope(paymentForm);
-      paymentFields.set("confirmedOn", "2026-08-18");
-      // **This POST is waited for.** It was not, for four sessions: the form
-      // never sent response headers, so the helper that stood here aborted at
-      // 5s and this chain asserted only the state left behind. The bind moved
-      // to the call site and it answers; section 17 is where that is the
-      // assertion, and here it is simply no longer excused.
-      const paidPost = await post(repJar, threadPath, paymentFields);
+      // **The payment drive lived here and is gone** `S133`. It filled the
+      // `confirmedOn` form, waited for the POST, then asserted the strip read
+      // `paid`. There is no such form, no such act and no such rung: `S70`
+      // records payment on the dispatch and `S73` makes a method a condition
+      // of approving one, so nothing sits between accepted and dispatched.
+      //
+      // What replaces it is the claim the old block was really making - that
+      // the strip reads the thread's real position and not a hopeful one.
+      // This thread is raised and not yet issued, so `S132` puts it at
+      // `requested`, owed by the coordinator.
       check(
-        `${locale}: the payment POST answers [WORKFLOW §5]`,
-        paidPost.status === 200,
-        paidPost.status === 0
-          ? "NO REPLY within 8s — the hang is back"
-          : `got ${paidPost.status}`,
+        `${locale}: *** the strip reads requested before it is issued *** [S132]`,
+        stripOf(thread.body)?.position === "requested",
+        `chain reads ${stripOf(thread.body)?.position ?? "nothing"}`,
+      );
+      check(
+        `${locale}: …and no payment form is offered anywhere on it [S133]`,
+        !thread.body.includes('name="confirmedOn"') &&
+          !thread.body.includes('data-act="confirm-payment"'),
+        "a payment form is still rendered",
       );
 
-      // What the POST actually did, read back off the screen: the form is
-      // offered only while the payment is unconfirmed, so its absence is the
-      // confirmation — and the chain strip agrees, at `paid` `D27` `D29`.
-      const paid = await get(repJar, threadPath);
-      check(
-        `${locale}: the rep's payment POST confirmed it [S73]`,
-        !paid.body.includes('name="confirmedOn"') &&
-          stripOf(paid.body)?.position === "paid",
-        `chain reads ${stripOf(paid.body)?.position ?? "nothing"}`,
-      );
-
-      /* --- 3b. paid is not enough: it must be ISSUED [S126] ------------- */
+      /* --- 3b. it must be ISSUED before it is dispatchable [S126] ------ */
 
       // The picker is the first half of the rule: what the action refuses is
       // never offered. `S126` narrowed `listDispatchableThreads` from the live
-      // version to the issued one, so a paid thread still being edited `S61`
-      // drops out of it.
+      // version to the issued one, so a thread still being edited `S61` drops
+      // out of it.
       const beforeIssue = await get(coordJar, `/${locale}/dispatches/new`);
       check(
-        `${locale}: *** a paid but UNISSUED quotation is not offered *** [S126]`,
+        `${locale}: *** an UNISSUED quotation is not offered *** [S126]`,
         !new RegExp(`<option[^>]*value="${threadId}"`).test(beforeIssue.body),
         "the form offers what the action refuses",
       );
@@ -2264,7 +2253,7 @@ async function main(): Promise<void> {
       const issueFields = envelope(issueForm);
       issueFields.set("smacReference", `${stamp}-${locale}`);
       issueFields.set("verification", "unverified");
-      // Waited for, as the payment above `WORKFLOW §5`.
+      // Waited for, as every real POST in this walk is `WORKFLOW §5`.
       const issuePost = await post(coordJar, threadPath, issueFields);
       check(
         `${locale}: the issue POST answers [WORKFLOW §5]`,
@@ -2281,9 +2270,9 @@ async function main(): Promise<void> {
         new RegExp(`<option[^>]*value="${threadId}"[^>]*>`),
       )?.[0];
       check(
-        `${locale}: the paid, project-less quotation is offered for dispatch [S74]`,
+        `${locale}: the issued, project-less quotation is offered for dispatch [S74]`,
         Boolean(option),
-        "not in the list — did the payment POST fail?",
+        "not in the list — did the issue POST fail?",
       );
       check(
         `${locale}: …and is marked as carrying no project of its own [S50]`,
@@ -3511,28 +3500,21 @@ async function main(): Promise<void> {
     };
 
     for (const locale of ["en", "ar"] as const) {
-      /* --- the rep's payment tick, on the write-nothing path ----------- */
+      /* --- the payment tick that used to lead this section ------------- */
 
-      // An empty date is refused by `readFields` before anything is written,
-      // and that is the point: the hang was never the panel being unmounted by
-      // its own success. It reproduced on paths that wrote nothing at all.
-      let paymentDriven = false;
-      const repThreads = await get(repJar, `/${locale}/quotations`);
-      for (const threadId of idsOf(repThreads.body, "quotations", locale)) {
-        const path = `/${locale}/quotations/${threadId}`;
-        const form = actForm((await get(repJar, path)).body, "confirm-payment");
-        if (!form) continue;
-        await drives(`${locale}: *** confirmPayment ***`, repJar, path, form, {
-          confirmedOn: "",
-        });
-        paymentDriven = true;
-        break;
-      }
-      check(
-        `${locale}: an unpaid quotation is reachable for the payment form`,
-        paymentDriven,
-        "nothing offered confirm-payment",
-      );
+      // **Gone with `S133`.** This drove `confirm-payment` on its empty-date
+      // path - the write-nothing path, which is where the hang reproduced -
+      // and it was the first of the four forms this section guards. The form,
+      // its action and the column behind it left together, so there is
+      // nothing here to drive and the check that an unpaid quotation was
+      // reachable has nothing to be reachable for.
+      //
+      // **This closes two of `WORKFLOW §5`'s ten §17 preconditions**: both
+      // *an unpaid quotation is reachable for the payment form* checks, one
+      // per locale, were among the ten that go red once residue displaces a
+      // seeded fixture off page one. Eight remain, and the six-runs-per-seed
+      // count that row measured is unchanged - the same four threads per run
+      // still displace the same page-one slots.
 
       /* --- the participant forms, added then taken back off ------------ */
 
@@ -4703,11 +4685,40 @@ async function main(): Promise<void> {
         `${surfaces} surfaces against ${columnTags} columns`,
       );
 
-      /* ── D2: whose move is on the header, not repeated per card ──────── */
+      /* ── D29: the header names the pile, and never a person ──────────── */
 
       check(
-        `${locale}: the column header says whose move it is [D2], [D29]`,
+        `${locale}: every column of the ladder renders its own header [D29]`,
         columns.every((column) => board.body.includes(`data-column="${column}"`)),
+      );
+      /*
+       * **`D29` as amended, asserted as an ABSENCE.** The board named a person
+       * under each column title until `S132` — `chainOwner`, through
+       * `chain.by.*` — and the rule now says why that was wrong: a header
+       * describing a person makes the person the subject, and the subject is
+       * the project. `D2` is answered by the pile's own definition instead.
+       *
+       * **Asserted structurally, not by string.** This file may not compare a
+       * translated value, so it counts what a header CONTAINS: exactly one
+       * paragraph, the name and the count. A second line coming back fails it
+       * whatever language it is written in, which is the whole point.
+       */
+      const headerBlocks = [
+        ...boardMarkup.matchAll(/<header[^>]*>([\s\S]*?)<\/header>/g),
+      ].map((match) => match[1]);
+      check(
+        `${locale}: every column renders exactly one header [D29]`,
+        headerBlocks.length === columns.length,
+        `${headerBlocks.length} header(s) for ${columns.length} columns`,
+      );
+      check(
+        `${locale}: *** no column header names a person *** [D29], [D24]`,
+        headerBlocks.every(
+          (block) => (block.match(/<p[\s>]/g) ?? []).length === 1,
+        ),
+        headerBlocks
+          .map((block) => (block.match(/<p[\s>]/g) ?? []).length)
+          .join(","),
       );
 
       /* ── D59: the view chips carry the search ────────────────────────── */

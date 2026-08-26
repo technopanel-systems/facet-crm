@@ -93,11 +93,9 @@ import {
   addQuotationLine,
   addServiceLine,
   cancelThread,
-  confirmPayment,
   createQuotationThread,
   createRevision,
   issueVersion,
-  markAcceptedForProcessing,
   rejectThread,
   returnForEdit,
   type QuotationLineInput,
@@ -859,24 +857,6 @@ function planThreads(look: Lookups): void {
           coordinator,
           id(threadId, row.key, "thread"),
           "المشروع تأجل من طرف المالك، ألغينا العرض بطلب من العميل",
-        );
-      });
-    }
-    if (row.paid !== undefined) {
-      const paid = row.paid;
-      on(paid, `thread ${row.key} paid`, async () => {
-        await confirmPayment(
-          who(owner),
-          id(threadId, row.key, "thread"),
-          day(paid),
-        );
-      });
-    }
-    if (row.processed !== undefined) {
-      on(row.processed, `thread ${row.key} processed`, async () => {
-        await markAcceptedForProcessing(
-          who(owner),
-          id(threadId, row.key, "thread"),
         );
       });
     }

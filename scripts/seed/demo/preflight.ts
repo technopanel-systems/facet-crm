@@ -100,8 +100,6 @@ export function preflight(): void {
       ...(row.revisions ?? []),
       row.issued,
       row.accepted,
-      row.paid,
-      row.processed,
     ]);
     // An end state is final: `setEndState` refuses a second one, and the
     // screen offers neither reject nor cancel once a thread is accepted.

@@ -2,25 +2,29 @@ import { getTranslations } from "next-intl/server";
 
 import { Badge } from "@/components/ui/badge";
 import { Link } from "@/i18n/navigation";
-import { chainOwner } from "@/lib/chain";
 import { formatSqm } from "@/lib/decimal";
 import { lookupName } from "@/lib/lookups";
 import { projectState, type ProjectBoard } from "@/lib/projects";
 
 /**
- * `D29`'s board — the six chain positions, side by side.
+ * `D29`'s board — `S132`'s six positions, side by side.
  *
  * **Six columns, always, empty ones included.** `D29` says the board's columns
  * *are* the six positions; a column that disappeared when nothing was in it
  * would be a different board on every screen, and the point of this one is
  * seeing the whole pipeline at once. The count says the column is empty.
  *
- * **Whose move is on the column header, not the card** `D2`. Within a column it
- * is the same answer for every card — `chainOwner` is a function of the
- * position and nothing else — so a line per card would be the same sentence
- * forty times. This is what a board buys over a table: **the grouping carries
- * the answer, so the row does not have to.** `D24` already asks a group header
- * for its name and its count; this adds the third thing `D2` asks for.
+ * **The header carries the pile's name and its count, and never a person**
+ * `D29` `D24`. It named one until `S132` — `chainOwner` under the title — and
+ * the rule now says why that was wrong: *a header describing a person makes the
+ * person the subject, and the subject is the project.* The coordinator
+ * processes paperwork inside three of the six positions and owns none of them.
+ *
+ * **`D2` is answered by the pile's own definition**, which is why removing the
+ * name costs nothing. *With the customer* says whose move it is as clearly as
+ * a name would and better — it names nobody who is not a user of FACET. A pile
+ * is not a status, so the grouping still carries the answer `D2` asks for; what
+ * changed is that the answer is the pile.
  *
  * **No m² in the header** `S68`. Quotations are never summed, and the only
  * figure that *could* be summed down a column without double counting is
@@ -73,7 +77,6 @@ export async function ProjectBoardView({
         className="flex h-128 items-stretch gap-3 overflow-x-auto pb-1"
       >
         {board.columns.map(({ column, cards }) => {
-          const owner = chainOwner(column);
           return (
             <section
               key={column}
@@ -88,12 +91,6 @@ export async function ProjectBoardView({
                   <span className="num ms-auto flex-none" dir="ltr">
                     {cards.length}
                   </span>
-                </p>
-                {/* `D2` at the group, which is what the card is spared. The
-                    terminal column owes nobody, and says so — the same
-                    treatment the chain strip gives its last node. */}
-                <p className="text-muted-foreground mt-1 text-[11px]">
-                  {owner ? t(`chain.by.${owner}`) : t("common.none")}
                 </p>
               </header>
 

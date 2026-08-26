@@ -195,7 +195,7 @@ column that used to claim a win by hand is gone from the vocabulary entirely —
 no route can set it. Committed is the rep's own flag, set and cleared by them,
 and is ranked below won and lost wherever a state is printed.
 
-**S132. [CHANGE]** **A project sits in exactly one of six positions on the
+**S132.** **A project sits in exactly one of six positions on the
 quotation chain, each derived from a real event.** In order:
 
 1. **No price yet** — no live quotation thread. Not the same as *no thread
@@ -228,17 +228,23 @@ moving, waiting on a named person, and closed with a reason, and this is the
 second. Left unwritten, the next reader decides a fourth state exists, which is
 how the silence derivation came to give two screens two answers.
 
-**S133. [CHANGE]** **Payment is not a position on the chain.** S70 records
+**S133.** **Payment is not a position on the chain.** S70 records
 payment on the dispatch and S73 makes a method a condition of approving one, so
 **no interval exists between paid and dispatched** for a position to occupy.
 
 The `paid` rung is removed, and **the mechanism behind it leaves in the same
 slice**: confirming payment on a quotation, marking one accepted for processing,
 and the three columns those two acts write. Each is a leftover of the gate S73
-replaced, and none is cited by a rule still standing. What must be decided
-before they go is what then stops a moving quotation being chased — two
-follow-up conditions suppress themselves on a confirmed payment today. **OPEN —
-not chosen.**
+replaced, and none is cited by a rule still standing.
+
+**Nothing replaces the two follow-up suppressors.** They read the confirmed
+payment to stop chasing a quotation that was already moving, and measured before
+the deletion the term removed **no rows at all**: every paid thread also carried
+`accepted`, which the end-state term beside it already dropped. So the two come
+out with the column and the behaviour is unchanged, which is what makes the
+deletion clean. Whether a *submitted dispatch* should stop a chase is a
+different question, and a new rule rather than a replacement; it is measured and
+recorded in WORKFLOW §5, to be decided on its own.
 
 **S134.** **A project's position is never set by hand.** No act moves a card,
 and none is added. Where a project's real events jump a position — no quotation

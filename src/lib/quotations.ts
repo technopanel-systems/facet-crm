@@ -24,10 +24,11 @@
  * two diverge. Every figure stays a string end to end — a square-metre number
  * the business is measured on must not pass through a float.
  *
- * **`accepted` is internal approval, not a won deal** `[16 §5]`. It means the
- * coordinator has the signatures. The customer commits at
- * `payment_confirmed_at` and then `accepted_for_processing_at`. Nothing that
- * counts, ranks or forecasts may read the end state as "bought".
+ * **`accepted` is internal approval, not a won deal** `S65`. It means the
+ * coordinator has the signatures; the customer is then deciding, which `S132`
+ * calls *with the customer* and names the longest wait in the business. Nothing
+ * that counts, ranks or forecasts may read the end state as "bought" — winning
+ * is an approved dispatch `S31` and nothing else.
  */
 
 import {
@@ -214,7 +215,6 @@ export type QuotationThreadListRow = {
   companyName: string;
   raisedByName: string;
   endState: QuotationThreadEndState | null;
-  paymentConfirmedAt: Date | null;
   smacReference: string | null;
   versionNumber: number;
   versionStatus: QuotationVersionStatus;
@@ -311,7 +311,6 @@ export async function listQuotationThreads(
         companyName: companies.name,
         raisedByName: users.name,
         endState: quotationThreads.endState,
-        paymentConfirmedAt: quotationThreads.paymentConfirmedAt,
         smacReference: quotationVersions.smacReference,
         versionNumber: quotationVersions.versionNumber,
         versionStatus: quotationVersions.status,
@@ -360,10 +359,16 @@ export async function listQuotationThreads(
  * project quoted three times at 2,000 m² is the same 2,000 counted three times.
  * The square metres of these threads are deliberately not returned.
  *
- * The position comes from `chainState()` — the one definition `D27` — on the
- * same three fields `/quotations` reads for its own turn column, so the
- * dashboard cannot disagree with the list it links to. Restating the ladder in
- * SQL would be the second derivation that module exists to prevent.
+ * The position comes from `chainState()` — the one definition `S132` — on the
+ * same two fields `/quotations` reads for its own turn column, so the dashboard
+ * cannot disagree with the list it links to. Restating the ladder in SQL would
+ * be the second derivation that module exists to prevent.
+ *
+ * **`S132` renamed the position this counts** — `waitingSignature` is `quoted`,
+ * and the figure is unchanged: the predicate was always *the live version is
+ * issued and the thread is not accepted*, which is the price existing, never
+ * somebody waiting to sign `S65`. `D32` keeps the side figure and follows the
+ * name.
  *
  * **Unpaginated, and that is the cost of one definition.** It reads every
  * visible thread's live version — three small columns — and grows linearly
@@ -371,14 +376,13 @@ export async function listQuotationThreads(
  * ceiling `listQuotationFormOptions` and `listDispatchableThreads` carry
  * (`WORKFLOW §5`). A `sees_all_reps` identity reads the whole company.
  */
-export async function awaitingSignatureCount(
+export async function quotedCount(
   session: AuthSession,
 ): Promise<number> {
   const rows = await db
     .select({
       versionStatus: quotationVersions.status,
       endState: quotationThreads.endState,
-      paymentConfirmedAt: quotationThreads.paymentConfirmedAt,
     })
     .from(quotationThreads)
     .innerJoin(
@@ -387,8 +391,7 @@ export async function awaitingSignatureCount(
     )
     .where(and(visibleQuotationThreadsFilter(session), liveVersionFilter()));
 
-  return rows.filter((row) => chainState(row).position === "waitingSignature")
-    .length;
+  return rows.filter((row) => chainState(row).position === "quoted").length;
 }
 
 export type QuotationProjectOption = {
@@ -572,7 +575,6 @@ export type QuotationThreadDetail = QuotationThread & {
   contactName: string | null;
   raisedByName: string;
   cancelledByName: string | null;
-  paymentConfirmedByName: string | null;
   versions: QuotationVersion[];
   live: QuotationVersionDetail;
   /**
@@ -788,10 +790,7 @@ export async function getQuotationThread(
   // transaction. If this is ever null the data is broken, not the request.
   if (!liveVersion) throw new Error(`Thread ${id} has no live version`);
 
-  const names = await namesFor([
-    row.thread.cancelledByUserId,
-    row.thread.paymentConfirmedByUserId,
-  ]);
+  const names = await namesFor([row.thread.cancelledByUserId]);
 
   const [projectViewable, companyViewable] = await Promise.all([
     // No project, nothing to open `S50` — and `false` is what the screen
@@ -815,8 +814,6 @@ export async function getQuotationThread(
     contactName: row.contactName,
     raisedByName: row.raisedByName,
     cancelledByName: names.get(row.thread.cancelledByUserId ?? "") ?? null,
-    paymentConfirmedByName:
-      names.get(row.thread.paymentConfirmedByUserId ?? "") ?? null,
     versions,
     live: await loadVersionDetail(liveVersion.version),
     projectViewable,
@@ -1971,14 +1968,19 @@ async function setEndState(
 }
 
 /**
- * The coordinator accepts, after obtaining the signatures `[04 flow 10]`,
- * `[07 C3]`, `[08 C2]`, `[12 §13]` — not the rep.
+ * The coordinator accepts, after obtaining the signatures `S64` `S65` — not the
+ * rep.
  *
- * **This is internal approval, not a won deal** `[16 §5]`. The customer
- * commits later, at `payment_confirmed_at` and `accepted_for_processing_at`.
+ * **This is internal approval, not a won deal** `S65`, and `S132` makes that a
+ * position: accepting moves the thread to *with the customer*, where the
+ * customer is deciding and **the rep** owes the chase. The two columns that
+ * used to sit between this and a dispatch are gone `S133` — `S70` records
+ * payment on the dispatch and `S73` makes it a condition of approving one, so
+ * no interval exists for a position to occupy.
+ *
  * Nothing that counts, ranks or forecasts may read this end state as "bought"
  * — `07 D4`'s conversion measure and `10 §11`'s `quotations_accepted` are the
- * two places that will be tempting.
+ * two places that will be tempting. Winning is an approved dispatch `S31`.
  */
 export async function acceptThread(
   session: AuthSession,
@@ -2060,98 +2062,4 @@ export async function cancelThread(
     },
     { body, decision: "quotation_cancelled" },
   );
-}
-
-/**
- * The rep ticks payment confirmed, with a date `[07 C3]`.
- *
- * The rep receives the payment, which is why it is theirs and not the
- * coordinator's. No permission flag exists for it and none is invented:
- * visibility grants edit `[14 §2]`, and the audit log plus
- * `payment_confirmed_by_user_id` record who actually did it.
- *
- * This is not an amounts ledger. Its value is the gate: dispatch is blocked
- * until it is set — enforced in Slice 3, where dispatch is built.
- */
-export async function confirmPayment(
-  session: AuthSession,
-  threadId: string,
-  confirmedOn: string,
-): Promise<void> {
-  await assertThreadVisible(session, threadId);
-
-  await withAudit(session.actor, async (tx, log) => {
-    const [before] = await tx
-      .select()
-      .from(quotationThreads)
-      .where(eq(quotationThreads.id, threadId))
-      .limit(1);
-    if (!before) throw new RuleError("quotations.errors.notFound");
-    if (
-      before.endState === "cancelled" ||
-      before.endState === "rejected"
-    ) {
-      throw new RuleError("quotations.errors.threadClosed");
-    }
-
-    const [after] = await tx
-      .update(quotationThreads)
-      .set({
-        paymentConfirmedByUserId: session.user.id,
-        // A date the rep types, read in Riyadh, stored as an instant at the
-        // start of that day so the column keeps meaning one calendar day.
-        paymentConfirmedAt: new Date(`${confirmedOn}T00:00:00+03:00`),
-      })
-      .where(eq(quotationThreads.id, threadId))
-      .returning();
-
-    log({
-      action: "quotation_thread.payment_confirmed",
-      entityType: "quotation_thread",
-      entityId: threadId,
-      before: { paymentConfirmedAt: before.paymentConfirmedAt },
-      after: {
-        paymentConfirmedAt: after.paymentConfirmedAt,
-        paymentConfirmedByUserId: after.paymentConfirmedByUserId,
-      },
-    });
-  });
-}
-
-/**
- * The rep marks it accepted for processing `[04 flow 13]` — **after** payment
- * `[04 flow 12]`. This, with payment, is where the customer commits `[16 §5]`.
- */
-export async function markAcceptedForProcessing(
-  session: AuthSession,
-  threadId: string,
-): Promise<void> {
-  await assertThreadVisible(session, threadId);
-
-  await withAudit(session.actor, async (tx, log) => {
-    const [before] = await tx
-      .select()
-      .from(quotationThreads)
-      .where(eq(quotationThreads.id, threadId))
-      .limit(1);
-    if (!before) throw new RuleError("quotations.errors.notFound");
-    if (!before.paymentConfirmedAt) {
-      throw new RuleError("quotations.errors.paymentFirst");
-    }
-    if (before.acceptedForProcessingAt) return; // idempotent
-
-    const [after] = await tx
-      .update(quotationThreads)
-      .set({ acceptedForProcessingAt: new Date() })
-      .where(eq(quotationThreads.id, threadId))
-      .returning();
-
-    log({
-      action: "quotation_thread.accepted_for_processing",
-      entityType: "quotation_thread",
-      entityId: threadId,
-      before: { acceptedForProcessingAt: null },
-      after: { acceptedForProcessingAt: after.acceptedForProcessingAt },
-    });
-  });
 }

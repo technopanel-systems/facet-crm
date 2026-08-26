@@ -19,9 +19,10 @@
  *    `S31`), lost, committed, open — and every `CHAIN_COLUMNS` position, plus
  *    `closed`, which `D29` keeps off the board
  *  - every quotation state a screen can draw: `requested`, `issued`,
- *    `superseded`, returned for edits, accepted, rejected, cancelled, paid,
- *    accepted for processing — and one thread carried to **three versions**,
- *    so "the latest live version" `S68` means something
+ *    `superseded`, returned for edits, accepted, rejected, cancelled — and one
+ *    thread carried to **three versions**, so "the latest live version" `S68`
+ *    means something. There is no paid state: `S133` took payment off the
+ *    quotation entirely, and `S70` records it on the dispatch instead
  *  - `S75`'s three dispatch routes in roughly equal thirds, `S120`'s
  *    difference on both sides of submission, and every `dispatch_status`
  */
@@ -573,6 +574,32 @@ export const PROJECTS: readonly ProjectRow[] = [
     sqmExpected: "150",
     age: 55,
   },
+  /*
+   * **This project exists so `S132`'s *With the customer* pile is not empty**,
+   * and that is the whole of its job.
+   *
+   * The pile is the longest wait in the business — a quotation accepted `S65`
+   * and the customer deciding, days to months — and until this row the dataset
+   * never produced one. Measured before it was added: all 19 projects carrying
+   * an accepted thread also carried an approved dispatch **from that same
+   * thread**, so furthest-along-wins `S132` read every one of them as Won and
+   * the column rendered its zero on every identity. A pile nobody can see
+   * working is a pile nobody can judge.
+   *
+   * So `T61` below is accepted and has NO dispatch, on a project no other
+   * thread touches, held by `faisal` so the pile is non-empty for a rep as well
+   * as for the manager and the coordinator.
+   */
+  {
+    key: "P50",
+    nameEn: "Buraydah retail frontage",
+    nameAr: "واجهة محلات تجارية - بريدة",
+    owner: "faisal",
+    companies: ["شركة البنيان الراسخ للمقاولات"],
+    city: "Buraydah",
+    sqmExpected: "540",
+    age: 80,
+  },
 ] as const;
 
 /* ------------------------------------------------------------------ *
@@ -620,9 +647,6 @@ export type ThreadRow = {
   accepted?: number;
   rejected?: number;
   cancelled?: number;
-  /** `S70`'s neighbour — the rep confirms the customer paid. */
-  paid?: number;
-  processed?: number;
 };
 
 export const THREADS: readonly ThreadRow[] = [
@@ -671,17 +695,17 @@ export const THREADS: readonly ThreadRow[] = [
   { key: "T32", company: "شركة مراسي جدة", project: "P38", contact: true, stock: "riyadh", sqm: 1900, lines: 3, raised: 76, issued: 70, accepted: 62 },
   { key: "T33", company: "شركة رسم للدعاية والإعلان", project: "P17", stock: "riyadh", sqm: 180, lines: 2, raised: 42, issued: 36, accepted: 28 },
 
-  /* --- paid: the customer committed `[16 §5]` ----------------------- */
-  { key: "T34", company: "مؤسسة إبداع للدعاية والإعلان", project: null, stock: "riyadh", sqm: 90, lines: 1, raised: 90, issued: 84, accepted: 79, paid: 74 },
-  { key: "T35", company: "شركة البناء المتين للمقاولات", project: null, contact: true, stock: "riyadh", sqm: 380, lines: 2, raised: 82, issued: 76, accepted: 70, paid: 64 },
-  { key: "T36", company: "مصنع النخبة للتشكيل المعدني", project: "P35", stock: "dammam", sqm: 350, lines: 2, raised: 44, issued: 38, accepted: 32, paid: 27 },
-  { key: "T37", company: "Silver Line Contracting", project: "P28", contact: true, stock: "riyadh", sqm: 1320, lines: 3, raised: 33, issued: 27, accepted: 20, paid: 14 },
-  { key: "T38", company: "شركة الياسمين للمقاولات", project: "P43", contact: true, stock: "south", sqm: 640, lines: 2, raised: 43, issued: 37, accepted: 31, paid: 25 },
+  /* --- accepted, with a dispatch behind them `S132` ------------------ */
+  { key: "T34", company: "مؤسسة إبداع للدعاية والإعلان", project: null, stock: "riyadh", sqm: 90, lines: 1, raised: 90, issued: 84, accepted: 79 },
+  { key: "T35", company: "شركة البناء المتين للمقاولات", project: null, contact: true, stock: "riyadh", sqm: 380, lines: 2, raised: 82, issued: 76, accepted: 70 },
+  { key: "T36", company: "مصنع النخبة للتشكيل المعدني", project: "P35", stock: "dammam", sqm: 350, lines: 2, raised: 44, issued: 38, accepted: 32 },
+  { key: "T37", company: "Silver Line Contracting", project: "P28", contact: true, stock: "riyadh", sqm: 1320, lines: 3, raised: 33, issued: 27, accepted: 20 },
+  { key: "T38", company: "شركة الياسمين للمقاولات", project: "P43", contact: true, stock: "south", sqm: 640, lines: 2, raised: 43, issued: 37, accepted: 31 },
 
-  /* --- accepted for processing `[04 flow 13]` ----------------------- */
-  { key: "T39", company: "مصنع سدرة للصناعات المعدنية", project: null, contact: true, stock: "riyadh", sqm: 480, lines: 2, raised: 110, issued: 105, accepted: 100, paid: 96, processed: 95 },
-  { key: "T40", company: "مصنع درة الشرق للصناعة", project: null, contact: true, stock: "dammam", sqm: 600, lines: 2, raised: 112, issued: 107, accepted: 102, paid: 98, processed: 97 },
-  { key: "T41", company: "unico aluminum factory", project: null, contact: true, stock: "riyadh", sqm: 700, lines: 2, raised: 91, issued: 85, accepted: 80, paid: 75, processed: 74 },
+  /* --- accepted, shipped, and still open `S77` ---------------------- */
+  { key: "T39", company: "مصنع سدرة للصناعات المعدنية", project: null, contact: true, stock: "riyadh", sqm: 480, lines: 2, raised: 110, issued: 105, accepted: 100 },
+  { key: "T40", company: "مصنع درة الشرق للصناعة", project: null, contact: true, stock: "dammam", sqm: 600, lines: 2, raised: 112, issued: 107, accepted: 102 },
+  { key: "T41", company: "unico aluminum factory", project: null, contact: true, stock: "riyadh", sqm: 700, lines: 2, raised: 91, issued: 85, accepted: 80 },
 
   /* --- rejected `S62` ----------------------------------------------- */
   { key: "T42", company: "شركة الحصن للمقاولات العامة", project: "P05", contact: true, stock: "riyadh", sqm: 950, lines: 3, raised: 88, issued: 82, rejected: 40 },
@@ -704,13 +728,21 @@ export const THREADS: readonly ThreadRow[] = [
   { key: "T53", company: "شركة النهضة للمقاولات", project: "P08", contact: true, stock: "riyadh", sqm: 2850, lines: 3, raised: 39, revisions: [33, 26], issued: 19 },
 
   /* --- issued and dispatched against `S126` ------------------------- */
-  { key: "T54", company: "مصنع الأفق للألمنيوم", project: null, contact: true, stock: "riyadh", sqm: 320, lines: 2, raised: 108, issued: 102, accepted: 97, paid: 92 },
-  { key: "T55", company: "مصنع الرواد للألمنيوم", project: null, contact: true, stock: "malham", sqm: 300, lines: 2, raised: 79, issued: 73, accepted: 68, paid: 63 },
-  { key: "T56", company: "مصنع الخليج الأول للألمنيوم", project: null, stock: "dammam", sqm: 450, lines: 2, raised: 103, issued: 96, accepted: 90, paid: 85 },
-  { key: "T57", company: "شركة مداد العمار للمقاولات", project: "P07", contact: true, stock: "riyadh", sqm: 410, lines: 2, raised: 66, issued: 60, accepted: 54, paid: 48 },
-  { key: "T58", company: "مصنع البحر الأحمر للألمنيوم", project: "P36", contact: true, stock: "riyadh", sqm: 520, lines: 2, raised: 94, issued: 88, accepted: 82, paid: 76 },
-  { key: "T59", company: "مصنع تهامة للألمنيوم", project: null, contact: true, stock: "south", sqm: 260, lines: 2, raised: 82, issued: 76, accepted: 70, paid: 65 },
-  { key: "T60", company: "شركة لمسات للدعاية والإعلان", project: "P46", contact: true, stock: "riyadh", sqm: 80, lines: 1, raised: 86, issued: 80, accepted: 74, paid: 69 },
+  { key: "T54", company: "مصنع الأفق للألمنيوم", project: null, contact: true, stock: "riyadh", sqm: 320, lines: 2, raised: 108, issued: 102, accepted: 97 },
+  { key: "T55", company: "مصنع الرواد للألمنيوم", project: null, contact: true, stock: "malham", sqm: 300, lines: 2, raised: 79, issued: 73, accepted: 68 },
+  { key: "T56", company: "مصنع الخليج الأول للألمنيوم", project: null, stock: "dammam", sqm: 450, lines: 2, raised: 103, issued: 96, accepted: 90 },
+  { key: "T57", company: "شركة مداد العمار للمقاولات", project: "P07", contact: true, stock: "riyadh", sqm: 410, lines: 2, raised: 66, issued: 60, accepted: 54 },
+  { key: "T58", company: "مصنع البحر الأحمر للألمنيوم", project: "P36", contact: true, stock: "riyadh", sqm: 520, lines: 2, raised: 94, issued: 88, accepted: 82 },
+  { key: "T59", company: "مصنع تهامة للألمنيوم", project: null, contact: true, stock: "south", sqm: 260, lines: 2, raised: 82, issued: 76, accepted: 70 },
+  { key: "T60", company: "شركة لمسات للدعاية والإعلان", project: "P46", contact: true, stock: "riyadh", sqm: 80, lines: 1, raised: 86, issued: 80, accepted: 74 },
+
+  /* --- with the customer: accepted, and nothing has shipped `S132` --- */
+  /* The only thread in the set that reaches `withCustomer` and stops there.
+     Every other accepted thread carries a dispatch, so furthest-along-wins
+     reads its project as Won and the pile would render its zero. Accepted
+     64 days ago and still undecided, which is what `S132` calls the long
+     wait. Do not give it a dispatch. See `P50` for the full reasoning. */
+  { key: "T61", company: "شركة البنيان الراسخ للمقاولات", project: "P50", contact: true, stock: "riyadh", sqm: 540, lines: 2, raised: 76, issued: 70, accepted: 64 },
 ] as const;
 
 /* ------------------------------------------------------------------ *

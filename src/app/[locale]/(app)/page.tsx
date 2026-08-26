@@ -21,7 +21,7 @@ import {
   FOLLOW_UP_GROUPS,
   type FollowUpKind,
 } from "@/lib/enums";
-import { awaitingSignatureCount } from "@/lib/quotations";
+import { quotedCount } from "@/lib/quotations";
 import {
   achievementForPeriod,
   currentPeriod,
@@ -48,7 +48,7 @@ const REQUEST_ROWS = 5;
  * system-status page at `/`.
  *
  * **It composes existing modules and writes no query and no predicate of its
- * own.** `followUpScope()`, `achievementForPeriod()`, `awaitingSignatureCount()`
+ * own.** `followUpScope()`, `achievementForPeriod()`, `quotedCount()`
  * and — inside `D65`'s block — `listQuotationThreads()` and `listDispatches()`
  * are each called exactly as their own screens call them; the follow-ups
  * derivation is shared with the rail through `shellCounts()` so `/` computes it
@@ -107,12 +107,12 @@ export default async function TodayPage({
   // unpaginated thread read, so they are fetched only when the panel will
   // actually render. A block that does not qualify is absent `D64`, and absent
   // should also cost nothing on the commonest read in the application.
-  const [lastMonth, awaitingSignature] = measured
+  const [lastMonth, quoted] = measured
     ? await Promise.all([
         achievementForPeriod(session, previousPeriodStart(period)).then(
           (rows) => rows.find((row) => row.userId === session.user.id),
         ),
-        awaitingSignatureCount(session),
+        quotedCount(session),
       ])
     : [undefined, 0];
 
@@ -184,7 +184,7 @@ export default async function TodayPage({
         <TargetPanel
           measured={measured}
           lastMonth={lastMonth}
-          awaitingSignature={awaitingSignature}
+          quoted={quoted}
           month={format.dateTime(new Date(`${period}T00:00:00Z`), {
             month: "long",
             timeZone: "UTC",
@@ -331,12 +331,12 @@ function monthWorked(today: string): { worked: number; total: number } {
 async function TargetPanel({
   measured,
   lastMonth,
-  awaitingSignature,
+  quoted,
   month,
 }: {
   measured: AchievementRow;
   lastMonth: AchievementRow | undefined;
-  awaitingSignature: number;
+  quoted: number;
   month: string;
 }) {
   const t = await getTranslations();
@@ -431,9 +431,9 @@ async function TargetPanel({
           {/* A COUNT, never a sum `S68` — one project quoted three times at
               2,000 m² is the same 2,000 counted three times. */}
           <SideFigure
-            label={t("today.target.awaitingSignature")}
-            value={String(awaitingSignature)}
-            detail={t("today.target.awaitingSignatureUnit")}
+            label={t("today.target.quoted")}
+            value={String(quoted)}
+            detail={t("today.target.quotedUnit")}
           />
           <SideFigure
             label={t("today.target.lastMonth")}

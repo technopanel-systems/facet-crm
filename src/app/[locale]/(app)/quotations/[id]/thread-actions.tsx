@@ -13,10 +13,8 @@ import { emptyFormState, type FormState } from "@/lib/validation";
 import {
   acceptThreadAction,
   cancelThreadAction,
-  confirmPaymentAction,
   createRevisionAction,
   issueVersionAction,
-  markAcceptedForProcessingAction,
   rejectThreadAction,
   returnForEditAction,
 } from "../actions";
@@ -219,56 +217,12 @@ function IssueForm({ action }: { action: ReasonAction }) {
   );
 }
 
-/**
- * The rep's tick, with a date, because the rep receives the payment `[07 C3]`.
- *
- * Its own component for `ReasonForm`'s reason — and this is the form
- * `WORKFLOW §5` named first: it is the one that has never answered a raw POST
- * since session 4.
- */
-function PaymentForm({ action }: { action: ReasonAction }) {
-  const t = useTranslations();
-  const [state, submit, pending] = useActionState(action, emptyFormState);
-  return (
-    <form
-      action={submit}
-      className="flex flex-col gap-2"
-      data-act="confirm-payment"
-    >
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-1.5">
-          <Label
-            htmlFor="confirmedOn"
-            className="text-muted-foreground text-start text-xs"
-          >
-            {t("common.date")}
-          </Label>
-          <Input
-            id="confirmedOn"
-            name="confirmedOn"
-            type="date"
-            dir="ltr"
-            required
-            className="text-start"
-          />
-        </div>
-        <Button type="submit" size="sm" disabled={pending}>
-          {pending ? t("common.saving") : t("common.confirm")}
-        </Button>
-      </div>
-      <Feedback state={state} />
-    </form>
-  );
-}
-
 export function ThreadActions({
   threadId,
   isCoordinator,
   liveStatus,
   endState,
   nextVersionNumber,
-  paymentConfirmed,
-  acceptedForProcessing,
 }: {
   threadId: string;
   /** Presentation only — every action re-checks the flag on the server. */
@@ -276,8 +230,6 @@ export function ThreadActions({
   liveStatus: "requested" | "issued" | "superseded";
   endState: string | null;
   nextVersionNumber: number;
-  paymentConfirmed: boolean;
-  acceptedForProcessing: boolean;
 }) {
   const t = useTranslations();
 
@@ -405,30 +357,6 @@ export function ThreadActions({
             <PlainButton
               action={createRevisionAction.bind(null, threadId, reviseOrigin)}
               label={t("quotations.actions.revise")}
-            />
-          </Panel>
-        ) : null}
-
-        {/* With acceptance for processing, this is where the customer actually
-            commits `[16 §5]`. */}
-        {!paymentConfirmed && endState !== "cancelled" && endState !== "rejected" ? (
-          <Panel
-            title={t("quotations.actions.confirmPayment")}
-            hint={t("quotations.actions.confirmPaymentHint")}
-          >
-            <PaymentForm action={confirmPaymentAction.bind(null, threadId)} />
-          </Panel>
-        ) : null}
-
-        {paymentConfirmed && !acceptedForProcessing ? (
-          <Panel
-            title={t("quotations.actions.markAccepted")}
-            hint={t("quotations.actions.markAcceptedHint")}
-          >
-            <PlainButton
-              action={markAcceptedForProcessingAction.bind(null, threadId)}
-              label={t("quotations.actions.markAccepted")}
-              variant="default"
             />
           </Panel>
         ) : null}

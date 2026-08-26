@@ -11,11 +11,9 @@ import {
   addQuotationLine,
   addServiceLine,
   cancelThread,
-  confirmPayment,
   createQuotationThread,
   createRevision,
   issueVersion,
-  markAcceptedForProcessing,
   rejectThread,
   removeQuotationLine,
   removeServiceLine,
@@ -423,41 +421,6 @@ export async function cancelThreadAction(
   }
 
   revalidatePath("/quotations");
-  revalidatePath(`/quotations/${threadId}`);
-  return {};
-}
-
-/** The rep's tick, with a date `[07 C3]`. */
-export async function confirmPaymentAction(
-  threadId: string,
-  _previous: FormState,
-  formData: FormData,
-): Promise<FormState> {
-  const session = await requireSession();
-  const fields = readFields(formData);
-  const confirmedOn = fields.date("confirmedOn", { required: true });
-  if (!fields.ok || !confirmedOn) return fields.state;
-
-  try {
-    await confirmPayment(session, threadId, confirmedOn);
-  } catch (error) {
-    return ruleErrorState(error, fields.values);
-  }
-
-  revalidatePath("/quotations");
-  revalidatePath(`/quotations/${threadId}`);
-  return {};
-}
-
-export async function markAcceptedForProcessingAction(
-  threadId: string,
-): Promise<FormState> {
-  const session = await requireSession();
-  try {
-    await markAcceptedForProcessing(session, threadId);
-  } catch (error) {
-    return ruleErrorState(error);
-  }
   revalidatePath(`/quotations/${threadId}`);
   return {};
 }

@@ -508,8 +508,6 @@ async function main(): Promise<void> {
       projectId: projectA.id,
       companyId: companyA.id,
       raisedByUserId: authorUser.id,
-      paymentConfirmedByUserId: authorUser.id,
-      paymentConfirmedAt: new Date(),
     })
     .returning();
   const [versionA] = await db
@@ -1076,7 +1074,6 @@ async function main(): Promise<void> {
     "company_added",
     "quotation_raised",
     "quotation_issued",
-    "payment_confirmed",
     "dispatched",
   ] as const) {
     check(`company A's timeline carries a \`${kind}\` event`, kinds.has(kind));
@@ -1399,12 +1396,12 @@ async function main(): Promise<void> {
     dispatched?.actorUserId === coordinator.user.id,
     `got ${dispatched?.actorUserId}`,
   );
-  const paid = chain.find((event) => event.kind === "payment_confirmed");
-  check(
-    "payment counts for the rep who ticked it [07 C3]",
-    paid?.actorUserId === authorUser.id,
-    `got ${paid?.actorUserId}`,
-  );
+  // **There is no payment event to attribute** `S133`. It was the third
+  // assertion here until this slice: `payment_confirmed` counted for the rep
+  // who ticked it, and the tick is gone with `confirmPayment` and the column
+  // behind it. Payment lives on the dispatch now `S70`, and the dispatch event
+  // above already attributes to its recorder `S112`, so the attribution rule
+  // this section proves is unchanged — one fewer event proves it.
 
   /* --- 15. Visibility in both directions [20 §10], [20 §8.2] ------- */
 

@@ -203,6 +203,36 @@ export function projectIsWon(): SQL<boolean> {
 }
 
 /**
+ * **`S132`'s fifth position: a dispatch against the project is `submitted`** —
+ * the coordinator is checking it `S72`, and `S88` says a dispatch request waits
+ * on her rather than on a rep.
+ *
+ * **A `draft` does not qualify**, which `S132` states rather than leaves to be
+ * inferred: a draft is still the rep's own to edit `S125` and can sit
+ * indefinitely, so it is not a place the deal has reached. Neither does a
+ * refused or cancelled one — this is a status test, not a history one.
+ *
+ * The twin of `projectIsWon` above in every other respect, and deliberately
+ * written the same way: `exists()` from the builder rather than a `sql`
+ * template, so both table qualifiers are emitted and `CLAUDE.md`'s correlated
+ * subquery trap cannot reach it. A free entry naming no project reaches no
+ * position `S75`.
+ */
+export function projectHasSubmittedDispatch(): SQL<boolean> {
+  return exists(
+    db
+      .select({ one: sql`1` })
+      .from(dispatches)
+      .where(
+        and(
+          eq(dispatches.projectId, projects.id),
+          eq(dispatches.status, "submitted"),
+        ),
+      ),
+  ) as SQL<boolean>;
+}
+
+/**
  * What a project's state is, in one word, for the one place a screen prints it.
  *
  * `S28` — a project's state is derived from real events, and `S29` lists what
@@ -244,10 +274,18 @@ export function projectState(row: {
  * `10 §1`: the funnel is *"computed from what has actually happened"* and
  * nobody ticks a box, so **there is no stage column and there is not going to
  * be one**. Moving means a stage-advancing event: a quotation raised on the
- * project, a payment confirmed on one of its threads, or an **approved**
- * dispatch against it `S72` — a request sitting with the coordinator is the
- * project waiting, not the project moving. Falling back to the project's own
- * creation, which is the case a threshold exists to catch.
+ * project, or an **approved** dispatch against it `S72` — a request sitting
+ * with the coordinator is the project waiting, not the project moving. Falling
+ * back to the project's own creation, which is the case a threshold exists to
+ * catch.
+ *
+ * **A confirmed payment was the third event until `S133`**, which took the
+ * column with the mechanism behind it. `S70` records payment on the dispatch
+ * now, and the dispatch is already counted here, so nothing a rule still names
+ * is lost. What DID move is the ordering: a project whose payment stamp was
+ * later than its raise ages by that gap, which shifts `/projects` `D25` and
+ * `S89`'s stage-unchanged clock together. `WORKFLOW §5` carries that, so a
+ * reader who notices the shift has the answer rather than rediscovering it.
  *
  * **This was `follow-ups.ts`'s private copy until this slice**, where it fed
  * `S89`'s stage-unchanged condition. `/projects` needs the same answer to order
@@ -279,9 +317,8 @@ export function projectMovement() {
   const threadEvents = db
     .select({
       projectId: quotationThreads.projectId,
-      at: sql<string | null>`greatest(
-        max((${quotationThreads.createdAt} at time zone 'Asia/Riyadh')::date),
-        max((${quotationThreads.paymentConfirmedAt} at time zone 'Asia/Riyadh')::date)
+      at: sql<string | null>`max(
+        (${quotationThreads.createdAt} at time zone 'Asia/Riyadh')::date
       )`.as("thread_event_at"),
     })
     .from(quotationThreads)
@@ -363,10 +400,10 @@ export async function firstCompanyByName(
  * is the only place that gap is closed, and it closes it two ways the founder
  * settled with the board:
  *
- * **Furthest along wins**, which is the rule `chainReached` already applies one
- * level down — a thread that is accepted *and* paid is at `paid`. A project
- * with one thread dispatched and one awaiting signature reads as dispatched,
- * and `liveThreads` is what stops the second one being lost behind the first.
+ * **Furthest along wins** `S132`, which is the rule `chainReached` already
+ * applies one level down. A project with one thread won and one still quoted
+ * reads as won, and `liveThreads` is what stops the second one being lost
+ * behind the first.
  *
  * **`new` at project level means no LIVE thread**, where `chain.ts`'s means no
  * thread at all. A project whose every thread was rejected or cancelled is not
@@ -375,12 +412,14 @@ export async function firstCompanyByName(
  * own text, because one that shifts by level and is not written down is how the
  * silence derivation drifted.
  *
- * **`won` supplies the last rung.** `chainState` stops at `paid` for a caller
- * that has not loaded dispatches, and the project already knows: `projectIsWon`
- * is `S31`'s one predicate and an approved dispatch is exactly what
- * `dispatched` means. So the answer is the furthest of the live threads'
- * positions and `dispatched` where the project is won — which is also what
- * stops a won project whose only thread was later cancelled reading as `new`.
+ * **The last two rungs come from the project, not the thread.** `chainState`
+ * stops at `withCustomer` for a caller that has not loaded dispatches, and both
+ * remaining positions are facts about a dispatch against the project:
+ * `projectHasSubmittedDispatch` is `S132`'s *ready to ship* `S72` `S88`, and
+ * `projectIsWon` is `S31`'s one predicate, which is exactly what *won* means.
+ * So the answer is the furthest of the live threads' positions and whichever of
+ * those two holds — which is also what stops a won project whose only thread
+ * was later cancelled reading as `new`.
  *
  * **No thread visibility filter**, deliberately. A project's figures follow the
  * project — `dispatchedSqmByCompany`'s argument — and filtering the threads by
@@ -414,14 +453,29 @@ function furthest(a: ChainColumn, b: ChainColumn): ChainColumn {
   return CHAIN_COLUMNS.indexOf(b) > CHAIN_COLUMNS.indexOf(a) ? b : a;
 }
 
+/**
+ * **The two positions a thread cannot answer, seeded from the project itself.**
+ *
+ * `S132`'s last two rungs are facts about a DISPATCH against the project, not
+ * about a quotation — *ready to ship* is one at `submitted` and *won* is one
+ * approved — so `chainState()` cannot reach either from a thread row and the
+ * caller supplies them. Both come from the same query as the cards, resolved in
+ * SQL before anything is folded (`CLAUDE.md`), and `won` outranks `ready`
+ * because furthest along wins.
+ */
 async function chainByProject(
   projectIds: string[],
   won: Map<string, boolean>,
+  readyToShip: Map<string, boolean>,
 ): Promise<Map<string, ProjectChain>> {
   const answer = new Map<string, ProjectChain>();
   for (const id of projectIds) {
     answer.set(id, {
-      position: won.get(id) ? "dispatched" : "new",
+      position: won.get(id)
+        ? "won"
+        : readyToShip.get(id)
+          ? "readyToShip"
+          : "new",
       liveThreads: 0,
     });
   }
@@ -431,7 +485,6 @@ async function chainByProject(
     .select({
       projectId: quotationThreads.projectId,
       endState: quotationThreads.endState,
-      paymentConfirmedAt: quotationThreads.paymentConfirmedAt,
       versionStatus: quotationVersions.status,
     })
     .from(quotationThreads)
@@ -451,10 +504,12 @@ async function chainByProject(
     const entry = answer.get(row.projectId);
     if (!entry) continue;
 
+    // No dispatch flags: the project already carries both, seeded above, and
+    // passing them per thread would answer a project-level question one thread
+    // at a time.
     const { position } = chainState({
       versionStatus: row.versionStatus,
       endState: row.endState,
-      paymentConfirmedAt: row.paymentConfirmedAt,
     });
     // A closed thread is not on the board and does not count as live `S86`.
     if (position === "closed") continue;
@@ -574,6 +629,9 @@ export async function listProjects(
       // computed after the page is fetched returns silently wrong screens
       // (`CLAUDE.md`).
       won: projectIsWon(),
+      // `S132`'s fifth rung, resolved in the same statement and for the same
+      // reason as `won` above.
+      readyToShip: projectHasSubmittedDispatch(),
       committed: projects.committed,
       region: projects.region,
 
@@ -605,6 +663,7 @@ export async function listProjects(
         chainByProject(
           found.map((row) => row.id),
           new Map(found.map((row) => [row.id, row.won])),
+          new Map(found.map((row) => [row.id, row.readyToShip])),
         ),
         getPositiveIntSetting(
           PROJECT_STAGE_UNCHANGED_KEY,
@@ -704,6 +763,7 @@ export async function listProjectBoard(
       ownerName: users.name,
       sqmExpected: projects.sqmExpected,
       won: projectIsWon(),
+      readyToShip: projectHasSubmittedDispatch(),
       committed: projects.committed,
     })
     .from(projects)
@@ -719,7 +779,11 @@ export async function listProjectBoard(
   const ids = found.map((row) => row.id);
 
   const [chain, participants, [lostTotal], [owners]] = await Promise.all([
-    chainByProject(ids, new Map(found.map((row) => [row.id, row.won]))),
+    chainByProject(
+      ids,
+      new Map(found.map((row) => [row.id, row.won])),
+      new Map(found.map((row) => [row.id, row.readyToShip])),
+    ),
     firstCompanyByName(ids),
     db
       .select({ total: count() })

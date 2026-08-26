@@ -67,10 +67,11 @@ export const OTHER_LOSS_REASON_CODE = "other";
  * `0018` then took the date too, because validity is SMAC's. A terminal state
  * said the thread was over, which is the opposite of what the rule says.
  *
- * **`accepted` is internal approval, never a won deal** `[16 §5]`: it means
- * the coordinator has the signatures. The customer commits later, at
- * `payment_confirmed_at` and then `accepted_for_processing_at`. Nothing that
- * counts, ranks or forecasts may read this value as "bought".
+ * **`accepted` is internal approval, never a won deal** `S65`: it means the
+ * coordinator has the signatures. The customer is then deciding, which `S132`
+ * names *with the customer* — the longest wait in the business, and the rep's
+ * to chase. Nothing that counts, ranks or forecasts may read this value as
+ * "bought": winning is an approved dispatch `S31`.
  */
 export const QUOTATION_THREAD_END_STATES = [
   "accepted",

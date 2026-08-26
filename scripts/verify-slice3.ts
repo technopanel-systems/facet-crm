@@ -183,7 +183,6 @@ import {
 import {
   acceptThread,
   addServiceLine,
-  confirmPayment,
   createQuotationThread,
   createRevision,
   getQuotationThread,
@@ -551,7 +550,7 @@ async function main(): Promise<void> {
   };
 
   // Thread 1 — will be paid, and is what the linked dispatches go against.
-  const paidThread = await createQuotationThread(
+  const mainThread = await createQuotationThread(
     repA,
     { projectId: project.id, companyId: company.id, contactId: null },
     version,
@@ -559,7 +558,7 @@ async function main(): Promise<void> {
     [],
   );
   // A service line, so §11 can prove service m² never reach a target.
-  await addServiceLine(repA, paidThread.id, {
+  await addServiceLine(repA, mainThread.id, {
     serviceTypeId: service.id,
     quantity: "10.0000",
     unitPrice: "25.00",
@@ -570,14 +569,14 @@ async function main(): Promise<void> {
   // `S72` it has to be ISSUED to be one: the gate now fires at the approval,
   // and a thread that was never issued is refused earlier, by `S126`. An
   // unissued thread would prove the wrong refusal.
-  const unpaidThread = await createQuotationThread(
+  const onDeliveryThread = await createQuotationThread(
     repA,
     { projectId: project.id, companyId: company.id, contactId: null },
     version,
     [line],
     [],
   );
-  await issueVersion(coordinator, unpaidThread.id, {
+  await issueVersion(coordinator, onDeliveryThread.id, {
     smacReference: `${stamp}-unpaid`,
     verification: "unverified",
   });
@@ -710,6 +709,11 @@ async function main(): Promise<void> {
   //     it, and `verify:schema25` §16 asserts that over every row.
   //   * It sat inside the thread branch, so a FREE ENTRY `S75` passed no
   //     payment gate at all. §3b below is that half, and it is new.
+  //   * `S133` has since removed the old gate ENTIRELY - the column, the two
+  //     acts that wrote it, and the chain rung `paid` that was its last
+  //     reader. So this section no longer contrasts paid with unpaid; every
+  //     quotation is unpaid as far as FACET is concerned, and the method on
+  //     the dispatch is the only payment fact there is.
   //
   // An unissued quotation is a different matter and still refuses at the
   // request: `S126` is about what may be dispatched against at all.
@@ -718,61 +722,57 @@ async function main(): Promise<void> {
   // approval succeed, and §10-§11 below assert September's achievement as an
   // exact worked example — a proof that quietly added five square metres to
   // two reps' targets would be failing those checks for the wrong reason.
-  const unpaidRequest = await requestDispatch(coordinator, {
+  const onDeliveryRequest = await requestDispatch(coordinator, {
     ...SHIP,
     lines: linesOf("10.0000"),
     dispatchDate: "2026-12-10",
-    quotationThreadId: unpaidThread.id,
+    quotationThreadId: onDeliveryThread.id,
     companyId: null,
     userId: null,
     projectId: null,
   });
   check(
     "*** an unpaid quotation may be REQUESTED against *** [S72]",
-    unpaidRequest.status === "draft",
+    onDeliveryRequest.status === "draft",
   );
-  await submitDispatchRequest(coordinator, unpaidRequest.id);
+  await submitDispatchRequest(coordinator, onDeliveryRequest.id);
   await refuses(
     "*** approval refuses with NO payment method *** [S73]",
     "dispatches.errors.paymentMethodRequired",
     () =>
-      approveDispatchRequest(coordinator, unpaidRequest.id, {
+      approveDispatchRequest(coordinator, onDeliveryRequest.id, {
         method: null,
         note: null,
       }),
   );
   check(
     "and the refused approval left the request submitted, not half-approved",
-    (await getDispatch(coordinator, unpaidRequest.id))?.status === "submitted",
+    (await getDispatch(coordinator, onDeliveryRequest.id))?.status === "submitted",
   );
-  // **The inversion.** This quotation carries no `payment_confirmed_at` and
-  // never will in this run. Before `S73` the same call refused with
-  // `dispatches.errors.paymentNotConfirmed` — a key that no longer exists.
-  await approveDispatchRequest(coordinator, unpaidRequest.id, {
+  // **The inversion.** Before `S73` the same call refused with
+  // `dispatches.errors.paymentNotConfirmed` - a key that no longer exists,
+  // reading a column that no longer exists either `S133`.
+  await approveDispatchRequest(coordinator, onDeliveryRequest.id, {
     method: "on_delivery",
     note: null,
   });
-  const unpaidApproved = await getDispatch(coordinator, unpaidRequest.id);
+  const onDeliveryApproved = await getDispatch(coordinator, onDeliveryRequest.id);
   check(
     "*** an UNCONFIRMED quotation approves, on delivery *** [S73], [S71]",
-    unpaidApproved?.status === "approved" &&
-      unpaidApproved.paymentMethod === "on_delivery",
-    `got status ${unpaidApproved?.status}, method ${unpaidApproved?.paymentMethod}`,
+    onDeliveryApproved?.status === "approved" &&
+      onDeliveryApproved.paymentMethod === "on_delivery",
+    `got status ${onDeliveryApproved?.status}, method ${onDeliveryApproved?.paymentMethod}`,
   );
+  // **The column that check read is gone** `S133`. It asserted that the
+  // thread carried no `payment_confirmed_at` after approving on delivery,
+  // which was the sharpest way to say the old gate was not being satisfied
+  // quietly. There is no such column now - `S70` records payment on the
+  // dispatch and nowhere else - so the assertion above, that the DISPATCH
+  // carries `on_delivery`, is the whole of it.
   check(
-    "the thread it came from still carries no payment confirmation [S73]",
-    (
-      await db
-        .select({ at: quotationThreads.paymentConfirmedAt })
-        .from(quotationThreads)
-        .where(eq(quotationThreads.id, unpaidThread.id))
-        .limit(1)
-    )[0]?.at === null,
-  );
-  check(
-    "an unpaid quotation IS offered — the list matches the write [S72]",
+    "an issued quotation IS offered - the list matches the write [S72]",
     (await listDispatchableThreads(coordinator)).some(
-      (thread) => thread.id === unpaidThread.id,
+      (thread) => thread.id === onDeliveryThread.id,
     ),
   );
 
@@ -837,17 +837,16 @@ async function main(): Promise<void> {
     (await getDispatch(coordinator, noNote.id))?.paymentNote === null,
   );
 
-  await issueVersion(coordinator, paidThread.id, {
+  await issueVersion(coordinator, mainThread.id, {
     smacReference: `${stamp}-9592`,
     verification: "unverified",
   });
-  await acceptThread(coordinator, paidThread.id);
-  await confirmPayment(repA, paidThread.id, "2026-08-01");
+  await acceptThread(coordinator, mainThread.id);
 
   check(
-    "a paid quotation IS offered",
+    "an accepted, issued quotation IS offered [S126]",
     (await listDispatchableThreads(coordinator)).some(
-      (thread) => thread.id === paidThread.id,
+      (thread) => thread.id === mainThread.id,
     ),
   );
 
@@ -855,12 +854,12 @@ async function main(): Promise<void> {
     ...SHIP,
     lines: linesOf("100.0000"),
     dispatchDate: "2026-09-10",
-    quotationThreadId: paidThread.id,
+    quotationThreadId: mainThread.id,
     companyId: null,
     userId: null,
     projectId: null,
   });
-  check("the dispatch was approved once payment was confirmed", !!linked.id);
+  check("the dispatch approved against it [S72]", !!linked.id);
   check(
     "company derived from the thread, not asked for [18 §7]",
     linked.companyId === company.id,
@@ -883,7 +882,7 @@ async function main(): Promise<void> {
     ...SHIP,
         lines: linesOf("1.0000"),
         dispatchDate: "2026-09-10",
-        quotationThreadId: paidThread.id,
+        quotationThreadId: mainThread.id,
         companyId: project.id, // any id that is not the thread's company
         userId: null,
         projectId: null,
@@ -894,7 +893,7 @@ async function main(): Promise<void> {
     ...SHIP,
     lines: linesOf("5000.0000"), // far beyond the 86.3040 m² quoted
     dispatchDate: "2026-09-11",
-    quotationThreadId: paidThread.id,
+    quotationThreadId: mainThread.id,
     companyId: null,
     userId: null,
     projectId: null,
@@ -1104,7 +1103,7 @@ async function main(): Promise<void> {
     ...SHIP,
     lines: linesOf("100.0000"),
     dispatchDate: "2026-10-05",
-    quotationThreadId: paidThread.id,
+    quotationThreadId: mainThread.id,
     companyId: null,
     userId: null,
     projectId: null,
@@ -1536,7 +1535,7 @@ async function main(): Promise<void> {
 
   // A SECOND participant that also buys, and a THIRD that never does. The
   // fixture project already has `company`, which dispatched 100 + 5000 m²
-  // against `paidThread` and — separately — 40 m² with no thread at all.
+  // against `mainThread` and — separately — 40 m² with no thread at all.
   const [buyerTwo] = await db
     .insert(companies)
     .values({
@@ -1586,7 +1585,7 @@ async function main(): Promise<void> {
     `got ${JSON.stringify(firstBuyerBefore?.dispatchedSqm)}`,
   );
 
-  // **Deltas, not totals.** Sections 3 and 7 both dispatch against `paidThread`
+  // **Deltas, not totals.** Sections 3 and 7 both dispatch against `mainThread`
   // and either could gain a row; a hardcoded total would then fail for a reason
   // that has nothing to do with S26. What must hold is how the figure MOVES.
   const baseline = toScaled(firstBuyerBefore?.dispatchedSqm ?? "0", SQM_SCALE);
@@ -1614,7 +1613,7 @@ async function main(): Promise<void> {
     ...SHIP,
     lines: linesOf("7.0000"),
     dispatchDate: "2026-09-13",
-    quotationThreadId: paidThread.id,
+    quotationThreadId: mainThread.id,
     companyId: null,
     userId: null,
     projectId: null,
@@ -1665,7 +1664,6 @@ async function main(): Promise<void> {
     verification: "unverified",
   });
   await acceptThread(coordinator, secondThread.id);
-  await confirmPayment(repA, secondThread.id, "2026-08-02");
   await approvedDispatch(coordinator, {
     ...SHIP,
     lines: linesOf("250.0000"),
@@ -1712,12 +1710,12 @@ async function main(): Promise<void> {
   // Branch one: the quotation HAS a project, so the dispatch takes it. Every
   // dispatch above already exercised this; what none of them proved is that
   // the column was written, rather than the figure still arriving through the
-  // thread. `paidThread` belongs to `project`.
+  // thread. `mainThread` belongs to `project`.
   const takenFrom = await approvedDispatch(coordinator, {
     ...SHIP,
     lines: linesOf("3.0000"),
     dispatchDate: "2026-09-14",
-    quotationThreadId: paidThread.id,
+    quotationThreadId: mainThread.id,
     companyId: null,
     userId: null,
     projectId: null,
@@ -1753,7 +1751,7 @@ async function main(): Promise<void> {
     ...SHIP,
         lines: linesOf("1.0000"),
         dispatchDate: "2026-09-14",
-        quotationThreadId: paidThread.id,
+        quotationThreadId: mainThread.id,
         companyId: null,
         userId: null,
         projectId: otherProject.id,
@@ -1798,7 +1796,6 @@ async function main(): Promise<void> {
     verification: "unverified",
   });
   await acceptThread(coordinator, looseThread.id);
-  await confirmPayment(repA, looseThread.id, "2026-08-03");
 
   await refuses(
     "dispatching it with no project chosen is refused [S74]",
@@ -2165,19 +2162,18 @@ async function main(): Promise<void> {
     "\n17. *** A dispatch may only be raised from an ISSUED quotation *** [S126]",
   );
 
-  // **Paid, deliberately not issued.** That combination was dispatchable until
-  // this slice: `confirmPayment` never reads a version's status, so a rep could
-  // confirm payment on a version still being edited `S61` and the coordinator
-  // could dispatch against it. The pairing is the assertion — the payment gate
-  // passes and the new one refuses — so a refusal cannot be `07 C3`'s.
-  const paidNotIssued = await createQuotationThread(
+  // **Accepted and deliberately not issued.** The fixture carried a confirmed
+  // payment here until `S133`, because that pairing was the assertion: the
+  // old payment gate passed while `S126` refused, so a refusal could not be
+  // `07 C3`'s. With payment off the quotation entirely there is no second
+  // gate left to be mistaken for, and the version status is the whole test.
+  const notIssuedThread = await createQuotationThread(
     repA,
     { projectId: project.id, companyId: company.id, contactId: null },
     version,
     [line],
     [],
   );
-  await confirmPayment(repA, paidNotIssued.id, "2026-08-05");
   await refuses(
     "*** a paid but UNISSUED quotation refuses *** [S126]",
     "dispatches.errors.quotationNotIssued",
@@ -2186,7 +2182,7 @@ async function main(): Promise<void> {
     ...SHIP,
         lines: linesOf("1.0000"),
         dispatchDate: "2026-09-20",
-        quotationThreadId: paidNotIssued.id,
+        quotationThreadId: notIssuedThread.id,
         companyId: null,
         userId: null,
         projectId: null,
@@ -2195,19 +2191,19 @@ async function main(): Promise<void> {
   check(
     "…and it is not offered in the dispatchable list either [S126]",
     (await listDispatchableThreads(coordinator)).every(
-      (thread) => thread.id !== paidNotIssued.id,
+      (thread) => thread.id !== notIssuedThread.id,
     ),
     "the form would offer what the action refuses",
   );
 
   // The other half of the same rule, which is what makes it a rule rather than
   // a gate: issue it and the same call goes through.
-  await issueVersion(coordinator, paidNotIssued.id, {
+  await issueVersion(coordinator, notIssuedThread.id, {
     smacReference: `${stamp}-126`,
     verification: "unverified",
   });
   const nowIssued = (await listDispatchableThreads(coordinator)).find(
-    (thread) => thread.id === paidNotIssued.id,
+    (thread) => thread.id === notIssuedThread.id,
   );
   check(
     "*** issuing it makes it dispatchable, and nothing else changed *** [S126]",
@@ -2231,7 +2227,7 @@ async function main(): Promise<void> {
   // so taking its lines untouched is *exactly as a quotation* and editing them
   // is *from a quotation, with edits* — the same two calls the screen makes.
   const prefilled = (await listDispatchableThreads(coordinator)).find(
-    (thread) => thread.id === paidNotIssued.id,
+    (thread) => thread.id === notIssuedThread.id,
   )!;
   check(
     "the issued version arrives pre-filled with its lines [S116]",
@@ -2246,7 +2242,7 @@ async function main(): Promise<void> {
     ...SHIP,
     lines: prefilled.lines,
     dispatchDate: "2026-09-21",
-    quotationThreadId: paidNotIssued.id,
+    quotationThreadId: notIssuedThread.id,
     companyId: null,
     userId: null,
     projectId: null,
@@ -2277,7 +2273,7 @@ async function main(): Promise<void> {
       ...linesOf("10.0000", "80.00"),
     ],
     dispatchDate: "2026-09-22",
-    quotationThreadId: paidNotIssued.id,
+    quotationThreadId: notIssuedThread.id,
     companyId: null,
     userId: null,
     projectId: null,
@@ -2296,7 +2292,7 @@ async function main(): Promise<void> {
     `got ${editedDetail.sqm}`,
   );
   // `S77` — the gap is the point. Editing a dispatch rewrites nothing upstream.
-  const quotedAfter = await getQuotationThread(coordinator, paidNotIssued.id);
+  const quotedAfter = await getQuotationThread(coordinator, notIssuedThread.id);
   check(
     "*** …and the QUOTATION is untouched — the gap is measured, not prevented *** [S77]",
     quotedAfter?.live.lines.length === 1 &&
@@ -2368,7 +2364,7 @@ async function main(): Promise<void> {
     ...SHIP,
     lines: linesOf("30.0000", "80.00"),
     dispatchDate: "2026-09-25",
-    quotationThreadId: paidThread.id,
+    quotationThreadId: mainThread.id,
     companyId: null,
     userId: null,
     projectId: null,
@@ -2527,7 +2523,7 @@ async function main(): Promise<void> {
     ...SHIP,
     lines: linesOf("7.0000", "60.00"),
     dispatchDate: "2026-09-27",
-    quotationThreadId: paidThread.id,
+    quotationThreadId: mainThread.id,
     companyId: null,
     userId: null,
     projectId: null,
@@ -2564,7 +2560,7 @@ async function main(): Promise<void> {
   // page one of a database with a hundred dispatches in it proves nothing —
   // it is exactly the shape of assertion that passes for the wrong reason.
   // Both scopes are asked of the same small set, so both halves are real.
-  const scope = { threadId: paidThread.id };
+  const scope = { threadId: mainThread.id };
   const working = await listDispatches(coordinator, scope);
   check(
     "*** a refused request is OUT of the working list *** [S122]",
@@ -2766,11 +2762,11 @@ async function main(): Promise<void> {
   // sections cannot disagree about what the figure is.
   const beforeCompany = await figureFor(company.id);
   const beforeThread = (await listDispatchableThreads(coordinator)).find(
-    (row) => row.id === paidThread.id,
+    (row) => row.id === mainThread.id,
   );
   const beforeChain = (
     await listDispatches(coordinator, {
-      threadId: paidThread.id,
+      threadId: mainThread.id,
       status: "approved",
     })
   ).total;
@@ -2779,7 +2775,7 @@ async function main(): Promise<void> {
     ...SHIP,
     lines: linesOf("500.0000", "100.00"),
     dispatchDate: "2026-09-30",
-    quotationThreadId: paidThread.id,
+    quotationThreadId: mainThread.id,
     companyId: null,
     userId: null,
     projectId: null,
@@ -2794,7 +2790,7 @@ async function main(): Promise<void> {
   );
 
   const afterThread = (await listDispatchableThreads(coordinator)).find(
-    (row) => row.id === paidThread.id,
+    (row) => row.id === mainThread.id,
   );
   check(
     "*** dispatched-so-far on the quotation does not move *** [S72], [S77]",
@@ -2806,7 +2802,7 @@ async function main(): Promise<void> {
     "*** and the chain's sixth node does not move *** [S72], [D27]",
     (
       await listDispatches(coordinator, {
-        threadId: paidThread.id,
+        threadId: mainThread.id,
         status: "approved",
       })
     ).total === beforeChain,
@@ -2819,11 +2815,11 @@ async function main(): Promise<void> {
     "…and approving it moves every one of them [S72]",
     (await figureFor(company.id)) !== beforeCompany &&
       (await listDispatchableThreads(coordinator)).find(
-        (row) => row.id === paidThread.id,
+        (row) => row.id === mainThread.id,
       )?.dispatchedSqm !== beforeThread?.dispatchedSqm &&
       (
         await listDispatches(coordinator, {
-          threadId: paidThread.id,
+          threadId: mainThread.id,
           status: "approved",
         })
       ).total ===
@@ -2878,7 +2874,6 @@ async function main(): Promise<void> {
     verification: "unverified",
   });
   await acceptThread(coordinator, projectless.id);
-  await confirmPayment(repA, projectless.id, "2026-08-01");
 
   await refuses(
     "a projectless quotation refuses a request that names no project [S74]",
@@ -3084,20 +3079,20 @@ async function main(): Promise<void> {
     "\n25. *** A dispatch may draw from a different stock than its quotation, and the quotation is not rewritten *** [S130]",
   );
 
-  // `paidThread` was raised from Dammam by the fixture at the head of this
+  // `mainThread` was raised from Dammam by the fixture at the head of this
   // script. The dispatch takes Riyadh, which is the whole of `S130`'s first
   // sentence — and `S119` then lets it be TT, which the quotation's own stock
   // would have forbidden. That is why the column had to move.
   const [quotedStock] = await db
     .select({ stock: quotationVersions.stock })
     .from(quotationVersions)
-    .where(eq(quotationVersions.threadId, paidThread.id))
+    .where(eq(quotationVersions.threadId, mainThread.id))
     .orderBy(quotationVersions.versionNumber)
     .limit(1);
   const elsewhere = await approvedDispatch(coordinator, {
     lines: linesOf("4.0000"),
     dispatchDate: "2026-09-13",
-    quotationThreadId: paidThread.id,
+    quotationThreadId: mainThread.id,
     companyId: null,
     userId: null,
     projectId: null,
@@ -3113,7 +3108,7 @@ async function main(): Promise<void> {
   const [afterwards] = await db
     .select({ stock: quotationVersions.stock })
     .from(quotationVersions)
-    .where(eq(quotationVersions.threadId, paidThread.id))
+    .where(eq(quotationVersions.threadId, mainThread.id))
     .orderBy(quotationVersions.versionNumber)
     .limit(1);
   check(

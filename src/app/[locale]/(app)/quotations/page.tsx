@@ -165,7 +165,6 @@ export default async function QuotationsPage({
                           chainState({
                             versionStatus: row.versionStatus,
                             endState: row.endState,
-                            paymentConfirmedAt: row.paymentConfirmedAt,
                           }),
                           viewerIsCoordinator,
                         ),
@@ -175,9 +174,7 @@ export default async function QuotationsPage({
                       // threshold for a quotation thread, and `S67` took away
                       // the one date that might have looked like one.
                       elapsed={t("followUps.fields.days", {
-                        count: daysSince(
-                          row.paymentConfirmedAt ?? row.createdAt,
-                        ),
+                        count: daysSince(row.createdAt),
                       })}
                     />
                   </TableCell>

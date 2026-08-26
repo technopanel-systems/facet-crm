@@ -162,7 +162,6 @@
       "company_added": "Company added",
       "quotation_raised": "Quotation raised",
       "quotation_issued": "Quotation issued",
-      "payment_confirmed": "Payment confirmed",
       "dispatched": "Dispatched",
       "comment": "Comment"
     },
@@ -206,29 +205,30 @@
     "turn": {
       "yours": {
         "requested": "Your turn — issue it in SMAC",
-        "waitingSignature": "Your turn — get it signed"
+        "quoted": "Your turn — accept it here",
+        "readyToShip": "Your turn — check the dispatch request"
       },
       "coordinator": {
         "requested": "Waiting on the coordinator — issue in SMAC",
-        "waitingSignature": "Waiting on the coordinator — signatures"
+        "quoted": "Waiting on the coordinator — accept it here",
+        "readyToShip": "Waiting on the coordinator — checking the dispatch request"
       },
       "rep": {
         "new": "Waiting on {name} — raise a quotation",
-        "waitingPayment": "Waiting on {name} — confirm payment",
-        "paid": "Waiting on {name} — request the dispatch"
+        "withCustomer": "Waiting on {name} — chase the customer for a decision"
       },
       "none": {
-        "dispatched": "Nothing outstanding — dispatched",
-        "closed": "Nothing outstanding — closed"
+        "closed": "Nothing outstanding — closed",
+        "won": "Nothing outstanding — won"
       }
     },
     "step": {
-      "new": "New",
-      "requested": "Quotation requested",
-      "waitingSignature": "Waiting signature",
-      "waitingPayment": "Waiting payment",
-      "paid": "Paid",
-      "dispatched": "Dispatched"
+      "new": "No price yet",
+      "requested": "Requested",
+      "quoted": "Quoted",
+      "withCustomer": "With the customer",
+      "readyToShip": "Ready to ship",
+      "won": "Won"
     },
     "by": {
       "rep": "Sales rep",
@@ -241,8 +241,8 @@
     "explain": {
       "title": "How this works.",
       "body": {
-        "rep": "You raise the request; the coordinator builds the real quotation in SMAC and gets it signed, then accepts it here and sends you the PDF. When the customer pays, you confirm the payment. The coordinator approves what actually leaves the warehouse.",
-        "coordinator": "The rep raises the request; you build the real quotation in SMAC and get it signed, then accept it here and send the PDF back. The rep confirms the payment. You approve what actually leaves the warehouse, and record how the customer is paying for it."
+        "rep": "You raise the request; the coordinator builds the real quotation in SMAC, gets it signed and accepts it here, then sends you the PDF. From there the customer decides, and chasing them is yours. When they commit you raise the dispatch request, and the coordinator checks it and approves what actually leaves the warehouse.",
+        "coordinator": "The rep raises the request; you build the real quotation in SMAC, get it signed, accept it here and send the PDF back. The customer then decides, and the rep chases them. When the rep raises the dispatch request you check it, record how the customer is paying, and approve what actually leaves the warehouse."
       },
       "target": "Only dispatched square metres count toward a target."
     }
@@ -478,10 +478,6 @@
       "returnedRounds": "Returned for edit",
       "cancelledBy": "Cancelled by",
       "cancellationReason": "Reason for cancellation",
-      "paymentConfirmedBy": "Payment confirmed by",
-      "paymentConfirmedAt": "Payment confirmed",
-      "acceptedForProcessing": "Accepted for processing",
-      "notConfirmed": "Not confirmed",
       "turnSince": "Sitting here since {date}.",
       "noProject": "No project yet",
       "noProjectState": "No project yet — one is recorded when this is dispatched.",
@@ -503,10 +499,6 @@
       "cancelHint": "A written reason is required.",
       "revise": "Create a revision",
       "reviseHint": "Version {number} carrying the RE number. The lines are carried forward and the current version becomes read-only.",
-      "confirmPayment": "Confirm payment",
-      "confirmPaymentHint": "The date the payment was received.",
-      "markAccepted": "Accept for processing",
-      "markAcceptedHint": "Available once payment is confirmed.",
       "done": "Recorded"
     },
     "errors": {
@@ -524,7 +516,6 @@
       "cancellationReasonRequired": "Cancelling needs a written reason.",
       "returnReasonRequired": "Say what needs changing. The reason goes to the rep as a comment.",
       "rejectionReasonRequired": "Say why you are rejecting it. The reason goes to the rep as a comment.",
-      "paymentFirst": "Confirm the payment first.",
       "noSuppliers": "No product suppliers have been set up yet, so a line cannot be saved.",
       "companyNotVisible": "That company cannot be found, or it is not one of yours."
     }
@@ -1169,10 +1160,10 @@
         "behind": "{pct}% of the month gone · behind pace by {sqm} m²",
         "onPace": "{pct}% of the month gone · on pace"
       },
-      "awaitingSignature": "Awaiting signature",
-      "awaitingSignatureUnit": "quotations",
       "lastMonth": "Last month",
-      "lastMonthOf": "{pct}% of {target} m²"
+      "lastMonthOf": "{pct}% of {target} m²",
+      "quoted": "Quoted",
+      "quotedUnit": "quotations"
     },
     "needsYouZero": "Nothing needs you today",
     "counts": {
