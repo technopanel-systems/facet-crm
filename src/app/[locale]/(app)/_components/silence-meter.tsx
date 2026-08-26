@@ -29,6 +29,7 @@ export async function SilenceMeter({
   thresholdDays,
   isQuiet,
   onHoldUntil,
+  variant = "cell",
 }: {
   /** Null = never logged against. */
   daysSince: number | null;
@@ -36,6 +37,18 @@ export async function SilenceMeter({
   thresholdDays: number;
   isQuiet: boolean;
   onHoldUntil: string | null;
+  /**
+   * `"cell"` is `D26`'s lead cell: the bar and the day count.
+   *
+   * `"inline"` is the turn panel's `[D24]`, where the count is already the
+   * subject of the line beside it — *"nothing recorded for 118 days"* — so this
+   * carries the **denominator** instead. That is the one thing the sentence
+   * cannot say: 118 means neglected against a 60-day threshold and merely late
+   * against a 30-day one, and a proportion is what a bar is for. It also takes
+   * no tone of its own — inside a tinted band `currentColor` is the band's, and
+   * a second red on red reads as a rendering fault.
+   */
+  variant?: "cell" | "inline";
 }) {
   const t = await getTranslations();
 
@@ -61,24 +74,36 @@ export async function SilenceMeter({
    *  and an overflowing fill reads as a rendering fault. */
   const fill = Math.min(100, Math.round((silentDays / thresholdDays) * 100));
 
+  const inline = variant === "inline";
+
   return (
     <span
       data-slot="silence-meter"
       data-days={daysSince === null ? "never" : String(daysSince)}
       data-tone={tone}
       data-quiet={isQuiet ? "true" : "false"}
+      data-variant={variant}
       className="flex w-[92px] flex-col gap-1 text-start"
     >
       {/* `aria-hidden`: the bar restates the figure below it, which a screen
           reader should hear once. */}
       <span
         aria-hidden
-        className="bg-surface-2 border-line h-1.5 w-full overflow-hidden rounded-full border"
+        className={cn(
+          "h-1.5 w-full overflow-hidden rounded-full border",
+          inline
+            ? "border-current/25 bg-current/10"
+            : "bg-surface-2 border-line",
+        )}
       >
         <span
           className={cn(
             "block h-full rounded-full",
-            tone === "late" ? "bg-tone-red-fg" : "bg-line-strong",
+            inline
+              ? "bg-current"
+              : tone === "late"
+                ? "bg-tone-red-fg"
+                : "bg-line-strong",
           )}
           style={{ inlineSize: `${fill}%` }}
         />
@@ -86,7 +111,11 @@ export async function SilenceMeter({
       {/* Never-logged is its own phrase and **never zero** — "Never" and
           "today" must not read the same (`coverage.ts`). The count is mono and
           `dir="ltr"`, a figure inside a sentence in either locale `D11`. */}
-      {daysSince === null ? (
+      {inline ? (
+        <span className="num text-[11px] font-semibold opacity-70" dir="ltr">
+          {t("companies.silence.threshold", { count: thresholdDays })}
+        </span>
+      ) : daysSince === null ? (
         <span className={cn("text-[11.5px] font-semibold", toneClass(tone))}>
           {t("companies.silence.never")}
         </span>

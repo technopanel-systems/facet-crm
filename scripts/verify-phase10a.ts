@@ -82,10 +82,10 @@ import {
   type Role,
   type User,
 } from "@/lib/authz";
+import { companyTurn } from "@/lib/coverage";
 import {
   archiveCompany,
   dormancyReviews,
-  isCompanyQuiet,
   reassignCompany,
   reincludeCompany,
 } from "@/lib/dormancy";
@@ -813,22 +813,38 @@ async function main(): Promise<void> {
     .where(eq(settings.key, QUIET_DAYS_UNQUALIFIED_KEY));
 
   /*
-   * `isCompanyQuiet` is the SAME condition, asked about one company — it is
-   * what decides whether the company page renders a dormancy panel at all.
+   * `companyTurn` is the SAME condition, asked about one company — it is what
+   * the company page's turn panel says and what decides whether the dormancy
+   * block renders at all.
    *
-   * It gets its own assertions because it was not covered by the four above
-   * and shipped broken: it wrote `current_date - $2` with the threshold as a
-   * bound parameter, Postgres cannot infer a type for `date - unknown`, and the
-   * company page answered 500. A driven HTTP pass found it. This is what keeps
-   * it found.
+   * It gets its own assertions because it was not covered by the four above and
+   * `isCompanyQuiet`, which it replaced, shipped broken: that wrote
+   * `current_date - $2` with the threshold as a bound parameter, Postgres
+   * cannot infer a type for `date - unknown`, and the company page answered
+   * 500. A driven HTTP pass found it. This is what keeps it found.
+   *
+   * **It asserts the elapsed figure too**, which `isCompanyQuiet` had no
+   * opinion about. The panel used to take that from the newest timeline event —
+   * a comment or a dispatch would reset it — and printed "Nothing recorded for
+   * 0 days" beside a Gone quiet badge. The figure is the interaction clock's
+   * `[20 §2]`, and `silentDays` past `thresholdDays` is the whole of `isQuiet`.
    */
+  const overTurn = await companyTurn(owner, quietOver.id);
   check(
-    "isCompanyQuiet agrees with the queue on a quiet company [21 §7]",
-    (await isCompanyQuiet(quietOver.id, thresholds)) === true,
+    "companyTurn agrees with the queue on a quiet company [21 §7]",
+    overTurn?.state === "quiet" && overTurn.isQuiet === true,
+    `state ${overTurn?.state}`,
   );
   check(
+    "…and its figure is the silence, not the newest event [20 §2]",
+    overTurn !== null && overTurn.silentDays > overTurn.thresholdDays,
+    `${overTurn?.silentDays} days against ${overTurn?.thresholdDays}`,
+  );
+  const underTurn = await companyTurn(owner, quietUnder.id);
+  check(
     "…and on one inside its threshold [21 §7]",
-    (await isCompanyQuiet(quietUnder.id, thresholds)) === false,
+    underTurn?.isQuiet === false && underTurn.state !== "quiet",
+    `state ${underTurn?.state}`,
   );
 
   // A response is a later interaction, whatever it said `[21 §1]`.

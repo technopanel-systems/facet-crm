@@ -15,9 +15,10 @@ import { Link } from "@/i18n/navigation";
 import { can, requireSession } from "@/lib/authz";
 import { chainState } from "@/lib/chain";
 import { lookupName } from "@/lib/lookups";
+import { getCompany } from "@/lib/companies";
 import { listQuotationThreads } from "@/lib/quotations";
 
-import { ListCard, SearchForm } from "../_components/list-controls";
+import { ListCard, ScopeChip, SearchForm } from "../_components/list-controls";
 import { Turn, chainTurnKey, daysSince } from "../_components/turn";
 
 export const dynamic = "force-dynamic";
@@ -36,11 +37,11 @@ export default async function QuotationsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ q?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; page?: string; companyId?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const { q, page } = await searchParams;
+  const { q, page, companyId } = await searchParams;
 
   const session = await requireSession();
   const t = await getTranslations();
@@ -51,8 +52,21 @@ export default async function QuotationsPage({
   const currentPage = Number(page) || 1;
   const { rows, total } = await listQuotationThreads(session, {
     q,
+    companyId,
     page: currentPage,
   });
+
+  // **The scope is named or it is not applied** `D59`. A company detail card
+  // links here for the sixth quotation onward `D70`, and a list that silently
+  // returned a subset is the defect that broke three screens. `getCompany`
+  // resolves the name through the reader's own visibility filter, so a
+  // `?companyId=` naming a company they may not see scopes the list and names
+  // nothing — the rows were already filtered by
+  // `visibleQuotationThreadsFilter`, which company membership never widens.
+  const scopedTo = companyId ? await getCompany(session, companyId) : null;
+  // Filters the search and the pager must carry, so neither throws the other
+  // away `D59`.
+  const extra = { companyId };
 
   return (
     <div className="flex flex-col gap-6">
@@ -69,7 +83,12 @@ export default async function QuotationsPage({
         basePath="/quotations"
         defaultValue={q}
         placeholder={t("quotations.searchPlaceholder")}
+        hidden={extra}
       />
+
+      {scopedTo ? (
+        <ScopeChip label={scopedTo.name} clearHref="/quotations" />
+      ) : null}
 
       {rows.length === 0 ? (
         <p className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
@@ -81,6 +100,7 @@ export default async function QuotationsPage({
           page={currentPage}
           total={total}
           query={q}
+          extra={extra}
         >
           <Table>
             <TableHeader>

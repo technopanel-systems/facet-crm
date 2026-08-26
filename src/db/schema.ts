@@ -715,8 +715,6 @@ export const companies = pgTable(
      */
     phone: text("phone").notNull(),
     categoryId: uuid("category_id").references(() => companyCategories.id),
-    /** The customer's VAT number `[08 D7]`. */
-    vatNumber: text("vat_number"),
     /**
      * `S14` — every company has one. `NOT NULL` because every company today is
      * Saudi in practice, so there is no such thing as a company whose country

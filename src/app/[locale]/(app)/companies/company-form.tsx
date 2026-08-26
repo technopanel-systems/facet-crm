@@ -131,21 +131,6 @@ export function CompanyForm({
       </FormField>
 
       <FormField
-        name="vatNumber"
-        label={t("companies.fields.vatNumber")}
-        error={errors.vatNumber}
-      >
-        <Input
-          id="vatNumber"
-          name="vatNumber"
-          dir="ltr"
-          defaultValue={value("vatNumber")}
-          aria-invalid={Boolean(errors.vatNumber) || undefined}
-          className="text-start"
-        />
-      </FormField>
-
-      <FormField
         name="categoryId"
         label={t("companies.fields.category")}
         error={errors.categoryId}

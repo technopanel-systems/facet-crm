@@ -84,11 +84,19 @@ export function TurnPanel({
   who,
   line,
   detail,
+  meter,
   tone = "soon",
 }: {
   who?: string;
   line: string;
   detail?: string;
+  /**
+   * A figure the line cannot carry — `D26`'s silence bar on a company, showing
+   * the elapsed time as a **proportion of its threshold**. It renders at the
+   * far inline-end and never restates the count: the number is in `line`, said
+   * once.
+   */
+  meter?: React.ReactNode;
   tone?: TurnTone;
 }) {
   const band =
@@ -114,7 +122,7 @@ export function TurnPanel({
           {who}
         </span>
       ) : null}
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1">
         <span className="block text-[13.5px] font-semibold">{line}</span>
         {detail ? (
           <span className="text-muted-foreground mt-0.5 block text-[12.5px]">
@@ -122,8 +130,86 @@ export function TurnPanel({
           </span>
         ) : null}
       </span>
+      {meter ? <span className="flex-none">{meter}</span> : null}
     </div>
   );
+}
+
+/**
+ * The message key for a **company's** turn — `D2` `D24`.
+ *
+ * A company has no chain position `[chain.ts]`, so this is not `chainTurnKey`'s
+ * sibling over a ladder of six; it is the six states `companyTurn` resolves,
+ * each of which already knows who owes the move.
+ *
+ * **Second person where the reader IS the holder.** `chainTurnKey` names the
+ * rep instead, and says why: a thread row carries `raisedByName` and no id, so
+ * two people called Mohammed would read each other's turn as their own. That
+ * objection does not apply here — a company's memberships carry user ids, so
+ * the comparison is honest and the second person is the clearer sentence.
+ * `D2`'s own example is the third-person half: *"Waiting on Rawan"*.
+ */
+export function companyTurnKey(
+  state:
+    | "archived"
+    | "onHold"
+    | "planned"
+    | "due"
+    | "quiet"
+    | "calm"
+    | "never",
+  viewerIsHolder: boolean,
+): string {
+  if (state === "archived" || state === "onHold") {
+    return `companies.turn.${state}`;
+  }
+  return `companies.turn.${viewerIsHolder ? "yours" : "theirs"}.${state}`;
+}
+
+/**
+ * The message key for a **dispatch's** turn — `D26`'s *who does this wait on?*,
+ * `S88`.
+ *
+ * Lifted out of `/dispatches`' row, which was the only place it existed, when
+ * the company page grew a dispatches card and would otherwise have written the
+ * same four-rung ladder a second time. `D26` states the two ends of it outright:
+ * *a submitted request owes the coordinator; an approved dispatch owes nobody*.
+ * Approved and refused both name who ended it instead — one is an event that
+ * happened, the other is archived `S122`.
+ */
+export function dispatchTurnKey(
+  status: "draft" | "submitted" | "approved" | "refused" | "cancelled",
+): string {
+  switch (status) {
+    // The raiser's, and who may still edit it while it is a draft `S125`.
+    case "draft":
+      return "dispatches.turn.rep";
+    case "submitted":
+      return "dispatches.turn.coordinator";
+    case "approved":
+      return "dispatches.turn.approved";
+    // **`cancelled` gained a line of its own here.** The ladder this replaced
+    // ended `: t("dispatches.turn.refused")`, so a cancelled dispatch read
+    // *Refused* — and the two are different acts with different rules: `S122`
+    // archives a refusal out of the working lists, while `S73`'s cancellation
+    // stays visible as history, un-wins its project and takes back the credit.
+    // The default scope keeps cancelled rows and drops refused ones, so
+    // `/dispatches` was the screen showing it, and extracting the ladder
+    // without fixing it would have printed the same wrong word twice.
+    case "cancelled":
+      return "dispatches.turn.cancelled";
+    case "refused":
+      return "dispatches.turn.refused";
+  }
+}
+
+/** Whether a dispatch's turn line names somebody — `rep` and `approved` take a
+ *  `{name}`, the other three do not. Keeps the parameter decision beside the
+ *  key that needs it rather than in each caller. */
+export function dispatchTurnNames(
+  status: "draft" | "submitted" | "approved" | "refused" | "cancelled",
+): boolean {
+  return status === "draft" || status === "approved";
 }
 
 /**

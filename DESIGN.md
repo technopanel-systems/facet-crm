@@ -241,6 +241,38 @@ the coordinator / waiting on the customer. Projects group as your move / moving.
 A flat list of forty identical rows is what reads as generic no matter how it's
 styled.
 
+**D70. A block on a detail page is sized by its content, not by its column.**
+Company, project, quotation and dispatch detail screens all inherit this.
+
+**What leads is chosen by what the reader is doing when they open the screen**,
+never by the order the fields were declared in. A company's phone leads because
+a rep reads it standing outside the customer's office. If no field can be
+defended that way, the screen has no lead and the grid is a wall — eleven facts
+in equal cells, which is what the company detail was.
+
+**A block sizes to what it holds.** A card whose whole content is one empty
+field and one sentence is not a card — it is a control, and it renders as one.
+Nothing gets a heading, a badge, a form and a history block for a decision
+nobody has taken.
+
+**A long list caps and states its total.** Whatever a card holds — timeline
+entries, quotations, dispatches — it shows a stated number and names the rest:
+*5 of 46*, with the way to them. A card the reader must drag through hides its
+own size, and a full one and an empty one look alike until they do. Where the
+rest live behind a filtered list, that list **says what it is scoped to** and
+offers the way out `D59`.
+
+**An empty block is absent, not an empty shell.** `D52` says what an empty
+*list* says and `D60` says where it sits; this says the block around it does not
+render at all when there is nothing in it and nothing to offer. A heading over
+*"No decisions recorded yet"* is the shell. (`D53` is the permission case — a
+different rule with the same instinct.)
+
+**The two columns are balanced by height, not by category.** The wide side takes
+what is genuinely long, the narrow side what is genuinely short. A column is not
+*work* and *people*; it is tall and short. When the short side runs out, a block
+moves rather than the column stretching.
+
 ---
 
 ## 6. Per-object row anatomy

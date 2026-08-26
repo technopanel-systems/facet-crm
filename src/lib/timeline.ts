@@ -701,7 +701,17 @@ async function gather(
     );
 }
 
-export const TIMELINE_CARD_LIMIT = 20;
+/**
+ * What the detail card shows before it says *and N more* `D70`.
+ *
+ * **It was 20, and 20 is a scroll, not a card.** `D70` sizes a block by its
+ * content and balances the two columns by height: twenty entries ran the wide
+ * side to roughly twice the narrow one, and a card the reader has to drag
+ * through hides its own size. The total is stated either way and
+ * `/companies/[id]/timeline` holds the rest, so nothing is lost by showing
+ * fewer — which is the test `D70`'s second clause sets.
+ */
+export const TIMELINE_CARD_LIMIT = 8;
 const TIMELINE_PAGE_SIZE = 25;
 
 /**

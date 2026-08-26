@@ -49,7 +49,10 @@ export async function Timeline({
   const t = await getTranslations();
 
   return (
-    <Card>
+    // `data-total` is `D70`'s *states its total* made assertable: the card says
+    // it in a translated sentence, which a black-box script may not read, and
+    // counting the rendered rows cannot tell a capped card from a short one.
+    <Card data-slot="timeline-card" data-total={String(total)}>
       <CardHeader className="flex flex-row items-center justify-between gap-4">
         <CardTitle className="text-start text-sm">
           {title ?? t("timeline.title")}
@@ -113,7 +116,17 @@ async function TimelineRow({ event }: { event: TimelineEvent }) {
   // border, the same padding, the same end-aligned mono date — so the two read
   // as one component in a card that holds both.
   return (
-    <li className="border-line flex items-center gap-3 border-b py-2.5 last:border-b-0">
+    <li
+      // `D70` — the card caps at `TIMELINE_CARD_LIMIT` and states its total,
+      // and `verify:routes` §21 counts these to prove it. A black-box script
+      // may not read a translated badge, so the countable thing is a marker.
+      //
+      // **Its own attribute, not a second `data-slot` value.** `data-slot` is
+      // one name per element everywhere in this codebase, and the comment row
+      // below already owns one that two sections assert on exactly.
+      data-timeline-event=""
+      className="border-line flex items-center gap-3 border-b py-2.5 last:border-b-0"
+    >
       <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-1 text-start">
         <Badge variant={event.kind === "report" ? "secondary" : "outline"}>
           {label}
@@ -165,6 +178,10 @@ async function CommentRow({
   return (
     <li
       id={`comment-${comment.id}`}
+      // A comment IS a timeline entry and counts toward `D70`'s cap, so it
+      // carries the same marker as every other row — and keeps its own
+      // `data-slot`, which sections 9 and 14 assert on.
+      data-timeline-event=""
       data-slot="comment"
       className="border-line flex flex-col gap-1 border-b py-2.5 last:border-b-0"
     >

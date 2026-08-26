@@ -86,16 +86,21 @@ export function DetailHeader({
 /**
  * The bordered fact grid `[22 §3]` — the concept's `.facts`.
  *
- * `auto-fit minmax(140px,1fr)`, as the concept has it. **The rules are drawn
- * by the cells, not by the container**, and that is the whole trick:
+ * `auto-fit minmax(170px,1fr)`, and **the rules are drawn by the cells, not by
+ * the container** — that is the whole trick:
  *
  * The concept shows exactly four facts on one row, so it can say
  * `border-inline-end` per fact and `none` on the last. A company detail has
- * **thirteen**, which at laptop width wraps to seven tracks and then six —
- * leaving one track of the last row empty. Any container-drawn line work
- * (`gap-px` over a coloured ground) paints that empty track as a solid block
- * of `--line`, which reads as a broken cell. Borders on the cells leave it
- * simply blank, because there is no cell there to draw one.
+ * **nine**, which at laptop width wraps to a short last row. Any
+ * container-drawn line work (`gap-px` over a coloured ground) paints an empty
+ * track as a solid block of `--line`, which reads as a broken cell. Borders on
+ * the cells leave it simply blank, because there is no cell there to draw one
+ * `D61`.
+ *
+ * **The track was `140px` and is now `170px`** `D70`. At 1366 the narrower one
+ * fitted seven of the company's ordinary facts on a row and left the eighth
+ * alone underneath — a ragged edge that read as a mistake. The wider track
+ * wraps them four and three.
  *
  * The wrapper exists to clip the first column's start border, which `-ms-px`
  * pushes outside. Without it the grid would show a doubled edge against the
@@ -106,7 +111,7 @@ export function Facts({ children }: { children: ReactNode }) {
     <div className="overflow-hidden">
       <dl
         data-slot="facts"
-        className="-ms-px grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))]"
+        className="-ms-px grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))]"
       >
         {children}
       </dl>
@@ -133,6 +138,7 @@ export function Fact({
   name,
   numeric,
   wide,
+  lead,
   children,
 }: {
   label: string;
@@ -141,23 +147,41 @@ export function Fact({
   numeric?: boolean;
   /** For a value that is a sentence — notes, a reason — rather than a datum. */
   wide?: boolean;
+  /**
+   * The one fact the reader came for `D70`.
+   *
+   * `D70` says what leads is chosen by what the reader is doing when they open
+   * the screen, never by the order the fields were declared in. A company's
+   * **phone** leads because a rep reads it standing outside the customer's
+   * office; it is mandatory `S13` and the primary matching key `S23`. Eleven
+   * equal cells had no lead at all, which is what made the grid a wall.
+   *
+   * At most one per grid. It spans two tracks and sets its value at 17px.
+   */
+  lead?: boolean;
   children: ReactNode;
 }) {
   return (
     <div
       data-fact={name}
+      data-lead={lead ? "true" : undefined}
       className={cn(
         // `border-t` is the row rule and, on the first row, the rule under the
         // card header. `border-s` is the column rule; the first column's is
         // clipped by `Facts`.
         "border-line border-s border-t px-4 py-3 text-start",
         wide && "col-span-full",
+        // Two tracks, but only where there are two to take — at one column the
+        // span would be the whole row anyway, and `sm:` keeps a phone from
+        // inheriting a rule written for a laptop `D55`.
+        lead && "sm:col-span-2",
       )}
     >
       <dt className="text-faint text-[11px]">{label}</dt>
       <dd
         className={cn(
-          "mt-0.5 text-sm font-semibold",
+          "mt-0.5 font-semibold",
+          lead ? "text-[17px] leading-snug" : "text-sm",
           numeric && "num",
           wide && "font-normal",
         )}

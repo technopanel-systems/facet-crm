@@ -18,10 +18,20 @@ import {
 import { Link } from "@/i18n/navigation";
 import { formatSqm } from "@/lib/decimal";
 import { requireSession } from "@/lib/authz";
+import { getCompany } from "@/lib/companies";
 import { asDispatchStatus, listDispatches } from "@/lib/dispatches";
 
-import { FilterNav, ListCard, SearchForm } from "../_components/list-controls";
-import { Turn } from "../_components/turn";
+import {
+  FilterNav,
+  ListCard,
+  ScopeChip,
+  SearchForm,
+} from "../_components/list-controls";
+import {
+  Turn,
+  dispatchTurnKey,
+  dispatchTurnNames,
+} from "../_components/turn";
 
 export const dynamic = "force-dynamic";
 
@@ -36,11 +46,12 @@ export default async function DispatchesPage({
     direct?: string;
     status?: string;
     userId?: string;
+    companyId?: string;
   }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const { q, page, direct, status, userId } = await searchParams;
+  const { q, page, direct, status, userId, companyId } = await searchParams;
 
   const session = await requireSession();
   const t = await getTranslations();
@@ -56,6 +67,7 @@ export default async function DispatchesPage({
     q,
     page: currentPage,
     userId,
+    companyId,
     status: scope,
     // `07 C6` — the direct route has to be countable, so it is filterable.
     direct: direct === "1" ? true : direct === "0" ? false : undefined,
@@ -63,6 +75,15 @@ export default async function DispatchesPage({
 
   const basePath = "/dispatches";
   const dash = t("common.none");
+
+  // **The scope is named or it is not applied** `D59`. A company detail card
+  // links here for the sixth dispatch onward `D70`, and a list that silently
+  // returned a subset is the defect that broke three screens. `getCompany`
+  // resolves the name through the reader's own filter, so a `?companyId=`
+  // naming a company they may not open scopes the list and names nothing —
+  // `visibleDispatchesFilter` had already decided which rows come back, and
+  // company membership is not one of its terms `[18 §2]`.
+  const scopedTo = companyId ? await getCompany(session, companyId) : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -84,8 +105,12 @@ export default async function DispatchesPage({
         basePath={basePath}
         defaultValue={q}
         placeholder={t("dispatches.searchPlaceholder")}
-        hidden={{ direct, status, userId }}
+        hidden={{ direct, status, userId, companyId }}
       />
+
+      {scopedTo ? (
+        <ScopeChip label={scopedTo.name} clearHref={basePath} />
+      ) : null}
 
       {/* `S72`'s four states, and the archive among them `S122`. A chip that
           dropped the current search threw the query away, which broke three
@@ -95,7 +120,7 @@ export default async function DispatchesPage({
         name="status"
         active={scope}
         query={q}
-        extra={{ direct, userId }}
+        extra={{ direct, userId, companyId }}
         options={[
           { label: t("dispatches.status.open") },
           { value: "submitted", label: t("dispatches.status.submitted") },
@@ -112,7 +137,7 @@ export default async function DispatchesPage({
         name="direct"
         active={direct === "0" || direct === "1" ? direct : undefined}
         query={q}
-        extra={{ status, userId }}
+        extra={{ status, userId, companyId }}
         options={[
           { label: t("dispatches.fields.filterAll") },
           { value: "0", label: t("dispatches.fields.filterLinked") },
@@ -135,7 +160,7 @@ export default async function DispatchesPage({
           page={currentPage}
           total={total}
           query={q}
-          extra={{ direct, status, userId }}
+          extra={{ direct, status, userId, companyId }}
         >
           <Table>
             <TableHeader>
@@ -248,19 +273,17 @@ export default async function DispatchesPage({
                         that happened, the other is archived `S122`. Both name
                         who ended it instead. */}
                     <Turn
-                      line={
-                        row.status === "draft"
-                          ? t("dispatches.turn.rep", {
-                              name: row.recordedByName,
-                            })
-                          : row.status === "submitted"
-                            ? t("dispatches.turn.coordinator")
-                            : row.status === "approved"
-                              ? t("dispatches.turn.approved", {
-                                  name: row.approvedByName ?? dash,
-                                })
-                              : t("dispatches.turn.refused")
-                      }
+                      line={t(
+                        dispatchTurnKey(row.status),
+                        dispatchTurnNames(row.status)
+                          ? {
+                              name:
+                                (row.status === "approved"
+                                  ? row.approvedByName
+                                  : row.recordedByName) ?? dash,
+                            }
+                          : undefined,
+                      )}
                     />
                   </TableCell>
                 </TableRow>

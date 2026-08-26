@@ -83,7 +83,6 @@ export type CompanyInput = {
   /** `S14`. Not nullable, and it decides the two below `S15`. */
   countryId: string;
   categoryId: string | null;
-  vatNumber: string | null;
   /** `S15` — required when the country is Saudi Arabia, forbidden otherwise.
    *  Both are `placeForCountry`'s to enforce, not this type's, because the
    *  answer depends on `countryId` rather than on the field itself.
@@ -514,7 +513,6 @@ const EDITABLE = [
   "phone",
   "countryId",
   "categoryId",
-  "vatNumber",
   "region",
   "cityId",
   "leadSourceId",

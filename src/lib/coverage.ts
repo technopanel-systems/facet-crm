@@ -395,3 +395,161 @@ export async function coverageRepOptions(
     .where(eq(users.isActive, true))
     .orderBy(asc(users.name));
 }
+
+/* ------------------------------------------------------------------ *
+ * The turn on ONE company — `D2` `D24`
+ * ------------------------------------------------------------------ */
+
+/**
+ * `D24`'s turn panel, for a company.
+ *
+ * **A company has no chain position.** `chain.ts` takes four quotation-thread
+ * fields and `CHAIN_COLUMNS[0]` is `new`, which is *a project with no thread* —
+ * there is nothing to hand `chainOwner`, so a company's turn is not computable
+ * the way a quotation's is and none is invented here. What a company can answer
+ * is how long since anyone talked to this customer, and what defers that.
+ *
+ * **The ladder is `follow-ups.ts::gather`'s, read rather than rewritten.** Step
+ * 1 drops a row whose customer is out of scope — archived, a merge tombstone,
+ * or on hold `[20 §5]`. Step 2 drops one whose record carries a future
+ * `next_follow_up_at` `[25 §18]`. Step 3 lets an arrived date **supersede** the
+ * automatic chase on its own anchor. That is `planned` before `quiet`, and
+ * `due` before `quiet`, and it is why this function exists rather than the
+ * screen ranking three booleans itself.
+ *
+ * **The elapsed figure comes from `companySilence` and nothing else.** The
+ * panel used to read `timeline.events[0].day` — the newest of seven event
+ * kinds, comments and dispatches included — while its own red band came from
+ * the interaction clock. On this database that put "Nothing recorded for 0
+ * days" beside a Gone quiet badge, and understated 20 of rep-a's 59 logged
+ * companies by 36.5 days on average. `20 §2` is the reason the two differ: a
+ * field note is anchored to nobody and cannot be evidence a customer was
+ * contacted, and neither can a comment, a dispatch or a quotation.
+ *
+ * **This is `companySilence`'s fourth reader** — after `/companies`' meter,
+ * `listCompanies`' order and `coverage()` — and the point of the extraction.
+ * `isCompanyQuiet` and `companyOnHoldUntil` came out in the same slice: the
+ * first was a second answer to *is this quiet*, and the second was **viewer
+ * scoped** where `companySilence` and `onHoldByCompany` deliberately are not,
+ * so a hold set on a report the viewer could not read showed the panel red and
+ * the list calm on one company.
+ */
+export type CompanyTurnState =
+  | "archived"
+  | "onHold"
+  | "planned"
+  | "due"
+  | "quiet"
+  | "calm"
+  | "never";
+
+export type CompanyTurn = {
+  state: CompanyTurnState;
+  /** Days since the last interaction. **Null = never logged against** — which
+   *  must not read the same as `0`. */
+  daysSince: number | null;
+  /** Days the clock has actually run: since the last interaction, else since
+   *  registration. What the meter's fill is built on. */
+  silentDays: number;
+  thresholdDays: number;
+  /** `20 §5` — in force, and unfiltered by viewer. Null unless `state` is
+   *  `onHold`. */
+  onHoldUntil: string | null;
+  /** `25 §18` — the rep's own date. Null unless `state` is `planned` or `due`. */
+  plannedFor: string | null;
+  /** The condition the dormancy block renders on `[07 E6]`, kept here so the
+   *  screen asks once. Archived and on-hold companies are never quiet. */
+  isQuiet: boolean;
+};
+
+/**
+ * The turn on one company, or `null` when this identity may not see it.
+ *
+ * The visibility filter is composed into the WHERE rather than checked after,
+ * the shape `getCompany` uses — a caller cannot forget it and still get a row.
+ */
+export async function companyTurn(
+  session: AuthSession,
+  companyId: string,
+): Promise<CompanyTurn | null> {
+  const thresholds = await getQuietThresholds();
+  const silence = companySilence(thresholds);
+
+  const [row] = await db
+    .select({
+      lastInteractionAt: silence.lastInteractionAt,
+      silentDays: silence.silentDays,
+      thresholdDays: silence.thresholdDays,
+      isQuiet: silence.isQuiet,
+      onHoldUntil: silence.onHoldUntil,
+      // Named outright rather than left to a bare `sql` template: this query
+      // joins, so an unqualified column would resolve inside the subquery
+      // (`CLAUDE.md`).
+      archivedAt: companies.archivedAt,
+      mergedIntoId: companies.mergedIntoId,
+      nextFollowUpAt: companies.nextFollowUpAt,
+    })
+    .from(companies)
+    .innerJoin(silence, eq(silence.companyId, companies.id))
+    .where(and(eq(companies.id, companyId), visibleCompaniesFilter(session)))
+    .limit(1);
+
+  if (!row) return null;
+
+  const silentDays = Number(row.silentDays);
+  const base = {
+    // Never logged is null, never zero — "Never" and "today" must not read the
+    // same, and the panel has a line of its own for it.
+    daysSince: row.lastInteractionAt ? silentDays : null,
+    silentDays,
+    thresholdDays: Number(row.thresholdDays),
+    isQuiet: Boolean(row.isQuiet),
+  };
+
+  // `gather` step 1 — the customer is out of scope. Archived and a merge
+  // tombstone are the same answer to the screen: nobody owes anything.
+  if (row.archivedAt || row.mergedIntoId) {
+    return {
+      ...base,
+      state: "archived",
+      onHoldUntil: null,
+      plannedFor: null,
+      isQuiet: false,
+    };
+  }
+
+  // Still step 1. `companySilence` already resolved this in SQL and already
+  // forced `isQuiet` false for it — on hold is never quiet `[20 §5]`.
+  if (row.onHoldUntil) {
+    return {
+      ...base,
+      state: "onHold",
+      onHoldUntil: row.onHoldUntil,
+      plannedFor: null,
+    };
+  }
+
+  // Steps 2 and 3 — the rep's own date, before the automatic clock either way.
+  // `>` and not `>=`, which is where this parts company with on hold: a
+  // follow-up date stops deferring ON the day it arrives, because that is the
+  // day it becomes the follow-up.
+  if (row.nextFollowUpAt) {
+    return {
+      ...base,
+      state: row.nextFollowUpAt > today() ? "planned" : "due",
+      onHoldUntil: null,
+      plannedFor: row.nextFollowUpAt,
+    };
+  }
+
+  return {
+    ...base,
+    state: base.isQuiet
+      ? "quiet"
+      : base.daysSince === null
+        ? "never"
+        : "calm",
+    onHoldUntil: null,
+    plannedFor: null,
+  };
+}

@@ -797,33 +797,6 @@ export function today(): string {
 }
 
 /**
- * The date until which this company raises no follow-up, or null.
- *
- * The greatest `on_hold_until` among its visible reports that has not passed.
- * Nothing is stored on the company, so correcting the report corrects the
- * suppression with nothing to keep in step `[20 §5]`. A date in the past is
- * simply not in force; the row stays, because it is what happened. Quotation
- * validity was the same shape until `S67` took it out of FACET entirely.
- */
-export async function companyOnHoldUntil(
-  session: AuthSession,
-  companyId: string,
-): Promise<string | null> {
-  const [row] = await db
-    .select({ until: sql<string | null>`max(${repReports.onHoldUntil})` })
-    .from(repReports)
-    .where(
-      and(
-        visibleRepReportsFilter(session),
-        eq(repReports.companyId, companyId),
-        eq(repReports.outcome, ON_HOLD_OUTCOME),
-        gte(repReports.onHoldUntil, today()),
-      ),
-    );
-  return row?.until ?? null;
-}
-
-/**
  * The same question for many companies at once, for the coverage screen.
  *
  * Deliberately **unfiltered by `visibleRepReportsFilter`**: suppression is a

@@ -49,7 +49,6 @@ function readCompanyForm(formData: FormData) {
     phone: fields.text("phone", { required: true, max: 50 }) ?? "",
     countryId: fields.uuid("countryId", { required: true }) ?? "",
     categoryId: fields.uuid("categoryId"),
-    vatNumber: fields.text("vatNumber", { max: 50 }),
     // Posted only for a Saudi country, and `placeForCountry` discards it
     // otherwise `S15` — the form does not render the field, and the data layer
     // does not trust that it didn't. It is not `{ required: true }` here for

@@ -1707,7 +1707,6 @@ async function main(): Promise<void> {
         // no-city case.
         for (const empty of [
           "cityId",
-          "vatNumber",
           "categoryId",
           "leadSourceId",
           "notes",
@@ -1925,7 +1924,6 @@ async function main(): Promise<void> {
       companyFields.set("countryId", saudiId);
       companyFields.set("cityId", cityId);
       for (const empty of [
-        "vatNumber",
         "categoryId",
         "leadSourceId",
         "notes",
@@ -4229,6 +4227,274 @@ async function main(): Promise<void> {
         theirs > 0 && theirs < all,
         `coordinator ${theirs} · manager ${all}`,
       );
+    }
+  }
+
+  console.log(
+    "\n21. The company detail — its turn panel, and D70's block sizing [D2], [D24], [D70]",
+  );
+  {
+    /*
+     * **The first assertion is the reason this section exists.**
+     *
+     * The turn panel took its elapsed figure from the newest TIMELINE event —
+     * the most recent of seven kinds, a comment and a dispatch among them —
+     * while the red band beside it came from the interaction clock. `20 §2`
+     * says why those differ: a field note is anchored to nobody and cannot be
+     * evidence a customer was contacted, and neither can a comment. So posting
+     * a comment reset the number to zero and left the colour alone, and the
+     * page printed "Nothing recorded for 0 days" inside a red band next to a
+     * Gone quiet badge. On this database it understated 20 of one rep's 59
+     * logged companies, by 36 days on average and 118 at worst.
+     *
+     * A screen cannot be asked whether it read the right column. It CAN be
+     * asked whether its number moves when something that is not an interaction
+     * happens, and that is a black-box question this file is allowed to ask.
+     * Section 9 already posts a comment on this same company; this brackets one
+     * with a before and an after.
+     */
+    const jar = jars["rep-a@example.test"];
+    const list = await get(jar, "/en/companies");
+    const id = firstId(list.body, "companies");
+
+    if (!id) {
+      console.log("  --    rep-a holds no company; section skipped");
+    } else {
+      const path = `/en/companies/${id}`;
+      const before = await get(jar, path);
+      check(
+        "the company detail answers 200 for its holder",
+        before.status === 200,
+        `got ${before.status}`,
+      );
+
+      /** The meter's figure, read from inside the turn panel and nowhere else —
+       *  `/companies` renders the same marker in every row. */
+      const daysOf = (body: string) =>
+        attrOf(after(body, "turn-panel"), "silence-meter", "data-days");
+
+      const figureBefore = daysOf(before.body);
+      check(
+        "the turn panel carries D26's meter [D24], [D26]",
+        figureBefore !== null,
+        `data-days ${figureBefore}`,
+      );
+
+      const form = before.body.match(
+        /<form[^>]*data-slot="comment-composer"[\s\S]*?<\/form>/,
+      )?.[0];
+      if (!form) {
+        check("the composer is on the company screen [S114]", false);
+      } else {
+        const fields = envelopeOf(form);
+        fields.set("body", "verify-routes turn-panel probe");
+        const posted = await fetch(`${BASE}${path}`, {
+          method: "POST",
+          headers: { cookie: header(jar), origin: BASE },
+          body: fields,
+          redirect: "manual",
+        });
+        store(jar, posted);
+        check(
+          "the probe comment posted",
+          posted.status === 200,
+          `got ${posted.status}`,
+        );
+
+        const afterPost = await get(jar, path);
+        // **The card's stated TOTAL, not its rendered rows.** `D70` caps the
+        // card at eight, so on a full one a ninth entry pushes one off the
+        // bottom and the row count cannot move — which is what this assertion
+        // measured first time out, and it read 8 then 8. The total is the
+        // number that is allowed to change, and stating it is `D70`'s own
+        // second clause.
+        const totalOf = (body: string) =>
+          Number(attrOf(body, "timeline-card", "data-total") ?? "-1");
+        const commentsBefore = totalOf(before.body);
+        const commentsAfter = totalOf(afterPost.body);
+        check(
+          "*** a comment does NOT move the turn panel's figure *** [D24], [20 §2]",
+          daysOf(afterPost.body) === figureBefore,
+          `${figureBefore} became ${daysOf(afterPost.body)}`,
+        );
+        check(
+          "…and the comment did land, so the negative above means something [S114]",
+          commentsAfter === commentsBefore + 1,
+          `timeline total ${commentsBefore} then ${commentsAfter}`,
+        );
+      }
+
+      const detail = await get(jar, path);
+
+      /*
+       * **The avatar names the HOLDER, not the finder** `S18` `S123`.
+       *
+       * `created_by` never moves; primacy moves on handover `S103` and on
+       * dormancy reassignment, so the panel's old `createdByName` was the wrong
+       * answer to `D2` on every company that has changed hands. The initials
+       * are decorative and `aria-hidden`, so what is asserted is that they are
+       * there at all — the name itself is in the line beside them.
+       */
+      check(
+        "the panel renders an avatar for whoever holds the company [S18], [D2]",
+        /aria-hidden/.test(after(detail.body, "turn-panel")),
+      );
+
+      /* `D70` — a long list caps and states its total. */
+      const timelineEvents = (
+        after(detail.body, "timeline").match(/data-timeline-event/g) ?? []
+      ).length;
+      check(
+        "the timeline card holds at most 8 entries [D70]",
+        timelineEvents <= 8,
+        `${timelineEvents} rendered`,
+      );
+
+      const cards = detail.body.match(/data-slot="related-card"[^>]*/g) ?? [];
+      check(
+        "quotations, projects, dispatches and contacts all render [22 §3], [D26]",
+        cards.length === 4,
+        `${cards.length} related cards`,
+      );
+      check(
+        "every related card states its total [D70]",
+        cards.length > 0 && cards.every((card) => /data-total="\d+"/.test(card)),
+        cards.join(" | "),
+      );
+
+      /* `D70` — an empty block is absent, not an empty shell. The dormancy
+       * history used to render a heading over "No decisions recorded yet". */
+      const decisions = (
+        after(detail.body, "dormancy-history").match(/<li/g) ?? []
+      ).length;
+      check(
+        "the dormancy history renders only when there is one [D70]",
+        !detail.body.includes('data-slot="dormancy-history"') || decisions > 0,
+        `history block present with ${decisions} decisions`,
+      );
+
+      /* `D70` — and it moved last. Positional, so it is asserted positionally:
+       * wherever the dormancy block is, it begins after the last related card. */
+      const lastCard = detail.body.lastIndexOf('data-slot="related-card"');
+      const dormancy = detail.body.indexOf('data-slot="dormancy-history"');
+      if (dormancy >= 0) {
+        check(
+          "the dormancy block sits after the related cards [D70]",
+          dormancy > lastCard,
+          `${dormancy} vs ${lastCard}`,
+        );
+      }
+
+      /* The facts grid keeps the three handles section 13 asserts on, gains a
+       * lead, and loses the two that no longer belong. */
+      check(
+        "phone leads the facts grid [D70], [S13], [S23]",
+        factHtmlOf(detail.body, "phone").includes('data-lead="true"'),
+      );
+      check(
+        "the place triple keeps its handles [S14], [S15]",
+        ["country", "region", "city"].every(
+          (name) => factHtmlOf(detail.body, name) !== "",
+        ),
+      );
+      check(
+        "category left the grid — the header already carries it [D70]",
+        factHtmlOf(detail.body, "category") === "",
+      );
+      check(
+        "and no VAT number fact survives [0028]",
+        !detail.body.includes("vatNumber"),
+      );
+
+      /* `S32` — the Log button is the main entry point, so it is in the header
+       * and not in the fourth card down. Asserted as *exactly one*: two would
+       * be two controls doing one thing. */
+      // **Anchors only, and no regex escaping.** Counting the raw substring
+      // also finds the RSC flight payload Next.js serialises into the same
+      // document, which is not a control anybody can click — it read 2 for
+      // one rendered button. A company id is a uuid and the href is fixed,
+      // so this is a plain string test over every anchor rather than a
+      // pattern with a `?` in it to escape.
+      const logHref = `/reports/new?companyId=${id}`;
+      const logLinks = (detail.body.match(/<a[^>]*>/g) ?? []).filter((tag) =>
+        tag.includes(logHref),
+      ).length;
+      check(
+        "exactly one Log button, and it is above the fold [S32], [D46]",
+        logLinks === 1,
+        `${logLinks} anchor(s)`,
+      );
+    }
+
+    /*
+     * **The coordinator holds four companies and is refused the rest** `S9`.
+     *
+     * NOT the flat 404 an earlier reading predicted: `S76` opens projects and
+     * contacts to the coordinator and says nothing about companies, while `S9`
+     * lets one be assigned to them — and `seed:demo` exercises that so no
+     * `company_reps.origin` is unreachable. So their company scope is an
+     * ordinary membership scope. Both halves are asserted, because a screen
+     * that 404s for everybody and one that opens for everybody each pass a
+     * one-sided check.
+     */
+    {
+      const coordinator = jars["coordinator@example.test"];
+      const theirs = firstId(
+        (await get(coordinator, "/en/companies")).body,
+        "companies",
+      );
+      if (theirs) {
+        const held = await get(coordinator, `/en/companies/${theirs}`);
+        check(
+          "the coordinator opens a company they hold [S9], [S18]",
+          held.status === 200,
+          `got ${held.status}`,
+        );
+      }
+      const managerFirst = firstId(
+        (await get(jars["manager@example.test"], "/en/companies")).body,
+        "companies",
+      );
+      if (managerFirst && managerFirst !== theirs) {
+        const refused = await get(coordinator, `/en/companies/${managerFirst}`);
+        check(
+          "…and gets 404, not 500, on one they do not [D53]",
+          refused.status === 404,
+          `got ${refused.status}`,
+        );
+      }
+    }
+
+    /*
+     * Arabic, and the empty-card sentence.
+     *
+     * A card can be empty for a RULE rather than for want of data: a rep
+     * holding a company through a share sees no projects `[04 Q7]` and no
+     * quotations, because neither filter consults company membership. A blank
+     * card and a card empty by rule are the same picture, so what is asserted
+     * is that an empty one still renders a sentence `D52` `D70`.
+     */
+    {
+      const arabic = await get(jar, "/ar/companies");
+      const anyId = firstId(arabic.body, "companies");
+      if (anyId) {
+        const page = await get(jar, `/ar/companies/${anyId}`);
+        check(
+          "ar: the detail renders with its cards [D57]",
+          page.status === 200 && page.body.includes('data-slot="related-card"'),
+          `got ${page.status}`,
+        );
+        const empties =
+          page.body.match(/data-slot="related-card" data-total="0"/g) ?? [];
+        check(
+          "ar: an empty related card carries a sentence, not a blank [D52], [D70]",
+          empties.length === 0 ||
+            /data-total="0"[\s\S]{0,600}?<p class="[^"]*text-start/.test(
+              page.body,
+            ),
+          `${empties.length} empty card(s)`,
+        );
+      }
     }
   }
 }

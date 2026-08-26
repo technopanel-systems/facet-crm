@@ -34,7 +34,7 @@
  * `verify:phase11` §12 already pins.
  */
 
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/db";
 import { companies, companyDormancyReviews, companyReps, users } from "@/db/schema";
@@ -49,7 +49,6 @@ import { NOTIFICATION_TYPES, type DormancyOutcome } from "@/lib/enums";
 import { raise } from "@/lib/notifications";
 import { today } from "@/lib/reports";
 import { RuleError } from "@/lib/validation";
-import { shiftDays } from "@/lib/working-days";
 
 export type DormancyReview = {
   id: string;
@@ -356,54 +355,4 @@ export async function archiveCompany(
       after: { companyId, outcome: review.outcome, decidedAt: review.decidedAt },
     });
   });
-}
-
-/**
- * Is this company quiet right now — the condition that makes the dormancy panel
- * worth rendering.
- *
- * Deliberately the same derivation `follow-ups.ts` uses rather than a second
- * one, and deliberately unfiltered by viewer: whether a company is quiet is a
- * fact about the company. The caller has already established it may show it.
- */
-export async function isCompanyQuiet(
-  companyId: string,
-  thresholds: { qualified: number; unqualified: number },
-): Promise<boolean> {
-  // Both cut-offs are computed in TypeScript and compared as dates, exactly as
-  // `follow-ups.ts` does. The first version wrote `current_date - $2` with the
-  // threshold as a bound parameter, and Postgres cannot infer a type for it —
-  // `date - unknown` is ambiguous, and the page answered 500. A driven HTTP
-  // pass found it; `verify-phase10a.ts` §6 now keeps it found.
-  const qualifiedCutoff = shiftDays(today(), -thresholds.qualified);
-  const unqualifiedCutoff = shiftDays(today(), -thresholds.unqualified);
-
-  // The whole expression lives in the WHERE, and the SELECT is a constant:
-  // Drizzle renders a column interpolated into a `sql` template in the SELECT
-  // list **without its table qualifier**, which is the same family as the bug
-  // `verify:phase9` caught in `coverage.ts`. A row coming back IS the answer.
-  const [row] = await db
-    .select({ one: sql<number>`1` })
-    .from(companies)
-    .where(
-      and(
-        eq(companies.id, companyId),
-        isNull(companies.archivedAt),
-        isNull(companies.mergedIntoId),
-        sql`coalesce(
-              (select max(r.report_date) from rep_reports r
-                where r.company_id = ${companies.id}
-                  and r.entry_type = 'interaction'),
-              (${companies.createdAt} at time zone 'Asia/Riyadh')::date
-            )
-            < (case
-                when exists (select 1 from quotation_threads qt
-                              where qt.company_id = ${companies.id})
-                then ${qualifiedCutoff}::date
-                else ${unqualifiedCutoff}::date
-              end)`,
-      ),
-    )
-    .limit(1);
-  return Boolean(row);
 }

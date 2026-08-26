@@ -93,10 +93,10 @@ import {
 import { REPORT_OUTCOMES, SAUDI_CODE } from "@/lib/enums";
 import { listCountries } from "@/lib/lookups";
 import {
-  companyOnHoldUntil,
   createReport,
   getReport,
   listReports,
+  onHoldByCompany,
   today,
   updateReport,
   type ReportInput,
@@ -978,9 +978,25 @@ async function main(): Promise<void> {
 
   console.log("\n8. `on hold` is derived on read, never stored on the company");
 
+  /*
+   * **`onHoldByCompany`, not the viewer-scoped reader this used to call.**
+   * `companyOnHoldUntil` composed `visibleRepReportsFilter` and came out with
+   * the company-detail slice: `20 §5` says suppression is a property of the
+   * **company**, not of the viewer, and `companySilence` and this function had
+   * always read it that way. The one caller that disagreed was the turn panel,
+   * which could show a company red while `/companies`' meter showed it calm — a
+   * hold set on a report the reader could not open.
+   *
+   * The assertions below are unchanged in substance. What is no longer proved
+   * is that a viewer who cannot read the hold report is told nothing, and that
+   * is deliberate: it was the defect, not the guarantee.
+   */
+  const heldUntil = async (companyId: string) =>
+    (await onHoldByCompany([companyId])).get(companyId) ?? null;
+
   check(
     "no suppression before anything says so",
-    (await companyOnHoldUntil(author, companyB.id)) === null,
+    (await heldUntil(companyB.id)) === null,
   );
   const held = await createReport(
     author,
@@ -994,7 +1010,7 @@ async function main(): Promise<void> {
   );
   check(
     "a future date suppresses the company [20 §5]",
-    (await companyOnHoldUntil(author, companyB.id)) === daysAgo(-30),
+    (await heldUntil(companyB.id)) === daysAgo(-30),
   );
   check(
     "and coverage does not call it quiet",
@@ -1015,7 +1031,7 @@ async function main(): Promise<void> {
   });
   check(
     "a date in the past suppresses nothing — the current row wins [20 §5]",
-    (await companyOnHoldUntil(author, companyB.id)) === null,
+    (await heldUntil(companyB.id)) === null,
   );
 
   /* --- 9. The timeline merges both halves [20 §6] ------------------ */

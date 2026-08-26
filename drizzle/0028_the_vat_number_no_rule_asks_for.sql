@@ -1,0 +1,25 @@
+-- 0028 - the VAT number no rule asks for.
+--
+-- `companies.vat_number` is required by nothing in SPEC.md. S57 is the 15% VAT
+-- RATE on a quotation and has no bearing on a company field; no other rule
+-- mentions one. It is the shape CLAUDE.md calls a defect rather than neutral:
+-- structure that exists because somebody thought it might be wanted.
+--
+-- The founder's live sheet fills category, city, lead source and one contact,
+-- and no VAT number at all. What made the column look real was the demo seed,
+-- which invented a fifteen-digit Saudi number on about two rows in five and
+-- said in a comment that this "is what the sheet looks like". It is not. That
+-- writer came out in the same slice as this column.
+--
+-- Pre-migration gate, run against the development database on 26 Aug 2026:
+--
+--   select count(*) from companies where vat_number is not null;  -- 54
+--
+-- All 54 are seed-invented; the production import carries none. The audit log
+-- keeps its own JSONB before/after copies of every edit that ever set one, so
+-- the history of the field survives the field.
+--
+-- No index, no constraint and no foreign key referenced it, so this is a plain
+-- drop with nothing to unpick.
+
+ALTER TABLE "companies" DROP COLUMN "vat_number";

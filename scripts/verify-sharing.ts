@@ -617,7 +617,6 @@ async function main(): Promise<void> {
     phone: detail!.phone,
     countryId: detail!.countryId,
     categoryId: detail!.categoryId,
-    vatNumber: detail!.vatNumber,
     cityId: detail!.cityId,
     leadSourceId: detail!.leadSourceId,
     notes: `${stamp} edited by the shared rep`,
@@ -642,7 +641,6 @@ async function main(): Promise<void> {
         phone: detail!.phone,
         countryId: detail!.countryId,
         categoryId: null,
-        vatNumber: null,
         // Null, deliberately: `canViewRecord` refuses before `placeForCountry`
         // is reached, so this must come back as `notFound` and never as the
         // required-city error `S15` would raise if that order ever flipped.

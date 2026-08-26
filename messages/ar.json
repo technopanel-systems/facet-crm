@@ -73,7 +73,8 @@
     "view": "عرض",
     "filter": "تصفية",
     "apply": "تطبيق",
-    "whoseMove": "بانتظار من"
+    "whoseMove": "بانتظار من",
+    "ofTotal": "{shown} من أصل {total}"
   },
   "enums": {
     "region": {
@@ -272,7 +273,6 @@
     "emptyFiltered": "لا توجد شركات مطابقة لهذا البحث.",
     "fields": {
       "category": "التصنيف",
-      "vatNumber": "الرقم الضريبي",
       "leadSource": "مصدر العميل",
       "lastTouched": "آخر تواصل"
     },
@@ -286,7 +286,9 @@
       "projects": "المشاريع",
       "noProjects": "لا توجد مشاريع يمكنك الاطلاع عليها.",
       "archived": "مؤرشفة",
-      "turnDetail": "سجّل تقريرًا لإعادة ضبط العدّاد — شاشة التغطية تحسب من آخر تقرير."
+      "noQuotations": "لا توجد عروض أسعار يمكنك الاطلاع عليها.",
+      "noDispatches": "لم يُورَّد شيء بعد.",
+      "viewAll": "عرض الكل"
     },
     "errors": {
       "notFound": "هذه الشركة غير موجودة، أو أنها ليست ضمن سجلاتك.",
@@ -305,7 +307,30 @@
     },
     "silence": {
       "never": "لم يُسجَّل أبداً",
-      "days": "{count, plural, zero {# يوم} one {يوم واحد} two {يومان} few {# أيام} many {# يوماً} other {# يوم}}"
+      "days": "{count, plural, zero {# يوم} one {يوم واحد} two {يومان} few {# أيام} many {# يوماً} other {# يوم}}",
+      "threshold": "من أصل {count, plural, zero {# يوم} one {يوم واحد} two {يومان} few {# أيام} many {# يوماً} other {# يوم}}"
+    },
+    "turn": {
+      "archived": "مؤرشفة — لا أحد يتابعها",
+      "onHold": "بانتظار العميل",
+      "onHoldDetail": "طلب تأجيل التواصل حتى {date}.",
+      "yours": {
+        "planned": "دورك في {date}",
+        "due": "دورك — كان مقرراً في {date}",
+        "quiet": "دورك — لم يُسجَّل شيء منذ {count} يوم",
+        "calm": "دورك — آخر تسجيل قبل {count} يوم",
+        "never": "دورك — لم يُسجَّل شيء بعد"
+      },
+      "theirs": {
+        "planned": "بانتظار {name} — {date}",
+        "due": "بانتظار {name} — كان مقرراً في {date}",
+        "quiet": "بانتظار {name} — لم يُسجَّل شيء منذ {count} يوم",
+        "calm": "بانتظار {name} — آخر تسجيل قبل {count} يوم",
+        "never": "بانتظار {name} — لم يُسجَّل شيء بعد"
+      },
+      "plannedDetail": "لم يُسجَّل شيء منذ {count} يوم.",
+      "quietDetail": "سجّل زيارة أو مكالمة، أو قرّر ما إذا كانت المتابعة ما زالت تستحق.",
+      "neverDetail": "سُجِّلت قبل {count} يوم."
     }
   },
   "contacts": {
@@ -668,7 +693,8 @@
       "coordinatorYours": "دورك — راجعه ثم اعتمده أو ارفضه",
       "submittedDetail": "أُرسل في {date}",
       "approved": "اعتمده {name}",
-      "refused": "مرفوض"
+      "refused": "مرفوض",
+      "cancelled": "ملغى"
     }
   },
   "credit": {
@@ -1065,7 +1091,6 @@
   "dormancy": {
     "title": "الركود",
     "detail": {
-      "hint": "توقف التواصل مع هذه الشركة. أبقِها، أو سلِّمها لغيرك، أو أخرجها من النطاق.",
       "quiet": "توقف التواصل",
       "archived": "مؤرشفة — خارج النطاق.",
       "history": "القرارات",

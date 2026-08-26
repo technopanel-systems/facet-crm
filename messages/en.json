@@ -73,7 +73,8 @@
     "view": "View",
     "filter": "Filter",
     "apply": "Apply",
-    "whoseMove": "Whose move"
+    "whoseMove": "Whose move",
+    "ofTotal": "{shown} of {total}"
   },
   "enums": {
     "region": {
@@ -272,7 +273,6 @@
     "emptyFiltered": "No companies match that search.",
     "fields": {
       "category": "Category",
-      "vatNumber": "VAT number",
       "leadSource": "Lead source",
       "lastTouched": "Last touched"
     },
@@ -286,7 +286,9 @@
       "projects": "Projects",
       "noProjects": "No projects you can see.",
       "archived": "Archived",
-      "turnDetail": "Log a report to reset the clock — the coverage screen counts from the last one."
+      "noQuotations": "No quotations you can see.",
+      "noDispatches": "Nothing dispatched yet.",
+      "viewAll": "View all"
     },
     "errors": {
       "notFound": "That company does not exist, or it is not one of yours.",
@@ -305,7 +307,30 @@
     },
     "silence": {
       "never": "Never logged",
-      "days": "{count, plural, one {# day} other {# days}}"
+      "days": "{count, plural, one {# day} other {# days}}",
+      "threshold": "of {count, plural, one {# day} other {# days}}"
+    },
+    "turn": {
+      "archived": "Archived — nobody is chasing this",
+      "onHold": "Waiting on the customer",
+      "onHoldDetail": "They asked to be left until {date}.",
+      "yours": {
+        "planned": "Your move on {date}",
+        "due": "Your move — planned for {date}",
+        "quiet": "Your move — nothing recorded for {count, plural, one {# day} other {# days}}",
+        "calm": "Your move — last recorded {count, plural, one {# day} other {# days}} ago",
+        "never": "Your move — nothing recorded yet"
+      },
+      "theirs": {
+        "planned": "Waiting on {name} — {date}",
+        "due": "Waiting on {name} — planned for {date}",
+        "quiet": "Waiting on {name} — nothing recorded for {count, plural, one {# day} other {# days}}",
+        "calm": "Waiting on {name} — last recorded {count, plural, one {# day} other {# days}} ago",
+        "never": "Waiting on {name} — nothing recorded yet"
+      },
+      "plannedDetail": "Nothing recorded for {count, plural, one {# day} other {# days}}.",
+      "quietDetail": "Log a visit or a call, or decide whether this is still worth chasing.",
+      "neverDetail": "Registered {count, plural, one {# day} other {# days}} ago."
     }
   },
   "contacts": {
@@ -668,7 +693,8 @@
       "coordinatorYours": "Your turn — check it, then approve or refuse",
       "submittedDetail": "Submitted {date}",
       "approved": "Approved by {name}",
-      "refused": "Refused"
+      "refused": "Refused",
+      "cancelled": "Cancelled"
     }
   },
   "credit": {
@@ -1065,7 +1091,6 @@
   "dormancy": {
     "title": "Dormancy",
     "detail": {
-      "hint": "This company has gone quiet. Keep it, hand it to somebody else, or take it out of scope.",
       "quiet": "Gone quiet",
       "archived": "Archived — out of scope.",
       "history": "Decisions",

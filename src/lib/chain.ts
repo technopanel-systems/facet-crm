@@ -20,10 +20,11 @@ import type {
  * columns *are* these positions.
  *
  * Two derivations of one rule is how the quiet-threshold trap `21 §7` names
- * came about: `follow-ups.ts` owns "quiet", and `isCompanyQuiet` exists so that
- * a second screen cannot invent a second answer. The chain is the next-largest
- * candidate for the same mistake, so it gets the same treatment before there is
- * a second caller rather than after.
+ * came about: `follow-ups.ts` owns "quiet", and `companySilence` in
+ * `coverage.ts` is the one shape every screen composes so a second one cannot
+ * invent a second answer. The chain is the next-largest candidate for the same
+ * mistake, so it gets the same treatment before there is a second caller rather
+ * than after.
  *
  * **This module imports nothing but types**, like `enums.ts` beside it, so a
  * `"use client"` component may import it without pulling the Postgres driver

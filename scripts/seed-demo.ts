@@ -663,12 +663,6 @@ function planCompanies(look: Lookups): void {
         phone: row.phone,
         countryId: need(look.countryId, country, "country"),
         categoryId: need(look.categoryId, row.category, "company category"),
-        // A Saudi VAT number is fifteen digits opening and closing with 3.
-        // About two in five carry one, which is what the sheet looks like.
-        vatNumber:
-          rng() < 0.4
-            ? `3${String(Math.floor(rng() * 1e12)).padStart(12, "0")}3`
-            : null,
         cityId: row.city ? need(look.cityId, row.city, "city") : null,
         leadSourceId: need(look.sourceId, row.source, "lead source"),
         notes: row.note ?? null,

@@ -170,8 +170,21 @@ Nothing below is optional before real users touch it.
 | 32 | Archive requests folded into the dormancy review | `S105`–`S107` |
 | 33 | Sharing per project; contacts shareable | `S97` `S98` |
 | 34 | **Bulk import** — nobody hand-types the customer base | `SPEC §15` |
+| 34b | **The verification scripts stop leaving accounts and comments behind** — each deactivates the users it created; `verify:routes` §9 comments on a company it registers rather than on a demo one | `S111` |
 
 ### Phase 4 — Complete the picture
+
+> **34b is ahead of 35 deliberately, and it is the founder's call.** Counted on
+> 26 Aug 2026: **158 users, 149 of them `verify-*` residue**, 138 active of
+> which 129 are residue — nine real accounts. A full pass of the seven
+> in-process scripts adds **30 permanent active users**, and `S111` forbids
+> deleting them, so nothing clears them but a re-seed. It has already reached a
+> real screen twice: the comment box's people list renders one checkbox per
+> active colleague, and `verify:routes` §9 posts two comments per run onto
+> whichever demo company sorts first by attention — the one a reader opens
+> first. Deactivating at the end of a run is `S111`'s own sanctioned end state
+> and `listActiveUsers` drops them at once.
+
 
 | # | Session | Rules |
 |---|---|---|

@@ -865,7 +865,6 @@ async function main(): Promise<void> {
     phone: `+9665${stamp.slice(-7)}1`,
     countryId: saudiId,
     categoryId: null,
-    vatNumber: null,
     cityId: fixtureCity.id,
     leadSourceId: null,
     notes: null,
@@ -1475,7 +1474,6 @@ async function main(): Promise<void> {
       phone: `+9665${stamp.slice(-7)}2`,
       countryId: saudi.id,
       categoryId: null,
-      vatNumber: null,
       cityId: aCity.id,
       leadSourceId: null,
       notes: null,
@@ -1505,7 +1503,6 @@ async function main(): Promise<void> {
           phone: `+9665${stamp.slice(-7)}5`,
           countryId: saudi.id,
           categoryId: null,
-          vatNumber: null,
           cityId: null,
           leadSourceId: null,
           notes: null,
@@ -1520,7 +1517,6 @@ async function main(): Promise<void> {
           phone: saudiCompany.phone,
           countryId: saudi.id,
           categoryId: null,
-          vatNumber: null,
           cityId: null,
           leadSourceId: null,
           notes: null,
@@ -1533,7 +1529,6 @@ async function main(): Promise<void> {
       phone: `+9665${stamp.slice(-7)}3`,
       countryId: abroad.id,
       categoryId: null,
-      vatNumber: null,
       cityId: aCity.id,
       leadSourceId: null,
       notes: null,
@@ -1556,7 +1551,6 @@ async function main(): Promise<void> {
         phone: abroadCompany.phone,
         countryId: abroad.id,
         categoryId: null,
-        vatNumber: null,
         cityId: aCity.id,
         leadSourceId: null,
         notes: `${stamp} edited`,
@@ -1574,7 +1568,6 @@ async function main(): Promise<void> {
         phone: saudiCompany.phone,
         countryId: abroad.id,
         categoryId: null,
-        vatNumber: null,
         cityId: aCity.id,
         leadSourceId: null,
         notes: null,
@@ -1593,7 +1586,6 @@ async function main(): Promise<void> {
           phone: `+9665${stamp.slice(-7)}4`,
           countryId: "00000000-0000-0000-0000-000000000000",
           categoryId: null,
-          vatNumber: null,
           cityId: null,
           leadSourceId: null,
           notes: null,
@@ -2303,8 +2295,17 @@ async function paymentAndShipmentHold(): Promise<void> {
       count(*) filter (
         where cargo_destination is not null and shipment <> 'cargo'
       )::int as bad_destination,
+      -- approved_by_user_id is null, NOT status <> 'approved'. The check's
+      -- own name is "nobody approved", and the two are not the same question:
+      -- S73's cancellation moves an approved dispatch out of the approved
+      -- status, and S31 keeps it visible as history carrying everything it
+      -- had, its SMAC number included. The old predicate therefore failed on
+      -- every cancelled-after-approval row -- two in the demo base -- because
+      -- it read a status where it meant an act. The same conflation the
+      -- dispatch turn line carried until dispatchTurnKey gave cancelled a line
+      -- of its own.
       count(*) filter (
-        where smac_dispatch_number is not null and status <> 'approved'
+        where smac_dispatch_number is not null and approved_by_user_id is null
       )::int as bad_number
     from dispatches
   `)) as unknown as {

@@ -257,3 +257,48 @@ export async function ListPagination({
     </div>
   );
 }
+
+/**
+ * A list narrowed to one record, and the way back out — `D59`, `D52`.
+ *
+ * A company detail page's related cards cap at five and link here for the rest
+ * `D70`, which means these lists can arrive already scoped. A list that
+ * silently returns a subset is the failure `D59` records breaking three
+ * screens: the reader cannot tell a filtered list from a short one. So the
+ * scope is **named**, in the reader's own language, with a link that clears it.
+ *
+ * It is not a `FilterNav` chip: those are a fixed set of options over the whole
+ * list, and this is one arbitrary record's id arriving from somewhere else.
+ * `label` is already resolved by the caller — the id alone would name nothing.
+ */
+export async function ScopeChip({
+  label,
+  clearHref,
+}: {
+  /** Already translated and already resolved — a company's name, not its id. */
+  label: string;
+  /** The same list with the scope dropped. */
+  clearHref: string;
+}) {
+  const t = await getTranslations();
+
+  return (
+    <div
+      data-slot="scope-chip"
+      className="border-line flex flex-wrap items-center gap-2 rounded-[10px] border border-dashed px-3 py-2 text-start"
+    >
+      {/* `dir="auto"` on the NAME `D62` — the row also holds a translated
+          label and a control, and putting it on the wrapper would drag both to
+          the far inline-end. */}
+      <span className="text-muted-foreground text-xs">
+        {t("common.filter")}
+      </span>
+      <span className="text-[13px] font-semibold" dir="auto">
+        {label}
+      </span>
+      <Button asChild size="xs" variant="ghost" className="ms-auto">
+        <Link href={clearHref}>{t("common.clear")}</Link>
+      </Button>
+    </div>
+  );
+}

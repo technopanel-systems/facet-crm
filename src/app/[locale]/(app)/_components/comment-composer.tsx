@@ -84,7 +84,21 @@ export function CommentComposer({
           <legend className="text-faint text-start text-[11.5px]">
             {t("comments.tag")}
           </legend>
-          <div className="flex flex-wrap gap-x-4 gap-y-2">
+          {/* **Capped, not rebuilt** `D70`. A block sizes to what it
+              holds, and this one held one checkbox per active colleague with
+              nothing bounding it — 137 rows on this database, taller than the
+              timeline beside it. 129 of those are `verify-*` accounts the
+              verification scripts leave behind, so the row count is a data
+              defect and the control is right at the fourteen people `D1`
+              describes: `25 §11` chose a checkbox because it is native, needs
+              no JavaScript to submit, and the browser places it in RTL.
+
+              A native `<select multiple>` is the control that works at 200 as
+              well as at 8 with no client JavaScript, and it is named here so it
+              is not re-derived — but rebuilding for a user count this company
+              will not reach is machinery for a case that has not happened. The
+              cap is one line and no JavaScript. */}
+          <div className="flex max-h-44 flex-wrap gap-x-4 gap-y-2 overflow-y-auto">
             {people.map((person) => (
               <div key={person.id} className="flex items-center gap-2">
                 <Checkbox

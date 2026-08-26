@@ -24,6 +24,15 @@ type Action = (state: FormState, formData: FormData) => Promise<FormState>;
  * A native `<select>` for the recipient, deliberately — the rep list is short,
  * and `15 §5`'s `Combobox` exception is for the ~200-item city list only.
  */
+/**
+ * **The hint is gone** `D70`.
+ *
+ * It read *"This company has gone quiet. Keep it, hand it to somebody else, or
+ * take it out of scope"* — three options, to a rep who is offered exactly one:
+ * the other two render only for `can_assign` `[21 §6]`. And the sentence it
+ * was really carrying is *what happens next*, which `D24` puts in the turn
+ * panel at the top of the page, where it now is.
+ */
 export function DormancyPanel({
   reincludeAction,
   reassignAction,
@@ -35,8 +44,6 @@ export function DormancyPanel({
   archiveAction?: Action;
   reps: { id: string; name: string }[];
 }) {
-  const t = useTranslations();
-
   return (
     <div className="flex flex-col gap-6">
       <ReincludeForm action={reincludeAction} />
@@ -44,9 +51,6 @@ export function DormancyPanel({
         <ReassignForm action={reassignAction} reps={reps} />
       ) : null}
       {archiveAction ? <ArchiveForm action={archiveAction} /> : null}
-      <p className="text-muted-foreground text-start text-xs">
-        {t("dormancy.detail.hint")}
-      </p>
     </div>
   );
 }
