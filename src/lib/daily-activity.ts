@@ -109,6 +109,13 @@ export async function dailyActivity(
     .from(users)
     .where(
       and(
+        // `S111` — an account deactivates rather than being deleted, and this
+        // is the *roster* half of that rule, not the display half. History
+        // keeps naming a departed person on the records they touched; a list
+        // of who is being measured does not. `achievementForPeriod`
+        // `[targets.ts]` is the same question and already asked it, so the two
+        // rosters answered it two different ways until this line existed.
+        eq(users.isActive, true),
         visibleMeasuredUsersFilter(session),
         options.userId ? eq(users.id, options.userId) : undefined,
       ),

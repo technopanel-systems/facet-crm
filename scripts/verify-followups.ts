@@ -55,7 +55,7 @@
 
 process.loadEnvFile(".env");
 
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, like, sql } from "drizzle-orm";
 
 import { closeDatabase, db } from "@/db";
 import {
@@ -194,6 +194,38 @@ async function kindsOn(
   );
 }
 
+/**
+ * The run's stamp. **Module scope, so the `finally` at the foot of the file can
+ * reach it** — every account this script writes is `${stamp}-…@example.test`,
+ * which is what `endRunAccounts` below matches on.
+ */
+const stamp = `verifyfu-${Date.now()}`;
+
+/**
+ * Every account this run created, ended the way `S111` sanctions.
+ *
+ * `S111` forbids deleting a person — history must keep pointing at a real one —
+ * and names deactivation as the end state instead. That is the whole of the
+ * fix: `listActiveUsers` drops a deactivated account immediately, so the
+ * mention picker on every comment box, the share recipient picker, the dispatch
+ * rep picker and every achievement roster stop offering the accounts this run
+ * invented. The rows stay; the people stop being offerable.
+ *
+ * **A direct `update`, not `deactivateUser`.** The data-layer writer would add
+ * an audit row per account `S112` — thirty a pass, to fix a residue problem —
+ * and this script already writes its users outside that path.
+ */
+async function endRunAccounts(): Promise<void> {
+  const ended = await db
+    .update(users)
+    .set({ isActive: false, deactivatedAt: new Date() })
+    .where(like(users.email, `${stamp}-%`))
+    .returning({ id: users.id });
+  console.log(
+    `  --    ${ended.length} account(s) of this run deactivated [S111]`,
+  );
+}
+
 async function main(): Promise<void> {
   if (process.env.NODE_ENV !== "development") {
     console.error(
@@ -203,7 +235,6 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const stamp = `verifyfu-${Date.now()}`;
   const manager = await sessionFor("manager@example.test");
   const coordinator = await sessionFor("coordinator@example.test");
 
@@ -1081,15 +1112,20 @@ async function main(): Promise<void> {
 }
 
 main()
-  .then(async () => {
+  .then(() => {
     console.log(
       failures === 0 ? "\nAll checks passed." : `\n${failures} CHECK(S) FAILED.`,
     );
+  })
+  .catch((error) => {
+    console.error(error);
+    failures += 1;
+  })
+  .finally(async () => {
+    // **In a `finally`, so a failing assertion still cleans up after
+    // itself.** A script that died halfway is exactly how 196 live
+    // accounts accumulated `[S111]`.
+    await endRunAccounts();
     await closeDatabase();
     process.exit(failures === 0 ? 0 : 1);
-  })
-  .catch(async (error) => {
-    console.error(error);
-    await closeDatabase();
-    process.exit(1);
   });

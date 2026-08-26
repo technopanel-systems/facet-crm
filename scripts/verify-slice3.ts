@@ -96,7 +96,7 @@
 
 process.loadEnvFile(".env");
 
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, eq, like, sql } from "drizzle-orm";
 
 import { closeDatabase, db } from "@/db";
 import {
@@ -371,6 +371,38 @@ async function creditOf(dispatch: {
   return credits.get(dispatch.id)!;
 }
 
+/**
+ * The run's stamp. **Module scope, so the `finally` at the foot of the file can
+ * reach it** — every account this script writes is `${stamp}-…@example.test`,
+ * which is what `endRunAccounts` below matches on.
+ */
+const stamp = `verify3-${Date.now()}`;
+
+/**
+ * Every account this run created, ended the way `S111` sanctions.
+ *
+ * `S111` forbids deleting a person — history must keep pointing at a real one —
+ * and names deactivation as the end state instead. That is the whole of the
+ * fix: `listActiveUsers` drops a deactivated account immediately, so the
+ * mention picker on every comment box, the share recipient picker, the dispatch
+ * rep picker and every achievement roster stop offering the accounts this run
+ * invented. The rows stay; the people stop being offerable.
+ *
+ * **A direct `update`, not `deactivateUser`.** The data-layer writer would add
+ * an audit row per account `S112` — thirty a pass, to fix a residue problem —
+ * and this script already writes its users outside that path.
+ */
+async function endRunAccounts(): Promise<void> {
+  const ended = await db
+    .update(users)
+    .set({ isActive: false, deactivatedAt: new Date() })
+    .where(like(users.email, `${stamp}-%`))
+    .returning({ id: users.id });
+  console.log(
+    `  --    ${ended.length} account(s) of this run deactivated [S111]`,
+  );
+}
+
 async function main(): Promise<void> {
   if (process.env.NODE_ENV !== "development") {
     console.error(
@@ -392,7 +424,6 @@ async function main(): Promise<void> {
   // the first run's square metres and every total assertion drifted. Reps
   // scoped to the run make the numbers reproducible, which is the whole point
   // of keeping the script.
-  const stamp = `verify3-${Date.now()}`;
   const [repRole] = await db
     .select()
     .from(roles)
@@ -452,8 +483,9 @@ async function main(): Promise<void> {
     .limit(1);
   const [service] = await db.select().from(serviceTypes).limit(1);
   if (!supplier || !productClass || !fireRating || !thickness || !service) {
-    console.error("The lookups are not seeded. Run: npm run db:seed");
-    process.exit(1);
+    // `throw`, not `process.exit`: this run has already created its
+    // accounts, and an exit skips the `finally` that ends them `[S111]`.
+    throw new Error("The lookups are not seeded. Run: npm run db:seed");
   }
   lookups = {
     supplierId: supplier.id,
@@ -2627,8 +2659,9 @@ async function main(): Promise<void> {
     .where(eq(roles.nameEn, "Sales Coordinator"))
     .limit(1);
   if (!coordRole) {
-    console.error("Roles are not seeded. Run: npm run db:seed");
-    process.exit(1);
+    // `throw`, not `process.exit`: this run has already created its
+    // accounts, and an exit skips the `finally` that ends them `[S111]`.
+    throw new Error("Roles are not seeded. Run: npm run db:seed");
   }
   const [herUser] = await db
     .insert(users)
@@ -4709,17 +4742,22 @@ async function main(): Promise<void> {
 }
 
 main()
-  .then(async () => {
+  .then(() => {
     console.log(
       failures === 0
         ? "\nAll checks passed."
         : `\n${failures} CHECK(S) FAILED.`,
     );
+  })
+  .catch((error) => {
+    console.error(error);
+    failures += 1;
+  })
+  .finally(async () => {
+    // **In a `finally`, so a failing assertion still cleans up after
+    // itself.** A script that died halfway is exactly how 196 live
+    // accounts accumulated `[S111]`.
+    await endRunAccounts();
     await closeDatabase();
     process.exit(failures === 0 ? 0 : 1);
-  })
-  .catch(async (error) => {
-    console.error(error);
-    await closeDatabase();
-    process.exit(1);
   });

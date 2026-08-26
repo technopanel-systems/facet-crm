@@ -1208,14 +1208,69 @@ async function main(): Promise<void> {
     // and the cap is shape validation, so the action is the only place it
     // lives. That boundary is where slices 2 and 3 replayed a POST by hand and
     // threw the replay away `[23]`; this one is kept.
+    //
+    // **The company is this section's own, registered here over HTTP.** It
+    // used to comment on whichever company rep-a held first, which on a seeded
+    // database is a real demo record — and `S107` means nothing can ever take
+    // a comment off again, so eighteen of them had settled onto two of them.
+    // The company below carries a run stamp, so the unremovable row lands on a
+    // record nobody reads as data.
+    //
+    // Abroad, for §13's reason: the city is a `Combobox` in a Radix portal, so
+    // this script has no city id to post, and `S15` refuses a Saudi company
+    // without one. Registered ONCE rather than per locale — `S18` makes rep-a
+    // the primary rep, and that is what puts the composer on the screen in
+    // both. **§21 is deliberately not moved with it**: its assertions are
+    // about an established company's clock and its capped timeline, and a
+    // company registered seconds ago has nothing for either to measure.
+    const jar = jars["rep-a@example.test"];
+    const stamp = `${Date.now()}`.slice(-7);
+
+    const blank = await get(jar, "/en/companies/new");
+    // `data-code` is a DOM marker, not a translated string `[23]`. `"SA"` is
+    // the literal `SAUDI_CODE` in `src/lib/enums.ts`, repeated rather than
+    // imported for the reason §13 records.
+    const countrySelect =
+      blank.body.match(/<select[^>]*name="countryId"[\s\S]*?<\/select>/)?.[0] ??
+      "";
+    const foreignId = [
+      ...countrySelect.matchAll(
+        /<option value="([0-9a-f-]{36})"[^>]*data-code="([A-Z]{2})"/g,
+      ),
+    ].find((option) => option[2] !== "SA")?.[1];
+    check(
+      "the register form offers a country outside Saudi Arabia [S14]",
+      Boolean(foreignId),
+    );
+
+    const registration = envelopeOf(blank.body);
+    registration.set("name", `comments-${stamp}`);
+    // `S13` makes the phone mandatory and `S23` matches companies on it, so it
+    // is this run's alone — a fixed literal would make every run a duplicate.
+    registration.set("phone", `+9665${stamp}0`);
+    registration.set("countryId", foreignId ?? "");
+    // The rest empty, exactly as an untouched form would send them. No region
+    // is set, because the form offers no such field `S15`.
+    for (const empty of ["cityId", "categoryId", "leadSourceId", "notes"]) {
+      registration.set(empty, "");
+    }
+    const registered = await fetch(`${BASE}/en/companies/new`, {
+      method: "POST",
+      headers: { cookie: header(jar), origin: BASE },
+      body: registration,
+      redirect: "manual",
+    });
+    store(jar, registered);
+    const location = registered.headers.get("location") ?? "";
+    const id = location.match(/\/companies\/([0-9a-f-]{36})/)?.[1];
+    check(
+      "*** this section registers the company it comments on *** [S13], [S18]",
+      registered.status === 303 && Boolean(id),
+      `got ${registered.status} ${location}`,
+    );
+
     for (const locale of ["en", "ar"] as const) {
-      const jar = jars["rep-a@example.test"];
-      const list = await get(jar, `/${locale}/companies`);
-      const id = firstId(list.body, "companies");
-      if (!id) {
-        console.log(`  --    ${locale}: rep-a holds no company to comment on`);
-        continue;
-      }
+      if (!id) break;
 
       const page = await get(jar, `/${locale}/companies/${id}`);
       check(
@@ -1237,22 +1292,6 @@ async function main(): Promise<void> {
         form.includes('name="mentions"'),
       );
 
-      const envelope = (): FormData => {
-        const fields = new FormData();
-        for (const input of form.matchAll(/<input[^>]*>/g)) {
-          const name = input[0].match(/name="([^"]+)"/)?.[1];
-          if (!name?.startsWith("$ACTION")) continue;
-          // HTML-unescaped, for the reason section 7 records: a bound action's
-          // envelope carries JSON, and replaying `&quot;` verbatim reads as a
-          // stale deployment that is not one.
-          fields.append(
-            name,
-            unescapeHtml(input[0].match(/value="([^"]*)"/)?.[1] ?? ""),
-          );
-        }
-        return fields;
-      };
-
       const post = async (body: FormData): Promise<number> => {
         const response = await fetch(`${BASE}/${locale}/companies/${id}`, {
           method: "POST",
@@ -1264,7 +1303,7 @@ async function main(): Promise<void> {
         return response.status;
       };
 
-      const good = envelope();
+      const good = envelopeOf(form);
       good.set("body", `verify-routes ${locale} comment`);
       const posted = await post(good);
       check(
@@ -1273,16 +1312,16 @@ async function main(): Promise<void> {
         `got ${posted}`,
       );
 
-      const after = await get(jar, `/${locale}/companies/${id}`);
+      const landed = await get(jar, `/${locale}/companies/${id}`);
       check(
         `${locale}: the comment is on the record's thread [S114]`,
-        after.body.includes('data-slot="comment"'),
+        landed.body.includes('data-slot="comment"'),
       );
 
       // **The cap** `S114`. It is `readFields` shape validation, so nothing
       // in process crosses it — this is the only assertion of it anywhere. A
       // 200 carrying the error is the correct answer; a 500 is the defect.
-      const tooLong = envelope();
+      const tooLong = envelopeOf(form);
       tooLong.set("body", "x".repeat(5001));
       const capped = await post(tooLong);
       check(
