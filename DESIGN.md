@@ -302,32 +302,44 @@ derives nothing.
 `?view=cards`. Same filters, same URL, same data — different arrangement. Nobody
 builds a second screen for a second view.
 
-**D29.** **The board's columns are the six chain positions** — New · Requested ·
-Signature · Payment · Paid · Dispatched. Position is computed from real events.
-**Cards do not drag.** Dragging from "Payment" to "Paid" would be claiming a
-payment that didn't happen. Lost projects leave the board and live in a filter,
-or the board becomes a graveyard nobody clears.
+**D29.** **The board's columns are `S132`'s six positions** — No price yet ·
+Requested · Quoted · With the customer · Ready to ship · Won. Each is computed
+from a real event and **no act moves a card** `S134`: there is no drag, and none
+is added. A card that jumps from *No price yet* to *Won* is a rep who skipped a
+step, and the board is meant to show that rather than hide it behind a pile
+somebody tidied. Lost projects leave the board and live in a filter, or the
+board becomes a graveyard nobody clears.
 
 **A project has one column and may have several threads, so furthest along
 wins** — the rule `chainReached` already applies one rung down. A project with
-one thread dispatched and one awaiting signature reads as Dispatched, and the
-card carries **a count of its live threads** so the second one is not lost
-behind the first. `S68` is why that is a count and never a sum of their metres.
+one thread won and one still quoted reads as Won, and the card carries **a count
+of its live threads** so the second one is not lost behind the first. `S68` is
+why that is a count and never a sum of their metres.
 
-**`new` means something different here, and it is written down rather than
-inferred.** On the board it is **a project with no LIVE thread**; in
-`src/lib/chain.ts` it is a project with **no thread at all**. So a project whose
-every quotation was rejected or cancelled sits in New — it is not lost, nobody
-has given up on it, and `chainOwner` already says whose move it is: the rep's,
-to quote again. A definition that shifts by level and is not stated is how the
-silence derivation came to give two screens two answers.
+**`No price yet` means something different here, and it is written down rather
+than inferred.** On the board it is **a project with no LIVE thread**; in
+`src/lib/chain.ts` the first rung is a project with **no thread at all**. So a
+project whose every quotation was rejected or cancelled sits in the first
+column — it is not lost, nobody has given up on it, and the position already
+says whose move it is: the rep's, to quote again. A definition that shifts by
+level and is not stated is how the silence derivation came to give two screens
+two answers.
 
-**Whose move is on the column header, not on the card.** Within a column it is
-the same answer for every card, because the owner is a function of the position
-and nothing else. **This is what a board buys over a table: the grouping carries
-the answer, so the row does not have to** — and `D2` is satisfied by the group
-the row sits in. It generalises: wherever rows are grouped by the thing `D2`
-asks about, the header says it once.
+**The column header carries the pile's name and its count, and never a person.**
+That is `D24`'s default for a group header, and the board takes it. A header
+describing a person makes the person the subject; **the subject is the project,
+and the rep owns it end to end.** The coordinator processes paperwork inside
+three of the six positions and owns none of them, so naming her at the top of a
+column would put her in charge of work that is not hers.
+
+**`D2` is answered by the pile's own definition.** *With the customer* says
+whose move it is as clearly as a name would, and better — it names nobody who is
+not a user of FACET. So the board still satisfies *a row says whose move it is,
+not what the status is*, because **a pile is not a status**: `S132` fixes each
+position's owner once, and the grouping carries the answer exactly as a board is
+supposed to. What changed is that the answer is the pile, not a name in a
+header. It generalises: wherever rows are grouped by the thing `D2` asks about,
+the group's name says it once.
 
 **The header carries a count and no square metres.** `S68` — quotations are
 never summed. The one figure that could be summed down a column without double
@@ -343,6 +355,14 @@ carries what that costs.
 **D30.** Activity offers `?view=stream` (default), `?view=by-rep`, and
 `?view=calendar`. All three read one query. "Just me" is a filter chip on the
 stream, not a separate screen.
+
+**D71.** **A mark is a small label on a card, never a column and never a
+colour.** `S135`'s four — catalogue sent, samples sent, documents sent,
+technical submitting — say *what is out with this customer*, and several may sit
+on one card at once. They are not a position, so they never become a column
+`D29`; and they are not a duration, so they take no colour — `D6` gives colour
+to how long something has waited and nothing else. A card with no mark shows
+nothing rather than an empty slot.
 
 **D31.** Build order: table and stream first. Board second. Cards and calendar
 only if someone asks twice.
@@ -422,7 +442,7 @@ Two placements doing two jobs, not a duplicate.
 metres this month as a large mono figure, of the target; a bar filled to
 achievement; a **vertical tick at today's position in the month**. Fill past the
 tick is ahead, fill short of it is behind. **Beneath** the bar, small figures:
-awaiting signature, last month.
+quoted, last month.
 
 **The panel appears only where a target row exists** `D64`, `S83`. Someone not
 measured this month has no target to be ahead or behind of, so the block is
@@ -491,13 +511,20 @@ scale — a bar labelled with its own achievement reads *963 of 963*, which is
 every rep exactly on target and no rep ahead. The achievement is already the
 large figure above, and the percentage is already in the middle of the legend.
 
-**Awaiting signature is a COUNT of quotation threads, never a sum of their
-square metres.** `S68`: quotations are never summed, because one project quoted
-three times at 2,000 m² is the same 2,000 counted three times, and summing it
-inflates the pipeline. The position comes from `chainState()` and nowhere else,
-as `D27` and `D29` already read it. **Last month** is the previous period's
-achievement against the previous period's target, from the same derivation as
-this month's `S85`.
+**The side figure is a COUNT of quotation threads, never a sum of their square
+metres.** `S68`: quotations are never summed, because one project quoted three
+times at 2,000 m² is the same 2,000 counted three times, and summing it inflates
+the pipeline. The position comes from `chainState()` and nowhere else, as `D27`
+and `D29` already read it.
+
+**Its label follows the position it reads**, which `S132` now calls **Quoted** —
+a price has been produced and is not yet with the customer. It was *awaiting
+signature*, and that name outlived its meaning: `S64` and `S65` make the
+signature internal management approval, effectively instant, so the figure never
+counted people waiting to sign. The set it counts is unchanged.
+
+**Last month** is the previous period's achievement against the previous
+period's target, from the same derivation as this month's `S85`.
 
 **Paid-not-yet-out is not one of them.** Payment is recorded on the dispatch
 (S70) and no route to approved bypasses it (S72, S73), so no interval exists

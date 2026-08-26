@@ -195,6 +195,66 @@ column that used to claim a win by hand is gone from the vocabulary entirely —
 no route can set it. Committed is the rep's own flag, set and cleared by them,
 and is ranked below won and lost wherever a state is printed.
 
+**S132. [CHANGE]** **A project sits in exactly one of six positions on the
+quotation chain, each derived from a real event.** In order:
+
+1. **No price yet** — no live quotation thread. Not the same as *no thread
+   ever*: a project whose every quotation was rejected or cancelled sits here,
+   because nobody has given up on it and the next move is the rep's, to quote
+   again.
+2. **Requested** — the live version is `requested`. The coordinator owes it: she
+   builds the real quotation in SMAC (S63).
+3. **Quoted** — the live version is `issued` and the thread is not accepted. The
+   price exists. This is **not** the customer signing: the signature is internal
+   management approval (S64, S65) and is effectively instant, so the position
+   means *a price has been produced*, never *someone is waiting to sign*.
+4. **With the customer** — the thread is `accepted`. Internal approval is in and
+   the customer is deciding. **This is the long wait** — days to months — and no
+   position named it before.
+5. **Ready to ship** — a dispatch against the project is `submitted`. The
+   coordinator is checking it (S72, S88). A `draft` request is not here: it is
+   still the rep's own to edit (S125) and can sit indefinitely.
+6. **Won** — a dispatch against the project is approved. This is S31's own
+   predicate read at the same place, never a second one beside it.
+
+**Furthest along wins.** A project may carry several threads; it has one
+position, and it is the furthest any of them reached. A closed thread is not one
+of them.
+
+**What *With the customer* waits on is stated, not inferred.** It waits on
+somebody who is not a FACET user. Whose move it is answers **the rep** — chasing
+the customer is his job. It is **not a fourth S86 state**: S86's three are
+moving, waiting on a named person, and closed with a reason, and this is the
+second. Left unwritten, the next reader decides a fourth state exists, which is
+how the silence derivation came to give two screens two answers.
+
+**S133. [CHANGE]** **Payment is not a position on the chain.** S70 records
+payment on the dispatch and S73 makes a method a condition of approving one, so
+**no interval exists between paid and dispatched** for a position to occupy.
+
+The `paid` rung is removed, and **the mechanism behind it leaves in the same
+slice**: confirming payment on a quotation, marking one accepted for processing,
+and the three columns those two acts write. Each is a leftover of the gate S73
+replaced, and none is cited by a rule still standing. What must be decided
+before they go is what then stops a moving quotation being chased — two
+follow-up conditions suppress themselves on a confirmed payment today. **OPEN —
+not chosen.**
+
+**S134.** **A project's position is never set by hand.** No act moves a card,
+and none is added. Where a project's real events jump a position — no quotation
+one week, won the next, because the rep skipped a step — **the board shows the
+jump**. A lazy process is meant to be visible, not smoothed into a tidy pile
+somebody filled in by hand. This is S108 applied to the board: the system knows
+where a project is, so it is not asked.
+
+**OPEN — not chosen: how a rep explains a genuinely odd case.** A note is the
+intent — a note explains, where an override would only move the card and lose
+the reason. Where that note lives is undecided, and deliberately so. A project
+carries no note today; its comments would serve, except that **S76 puts every
+project on the coordinator's board while S131 keeps her out of its
+conversation**, so a note on a card would either disclose to her or render blank
+for her alone. That is a disclosure decision, not a rendering detail, and it is
+not made in passing.
 
 ---
 
@@ -221,6 +281,33 @@ quotation exists, never because someone ticked a box.
 
 **S37.** Outcome **on hold requires a date**. Until it passes, that company
 raises nothing.
+
+**S135. [BUILD]** **An outcome is a mark, never a position.** S35's ten are
+unordered, repeatable, and several may be true at once — a catalogue and samples
+can both be out, and **either can happen with no quotation at all**. So they are
+not piles on a board (S132) and never become one. A record carries them as
+**marks, read from the reports the rep already logged**; nothing new is asked of
+anybody (S108).
+
+**Four earn a mark**, and they are one family — *something is out with them and
+we are waiting*:
+
+- **catalogue sent** · **samples sent** · **documents sent** ·
+  **technical submitting**
+
+**Six do not, each for its own reason.** *Introduced* is true of every company
+that has a report at all, so it distinguishes nothing. *Discussed pricing* is
+what the quotation itself records — S36's argument, that a state is read from a
+real record and not from a ticked box. *No answer* is the silence meter's
+subject already (S89). *Not interested* is a signal or a loss reason (S43, S44),
+which is a vocabulary of its own. *On hold* already parks the company (S37) and
+a mark would be a second answer to a question that has one. *Other* carries
+nothing to mark.
+
+**A mark reaches a project only through a report that names that project.** S33
+makes the project optional on an interaction, so most reports name a company
+alone. Reading a project's marks through its company would put an unrelated
+project's catalogue on this project's card, and that is not done.
 
 **S38.** A report has **two halves, with different visibility**:
 
@@ -271,7 +358,6 @@ that why?"*
 - Losing a **project** closes every open quotation under it; they inherit the
   project's reason and are marked as closed by the project.
 - Losing a **quotation** does not close its project.
-- A quotation with **no project** carries its own reason.
 
 **S48. [BUILD]** Loss reporting counts **each situation once**. A lost project
 counts once, not once per quotation beneath it.
@@ -282,8 +368,23 @@ counts once, not once per quotation beneath it.
 
 ## 8. Quotations
 
-**S50.** A quotation may exist **with or without a project**. Reps
-sometimes need to quote before a project exists.
+**S50. [CHANGE]** A quotation **always names a project**. Every sale is on the
+board (D29), and a sale with no project cannot appear on it.
+
+Raising asks for the company first. The rep then attaches the quotation to one
+of that company's projects **he can already see** — S30 is unchanged, so a
+project belonging to another rep is not offered — or **creates one as part of
+raising**, pre-named from what he has already typed. **The default is the new
+project.** Two projects that should have been one can be merged; one project
+holding four unrelated jobs cannot be pulled apart.
+
+**There is no free-text fallback and no "no project" option.** A description
+typed into a box is faster than creating a project, so it becomes the lazy path,
+and it produces a record nothing can quote against, count, or put in a column.
+
+The code today permits the null and then refuses it one step later: a
+project-less quotation cannot be dispatched at all (S74). This rule moves that
+refusal to the moment the gap is cheap to close, and closes the window to zero.
 
 **S51.** A quotation always names a **company**.
 
@@ -388,13 +489,18 @@ method, the SMAC number and its difference flag (S120) — and it credits nothin
 and wins nothing (S31). The reason reaches the rep and anyone whose credit it
 takes back (S128).
 
-**S74.** **The project is recorded on the dispatch itself.** When the
-quotation has a project, the dispatch takes it. When the quotation has none, the
-project chosen at dispatch is written back onto the quotation, and the
-quotation's company is added to that project as a participant if it is not
-already one. The write-back happens when the coordinator approves — so a
-request that is refused writes nothing back, and a request that names a project
-its quotation does not yet carry is the ordinary state of one before approval.
+**S74. [CHANGE]** **The project is recorded on the dispatch itself**, and it is
+always the quotation's own. A dispatch raised from a quotation takes that
+quotation's project, shown and never chosen; a dispatch that names a different
+one is refused rather than silently corrected. A **free entry** names none
+(S75), because it has no quotation to have taken one from.
+
+**The write-back is gone, and it goes with S50's null case in the same slice.**
+It existed only because a quotation might have no project. Since S50 every
+quotation has one before it is ever dispatched, so there is nothing to write
+back and no participant to add — the picker at dispatch, the `projectRequired`
+refusal, and the approval-time update all come out together. Building the new
+rule beside the old mechanism is the failure mode this avoids.
 
 **S75. [BUILD]** A dispatch is raised one of three ways: **exactly as a
 quotation** · **from a quotation, with edits** · **as a free entry with no
@@ -826,7 +932,8 @@ Ordered by what unblocks what.
 
 3. One name field on companies and contacts; phone mandatory; country added
 4. Drop project role labels
-5. Quotation project becomes optional; write-back at dispatch
+5. Every quotation names a project (S50); the write-back at dispatch comes out
+   with it (S74)
 6. VAT fixed; validity and delivery period leave FACET; readable product fields
 7. Report split into shared half and private note; same-day edit
 8. Signals and loss reasons unified; loss cascade
@@ -906,8 +1013,12 @@ for being empty.
   onto quotations, but SMAC prints the quotation. Needed at all?
 - **The performance formula.** Activity and target are shown side by side and
   never combined into one score. Nothing scores a rep.
-- **Whether an unlinked quotation should ever be forced to gain a project**
-  before dispatch, or whether S74's write-back is always enough.
+- **Where a rep's explanation lives when a project jumps a position** on the
+  board (S134). A note, not an override — but S76 and S131 disagree about who
+  may read a project's conversation, and that is settled before a note renders.
+- **What stops a moving quotation being chased** once payment leaves the
+  quotation (S133). Two follow-up conditions suppress themselves on a confirmed
+  payment today and lose their test with the column.
 - **Project names.** Companies and contacts have one name field (S12, S19).
   Projects still have two, and no rule says why. Same reasoning appears to
   apply. Decide before the projects slice.
