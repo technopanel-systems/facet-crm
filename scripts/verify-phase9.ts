@@ -1099,11 +1099,6 @@ async function main(): Promise<void> {
 
   console.log("\n11. Coverage answers which companies went quiet, not who submitted");
 
-  // A company nobody has ever logged against is quiet from birth: it is
-  // exactly the one that needs the conversation.
-  const quietRow = (await coverage(manager, { q: stamp })).rows.find(
-    (row) => row.companyId === companyNever.id,
-  );
   check(
     "a company logged against reads back its last interaction, not null",
     (await coverage(manager, { q: stamp })).rows.find(
@@ -1115,10 +1110,46 @@ async function main(): Promise<void> {
       )?.lastInteractionOn
     }`,
   );
+  /* **A company never logged against is quiet once the clock has run, not from
+   * birth** — `S89`: something joins the list when a company has had *"no
+   * contact for too long"*, and a company registered this morning has not.
+   *
+   * **This assertion used to claim the opposite**, and it was encoding a
+   * defect. `coverage()` and `companyQuiet()` in `follow-ups.ts` held two
+   * copies of this derivation which had drifted: coverage counted a
+   * never-logged company quiet immediately, follow-ups counted from
+   * registration plus the threshold, and both carried the same sentence in
+   * prose. On the demo base that was 100 of rep-a's 125 companies marked Quiet
+   * against 36 — the same rep, the same afternoon, two screens, two answers.
+   * `companySilence()` is now the one definition and this is `S89`'s half of
+   * it, asserted in **both** directions rather than only the convenient one. */
+  const freshNever = (await coverage(manager, { q: stamp })).rows.find(
+    (row) => row.companyId === companyNever.id,
+  );
   check(
-    "a company never logged against has no last interaction, and is quiet",
-    quietRow?.lastInteractionOn === null && quietRow?.isQuiet === true,
-    `last=${quietRow?.lastInteractionOn} quiet=${quietRow?.isQuiet}`,
+    "a company never logged against has no last interaction [20 §2]",
+    freshNever?.lastInteractionOn === null,
+    `last=${freshNever?.lastInteractionOn}`,
+  );
+  check(
+    "…and registered today it is NOT yet quiet — no contact for too long [S89]",
+    freshNever?.isQuiet === false,
+    `quiet=${freshNever?.isQuiet} threshold=${freshNever?.thresholdDays}`,
+  );
+
+  // Age its registration past the unqualified threshold. Nothing is logged
+  // against it either way — only the clock moves, which is the whole claim.
+  await db
+    .update(companies)
+    .set({ createdAt: new Date(`${daysAgo(61)}T00:00:00Z`) })
+    .where(eq(companies.id, companyNever.id));
+  const agedNever = (await coverage(manager, { q: stamp })).rows.find(
+    (row) => row.companyId === companyNever.id,
+  );
+  check(
+    "…and at 61 days it IS quiet, still with no interaction to show [S89]",
+    agedNever?.isQuiet === true && agedNever?.lastInteractionOn === null,
+    `quiet=${agedNever?.isQuiet} last=${agedNever?.lastInteractionOn}`,
   );
 
   // Age company B's only interaction past each threshold in turn.

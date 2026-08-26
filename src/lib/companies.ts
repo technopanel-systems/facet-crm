@@ -14,7 +14,18 @@
  * question the reads do — there is no second permission to consult.
  */
 
-import { and, count, desc, eq, ilike, isNull, or, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  isNull,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -32,6 +43,7 @@ import {
   visibleCompaniesFilter,
   type AuthSession,
 } from "@/lib/authz";
+import { companySilence } from "@/lib/coverage";
 import { REGIONS, type Region, type SameValues } from "@/lib/enums";
 import { assertLeadSourceSelectable, placeForCountry } from "@/lib/lookups";
 import { normalizeName } from "@/lib/normalize";
@@ -39,6 +51,7 @@ import { normalizeName } from "@/lib/normalize";
 // `[10 §1]`. The dependency runs one way only — that module never imports this
 // one, so there is no cycle to unpick later.
 import { companyIsQualified } from "@/lib/quotations";
+import { getQuietThresholds } from "@/lib/settings";
 import { RuleError } from "@/lib/validation";
 
 export type Company = typeof companies.$inferSelect;
@@ -95,7 +108,64 @@ export type CompanyListRow = {
   cityNameAr: string | null;
   /** Derived, never stored — see `companyIsQualified`. */
   isQualified: boolean;
-  createdAt: Date;
+  /**
+   * `D26`'s silence meter, decided in SQL by `companySilence` and merely
+   * rendered by the screen. **A threshold is never derived in a component**
+   * (`CLAUDE.md`).
+   */
+  /** Days since the last interaction. **Null = never logged against** — which
+   *  must not read the same as `0` (`coverage.ts`). */
+  daysSince: number | null;
+  /** Days the clock has actually run: since the last interaction, else since
+   *  registration. This is what the order and the meter's fill are built on. */
+  silentDays: number;
+  thresholdDays: number;
+  isQuiet: boolean;
+  /** `20 §5` — suppressed until this date, and calm however old meanwhile. */
+  onHoldUntil: string | null;
+};
+
+/**
+ * `D25` — *companies group as gone quiet / due soon / recently touched*.
+ *
+ * **Two of the three are built.** `D25` names a middle group and no rule
+ * anywhere says where *soon* starts: the thresholds `07 D5` gives are the
+ * boundary between quiet and not, and there is no second one. A window chosen
+ * here would become the number everyone believes in, so it is
+ * `OPEN — not chosen` and recorded in `WORKFLOW §5` with the candidate
+ * readings. `D6`'s amber band consequently goes unused on this screen — red
+ * past the threshold, faint otherwise.
+ */
+export const COMPANY_ATTENTION_GROUPS = ["quiet", "touched"] as const;
+export type CompanyAttentionGroup = (typeof COMPANY_ATTENTION_GROUPS)[number];
+
+/**
+ * `?sort=` — attention by default `D25`, with name and recency kept.
+ *
+ * Recency is `created_at desc`, which is what this list used to default to.
+ * It stays reachable because it is the only order that answers *what did I add
+ * last*, and because the demo base's three deliberately long names are recent
+ * (`scripts/seed/demo/companies.ts`) — attention order buries them, so RTL
+ * truncation is driven through this sort.
+ */
+export const COMPANY_SORTS = ["attention", "name", "recent"] as const;
+export type CompanySort = (typeof COMPANY_SORTS)[number];
+
+export function isCompanySort(value: string | undefined): value is CompanySort {
+  return COMPANY_SORTS.includes(value as CompanySort);
+}
+
+export type CompanyListResult = {
+  rows: CompanyListRow[];
+  total: number;
+  page: number;
+  sort: CompanySort;
+  /**
+   * How many rows are in each group **across the whole scope**, not the page.
+   * `D24` says a group header carries its count, and a header counting only
+   * what happens to be on this page would lie on every page but the last.
+   */
+  groupCounts: Record<CompanyAttentionGroup, number>;
 };
 
 /** `09 §3.1` — no document sets a page size; 25 is a display detail. */
@@ -117,12 +187,47 @@ function searchFilter(query: string | undefined): SQL | undefined {
   );
 }
 
+/**
+ * The companies list — **ordered by attention** `D25`.
+ *
+ * `D25` says a list is grouped by whose move it is and names this list's
+ * groups; `D2` says a row says whose move it is rather than what its status is.
+ * Sorting by `created_at` answered neither — a rep does not open FACET to find
+ * out what he added last.
+ *
+ * **The order is resolved in SQL, before `.limit()`.** Ordering a page after
+ * fetching it is the failure `CLAUDE.md` records shipping once already, and it
+ * fails silently: page two would simply hold rows that belong on page one.
+ * `companySilence` exists so this is a join rather than a second derivation —
+ * `follow-ups.ts` and `coverage()` had already drifted apart writing it twice.
+ *
+ * **`followUpScope()` is deliberately NOT the reader here.** It returns only
+ * rows already past threshold, suppresses on-hold, archived and merged
+ * companies, and merges three anchor types — so it cannot order the companies
+ * that are *fine*, which is most of them, and a list that hides an on-hold
+ * customer is a list a rep cannot find that customer in. It answers *what needs
+ * me today*; this answers *where does each of my companies stand*.
+ */
 export async function listCompanies(
   session: AuthSession,
-  options: { q?: string; page?: number } = {},
-): Promise<{ rows: CompanyListRow[]; total: number; page: number }> {
+  options: { q?: string; page?: number; sort?: CompanySort } = {},
+): Promise<CompanyListResult> {
   const page = Math.max(1, options.page ?? 1);
+  const sort = options.sort ?? "attention";
+  const thresholds = await getQuietThresholds();
+  const silence = companySilence(thresholds);
   const where = and(visibleCompaniesFilter(session), searchFilter(options.q));
+
+  // `attention` leads with the quiet — `isQuiet desc` puts true first — and
+  // ranks within each group by how long the clock has run, which is `D34`'s
+  // *worked down by ranking*. `name` and `recent` are the two orders a rep may
+  // still want; neither changes which rows are returned.
+  const orderBy =
+    sort === "name"
+      ? [asc(companies.name)]
+      : sort === "recent"
+        ? [desc(companies.createdAt)]
+        : [desc(silence.isQuiet), desc(silence.silentDays), asc(companies.name)];
 
   const rows = await db
     .select({
@@ -137,23 +242,50 @@ export async function listCompanies(
       // Qualification is derived from the event, never set by hand
       // `[04 qualification]`, `[10 §1]` — a correlated EXISTS, not a column.
       isQualified: companyIsQualified(companies.id),
-      createdAt: companies.createdAt,
+      lastInteractionAt: silence.lastInteractionAt,
+      silentDays: silence.silentDays,
+      thresholdDays: silence.thresholdDays,
+      isQuiet: silence.isQuiet,
+      onHoldUntil: silence.onHoldUntil,
     })
     .from(companies)
     .leftJoin(companyCategories, eq(companies.categoryId, companyCategories.id))
     .leftJoin(cities, eq(companies.cityId, cities.id))
+    .innerJoin(silence, eq(silence.companyId, companies.id))
     .where(where)
-    .orderBy(desc(companies.createdAt))
+    .orderBy(...orderBy)
     .limit(PAGE_SIZE)
     .offset((page - 1) * PAGE_SIZE);
 
-  // Same WHERE, so the count can never disagree with the page.
+  // Same WHERE and the same join, so neither can disagree with the page. The
+  // group counts come back in the same pass as the total, because `D24`'s
+  // header counts the whole scope and a second query could see a different one.
   const [totals] = await db
-    .select({ total: count() })
+    .select({
+      total: count(),
+      quiet: sql<number>`count(*) filter (where ${silence.isQuiet})`,
+    })
     .from(companies)
+    .innerJoin(silence, eq(silence.companyId, companies.id))
     .where(where);
 
-  return { rows, total: totals?.total ?? 0, page };
+  const total = totals?.total ?? 0;
+  const quiet = Number(totals?.quiet ?? 0);
+
+  return {
+    rows: rows.map(({ lastInteractionAt, ...row }) => ({
+      ...row,
+      // Never logged is null, never zero — `coverage.ts` makes the point and
+      // the meter depends on it: "Never" and "today" must not read the same.
+      daysSince: lastInteractionAt
+        ? row.silentDays
+        : null,
+    })),
+    total,
+    page,
+    sort,
+    groupCounts: { quiet, touched: total - quiet },
+  };
 }
 
 /** The company select on the contact and project forms. */

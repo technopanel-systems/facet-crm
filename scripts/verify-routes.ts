@@ -374,15 +374,22 @@ function firstId(body: string, section: string): string | null {
  * The archetype markers.
  *
  * **Asserted for the manager only.** `sees_all_reps` is the one identity with
- * rows on every list; a coordinator's `/companies` and `/performance` are
- * legitimately empty — they see quotation threads and company NAMES, not
- * company records `[18 §2]`. So a list card that is absent there is the empty
- * state working, not a missing frame, and asserting it for everyone turns a
- * correct screen into a red line.
+ * rows on every list, and a list card absent for someone else is the empty
+ * state working rather than a missing frame — asserting it for everyone turns
+ * a correct screen into a red line.
  *
- * `S76` moved the line without erasing it: the coordinator now reads projects
- * and contacts in full, so `/projects` and `/contacts` are no longer empty for
- * them — section 14 asserts that directly — while `/companies` still is.
+ * `S76` moved the coordinator's line without erasing it: they read projects
+ * and contacts in full, so `/projects` and `/contacts` are not empty for them
+ * — section 14 asserts that directly.
+ *
+ * **This note used to say `/companies` still was empty for them, and that is
+ * no longer true.** `S9` assigns a company to *a rep, a desk rep, marketing,
+ * or the coordinator*, and `S18` makes whoever registers one its primary rep;
+ * `seed:demo` exercises that so no `company_reps.origin` is unreachable, and
+ * the coordinator holds four. The claim predated that seed. **Section 20
+ * asserts the live shape** — scoped, not empty and not everything — so this
+ * stays a note about which identity the markers are asserted for, and nothing
+ * more.
  */
 const MARKERS: Record<string, readonly string[]> = {
   // `D69`'s row renders for everyone whatever flags they hold, so the marker
@@ -4027,7 +4034,205 @@ async function main(): Promise<void> {
       }
     }
   }
+  console.log(
+    "\n20. The companies list — ordered by attention, grouped, and its lead cell [D25], [D26], [D2]",
+  );
+  {
+    /* **The order is the claim, and it is asserted ACROSS the page boundary.**
+     *
+     * A screen that orders its rows after fetching them looks right on page
+     * one and is wrong everywhere else — silently, which is the failure
+     * `CLAUDE.md` records shipping once already. So this walks page one, takes
+     * the last row's silence, walks page two, and takes the first: if the
+     * order were applied per page, page two would restart at the top of the
+     * scale and this is where it shows.
+     *
+     * It asserts on `data-days` off `data-slot="silence-meter"` — a DOM marker
+     * carrying the number the colour was chosen from, never a translated
+     * string.
+     */
+    for (const locale of ["en", "ar"] as const) {
+      const jar = jars["rep-a@example.test"];
+
+      const days = (body: string): (number | "never")[] =>
+        [
+          ...body.matchAll(/data-slot="silence-meter"[^>]*data-days="([^"]*)"/g),
+        ].map((m) => (m[1] === "never" ? "never" : Number(m[1])));
+
+      const one = await get(jar, `/${locale}/companies`);
+      const two = await get(jar, `/${locale}/companies?page=2`);
+
+      const meters = days(one.body).length;
+      const headers = (one.body.match(/data-slot="company-group"/g) ?? []).length;
+      /* **A group header is not a record row.** `TableRow` spreads its props
+       * after its own `data-slot`, so `data-slot="company-group"` replaces
+       * `table-row` rather than joining it — which is the semantics wanted:
+       * anything counting `table-row` to mean *records* then counts records.
+       * So the only non-record `table-row` left is the one in `TableHeader`,
+       * and that is the single subtraction. */
+      const bodyRows =
+        (one.body.match(/data-slot="table-row"/g) ?? []).length - 1;
+      check(
+        `${locale}: every row leads with D26's silence meter [D26]`,
+        meters > 0 && meters === bodyRows,
+        `${meters} meters · ${bodyRows} rows`,
+      );
+      check(
+        `${locale}: a group header does not count as a record row [D24]`,
+        headers > 0 &&
+          !/data-slot="company-group"[^>]*data-slot="table-row"/.test(one.body),
+        `${headers} headers`,
+      );
+
+      /* `silentDays` is what the order is built on and `data-days` is what a
+       * person reads — they part company on a never-logged row, which shows
+       * "never" and still sorts by its age. So the monotonic assertion runs
+       * over the quiet flag first and the figure second, and skips `never`
+       * rather than coercing it to a number the screen never showed. */
+      const quietFlags = [
+        ...one.body.matchAll(
+          /data-slot="silence-meter"[^>]*data-quiet="([^"]*)"/g,
+        ),
+      ].map((m) => m[1]);
+      check(
+        `${locale}: the quiet rows come first [D25]`,
+        quietFlags.join(",") === [...quietFlags].sort().reverse().join(","),
+        quietFlags.join(","),
+      );
+
+      const tail = days(one.body)
+        .filter((d): d is number => d !== "never")
+        .at(-1);
+      const head = days(two.body).filter((d): d is number => d !== "never")[0];
+      if (tail === undefined || head === undefined) {
+        console.log(`  --    ${locale}: rep-a has no second page to cross`);
+      } else {
+        check(
+          `${locale}: attention order holds ACROSS the page boundary [D25]`,
+          head <= tail,
+          `page1 ends ${tail} · page2 starts ${head}`,
+        );
+      }
+
+      /* `D24` — a group header carries its count, and the count is the whole
+       * scope's. Page one of a 37-quiet scope shows 25 quiet rows under a
+       * header reading 37; a header counting the page would read 25 and be
+       * wrong on every page but the last. */
+      const groupCount = one.body.match(
+        /data-slot="company-group"[^>]*data-group="quiet"[^>]*data-count="([^"]*)"/,
+      );
+      const quietOnPage = quietFlags.filter((f) => f === "true").length;
+      if (!groupCount) {
+        console.log(`  --    ${locale}: rep-a has no quiet group`);
+      } else {
+        check(
+          `${locale}: the group header counts the SCOPE, not the page [D24]`,
+          Number(groupCount[1]) >= quietOnPage,
+          `header ${groupCount[1]} · page ${quietOnPage}`,
+        );
+      }
+
+      /* QUALIFIED lost its column `D2`. The mark is what replaced it, and an
+       * unqualified row carries nothing at all — absent, not a dash. */
+      const marks = (one.body.match(/data-slot="company-qualified"/g) ?? [])
+        .length;
+      check(
+        `${locale}: qualification is a mark, on some rows and not all [D2]`,
+        marks > 0 && marks < meters,
+        `${marks} of ${meters}`,
+      );
+
+      /* `D62` — `dir="auto"` on the NAME, never on a wrapper that also holds a
+       * label or a number. The group header is exactly such a wrapper, and the
+       * dashboard shipped this defect once. */
+      const groupHeaders = [
+        ...one.body.matchAll(/<tr[^>]*data-slot="company-group"[^>]*>/g),
+      ].map((m) => m[0]);
+      check(
+        `${locale}: no group header carries dir="auto" [D62]`,
+        groupHeaders.every((h) => !h.includes('dir="auto"')),
+        `${groupHeaders.length} headers`,
+      );
+
+      /* The two other sorts, and the property that must survive both: a sort
+       * never removes a row. Groups go with them — under name or recency the
+       * groups would interleave and a header would be a lie. */
+      for (const sort of ["name", "recent"]) {
+        const sorted = await get(jar, `/${locale}/companies?sort=${sort}`);
+        check(
+          `${locale}: ?sort=${sort} keeps the list non-empty [D25]`,
+          days(sorted.body).length > 0,
+        );
+        check(
+          `${locale}: ?sort=${sort} drops D25's group headers`,
+          !sorted.body.includes('data-slot="company-group"'),
+        );
+      }
+
+      /* An unknown sort is a display preference in a URL people edit, so it
+       * falls back rather than 404ing. */
+      const bogus = await get(jar, `/${locale}/companies?sort=nonsense`);
+      check(
+        `${locale}: an unknown ?sort= falls back to the default`,
+        bogus.status === 200 && bogus.body.includes('data-slot="company-group"'),
+        String(bogus.status),
+      );
+
+      /* `D52` — the two empty states are different messages and the filtered
+       * one offers a way back. Asserted on the marker and on a link to the
+       * bare list, never on the translated sentence. */
+      const none = await get(
+        jar,
+        `/${locale}/companies?q=zzzzznosuchcompanyzzzzz`,
+      );
+      check(
+        `${locale}: a search with no match renders the FILTERED empty state [D52]`,
+        attrOf(none.body, "companies-empty", "data-filtered") === "true",
+        String(attrOf(none.body, "companies-empty", "data-filtered")),
+      );
+      check(
+        `${locale}: …and offers a way back to the unfiltered list [D52]`,
+        after(none.body, "companies-empty").includes(
+          `href="/${locale}/companies"`,
+        ),
+      );
+      check(
+        `${locale}: the empty state sits OUTSIDE the list card [D60]`,
+        !none.body.includes('data-slot="list-card"'),
+      );
+
+      /* Emptiness is judged on `q` alone — a sort must never reach the empty
+       * state at all. */
+      const sortedFull = await get(jar, `/${locale}/companies?sort=name`);
+      check(
+        `${locale}: a sort never empties the list [D52]`,
+        !sortedFull.body.includes('data-slot="companies-empty"'),
+      );
+    }
+
+    /* **The coordinator's list is NOT empty**, and the note above the archetype
+     * markers said it was. `S9` lets a company be assigned to the coordinator
+     * and `S18` makes whoever registers one its primary rep — `seed:demo`
+     * exercises that so no `company_reps.origin` is unreachable, and they hold
+     * four. The old claim predates that seed. Their scope is still their own:
+     * what is asserted is that they see *some* and not *every*. */
+    {
+      const coordinator = jars["coordinator@example.test"];
+      const manager = jars["manager@example.test"];
+      const countRows = (body: string) =>
+        (body.match(/data-slot="silence-meter"/g) ?? []).length;
+
+      const theirs = countRows((await get(coordinator, "/en/companies")).body);
+      const all = countRows((await get(manager, "/en/companies")).body);
+      check(
+        "the coordinator's /companies is scoped — not empty, not everything [S9], [S18]",
+        theirs > 0 && theirs < all,
+        `coordinator ${theirs} · manager ${all}`,
+      );
+    }
+  }
 }
+
 /** One `data-` attribute off the element carrying `data-slot="…"`. */
 function attrOf(body: string, slot: string, attr: string): string | null {
   const tag = body.match(new RegExp(`<[a-z]+[^>]*data-slot="${slot}"[^>]*>`));

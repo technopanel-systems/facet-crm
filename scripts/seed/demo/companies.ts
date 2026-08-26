@@ -31,8 +31,19 @@
  * **Three names are deliberately long**, one Arabic, one English, one contact.
  * `S12` gives a company a single name field, so a list's lead cell and a
  * detail heading are exactly where RTL truncation breaks, and nothing else in
- * the base is long enough to find it. All three are recent, so
- * `desc(created_at)` puts them on page one of `/companies`.
+ * the base is long enough to find it.
+ *
+ * **Reach them with `/companies?sort=recent`.** All three are recent, which
+ * used to put them on page one because the list defaulted to
+ * `desc(created_at)`. It defaults to attention now `D25`, and recent is the
+ * calm end of that order — the long Arabic company is `age: 8`, so it sorts
+ * near the *back*. That is intended, not a regression: the sort is kept
+ * precisely so these stay one URL away. `verify:routes` §20 drives it.
+ *
+ * **Known gap, deliberately not closed here:** none of the three is quiet, so
+ * the *default* screen — the one a rep actually looks at — exercises no long
+ * name at all. Making one of them quiet is a change to this dataset and wants
+ * its own decision (`WORKFLOW §5`).
  *
  * `region` is never written here: `S15` derives it from the city and the rep
  * is never asked. Country is Saudi unless `country` says otherwise, and a

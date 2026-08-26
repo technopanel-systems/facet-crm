@@ -268,12 +268,13 @@
     "new": "شركة جديدة",
     "newTitle": "شركة جديدة",
     "editTitle": "تعديل الشركة",
-    "empty": "لا توجد شركات بعد.",
-    "emptyFiltered": "لا توجد شركات مطابقة للبحث.",
+    "empty": "لا توجد شركات بعد — أضف الأولى.",
+    "emptyFiltered": "لا توجد شركات مطابقة لهذا البحث.",
     "fields": {
       "category": "التصنيف",
       "vatNumber": "الرقم الضريبي",
-      "leadSource": "مصدر العميل"
+      "leadSource": "مصدر العميل",
+      "lastTouched": "آخر تواصل"
     },
     "detail": {
       "details": "التفاصيل",
@@ -290,6 +291,21 @@
     "errors": {
       "notFound": "هذه الشركة غير موجودة، أو أنها ليست ضمن سجلاتك.",
       "leadSourceNotSelectable": "هذا المصدر لا يمكن تعيينه إلا بواسطة من يوزّع العملاء المحتملين."
+    },
+    "emptyFilteredAction": "مسح البحث",
+    "qualifiedMark": "ع",
+    "sort": {
+      "attention": "يحتاج متابعة",
+      "name": "الاسم",
+      "recent": "الأحدث إضافة"
+    },
+    "groups": {
+      "quiet": "انقطع التواصل",
+      "touched": "تم التواصل مؤخراً"
+    },
+    "silence": {
+      "never": "لم يُسجَّل أبداً",
+      "days": "{count, plural, zero {# يوم} one {يوم واحد} two {يومان} few {# أيام} many {# يوماً} other {# يوم}}"
     }
   },
   "contacts": {
