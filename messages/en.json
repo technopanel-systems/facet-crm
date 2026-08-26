@@ -361,6 +361,7 @@
     "emptyFiltered": "No projects match that search.",
     "fields": {
       "owner": "Owner",
+      "lastMoved": "Last moved",
       "sqmExpected": "Expected m²",
       "state": "State",
       "endState": "End state",
@@ -374,6 +375,15 @@
       "lost": "Lost",
       "committed": "Committed",
       "open": "Open"
+    },
+    "view": {
+      "board": "Board",
+      "table": "Table"
+    },
+    "board": {
+      "threads": "{count, plural, one {# quotation} other {# quotations}}",
+      "lost": "{count, plural, one {# lost project is not on the board} other {# lost projects are not on the board}}",
+      "seeTable": "See them in the table"
     },
     "detail": {
       "details": "Details",

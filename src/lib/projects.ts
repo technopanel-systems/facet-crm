@@ -31,13 +31,17 @@
 
 import {
   and,
+  asc,
   count,
+  countDistinct,
   desc,
   eq,
   exists,
   ilike,
   inArray,
+  isNotNull,
   isNull,
+  ne,
   sql,
   sum,
   type SQL,
@@ -53,6 +57,8 @@ import {
   lossReasons,
   projectCompanies,
   projects,
+  quotationThreads,
+  quotationVersions,
   users,
 } from "@/db/schema";
 import { withAudit, type AuditEntry } from "@/lib/audit";
@@ -70,6 +76,7 @@ import {
   visibleProjectsFilter,
   type AuthSession,
 } from "@/lib/authz";
+import { CHAIN_COLUMNS, chainState, type ChainColumn } from "@/lib/chain";
 import {
   OTHER_LOSS_REASON_CODE,
   PROJECT_END_STATES,
@@ -80,6 +87,12 @@ import {
 } from "@/lib/enums";
 import { lossReasonCode, regionForCity } from "@/lib/lookups";
 import { normalizeName } from "@/lib/normalize";
+import {
+  getPositiveIntSetting,
+  PROJECT_STAGE_UNCHANGED_DEFAULT,
+  PROJECT_STAGE_UNCHANGED_KEY,
+} from "@/lib/settings";
+import { calendarDaysBetween, riyadhDayOf } from "@/lib/working-days";
 import { RuleError } from "@/lib/validation";
 
 export type Project = typeof projects.$inferSelect;
@@ -224,8 +237,236 @@ export function projectState(row: {
   return "open";
 }
 
-export type ProjectListRow = {
+/**
+ * **When a project last moved** — the one derivation, and the key `D25` orders
+ * this list by.
+ *
+ * `10 §1`: the funnel is *"computed from what has actually happened"* and
+ * nobody ticks a box, so **there is no stage column and there is not going to
+ * be one**. Moving means a stage-advancing event: a quotation raised on the
+ * project, a payment confirmed on one of its threads, or an **approved**
+ * dispatch against it `S72` — a request sitting with the coordinator is the
+ * project waiting, not the project moving. Falling back to the project's own
+ * creation, which is the case a threshold exists to catch.
+ *
+ * **This was `follow-ups.ts`'s private copy until this slice**, where it fed
+ * `S89`'s stage-unchanged condition. `/projects` needs the same answer to order
+ * by `D25`, and `companyQuiet` is the live example in `WORKFLOW §5` of what two
+ * copies of one derivation do — they had already drifted, 100 companies marked
+ * quiet against 36, while both carried the same sentence in prose. So it is one
+ * function, here, and `projectStageUnchanged` composes it.
+ *
+ * **A dispatch reaches a project by its own `project_id`** `S74`, as
+ * `dispatchedSqmByCompany` does — not through `quotation_threads`, which is the
+ * route the follow-ups copy still took. The two agree on every row today
+ * (`S75`'s free-entry route writes the column null, and `S74`'s write-back puts
+ * the project on the thread at approval), and this is the one the rules name.
+ * `verify:followups` is the gate that proves nothing moved.
+ *
+ * Two grouped subqueries **joined on**, never correlated subqueries in a `sql`
+ * template — the shape `coverage.ts` records this codebase getting wrong once
+ * already. Each exposes its date under a name unique across the whole
+ * statement, because Drizzle drops the table qualifier in a `sql` template's
+ * SELECT list and two subqueries both exposing `at` would render as an
+ * ambiguous bare `"at"`. The fallback **names its table outright** for the same
+ * reason (`CLAUDE.md`): `created_at` alone is ambiguous the moment this query
+ * joins `users`.
+ *
+ * `greatest()` ignores nulls, so a project with threads but no dispatch takes
+ * the thread date, and one with neither takes its own creation.
+ */
+export function projectMovement() {
+  const threadEvents = db
+    .select({
+      projectId: quotationThreads.projectId,
+      at: sql<string | null>`greatest(
+        max((${quotationThreads.createdAt} at time zone 'Asia/Riyadh')::date),
+        max((${quotationThreads.paymentConfirmedAt} at time zone 'Asia/Riyadh')::date)
+      )`.as("thread_event_at"),
+    })
+    .from(quotationThreads)
+    .groupBy(quotationThreads.projectId)
+    .as("thread_events");
 
+  const dispatchEvents = db
+    .select({
+      projectId: dispatches.projectId,
+      at: sql<string | null>`max(${dispatches.dispatchDate})`.as(
+        "dispatch_event_at",
+      ),
+    })
+    .from(dispatches)
+    .where(approvedDispatches())
+    .groupBy(dispatches.projectId)
+    .as("dispatch_events");
+
+  const at = sql<string>`coalesce(
+    greatest(${threadEvents.at}, ${dispatchEvents.at}),
+    ("projects"."created_at" at time zone 'Asia/Riyadh')::date
+  )`;
+
+  return { threadEvents, dispatchEvents, at };
+}
+
+/**
+ * The first participant of each project, by name — one query for a whole page
+ * rather than one per row.
+ *
+ * A project keeps at least one participant `S27`, and a row or a board card has
+ * space for one name; the rest are on the project itself. Ordered by name so
+ * the choice is stable between requests rather than following insertion order.
+ *
+ * **Removed links are hidden** `S27` — kept in the table, absent from every
+ * screen. Moved here from `follow-ups.ts` in the board slice, alongside
+ * `projectMovement` above: both are facts about a project, and the waiting list
+ * is one reader of them rather than their owner.
+ *
+ * No visibility term: the caller has already proved the project visible, and a
+ * project's participants follow it `[20 §13]` — `listProjectCompanies` is what
+ * decides which of them the reader may *open*.
+ */
+export async function firstCompanyByName(
+  projectIds: string[],
+): Promise<Map<string, { id: string; name: string }>> {
+  if (projectIds.length === 0) return new Map();
+
+  const rows = await db
+    .select({
+      projectId: projectCompanies.projectId,
+      id: companies.id,
+      name: companies.name,
+    })
+    .from(projectCompanies)
+    .innerJoin(companies, eq(companies.id, projectCompanies.companyId))
+    .where(
+      and(
+        inArray(projectCompanies.projectId, projectIds),
+        isNull(projectCompanies.removedAt),
+      ),
+    )
+    .orderBy(asc(companies.name));
+
+  const byProject = new Map<string, { id: string; name: string }>();
+  for (const row of rows) {
+    if (byProject.has(row.projectId)) continue;
+    byProject.set(row.projectId, { id: row.id, name: row.name });
+  }
+  return byProject;
+}
+
+/**
+ * **Where one project sits on the quotation chain** `D29` — the board's column,
+ * and the table's whose-move cell.
+ *
+ * `chainState()` is the one ladder `[chain.ts]` and it takes **one thread**;
+ * `D29` asks the same question of a **project**, which may have several. This
+ * is the only place that gap is closed, and it closes it two ways the founder
+ * settled with the board:
+ *
+ * **Furthest along wins**, which is the rule `chainReached` already applies one
+ * level down — a thread that is accepted *and* paid is at `paid`. A project
+ * with one thread dispatched and one awaiting signature reads as dispatched,
+ * and `liveThreads` is what stops the second one being lost behind the first.
+ *
+ * **`new` at project level means no LIVE thread**, where `chain.ts`'s means no
+ * thread at all. A project whose every thread was rejected or cancelled is not
+ * lost — nobody has given up on it, and `chainOwner("new")` already says whose
+ * move it is: the rep's, to quote again. `D29` carries both definitions in its
+ * own text, because one that shifts by level and is not written down is how the
+ * silence derivation drifted.
+ *
+ * **`won` supplies the last rung.** `chainState` stops at `paid` for a caller
+ * that has not loaded dispatches, and the project already knows: `projectIsWon`
+ * is `S31`'s one predicate and an approved dispatch is exactly what
+ * `dispatched` means. So the answer is the furthest of the live threads'
+ * positions and `dispatched` where the project is won — which is also what
+ * stops a won project whose only thread was later cancelled reading as `new`.
+ *
+ * **No thread visibility filter**, deliberately. A project's figures follow the
+ * project — `dispatchedSqmByCompany`'s argument — and filtering the threads by
+ * the reader would put one project in two columns for two people.
+ */
+export type ProjectChain = {
+  position: ChainColumn;
+  /** Threads not yet closed. More than one is `25 §22`'s case. */
+  liveThreads: number;
+};
+
+/**
+ * A chain position with the movement figure the table's cell shows beside it.
+ *
+ * **`stale` is decided here and never in a screen.** `S89`'s threshold lives in
+ * `settings`, so a screen comparing a day count against a number of its own
+ * would be inventing one — which is what the `facet-ui` pre-flight forbids and
+ * what put two different quiet counts on two screens. `/follow-ups` applies the
+ * same threshold to put the project on a queue; this only colours a figure
+ * `D6`, and both read it from the same row.
+ */
+export type ProjectAttention = ProjectChain & {
+  /** Calendar days since the project last moved. */
+  ageDays: number;
+  /** `S89`'s stage-unchanged threshold, as configured. */
+  thresholdDays: number;
+  stale: boolean;
+};
+
+function furthest(a: ChainColumn, b: ChainColumn): ChainColumn {
+  return CHAIN_COLUMNS.indexOf(b) > CHAIN_COLUMNS.indexOf(a) ? b : a;
+}
+
+async function chainByProject(
+  projectIds: string[],
+  won: Map<string, boolean>,
+): Promise<Map<string, ProjectChain>> {
+  const answer = new Map<string, ProjectChain>();
+  for (const id of projectIds) {
+    answer.set(id, {
+      position: won.get(id) ? "dispatched" : "new",
+      liveThreads: 0,
+    });
+  }
+  if (projectIds.length === 0) return answer;
+
+  const rows = await db
+    .select({
+      projectId: quotationThreads.projectId,
+      endState: quotationThreads.endState,
+      paymentConfirmedAt: quotationThreads.paymentConfirmedAt,
+      versionStatus: quotationVersions.status,
+    })
+    .from(quotationThreads)
+    // The live version is the one that is not superseded — the same predicate
+    // `listQuotationThreads` applies, and the same invariant behind it.
+    .innerJoin(
+      quotationVersions,
+      and(
+        eq(quotationVersions.threadId, quotationThreads.id),
+        ne(quotationVersions.status, "superseded"),
+      ),
+    )
+    .where(inArray(quotationThreads.projectId, projectIds));
+
+  for (const row of rows) {
+    if (!row.projectId) continue;
+    const entry = answer.get(row.projectId);
+    if (!entry) continue;
+
+    const { position } = chainState({
+      versionStatus: row.versionStatus,
+      endState: row.endState,
+      paymentConfirmedAt: row.paymentConfirmedAt,
+    });
+    // A closed thread is not on the board and does not count as live `S86`.
+    if (position === "closed") continue;
+
+    entry.liveThreads += 1;
+    entry.position = furthest(entry.position, position);
+  }
+
+  return answer;
+}
+
+export type ProjectListRow = {
   id: string;
   nameEn: string;
   nameAr: string | null;
@@ -241,6 +482,10 @@ export type ProjectListRow = {
   cityNameEn: string | null;
   cityNameAr: string | null;
   createdAt: Date;
+  /** `YYYY-MM-DD` in Riyadh — `projectMovement`, and what `D25` orders by. */
+  lastMovedOn: string;
+  /** Null unless the caller asked for it — see `withChain`. */
+  chain: ProjectAttention | null;
 };
 
 const PAGE_SIZE = 25;
@@ -262,11 +507,36 @@ function searchFilter(query: string | undefined): SQL | undefined {
  * holding a company through a share sees the company and an empty projects
  * list, because `visibleProjectsFilter` is still the outer condition
  * `[04 Q7]`.
+ *
+ * **Ordered by when the project last moved, oldest first** `D25` — a list is
+ * ordered by attention, and creation date is not attention. `projectMovement`
+ * is the key and it is resolved in SQL, before the LIMIT.
+ *
+ * **`ownerCount` is how the OWNER column earns its place.** It is the distinct
+ * owners across the whole visible scope, not this page, so the column cannot
+ * appear on page 2 and vanish on page 3; a rep reading their own list sees 1
+ * and the column is not rendered at all. `D2` — a row says whose move it is,
+ * and a column repeating the reader's own name on every row says nothing.
+ *
+ * **`withChain` costs one extra query and is opt-in**, because only `/projects`
+ * renders the position. It decorates a page already fetched rather than
+ * filtering it, which is the distinction `CLAUDE.md` draws: nothing here
+ * narrows the result set or reorders it.
  */
 export async function listProjects(
   session: AuthSession,
-  options: { companyId?: string; q?: string; page?: number } = {},
-): Promise<{ rows: ProjectListRow[]; total: number; page: number }> {
+  options: {
+    companyId?: string;
+    q?: string;
+    page?: number;
+    withChain?: boolean;
+  } = {},
+): Promise<{
+  rows: ProjectListRow[];
+  total: number;
+  page: number;
+  ownerCount: number;
+}> {
   const page = Math.max(1, options.page ?? 1);
 
   const linkedToCompany = options.companyId
@@ -290,7 +560,9 @@ export async function listProjects(
     linkedToCompany,
   );
 
-  const rows = await db
+  const moved = projectMovement();
+
+  const found = await db
     .select({
       id: projects.id,
       nameEn: projects.nameEn,
@@ -308,21 +580,187 @@ export async function listProjects(
       cityNameEn: cities.nameEn,
       cityNameAr: cities.nameAr,
       createdAt: projects.createdAt,
+      lastMovedOn: moved.at,
     })
     .from(projects)
     .innerJoin(users, eq(projects.ownerUserId, users.id))
     .leftJoin(cities, eq(projects.cityId, cities.id))
+    .leftJoin(moved.threadEvents, eq(moved.threadEvents.projectId, projects.id))
+    .leftJoin(
+      moved.dispatchEvents,
+      eq(moved.dispatchEvents.projectId, projects.id),
+    )
     .where(where)
-    .orderBy(desc(projects.createdAt))
+    .orderBy(asc(moved.at), desc(projects.createdAt))
     .limit(PAGE_SIZE)
     .offset((page - 1) * PAGE_SIZE);
 
   const [totals] = await db
-    .select({ total: count() })
+    .select({ total: count(), owners: countDistinct(projects.ownerUserId) })
     .from(projects)
     .where(where);
 
-  return { rows, total: totals?.total ?? 0, page };
+  const [chain, thresholdDays] = options.withChain
+    ? await Promise.all([
+        chainByProject(
+          found.map((row) => row.id),
+          new Map(found.map((row) => [row.id, row.won])),
+        ),
+        getPositiveIntSetting(
+          PROJECT_STAGE_UNCHANGED_KEY,
+          PROJECT_STAGE_UNCHANGED_DEFAULT,
+        ),
+      ])
+    : [null, 0];
+
+  const now = riyadhDayOf(new Date());
+
+  return {
+    rows: found.map((row) => {
+      const position = chain?.get(row.id);
+      if (!position) return { ...row, chain: null };
+      const ageDays = calendarDaysBetween(row.lastMovedOn, now);
+      return {
+        ...row,
+        chain: {
+          ...position,
+          ageDays,
+          thresholdDays,
+          stale: ageDays >= thresholdDays,
+        },
+      };
+    }),
+    total: totals?.total ?? 0,
+    page,
+    ownerCount: totals?.owners ?? 0,
+  };
+}
+
+/** One card on the board `D29`. */
+export type ProjectBoardCard = {
+  id: string;
+  nameEn: string;
+  nameAr: string | null;
+  ownerName: string;
+  sqmExpected: string | null;
+  won: boolean;
+  committed: boolean;
+  /** The first participant by name `S27`; null only if every link is removed. */
+  companyName: string | null;
+  liveThreads: number;
+};
+
+export type ProjectBoard = {
+  /** All six of `CHAIN_COLUMNS`, in order, empty ones included. */
+  columns: { column: ChainColumn; cards: ProjectBoardCard[] }[];
+  /** Cards on the board — lost projects are not among them. */
+  total: number;
+  /** Lost, and therefore off the board `D29`. Stated, never silently dropped. */
+  lost: number;
+  /** As `listProjects` — what decides whether a card names its owner. */
+  ownerCount: number;
+};
+
+/**
+ * `D29`'s board: every visible project, in one of the six chain positions.
+ *
+ * **Unpaginated, and that is the cost of one definition** — the argument
+ * `awaitingSignatureCount` already makes `[quotations.ts]`. `CLAUDE.md` forbids
+ * filtering *a page* after fetching it, because the rows that fall out are
+ * silently gone; this fetches no page, so every column's count is the true one
+ * and `chain.ts` stays the only ladder. It grows with the reader's book: 49
+ * projects today, and a `sees_all_reps` or `can_dispatch` identity reads them
+ * all `S76`.
+ *
+ * **Lost projects leave the board and are counted** `D29` — *"or the board
+ * becomes a graveyard nobody clears"*. `lost` is what the screen states and
+ * links to the table with; it is never a silent subtraction.
+ *
+ * **A won project stays on the board**, in `dispatched` or further. Winning is
+ * an approved dispatch `S31`, not an exit: `S77` has one quotation producing
+ * any number of dispatches, and `follow-ups.ts` makes the same call about the
+ * same fact — a project that has shipped part of what it quoted is still
+ * moving.
+ *
+ * Cards are ordered within a column by `projectMovement`, oldest first — the
+ * same key the table is ordered by `D25`, so the two views of one query agree
+ * about what wants attention `D28`.
+ */
+export async function listProjectBoard(
+  session: AuthSession,
+  options: { q?: string } = {},
+): Promise<ProjectBoard> {
+  const visible = and(visibleProjectsFilter(session), searchFilter(options.q));
+  // `end_state` carries only `lost` since `S31`, so this reads "not lost".
+  const onBoard = and(visible, isNull(projects.endState));
+
+  const moved = projectMovement();
+
+  const found = await db
+    .select({
+      id: projects.id,
+      nameEn: projects.nameEn,
+      nameAr: projects.nameAr,
+      ownerName: users.name,
+      sqmExpected: projects.sqmExpected,
+      won: projectIsWon(),
+      committed: projects.committed,
+    })
+    .from(projects)
+    .innerJoin(users, eq(projects.ownerUserId, users.id))
+    .leftJoin(moved.threadEvents, eq(moved.threadEvents.projectId, projects.id))
+    .leftJoin(
+      moved.dispatchEvents,
+      eq(moved.dispatchEvents.projectId, projects.id),
+    )
+    .where(onBoard)
+    .orderBy(asc(moved.at), desc(projects.createdAt));
+
+  const ids = found.map((row) => row.id);
+
+  const [chain, participants, [lostTotal], [owners]] = await Promise.all([
+    chainByProject(ids, new Map(found.map((row) => [row.id, row.won]))),
+    firstCompanyByName(ids),
+    db
+      .select({ total: count() })
+      .from(projects)
+      .where(and(visible, isNotNull(projects.endState))),
+    db
+      .select({ owners: countDistinct(projects.ownerUserId) })
+      .from(projects)
+      .where(onBoard),
+  ]);
+
+  const columns = CHAIN_COLUMNS.map((column) => ({
+    column,
+    cards: [] as ProjectBoardCard[],
+  }));
+
+  for (const row of found) {
+    const position = chain.get(row.id);
+    const slot = columns.find((entry) => entry.column === position?.position);
+    // Unreachable: `chainByProject` seeds every id it is given. Skipped rather
+    // than defaulted, so a card can never land in the wrong column.
+    if (!slot) continue;
+    slot.cards.push({
+      id: row.id,
+      nameEn: row.nameEn,
+      nameAr: row.nameAr,
+      ownerName: row.ownerName,
+      sqmExpected: row.sqmExpected,
+      won: row.won,
+      committed: row.committed,
+      companyName: participants.get(row.id)?.name ?? null,
+      liveThreads: position?.liveThreads ?? 0,
+    });
+  }
+
+  return {
+    columns,
+    total: found.length,
+    lost: lostTotal?.total ?? 0,
+    ownerCount: owners?.owners ?? 0,
+  };
 }
 
 export type ProjectCompanyRow = {

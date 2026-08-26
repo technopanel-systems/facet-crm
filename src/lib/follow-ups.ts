@@ -91,8 +91,6 @@ import {
   companies,
   companyDormancyReviews,
   companyReps,
-  dispatches,
-  projectCompanies,
   projects,
   quotationThreads,
   quotationVersions,
@@ -101,7 +99,6 @@ import {
 } from "@/db/schema";
 import { withAudit } from "@/lib/audit";
 /** `S72`'s one predicate `[dispatches.ts]` — a project moves on an approval. */
-import { approvedDispatches } from "@/lib/dispatches";
 import {
   canViewRecord,
   ownProjectsFilter,
@@ -116,6 +113,13 @@ import {
   type FollowUpGroup,
   type FollowUpKind,
 } from "@/lib/enums";
+/**
+ * The two project facts this file used to keep private copies of `D25`.
+ * `projects.ts` owns them now: `/projects` orders by the same movement
+ * derivation, and a second copy of one derivation is the trap `companyQuiet`
+ * below is still an open example of.
+ */
+import { firstCompanyByName, projectMovement } from "@/lib/projects";
 import { onHoldByCompany, today } from "@/lib/reports";
 import { getFollowUpThresholds, type FollowUpThresholds } from "@/lib/settings";
 import { RuleError } from "@/lib/validation";
@@ -575,44 +579,15 @@ async function projectStageUnchanged(
 ): Promise<FollowUpRow[]> {
   const cutoff = shiftDays(today(), -thresholds.projectStageUnchanged);
 
-  // The latest advancing event per project, as two grouped subqueries joined on
-  // — not correlated subqueries in a `sql` template, which is the shape
-  // `coverage.ts` records this codebase getting wrong once already. A subquery
-  // column renders qualified in both the SELECT list and the WHERE.
-  // Every column a `sql` template interpolates needs a name unique across the
-  // whole statement: Drizzle drops the table qualifier there, so two subqueries
-  // both exposing `at` render as an ambiguous bare `"at"`.
-  const threadEvents = db
-    .select({
-      projectId: quotationThreads.projectId,
-      at: sql<string | null>`greatest(
-        max((${quotationThreads.createdAt} at time zone 'Asia/Riyadh')::date),
-        max((${quotationThreads.paymentConfirmedAt} at time zone 'Asia/Riyadh')::date)
-      )`.as("thread_event_at"),
-    })
-    .from(quotationThreads)
-    .groupBy(quotationThreads.projectId)
-    .as("thread_events");
-
-  const dispatchEvents = db
-    .select({
-      projectId: quotationThreads.projectId,
-      at: sql<string | null>`max(${dispatches.dispatchDate})`.as(
-        "dispatch_event_at",
-      ),
-    })
-    .from(dispatches)
-    .innerJoin(
-      quotationThreads,
-      eq(quotationThreads.id, dispatches.quotationThreadId),
-    )
-    // `S72` — a project has moved when something was APPROVED against it. A
-    // request sitting with the coordinator is the project waiting, not the
-    // project moving, and counting it would take a stalled project off this
-    // list on the day a rep asked for something.
-    .where(approvedDispatches())
-    .groupBy(quotationThreads.projectId)
-    .as("dispatch_events");
+  // **The latest advancing event per project comes from `projectMovement`**
+  // `[projects.ts]`, which is where this query's own two subqueries moved in
+  // the board slice. `/projects` orders by the same answer `D25`, and two
+  // copies of one derivation is what `companyQuiet` is still a live example of
+  // — they had already drifted before anyone compared them. The shape is
+  // unchanged: grouped subqueries joined on, never correlated subqueries in a
+  // `sql` template, each exposing its date under a name unique across the whole
+  // statement.
+  const moved = projectMovement();
 
   const rows = await db
     .select({
@@ -620,12 +595,15 @@ async function projectStageUnchanged(
       projectNameEn: projects.nameEn,
       projectNameAr: projects.nameAr,
       createdAt: projects.createdAt,
-      threadAt: threadEvents.at,
-      dispatchAt: dispatchEvents.at,
+      threadAt: moved.threadEvents.at,
+      dispatchAt: moved.dispatchEvents.at,
     })
     .from(projects)
-    .leftJoin(threadEvents, eq(threadEvents.projectId, projects.id))
-    .leftJoin(dispatchEvents, eq(dispatchEvents.projectId, projects.id))
+    .leftJoin(moved.threadEvents, eq(moved.threadEvents.projectId, projects.id))
+    .leftJoin(
+      moved.dispatchEvents,
+      eq(moved.dispatchEvents.projectId, projects.id),
+    )
     .where(
       and(
         // **`ownProjectsFilter`, never `visibleProjectsFilter`** `S76`. A queue
@@ -647,11 +625,7 @@ async function projectStageUnchanged(
         // dispatch resets the clock below as the event it is, and nothing
         // more.
         isNull(projects.endState),
-        sql`coalesce(
-
-          greatest(${threadEvents.at}, ${dispatchEvents.at}),
-          ${riyadhDay(projects.createdAt)}
-        ) <= ${cutoff}`,
+        sql`${moved.at} <= ${cutoff}`,
       ),
     );
 
@@ -974,43 +948,6 @@ async function suppressedCompanies(
   const held = new Set<string>(onHold.keys());
   for (const row of reincluded) held.add(row.companyId);
   return held;
-}
-
-/**
- * The first live participant by name.
- *
- * It used to prefer a flagged buyer; `S26` derives who bought from dispatches
- * and there is no flag left to read. Name order is arbitrary but **stable**,
- * which is the property that matters here — a follow-up row that renamed
- * itself the day a dispatch landed would be worse than one that never moves.
- */
-async function firstCompanyByName(
-  projectIds: string[],
-): Promise<Map<string, { id: string; name: string }>> {
-  if (projectIds.length === 0) return new Map();
-
-  const rows = await db
-    .select({
-      projectId: projectCompanies.projectId,
-      id: companies.id,
-      name: companies.name,
-    })
-    .from(projectCompanies)
-    .innerJoin(companies, eq(companies.id, projectCompanies.companyId))
-    .where(
-      and(
-        inArray(projectCompanies.projectId, projectIds),
-        isNull(projectCompanies.removedAt),
-      ),
-    )
-    .orderBy(asc(companies.name));
-
-  const byProject = new Map<string, { id: string; name: string }>();
-  for (const row of rows) {
-    if (byProject.has(row.projectId)) continue;
-    byProject.set(row.projectId, { id: row.id, name: row.name });
-  }
-  return byProject;
 }
 
 /** The SMAC reference of a thread's highest version, where it has one. */

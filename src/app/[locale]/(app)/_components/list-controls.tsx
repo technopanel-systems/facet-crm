@@ -170,6 +170,11 @@ export async function ListCard({
   return (
     <div
       data-slot="list-card"
+      // `D70`'s *states its total*, made assertable. The footer says it in a
+      // translated sentence, which a black-box script may not read, and
+      // counting the rendered rows cannot tell page 1 of 3 from a short list —
+      // the same argument `data-total` on the timeline card already makes.
+      data-total={String(total)}
       className="card-face glass"
     >
       {children}

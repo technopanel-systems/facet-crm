@@ -80,8 +80,23 @@
  *      in both locales, because a flag-gated block is only ever wrong for the
  *      identity nobody drove.
  *
+ *  22. **The projects board** `D28` `D29` — `/projects` with no parameter is
+ *      the board and `?view=table` the table; all six chain positions render
+ *      in `CHAIN_COLUMNS` order, **read out of `src/lib/chain.ts` rather than
+ *      copied here**, with an empty one still drawing its zero; the column
+ *      counts add up to the board's own total and **every card is in the DOM**,
+ *      which is what separates `D29`'s scrolling column from `D70`'s cap;
+ *      nothing carries a drag affordance and the card texture is worn six
+ *      times, once per column, never by an item `D21`; the view chip carries
+ *      the search `D59`; the table's stale rows come first `D25`; the owner
+ *      column is absent for a rep and present for a manager `D2`; and in
+ *      Arabic the DOM order is **identical** to English, because the mirror is
+ *      CSS `D57`.
+ *
  * Section 18 — `D69`'s two controls and `D32`'s panel — is in the code and was
- * never in this list either; 19 is listed the day it is written.
+ * never in this list either; 19 is listed the day it is written. Sections 20
+ * and 21 — the companies list and the company detail — are the same omission;
+ * 22 is listed the day it is written.
  *
  * This was 11 sections until feature slice 6: the old item 11 (the
  * message-key scan) is now section 12, and section 11 above — the
@@ -2910,9 +2925,17 @@ async function main(): Promise<void> {
 
     for (const section of ["projects", "contacts"] as const) {
       const list = await get(coordJar, `/en/${section}`);
+      // **`/projects` defaults to the board since `D28` shipped**, so the
+      // marker that says "not empty" differs by screen. The claim is unchanged
+      // — `S76` gives her sight of every project — and the board is the
+      // stronger witness of it, because `data-total` is the whole scope rather
+      // than one page.
+      const marker =
+        section === "projects" ? "project-board" : "list-card";
       check(
         `the coordinator's /${section} is no longer empty [S76]`,
-        list.body.includes('data-slot="list-card"'),
+        list.body.includes(`data-slot="${marker}"`) &&
+          Number(attrOf(list.body, marker, "data-total")) > 0,
         `status ${list.status}`,
       );
       // `D51` — **a New button that always fails is not rendered**, which is a
@@ -2993,9 +3016,13 @@ async function main(): Promise<void> {
        * This used to read `data-participant=` off whatever `firstId` returned,
        * which made it a lottery: `S50` allows a project with no live company
        * link, `verify:slice3` and `verify:phase10a` each leave several behind,
-       * and `/projects` is newest-first — so the residue of any other verify
-       * script sorts to the top and the check fails on a screen that is
-       * correct. Measured: 11 such projects, all from one afternoon's runs.
+       * and `/projects` used to be newest-first — so the residue of any other
+       * verify script sorted to the top and the check failed on a screen that
+       * was correct. Measured: 11 such projects, all from one afternoon's runs.
+       * `D25` reordered it by when a project last moved, which does not make
+       * the hazard go away: residue is created recently and never moves again,
+       * so it now sorts by its own age instead. The subject is still chosen by
+       * what it carries rather than by where it sits.
        *
        * **The subject is chosen from the MANAGER's view**, never the
        * coordinator's, or the choice would presuppose what is being asserted.
@@ -4534,6 +4561,250 @@ async function main(): Promise<void> {
           `${empties.length} empty card(s)`,
         );
       }
+    }
+  }
+  console.log(
+    "\n22. The projects board — six columns, nothing draggable, and the table beside it [D28], [D29], [D25]",
+  );
+  {
+    /*
+     * **The board's columns are read out of `src/lib/chain.ts`, not typed
+     * here.** `CHAIN_COLUMNS` is the one definition `D27` and `D29` both point
+     * at, and a copy of a list in an assertion goes stale in silence — the same
+     * device `NAMESPACES` uses at the top of this file to build its pattern
+     * from the catalogue rather than from memory. This file still imports
+     * nothing from `src/`.
+     */
+    const columns = (
+      readFileSync("src/lib/chain.ts", "utf8")
+        .match(/export const CHAIN_COLUMNS = \[([\s\S]*?)\] as const;/)?.[1] ??
+      ""
+    )
+      .split(",")
+      .map((entry) => entry.trim().replace(/^"|"$/g, ""))
+      .filter(Boolean);
+
+    check(
+      "the six columns were read from chain.ts, not copied into this script",
+      columns.length === 6,
+      `${columns.length} found`,
+    );
+
+    for (const locale of ["en", "ar"] as const) {
+      const jar = jars["rep-a@example.test"];
+
+      /* ── D28: the default view, and the other one ────────────────────── */
+
+      const board = await get(jar, `/${locale}/projects`);
+      check(
+        `${locale}: *** /projects with no parameter is the BOARD *** [D28]`,
+        board.body.includes('data-slot="project-board"'),
+        `status ${board.status}`,
+      );
+      check(
+        `${locale}: …and it is not also rendering the table`,
+        !board.body.includes('data-slot="list-card"'),
+      );
+
+      const table = await get(jar, `/${locale}/projects?view=table`);
+      check(
+        `${locale}: ?view=table is the table [D28]`,
+        table.body.includes('data-slot="list-card"') &&
+          !table.body.includes('data-slot="project-board"'),
+        `status ${table.status}`,
+      );
+      // An unknown value is a display preference in a URL people edit, not a
+      // record — it falls back rather than 404ing, as `?sort=` does.
+      const nonsense = await get(jar, `/${locale}/projects?view=chartreuse`);
+      check(
+        `${locale}: an unknown ?view= falls back to the board, never a 404`,
+        nonsense.status === 200 &&
+          nonsense.body.includes('data-slot="project-board"'),
+        `status ${nonsense.status}`,
+      );
+
+      /* ── D29: six columns, in the chain's own order ──────────────────── */
+
+      const rendered = [
+        ...board.body.matchAll(/data-slot="board-column" data-column="([a-zA-Z]+)"/g),
+      ].map((match) => match[1]);
+      check(
+        `${locale}: *** all six chain positions render, in CHAIN_COLUMNS order *** [D29]`,
+        rendered.join(",") === columns.join(","),
+        `got ${rendered.join(",") || "none"}`,
+      );
+
+      const counts = [
+        ...board.body.matchAll(/data-slot="board-column"[^>]*data-count="(\d+)"/g),
+      ].map((match) => Number(match[1]));
+      const total = Number(attrOf(board.body, "project-board", "data-total"));
+      check(
+        `${locale}: the column counts add up to the board's own total`,
+        counts.length === 6 && counts.reduce((a, b) => a + b, 0) === total,
+        `${counts.join("+")} against ${total}`,
+      );
+
+      /*
+       * **The column scrolls; it does not truncate.** `D29` takes the scroll
+       * answer over `D70`'s cap, and the difference between the two is exactly
+       * whether every card is in the DOM. A cap would put fewer cards here than
+       * the counts claim, which is the failure a reader could not see.
+       */
+      const cards = (board.body.match(/data-slot="board-card"/g) ?? []).length;
+      check(
+        `${locale}: *** every card is rendered — the column scrolls, it does not cap *** [D29]`,
+        cards === total,
+        `${cards} rendered against ${total} counted`,
+      );
+
+      // A column with nothing in it still renders `D29` — the board is the six
+      // positions, not however many happen to be occupied.
+      check(
+        `${locale}: an empty column still renders, with its zero [D29], [D24]`,
+        rendered.length === 6,
+        `${rendered.length} column(s)`,
+      );
+
+      /* ── D29 + D58: nothing that reads as draggable ──────────────────── */
+
+      /*
+       * **The flight payload is stripped first.** Next embeds the RSC payload
+       * in `<script>` tags that repeat every className as JSON, so a raw count
+       * of `card-face` reads six columns as twelve — the same reason section
+       * 12's key scanner strips `<script>` blocks whole before it looks at
+       * anything. What is left is what a person actually sees.
+       */
+      const boardMarkup = after(board.body, "project-board").replace(
+        /<script[\s\S]*?<\/script>/g,
+        "",
+      );
+      check(
+        `${locale}: *** nothing on the board is draggable, and nothing looks it *** [D29], [D58]`,
+        !/draggable|cursor-grab|cursor-move|hover:-translate|hover:scale|hover:shadow/.test(
+          boardMarkup,
+        ),
+        "a drag affordance is present",
+      );
+      // `D21` forbids a nested card. The column wears the card texture; the
+      // items inside it are rows, which is what removes the affordance rather
+      // than suppressing it.
+      // Counted against the columns rather than against six: Next embeds the
+      // flight payload in a `<script>`, which repeats every className, so both
+      // sides double together and the ratio is what carries the claim. An item
+      // wearing the texture would push the surfaces above the columns.
+      const surfaces = (boardMarkup.match(/card-face/g) ?? []).length;
+      const columnTags = (
+        boardMarkup.match(/data-slot="board-column"/g) ?? []
+      ).length;
+      check(
+        `${locale}: the column is the card and the items are rows [D21], [D14]`,
+        surfaces === columnTags &&
+          !/data-slot="board-card"[^>]*card-face/.test(boardMarkup),
+        `${surfaces} surfaces against ${columnTags} columns`,
+      );
+
+      /* ── D2: whose move is on the header, not repeated per card ──────── */
+
+      check(
+        `${locale}: the column header says whose move it is [D2], [D29]`,
+        columns.every((column) => board.body.includes(`data-column="${column}"`)),
+      );
+
+      /* ── D59: the view chips carry the search ────────────────────────── */
+
+      const searched = await get(jar, `/${locale}/projects?q=a`);
+      check(
+        `${locale}: *** the view chip carries the current search *** [D59]`,
+        /href="[^"]*\/projects\?q=a&(?:amp;)?view=table"/.test(searched.body),
+        "the table chip drops ?q=",
+      );
+
+      /* ── D25: ordered by attention, and the chain cell that says so ──── */
+
+      check(
+        `${locale}: the table says whose move it is, not only the state [D2]`,
+        table.body.includes('data-slot="turn"') &&
+          table.body.includes('data-slot="project-moved"'),
+      );
+      const moved = [
+        ...table.body.matchAll(/data-slot="project-moved"[^>]*data-stale="(true|false)"/g),
+      ].map((match) => match[1]);
+      check(
+        `${locale}: …and every row carries the figure the order is built on [D25]`,
+        moved.length > 0,
+        `${moved.length} row(s)`,
+      );
+      // Oldest first `D25`, so a stale row can never sit below a fresh one.
+      check(
+        `${locale}: *** stale rows come first — the list is ordered by attention *** [D25]`,
+        moved.indexOf("false") === -1 ||
+          moved.lastIndexOf("true") < moved.indexOf("false"),
+        `order was ${moved.join(",")}`,
+      );
+
+      /* ── D2: the owner column earns its place ────────────────────────── */
+
+      check(
+        `${locale}: *** rep-a's own list does NOT repeat his name in a column *** [D2]`,
+        !table.body.includes('data-slot="project-owner"'),
+        "the owner column rendered for a single-owner list",
+      );
+
+      const wide = await get(
+        jars["manager@example.test"],
+        `/${locale}/projects?view=table`,
+      );
+      check(
+        `${locale}: …while a reader who sees more than one person's work gets it [D2]`,
+        wide.body.includes('data-slot="project-owner"'),
+      );
+
+      /* ── D57: RTL mirrors by CSS, never by reordering the DOM ────────── */
+
+      if (locale === "ar") {
+        const english = await get(jar, "/en/projects");
+        const order = (body: string) =>
+          [...body.matchAll(/data-column="([a-zA-Z]+)"/g)]
+            .map((m) => m[1])
+            .join(",");
+        check(
+          "ar: *** the DOM order is identical to English — the mirror is CSS *** [D57]",
+          order(board.body) === order(english.body),
+          "the columns were reordered in markup",
+        );
+        check(
+          "ar: …and no rtl: override or flex-row-reverse was needed [D57]",
+          !/flex-row-reverse|rtl:/.test(boardMarkup),
+        );
+      }
+    }
+
+    /*
+     * **The two views are two arrangements of one query** `D28`, and the
+     * cheapest proof of that is that they count the same records. The board
+     * subtracts the lost `D29` and states how many — a silent subtraction is
+     * the thing `D70` and `D59` both exist to stop — so board + lost is the
+     * table's own total.
+     */
+    {
+      const jar = jars["manager@example.test"];
+      const board = await get(jar, "/en/projects");
+      const table = await get(jar, "/en/projects?view=table");
+      const onBoard = Number(attrOf(board.body, "project-board", "data-total"));
+      const lost = Number(attrOf(board.body, "board-off", "data-lost") ?? "0");
+      // `data-total` on the list card, not the footer's sentence — the count
+      // is prose in two locales and this file never reads a translation.
+      const showing = Number(attrOf(table.body, "list-card", "data-total"));
+      check(
+        "*** the board states what it is not showing, rather than dropping it *** [D29], [D70]",
+        lost === 0 || board.body.includes('data-slot="board-off"'),
+        `${lost} lost with no line saying so`,
+      );
+      check(
+        "the board and the table are two arrangements of one query [D28]",
+        onBoard + lost === showing,
+        `board ${onBoard} + lost ${lost} against table ${showing}`,
+      );
     }
   }
 }

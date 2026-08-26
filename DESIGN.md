@@ -308,6 +308,38 @@ Signature · Payment · Paid · Dispatched. Position is computed from real event
 payment that didn't happen. Lost projects leave the board and live in a filter,
 or the board becomes a graveyard nobody clears.
 
+**A project has one column and may have several threads, so furthest along
+wins** — the rule `chainReached` already applies one rung down. A project with
+one thread dispatched and one awaiting signature reads as Dispatched, and the
+card carries **a count of its live threads** so the second one is not lost
+behind the first. `S68` is why that is a count and never a sum of their metres.
+
+**`new` means something different here, and it is written down rather than
+inferred.** On the board it is **a project with no LIVE thread**; in
+`src/lib/chain.ts` it is a project with **no thread at all**. So a project whose
+every quotation was rejected or cancelled sits in New — it is not lost, nobody
+has given up on it, and `chainOwner` already says whose move it is: the rep's,
+to quote again. A definition that shifts by level and is not stated is how the
+silence derivation came to give two screens two answers.
+
+**Whose move is on the column header, not on the card.** Within a column it is
+the same answer for every card, because the owner is a function of the position
+and nothing else. **This is what a board buys over a table: the grouping carries
+the answer, so the row does not have to** — and `D2` is satisfied by the group
+the row sits in. It generalises: wherever rows are grouped by the thing `D2`
+asks about, the header says it once.
+
+**The header carries a count and no square metres.** `S68` — quotations are
+never summed. The one figure that could be summed down a column without double
+counting is `sqm_expected`, one row per project; it is a sum of forecasts, it
+reads as a pipeline value, and that is the thing `S68` exists to stop being
+invented.
+
+**A tall column scrolls; it does not cap.** Every column is the same height and
+its header states the true count, so nothing hides its own size. `D70`'s
+cap-and-state is the other answer and was deliberately not taken — `WORKFLOW §5`
+carries what that costs.
+
 **D30.** Activity offers `?view=stream` (default), `?view=by-rep`, and
 `?view=calendar`. All three read one query. "Just me" is a filter chip on the
 stream, not a separate screen.
