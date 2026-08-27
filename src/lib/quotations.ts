@@ -13,11 +13,11 @@
  * rep, an explicit thread share, or visibility of the parent project
  * `[11 §2]`. No query in this file writes its own predicate.
  *
- * **A thread may have no project** `S50`. Every join onto `projects` here is
- * therefore a LEFT join: an inner one silently drops the project-less thread
- * from the list, the count and the detail screen alike, with no error anywhere.
- * A thread with none gains one at dispatch `S74` — `src/lib/dispatches.ts` is
- * the only writer, and nothing in this file may fill it in instead.
+ * **A thread always names a project** `S50`, since migration `0031` made
+ * `project_id` NOT NULL. Every join onto `projects` here is therefore an INNER
+ * join, and the LEFT joins this note used to require came out with the null
+ * case: there is no project-less thread for one to rescue. A dispatch takes
+ * that project rather than writing one back `S74`.
  *
  * Money is computed, never typed `[16 §1]`. SMAC still owns it: `08 D5`
  * governs disagreement, and computing the mirror removes the commonest way the
@@ -34,7 +34,6 @@
 import {
   and,
   asc,
-  count,
   desc,
   eq,
   exists,
@@ -47,11 +46,18 @@ import {
 } from "drizzle-orm";
 import { QueryBuilder, type AnyPgColumn } from "drizzle-orm/pg-core";
 
-import { chainState } from "@/lib/chain";
+import {
+  CHAIN_GROUPS,
+  chainGroup,
+  chainState,
+  type ChainGroup,
+  type ChainPosition,
+} from "@/lib/chain";
 import { db } from "@/db";
 import {
   companies,
   contacts,
+  dispatches,
   productClasses,
   productFireRatings,
   productSuppliers,
@@ -66,6 +72,17 @@ import {
   users,
 } from "@/db/schema";
 import { withAudit, type AuditEntry } from "@/lib/audit";
+/**
+ * `S31`'s one won predicate, composed rather than hand-written a ninth time —
+ * `dispatches.ts` records what eight copies of `status = 'approved'` cost.
+ *
+ * **This closes a two-module cycle** (`dispatches.ts` imports
+ * `productLineMoney` and `quotationVersionLines` from here) and it is safe for
+ * the reason that file's own import note already gives: no side of it is used
+ * at module-evaluation time. `approvedDispatches()` is called inside a query
+ * builder, and both of its imports from here are called at runtime.
+ */
+import { approvedDispatches } from "@/lib/dispatches";
 import {
   MONEY_SCALE,
   SQM_SCALE,
@@ -87,6 +104,7 @@ import {
 // `25 §13` — the return-for-edit reason is a comment. See the note in
 // `comments.ts` about the import cycle this closes, and why it is safe.
 import { insertComment } from "@/lib/comments";
+import { normalizeName } from "@/lib/normalize";
 import {
   NOTIFICATION_TYPES,
   QUOTATION_THREAD_END_STATES,
@@ -227,24 +245,108 @@ export type QuotationThreadListRow = {
    * rows for any other purpose.
    */
   totalSqm: string | null;
-  grandTotal: string | null;
   createdAt: Date;
+  /**
+   * Where this thread sits `S132`, from `chainState()` and nothing else `D27`.
+   *
+   * **Carried rather than re-derived by each reader.** Three screens folded the
+   * same two fields themselves before session 26, and two of them passed no
+   * dispatch flag — so a shipped thread read *with the customer* on the list,
+   * on the company page and on the project page, and *won* on its own. The
+   * ladder is read once, here, where the flags are in scope.
+   */
+  position: ChainPosition;
+  /** `D25`'s pile — a fold of `chainOwner`, never a second answer. */
+  group: ChainGroup;
 };
+
+/**
+ * The three group counts over the **whole visible scope**, never the page.
+ *
+ * A header counting only the rows that landed on this page would read
+ * *Waiting on the coordinator · 25* on every page but the last — the reason
+ * `listCompanies` takes its counts from the same pass as the total `D24`.
+ */
+export type QuotationGroupCounts = Record<ChainGroup, number>;
 
 /** The live version of each thread: the one that is not superseded. */
 function liveVersionFilter(): SQL {
   return ne(quotationVersions.status, "superseded");
 }
 
+/**
+ * Free-text search over the reference, the project and the company.
+ *
+ * **The two names match `name_normalized`**, the shape `companies.ts` and
+ * `projects.ts` have used since `0030`. This list compared the raw columns
+ * until session 26, so one query string found a row on `/companies` and
+ * `/projects` and missed it here: `Al Rajhi` missed `Al-Rajhi`, `Cafe` missed
+ * `Café`, `احمد` missed `أحمد`, and `مشروع 24` missed `مشروع ٢٤`. Punctuation,
+ * Latin accents, Arabic diacritics, alef and ya variants, tatweel and
+ * Arabic-Indic digits are all folded on the stored side and were not on the
+ * asked side, which is a miss that raises no error.
+ *
+ * **The reference stays raw**, deliberately — it is an identifier, not a name,
+ * and `normalizeName` would fold `RE-9592` and `re9592` together. The same
+ * reason `companies.ts` leaves `phone` out of the folded half.
+ */
 function searchFilter(query: string | undefined): SQL | undefined {
   const trimmed = query?.trim();
   if (!trimmed) return undefined;
-  const pattern = `%${trimmed}%`;
+  const folded = `%${normalizeName(trimmed)}%`;
   return or(
-    sql`${quotationVersions.smacReference} ilike ${pattern}`,
-    sql`${projects.name} ilike ${pattern}`,
-    sql`${companies.name} ilike ${pattern}`,
+    sql`${quotationVersions.smacReference} ilike ${`%${trimmed}%`}`,
+    sql`${projects.nameNormalized} ilike ${folded}`,
+    sql`${companies.nameNormalized} ilike ${folded}`,
   );
+}
+
+/**
+ * **`S132`'s last two rungs, asked of a thread** — the two flags `chainState`
+ * cannot reach from a thread row, resolved in SQL so the fold below sees a
+ * complete chain and no screen has to guess.
+ *
+ * `/quotations` passed neither until session 26, so the list could never render
+ * `readyToShip` or `won`: a thread with an approved dispatch read *"waiting on
+ * the rep — chase the customer"* on the list and *"nothing outstanding — won"*
+ * on its own detail page, which loads both. One function, two screens, two
+ * answers, and no error.
+ *
+ * **Both tables are named outright** in the correlated predicate, per
+ * `CLAUDE.md` — the outer query does join, so the qualifiers would survive
+ * anyway, but the rule is not conditional on remembering that.
+ */
+function threadHasApprovedDispatch(): SQL<boolean> {
+  return sql<boolean>`${exists(
+    subquery
+      .select({ one: sql`1` })
+      .from(dispatches)
+      .where(
+        and(
+          eq(dispatches.quotationThreadId, quotationThreads.id),
+          approvedDispatches(),
+        ),
+      ),
+  )}`;
+}
+
+/**
+ * `submitted`, and a `draft` deliberately does not qualify `S132` — a draft is
+ * still the rep's own to edit `S125` and can sit indefinitely, so without that
+ * narrowing a rep would advance his own chain by opening a form.
+ */
+function threadHasSubmittedDispatch(): SQL<boolean> {
+  return sql<boolean>`${exists(
+    subquery
+      .select({ one: sql`1` })
+      .from(dispatches)
+      .where(
+        and(
+          eq(dispatches.quotationThreadId, quotationThreads.id),
+          eq(dispatches.status, "submitted"),
+        ),
+      ),
+  )}`;
 }
 
 export async function listQuotationThreads(
@@ -279,6 +381,8 @@ export async function listQuotationThreads(
   rows: QuotationThreadListRow[];
   total: number;
   page: number;
+  groupCounts: QuotationGroupCounts;
+  raiserCount: number;
 }> {
   const page = Math.max(1, options.page ?? 1);
   const where = and(
@@ -313,42 +417,86 @@ export async function listQuotationThreads(
         versionNumber: quotationVersions.versionNumber,
         versionStatus: quotationVersions.status,
         totalSqm: quotationVersions.totalSqm,
-        grandTotal: quotationVersions.grandTotal,
         createdAt: quotationThreads.createdAt,
+        // `S132`'s last two rungs, resolved in SQL so the fold below sees a
+        // complete chain — see the two predicates above.
+        hasDispatch: threadHasApprovedDispatch(),
+        hasSubmittedDispatch: threadHasSubmittedDispatch(),
       })
       .from(quotationThreads)
       .innerJoin(
         quotationVersions,
         eq(quotationVersions.threadId, quotationThreads.id),
       )
-      // INNER since `S50`. It moves together with the `count()` below: a
-      // widening on one and not the other drifts the total from the page.
+      // INNER since `S50`. There is no second `count()` query to keep in step
+      // any more — the total is the folded length, so the page and the count
+      // cannot disagree about which rows exist.
       .innerJoin(projects, eq(quotationThreads.projectId, projects.id))
       .innerJoin(companies, eq(quotationThreads.companyId, companies.id))
       .innerJoin(users, eq(quotationThreads.raisedByUserId, users.id));
 
-  const rows = await base()
-    .where(where)
-    .orderBy(
-      options.awaitingIssue
-        ? asc(quotationThreads.createdAt)
-        : desc(quotationThreads.createdAt),
-    )
-    .limit(PAGE_SIZE)
-    .offset((page - 1) * PAGE_SIZE);
+  // **Ordered oldest first in SQL, before anything is folded.** Within a group
+  // the longest-waiting thread leads — `S87`'s shape, and the order
+  // `awaitingIssue` already wanted. **What it measures is stated rather than
+  // implied: how old the DEAL is, not how long this position has been owed.**
+  // No `issued_at` or `accepted_at` exists, and the audit-log clock that would
+  // answer properly is `follow-ups.ts`'s, covering one position of six — a
+  // second ladder in the place `D27` pins to one file, which is a rule change
+  // and not a slice decision.
+  const found = await base().where(where).orderBy(asc(quotationThreads.createdAt));
 
-  const [totals] = await db
-    .select({ total: count() })
-    .from(quotationThreads)
-    .innerJoin(
-      quotationVersions,
-      eq(quotationVersions.threadId, quotationThreads.id),
-    )
-    .innerJoin(projects, eq(quotationThreads.projectId, projects.id))
-    .innerJoin(companies, eq(quotationThreads.companyId, companies.id))
-    .where(where);
+  // **The whole visible scope is fetched, then folded, then cut.** This is the
+  // cost of one definition, and it is the same bargain `awaitingSignatureCount`
+  // below and `listProjectBoard` in `projects.ts` already strike: deriving
+  // `D25`'s groups in SQL would restate the six-position ladder `D27` pins to
+  // `chain.ts`, which is exactly the drift that module exists to prevent.
+  //
+  // `CLAUDE.md` forbids filtering or ordering **a page** after fetching it,
+  // because the rows that fall out are silently gone. Nothing here is
+  // paginated before the fold, so no row can fall out and every count is the
+  // true one. **73 threads today**, against the 56 projects `listProjectBoard`
+  // already fetches unpaginated for the same reason.
+  const buckets = new Map<ChainGroup, QuotationThreadListRow[]>(
+    CHAIN_GROUPS.map((group) => [group, []]),
+  );
+  const raisers = new Set<string>();
 
-  return { rows, total: totals?.total ?? 0, page };
+  for (const row of found) {
+    const { hasDispatch, hasSubmittedDispatch, ...rest } = row;
+    // The one ladder, read once, with both flags in scope `S132` `D27`.
+    const { position } = chainState({
+      versionStatus: rest.versionStatus,
+      endState: rest.endState,
+      hasDispatch,
+      hasSubmittedDispatch,
+    });
+    const group = chainGroup(position);
+    buckets.get(group)!.push({ ...rest, position, group });
+    raisers.add(rest.raisedByName);
+  }
+
+  // `CHAIN_GROUPS`' own order, so the piles read coordinator → customer →
+  // nothing outstanding and a group is a contiguous run the screen can head
+  // without re-sorting.
+  const ordered = CHAIN_GROUPS.flatMap((group) => buckets.get(group)!);
+
+  return {
+    rows: ordered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    total: ordered.length,
+    page,
+    groupCounts: {
+      coordinator: buckets.get("coordinator")!.length,
+      customer: buckets.get("customer")!.length,
+      none: buckets.get("none")!.length,
+    },
+    // **What decides whether the row names its raiser at all** — the distinct
+    // raisers across the whole visible scope, never this page, so the column
+    // cannot appear on page 1 and vanish on page 2. `listProjects`' `ownerCount`
+    // makes the same argument: the reader's own name on every row says nothing
+    // `D2`, and a manager or the coordinator reading a coordinator-owed row had
+    // no way at all to tell whose deal it was.
+    raiserCount: raisers.size,
+  };
 }
 
 /**

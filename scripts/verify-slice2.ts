@@ -550,14 +550,21 @@ async function main(): Promise<void> {
     "while the raiser may open both",
     (await getQuotationThread(repA, thread.id))?.projectViewable === true,
   );
+  // **Scoped to this project, and that is not incidental.** Session 26 ordered
+  // the list by `D25`'s groups and then oldest first inside each, so a thread
+  // created seconds ago sorts to the LAST page of the coordinator's 73 rather
+  // than the first. Unscoped, this read page 1 and asserted a visibility rule
+  // against a pagination accident — it passed for two years because the order
+  // happened to be newest-first. The scope narrows both sides equally, so what
+  // is being compared is still visibility and nothing else.
   check(
     "the thread appears in the coordinator's list, not rep B's",
-    (await listQuotationThreads(coordinator)).rows.some(
-      (row) => row.id === thread.id,
-    ) &&
-      !(await listQuotationThreads(repB)).rows.some(
-        (row) => row.id === thread.id,
-      ),
+    (
+      await listQuotationThreads(coordinator, { projectId: project.id })
+    ).rows.some((row) => row.id === thread.id) &&
+      !(
+        await listQuotationThreads(repB, { projectId: project.id })
+      ).rows.some((row) => row.id === thread.id),
   );
 
   /* --- 11. Company scope ----------------------------------------- */

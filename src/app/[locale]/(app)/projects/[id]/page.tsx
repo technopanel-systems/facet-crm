@@ -92,9 +92,7 @@ export default async function ProjectDetailPage({
   // other reading — a thread the rep closes because he knows nothing more is
   // coming — but nothing writes it yet, so the chain is the only answer
   // available and this is not a second definition of it.
-  const live = threads.rows.filter(
-    (row) => chainState(row).position !== "closed",
-  );
+  const live = threads.rows.filter((row) => row.position !== "closed");
 
   // `25 §22` — one thread per project is the encouraged path, and a second is
   // usually the coordinator not knowing the first exists. One gets the strip;

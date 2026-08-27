@@ -434,7 +434,9 @@
       "grandTotal": "Total",
       "projectNew": "A new project",
       "projectNewName": "New project name",
-      "rejectionReason": "Why it is being rejected"
+      "rejectionReason": "Why it is being rejected",
+      "position": "Position",
+      "totalSqm": "Quoted"
     },
     "detail": {
       "details": "Details",
@@ -511,7 +513,14 @@
       "returnReasonRequired": "Say what needs changing. The reason goes to the rep as a comment.",
       "rejectionReasonRequired": "Say why you are rejecting it. The reason goes to the rep as a comment.",
       "noSuppliers": "No product suppliers have been set up yet, so a line cannot be saved."
-    }
+    },
+    "groups": {
+      "coordinator": "Waiting on the coordinator",
+      "customer": "With the customer",
+      "none": "Nothing outstanding",
+      "yours": "Your move"
+    },
+    "emptyFilteredAction": "Clear the search"
   },
   "auth": {
     "login": {

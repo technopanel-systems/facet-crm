@@ -192,3 +192,45 @@ function chainReached(input: ChainInput): ChainColumn {
   if (versionStatus === "issued") return "quoted";
   return "requested";
 }
+
+/**
+ * `D25`'s groups for a **quotation thread list** — a fold of `chainOwner`, not
+ * a second ladder beside it.
+ *
+ * `D25` names three: *your move · waiting on the coordinator · waiting on the
+ * customer*. Only two of them survive `S133`. At thread level the positions are
+ * `requested` `quoted` `readyToShip` (hers), `withCustomer` (his) and
+ * `won` `closed` (nobody's) — `new` is never a thread `[chainReached]` — so
+ * once the `paid` rung left, **`withCustomer` is the only rep-owed position**
+ * and *your move* and *waiting on the customer* select the same rows. `D25`
+ * names one pile twice; the founder's call is two honest groups rather than
+ * three invented ones, and the third name is superseded rather than preserved
+ * by splitting something no rule splits (`WORKFLOW §5 AD16`).
+ *
+ * **`none` is not in `D25` at all.** A won or closed thread owes nobody, and a
+ * list must still show every row it returns — so it is a third group at the
+ * bottom rather than a default scope that hides last month's win behind a chip.
+ * `D29`'s graveyard argument is about a board where columns compete for width;
+ * a list only gets longer.
+ *
+ * **The reader's own name for their group is not here.** Where the reader IS
+ * the coordinator the header reads *your move*, exactly the condition
+ * `chainTurnKey` already splits the turn line on; that is a message key, and
+ * the group is the same group either way.
+ */
+export const CHAIN_GROUPS = ["coordinator", "customer", "none"] as const;
+export type ChainGroup = (typeof CHAIN_GROUPS)[number];
+
+/**
+ * Which of the three a position belongs to.
+ *
+ * Read off `chainOwner` and nothing else, so a change to `OWNERS` moves the
+ * groups with it and the two cannot drift — the whole reason this module
+ * exists `D27`.
+ */
+export function chainGroup(position: ChainPosition): ChainGroup {
+  const owner = chainOwner(position);
+  if (owner === "coordinator") return "coordinator";
+  if (owner === "rep") return "customer";
+  return "none";
+}

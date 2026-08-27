@@ -225,7 +225,12 @@ export function dispatchTurnNames(
  * is what `22 §4`'s own example does — "Waiting on Rawan — signatures".
  */
 export function chainTurnKey(
-  { position, owedBy }: ChainState,
+  // **Two fields, not a whole `ChainState`.** `reached` is the strip's, and
+  // asking for it made every caller that holds only a position fabricate one —
+  // `/projects` and the company page both wrote `reached: position`, which is
+  // false on a closed thread and was never read. A narrower parameter is what
+  // stops a caller inventing a field to satisfy a signature.
+  { position, owedBy }: Pick<ChainState, "position" | "owedBy">,
   viewerIsCoordinator: boolean,
 ): string {
   if (owedBy === null) return `chain.turn.none.${position}`;

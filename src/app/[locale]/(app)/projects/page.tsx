@@ -242,7 +242,6 @@ export default async function ProjectsPage({
                               {
                                 position: row.chain.position,
                                 owedBy: chainOwner(row.chain.position),
-                                reached: row.chain.position,
                               },
                               viewerIsCoordinator,
                             ),

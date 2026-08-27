@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
 import { formatSqm } from "@/lib/decimal";
 import { can, listCompanyBookHolders, requireSession } from "@/lib/authz";
-import { chainState } from "@/lib/chain";
+import { chainOwner } from "@/lib/chain";
 import { getCompany, listCompanyReps } from "@/lib/companies";
 import { listContacts } from "@/lib/contacts";
 import { companyTurn } from "@/lib/coverage";
@@ -361,16 +361,18 @@ export default async function CompanyDetailPage({
             empty={t("companies.detail.noQuotations")}
           >
             {quotations.rows.slice(0, RELATED_CARD_LIMIT).map((row) => {
-              // `S132` — the chain is `chain.ts`'s and nothing else. This
-              // passes neither dispatch flag, exactly as `/quotations` does
-              // not: a thread that has shipped therefore reads as *with the
-              // customer* on both screens. One under-informed answer beats two
-              // different ones; the gap is recorded rather than closed on one
-              // screen only.
-              const state = chainState({
-                versionStatus: row.versionStatus,
-                endState: row.endState,
-              });
+              // `S132` — the chain is `chain.ts`'s and nothing else, and
+              // since session 26 the ROW carries it: `listQuotationThreads`
+              // resolves both dispatch flags in SQL and folds the ladder once.
+              // This screen used to re-derive without them and said so, on the
+              // grounds that `/quotations` was equally under-informed. That
+              // stopped being true when the list closed the gap, so this reads
+              // the answer rather than computing a second, worse one.
+              const state = {
+                position: row.position,
+                owedBy: chainOwner(row.position),
+                reached: row.position,
+              } as const;
               return (
                 <RecordRow
                   key={row.id}

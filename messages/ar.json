@@ -205,7 +205,7 @@
         "readyToShip": "دورك — راجع طلب التسليم"
       },
       "coordinator": {
-        "requested": "بانتظار منسق المبيعات — الإصدار في سماك",
+        "requested": "بانتظار منسقة المبيعات — الإصدار في سماك",
         "quoted": "بانتظار منسقة المبيعات — الاعتماد هنا",
         "readyToShip": "بانتظار منسقة المبيعات — مراجعة طلب التسليم"
       },
@@ -434,7 +434,9 @@
       "grandTotal": "الإجمالي",
       "projectNew": "مشروع جديد",
       "projectNewName": "اسم المشروع الجديد",
-      "rejectionReason": "سبب الرفض"
+      "rejectionReason": "سبب الرفض",
+      "position": "الموضع",
+      "totalSqm": "المعروض"
     },
     "detail": {
       "details": "التفاصيل",
@@ -511,7 +513,14 @@
       "returnReasonRequired": "اذكر ما الذي يحتاج تعديلاً. يصل السبب إلى المندوب كتعليق.",
       "rejectionReasonRequired": "اذكر سبب الرفض. يصل السبب إلى المندوب كتعليق.",
       "noSuppliers": "لم تُضف أي جهات توريد بعد، لذلك لا يمكن حفظ البند."
-    }
+    },
+    "groups": {
+      "coordinator": "بانتظار منسقة المبيعات",
+      "customer": "لدى العميل",
+      "none": "لا شيء معلّق",
+      "yours": "دورك"
+    },
+    "emptyFilteredAction": "مسح البحث"
   },
   "auth": {
     "login": {

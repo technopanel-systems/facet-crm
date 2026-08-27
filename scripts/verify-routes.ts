@@ -611,7 +611,18 @@ const MARKERS: Record<string, readonly string[]> = {
     'data-slot="today-shortcuts"',
   ],
   "/companies": ['data-slot="list-card"', 'data-slot="table-head"'],
-  "/quotations": ['data-slot="list-card"'],
+  // `D25` — grouped, never flat, and `D26`'s lead cell. `quotation-group` is
+  // the header row; `turn` is the lead cell. Both are new in session 26 and a
+  // flat list would fail here rather than merely look wrong.
+  "/quotations": [
+    'data-slot="list-card"',
+    'data-slot="quotation-group"',
+    'data-slot="turn"',
+    // `D24`'s own marker must survive the raiser column — see the note at that
+    // `TableHead`. Asserting it here is what would catch a `data-slot` prop
+    // overriding the shared component's.
+    'data-slot="table-head"',
+  ],
   // One name field `S12` — the input is `name`, not a locale-suffixed pair.
   // `countryId` is `S14`; section 13 asserts it sits before the city.
   "/companies/new": [
@@ -1292,9 +1303,37 @@ async function main(): Promise<void> {
         if (ids.length === 0) break;
         found += ids.length;
 
+        // **The list's own answer, per row.** `D27` makes `chain.ts` the one
+        // ladder; this is what proves the two readers of it agree.
+        const listed = new Map(
+          [
+            ...list.body.matchAll(
+              /data-slot="quotation-row"[^>]*data-id="([0-9a-f-]{36})"[^>]*data-position="([a-zA-Z]+)"/gi,
+            ),
+          ].map((match) => [match[1], match[2]]),
+        );
+        check(
+          `${locale} page ${page}: every listed row carries its position`,
+          listed.size === ids.length,
+          `${listed.size} marked, ${ids.length} linked`,
+        );
+
         for (const id of ids) {
           const thread = await get(jar, `/${locale}/quotations/${id}`);
           const strip = stripOf(thread.body);
+          // **The assertion this slice was written for.** `/quotations` passed
+          // no dispatch flag, so a thread with an approved dispatch read *with
+          // the customer* on the list and *won* on its own page — one function,
+          // two screens, two answers, and nothing failed. Asserted at every
+          // row rather than at one, which is `CLAUDE.md`'s rule about a derived
+          // figure having more than one reader.
+          if (strip && listed.has(id)) {
+            check(
+              `${locale} ${id.slice(0, 8)}: list and detail agree on position`,
+              listed.get(id) === strip.position,
+              `list ${listed.get(id)}, detail ${strip.position}`,
+            );
+          }
           if (!strip) {
             // Every thread has a chain position, so this is a real failure
             // rather than a shape not worth repeating.
