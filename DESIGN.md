@@ -193,11 +193,91 @@ slow on a real phone, the fix is to lower that one number - never to strip the
 design. **The design must look correct with blur off** — check it that way
 before calling a screen done.
 
-**D20. JavaScript stays near zero regardless of how the surface looks.** Depth
-is CSS. Filters are GET forms in the URL. Native `<select>`. The theme is a
-server-read cookie. The named exceptions are: the ~200-item city combobox, the
-view-mode switch, and the board's horizontal scroll. Nothing else, and none of
-the visual system above requires any.
+**D20. JavaScript may enhance, never enable.** Every screen works with scripts
+off: it renders, it reads, and **every act it offers can be completed**. Script
+may make a screen nicer, faster or fresher — it may never be the thing that
+makes it work. Depth is CSS. Filters are GET forms in the URL. Native
+`<select>`, native `<input type="date">`, native checkboxes. The theme is a
+server-read cookie.
+
+**The test is a sentence, not a list.** Turn scripts off, then ask whether the
+person can still do the thing. If yes, it is an enhancement and needs no
+permission from this rule. If no, it is **enablement**, and it is a defect
+whatever it is called. This replaces the three named exceptions the rule used to
+carry — the city combobox, the view-mode switch, the board's scroll. A waiver
+list makes every new need an argument about whether it earns another entry, and
+it cannot answer a case nobody has thought of yet. Of those three, two were
+never JavaScript at all: `?view=` ships as `FilterNav` links carrying the search
+`D59`, and the board's scroll is `overflow-x-auto`.
+
+**The reasons the ban existed still hold, which is why this is a boundary and
+not a loosening:**
+
+- **The quality system is server-rendered HTML.** `verify:routes` drives 1,051
+  checks by fetching HTML and reading it. It executes no script and this project
+  has no browser. A screen that needs script to render is a screen nothing can
+  test.
+- **RTL.** Arabic works because the server sends finished markup, with direction
+  decided before it leaves.
+- **A rep on a bad connection outside Jubail gets HTML, not a bundle.**
+
+**Two things are not enhancements and stay forbidden outright:**
+
+- **No optimistic rendering** `D58`. A screen never shows a state the database
+  has not confirmed. A screen that lies about state is worse than a slow one,
+  and in FACET a lie about state is a lie about money.
+- **No dragging a card to change a position** `S134` `D29`. A position is
+  derived from a real event; a drag is a person asserting one.
+
+**Enforcement.** `verify:routes` is already the check for half of this, and
+nothing has to be built for that half: it fetches over HTTP and **executes no
+script**, so all 1,051 checks are already scripts-off checks — every DOM marker
+it asserts is proof that screen rendered without a bundle. What it cannot see is
+**operability**: a control can render and do nothing. So one section joins the
+same walk — for every form it reaches, each field the action requires is present
+as a **native, focusable control carrying that name**; a `type="hidden"` input,
+an `aria-hidden` one, or a `role="checkbox"` / `role="combobox"` button standing
+in for a field is a named failure, and every non-required one is printed as a
+note. `§17` already replays the POST, but it writes the body itself, so it
+proves the action answers and never that a person could have produced the body.
+This is that second half.
+
+**D72. A screen refreshes itself visibly, or not at all.** Nothing in FACET
+updates without a reload: a rep submits a request at 9:15 and the coordinator's
+open screen still says 9:00 until she presses F5. So a screen where somebody
+else's work arrives polls for **how much** has arrived and renders one line —
+*"3 new — refresh"* — that the person chooses to press.
+
+**Visible, never silent, and that is safety rather than taste.** A silent update
+can move a row under the cursor between the decision to click and the click, and
+on the coordinator's queue that means **approving the wrong dispatch**. Visible
+also degrades honestly: scripts off, no line, page unchanged — which is what
+`D20` asks of every enhancement.
+
+**What it polls.** **One route, not one per screen.** The screen's scope and the
+moment it was rendered go out; a **count** comes back, resolved in SQL by the
+same query the screen ran (`CLAUDE.md`). No second definition of *new*.
+
+**How often.** Every **60 seconds**, and only while the screen is in front of
+the person — a hidden tab polls nothing. Sixty suits a queue where work arrives
+every few minutes and is cheap on one company PC behind a tunnel. If it reads
+slow to the person working the queue, one number changes.
+
+**What it may update.** The number in that line, and whether the line is there
+at all. **Nothing beneath it.** No row is inserted, removed, re-ordered or
+re-coloured; no tile's figure moves; no badge changes meaning. The refresh a
+person presses is the ordinary server render they would have got from F5.
+
+**Where it renders.** In the header of the block it belongs to — the list card's
+own header, the dashboard block's heading row. Never floating, never over
+content, never dismissing itself. **It is not a toast**, which `D58` forbids: it
+is static, it stays until it is acted on, and pressing it navigates.
+
+**Which screens.** Every screen where the work is somebody else's: the
+dashboard's blocks and the waiting list `D64` `D34`, the coordinator's queues
+`D65`, `/quotations`, `/dispatches`, `/projects` in both views, the stream
+`D45`, and the rail's Today count `D49`. A screen showing only your own typing
+polls nothing.
 
 **D21. Still forbidden, and these are the actual tells.** Purple, violet or cyan
 accents. Rainbow or multi-hue gradients. Large gradient blobs. Glassmorphism on
