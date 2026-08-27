@@ -124,9 +124,12 @@ export async function createReportAction(
   }
 
   const locale = await getLocale();
-  revalidatePath("/reports");
-  revalidatePath("/performance");
+  // **`/reports` and `/performance` are both gone as routes** — session 27
+  // made the stream `/activity` and `28b` merged Targets. What a report
+  // actually moves now is the company's silence: the meter, the attention
+  // order and the quiet group count on `/companies` `D25`.
   revalidatePath("/activity");
+  revalidatePath("/companies", "layout");
   if (input.companyId) revalidatePath(`/companies/${input.companyId}`);
   if (input.projectId) revalidatePath(`/projects/${input.projectId}`);
   redirect({ href: `/reports/${reportId}`, locale });
@@ -150,11 +153,10 @@ export async function updateReportAction(
   }
 
   const locale = await getLocale();
-  revalidatePath("/reports");
-  revalidatePath("/performance");
   revalidatePath("/activity");
   // The anchor may have MOVED `[20 §9]`, so both timelines are stale: the one
-  // it left and the one it joined. Revalidating the section covers both.
+  // it left and the one it joined. Revalidating the section covers both — and
+  // the list's silence meter with them.
   revalidatePath("/companies", "layout");
   revalidatePath("/projects", "layout");
   redirect({ href: `/reports/${reportId}`, locale });

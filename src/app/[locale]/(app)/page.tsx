@@ -71,7 +71,7 @@ const REQUEST_ROWS = 5;
  * The `company_quiet` tile below is safe and does render: that number comes from
  * `followUps().counts`, computed over the whole scope rather than over a page.
  *
- * **Scoped, never gated** — like `/follow-ups` and `/performance`'s coverage
+ * **Scoped, never gated** — like `/follow-ups` and `/companies`' silence
  * section, every identity gets the same screen and the visibility filters
  * decide the rows.
  */

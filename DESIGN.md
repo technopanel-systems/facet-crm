@@ -924,16 +924,16 @@ both locales.
 **Performance and Targets are one item, called Targets.** One table, one row per
 rep, **the goal and the attainment together** — they were never two questions,
 and splitting them put a rep's number on one screen and what it was measured
-against on another. The edit control renders **per row** for `can_set_targets`.
-Merging them is what frees the seventh slot for Activity.
+against on another. The edit control renders **per row** for `can_set_targets`,
+and **not in a cell**: `D58` bans inline cell editing and this rule asks for a
+control on every row, so the row carries a disclosure of its own beneath its
+figures. Merging them is what frees the seventh slot for Activity.
 
-**The built rail carries eight, and that is deliberate and temporary.**
-Activity and Targets are now on it. **Performance is still there too**, against
-this rule's *not top-level*, because merging it into Targets is a screen change
-and moving the rail item first would hide attainment from everyone who can
-reach it today. It sits **last in *Track***, so deleting it leaves this rule's
-order already correct. **Session `28b` merges the two screens, and that is what
-takes the rail to seven** (`WORKFLOW §4`, `§5`).
+**The built rail carries seven**, since session `28b` merged the two screens
+and deleted `/performance`. It had carried eight until then, deliberately —
+merging is a screen change, and moving the rail item first would have hidden
+attainment from everyone who could reach it. Performance sat **last in
+*Track*** so that deleting it left this rule's order already correct.
 
 **D50.** The rail is hidden by a permission boolean passed from the layout, never
 by a `can()` call in a client component. Hiding a link is cosmetic; the route

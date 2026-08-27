@@ -84,7 +84,7 @@ import {
   type Role,
   type User,
 } from "@/lib/authz";
-import { coverage, coverageRepOptions, daysBetween } from "@/lib/coverage";
+import { listCompanies } from "@/lib/companies";
 import { normalizeName } from "@/lib/normalize";
 import { dailyActivity } from "@/lib/daily-activity";
 import { REPORT_OUTCOMES, SAUDI_CODE } from "@/lib/enums";
@@ -733,9 +733,9 @@ async function main(): Promise<void> {
 
   // The negative claim `20 §7`, `20 §8`: these two are SCOPED, not gated.
   // A rep calling either gets rows, never a refusal.
-  const repCoverage = await coverage(author);
+  const repCoverage = await listCompanies(author);
   check(
-    "coverage refuses a rep NOTHING — it scopes [20 §7]",
+    "the company list refuses a rep NOTHING — it scopes [20 §7]",
     Array.isArray(repCoverage.rows),
   );
   const repActivity = await dailyActivity(author, {
@@ -1047,9 +1047,9 @@ async function main(): Promise<void> {
     !REPORT_OUTCOMES.some((value) => value.includes("quot")),
     `got ${REPORT_OUTCOMES.join(", ")}`,
   );
-  const coverageRows = await coverage(manager, { q: stamp });
-  const rowB = coverageRows.rows.find((row) => row.companyId === companyB.id);
-  const rowA = coverageRows.rows.find((row) => row.companyId === companyA.id);
+  const coverageRows = await listCompanies(manager, { q: stamp });
+  const rowB = coverageRows.rows.find((row) => row.id === companyB.id);
+  const rowA = coverageRows.rows.find((row) => row.id === companyA.id);
   check(
     "a company whose only interaction discussed pricing is NOT qualified [10 §1]",
     rowB?.isQualified === false,
@@ -1100,9 +1100,9 @@ async function main(): Promise<void> {
     (await heldUntil(companyB.id)) === daysAgo(-30),
   );
   check(
-    "and coverage does not call it quiet",
-    (await coverage(manager, { q: stamp })).rows.find(
-      (row) => row.companyId === companyB.id,
+    "and the list does not call it quiet",
+    (await listCompanies(manager, { q: stamp })).rows.find(
+      (row) => row.id === companyB.id,
     )?.isQuiet === false,
   );
   // Correcting the report corrects the suppression, with nothing to keep in
@@ -1201,16 +1201,24 @@ async function main(): Promise<void> {
 
   console.log("\n11. Coverage answers which companies went quiet, not who submitted");
 
+  /* **`daysSince`, because `CompanyListRow` carries the age and not the date.**
+   * The claim is the one `coverage()` made — a company logged against yesterday
+   * reads back yesterday, and never null — and `companySilence` computes both
+   * from the same `max(report_date)`. Null is still the interesting half: it is
+   * what *never logged against* returns, and it must not read as `0`.
+   *
+   * **The literal `1`, not a helper.** This used to read
+   * `daysBetween(daysAgo(1), today())`, and `daysBetween` was deleted in `28b`
+   * along with its last production caller: `companySilence` does the
+   * arithmetic in Postgres and is the only implementation. A helper kept alive
+   * by the assertion that tests it proves nothing. */
+  const loggedYesterday = (await listCompanies(manager, { q: stamp })).rows.find(
+    (row) => row.id === companyA.id,
+  );
   check(
     "a company logged against reads back its last interaction, not null",
-    (await coverage(manager, { q: stamp })).rows.find(
-      (row) => row.companyId === companyA.id,
-    )?.lastInteractionOn === daysAgo(1),
-    `got ${
-      (await coverage(manager, { q: stamp })).rows.find(
-        (row) => row.companyId === companyA.id,
-      )?.lastInteractionOn
-    }`,
+    loggedYesterday?.daysSince === 1,
+    `got ${loggedYesterday?.daysSince}`,
   );
   /* **A company never logged against is quiet once the clock has run, not from
    * birth** — `S89`: something joins the list when a company has had *"no
@@ -1225,13 +1233,13 @@ async function main(): Promise<void> {
    * against 36 — the same rep, the same afternoon, two screens, two answers.
    * `companySilence()` is now the one definition and this is `S89`'s half of
    * it, asserted in **both** directions rather than only the convenient one. */
-  const freshNever = (await coverage(manager, { q: stamp })).rows.find(
-    (row) => row.companyId === companyNever.id,
+  const freshNever = (await listCompanies(manager, { q: stamp })).rows.find(
+    (row) => row.id === companyNever.id,
   );
   check(
     "a company never logged against has no last interaction [20 §2]",
-    freshNever?.lastInteractionOn === null,
-    `last=${freshNever?.lastInteractionOn}`,
+    freshNever?.daysSince === null,
+    `daysSince=${freshNever?.daysSince}`,
   );
   check(
     "…and registered today it is NOT yet quiet — no contact for too long [S89]",
@@ -1245,13 +1253,13 @@ async function main(): Promise<void> {
     .update(companies)
     .set({ createdAt: new Date(`${daysAgo(61)}T00:00:00Z`) })
     .where(eq(companies.id, companyNever.id));
-  const agedNever = (await coverage(manager, { q: stamp })).rows.find(
-    (row) => row.companyId === companyNever.id,
+  const agedNever = (await listCompanies(manager, { q: stamp })).rows.find(
+    (row) => row.id === companyNever.id,
   );
   check(
     "…and at 61 days it IS quiet, still with no interaction to show [S89]",
-    agedNever?.isQuiet === true && agedNever?.lastInteractionOn === null,
-    `quiet=${agedNever?.isQuiet} last=${agedNever?.lastInteractionOn}`,
+    agedNever?.isQuiet === true && agedNever?.daysSince === null,
+    `quiet=${agedNever?.isQuiet} daysSince=${agedNever?.daysSince}`,
   );
 
   // Age company B's only interaction past each threshold in turn.
@@ -1259,8 +1267,8 @@ async function main(): Promise<void> {
     .update(repReports)
     .set({ reportDate: daysAgo(31) })
     .where(eq(repReports.companyId, companyB.id));
-  const at31 = (await coverage(manager, { q: stamp })).rows.find(
-    (row) => row.companyId === companyB.id,
+  const at31 = (await listCompanies(manager, { q: stamp })).rows.find(
+    (row) => row.id === companyB.id,
   );
   check(
     "unqualified at 31 days is NOT yet quiet — 60 is its threshold [07 D5]",
@@ -1273,8 +1281,8 @@ async function main(): Promise<void> {
     .where(eq(repReports.companyId, companyB.id));
   check(
     "at 61 days it is quiet",
-    (await coverage(manager, { q: stamp })).rows.find(
-      (row) => row.companyId === companyB.id,
+    (await listCompanies(manager, { q: stamp })).rows.find(
+      (row) => row.id === companyB.id,
     )?.isQuiet === true,
   );
   // Company A is qualified, so 31 days is already past ITS threshold.
@@ -1282,21 +1290,22 @@ async function main(): Promise<void> {
     .update(repReports)
     .set({ reportDate: daysAgo(31) })
     .where(eq(repReports.companyId, companyA.id));
-  const qualifiedAt31 = (await coverage(manager, { q: stamp })).rows.find(
-    (row) => row.companyId === companyA.id,
+  const qualifiedAt31 = (await listCompanies(manager, { q: stamp })).rows.find(
+    (row) => row.id === companyA.id,
   );
   check(
     "a QUALIFIED company is quiet at 31 days — 30 is its threshold [07 D5]",
     qualifiedAt31?.isQuiet === true && qualifiedAt31?.thresholdDays === 30,
     `quiet=${qualifiedAt31?.isQuiet} threshold=${qualifiedAt31?.thresholdDays}`,
   );
+  /* **The whole-calendar-days claim is asserted by the four checks above**,
+   * not by a helper of its own. Each one moves a report to an exact day
+   * boundary — 31, 61 — and reads the threshold decision back; an arithmetic
+   * that measured instants rather than calendar days would land on the wrong
+   * side of at least one of them. That is `D34`'s unit proved where it is
+   * actually computed, in SQL, rather than in a TypeScript twin. */
   check(
-    "days since is whole calendar days, not an instant",
-    daysBetween(daysAgo(31), today()) === 31,
-    `got ${daysBetween(daysAgo(31), today())}`,
-  );
-  check(
-    "nothing was written by asking — coverage is a diagnostic [07 D6]",
+    "nothing was written by asking — silence is a diagnostic [07 D6]",
     (await auditCount(companyA.id)) === 0,
   );
 
@@ -1305,39 +1314,36 @@ async function main(): Promise<void> {
   console.log("\n12. Coverage is scoped in both directions");
 
   const mine = [companyA.id, companyB.id, companyQuiet.id, companyNever.id];
-  const authorSees = await coverage(author, { q: stamp });
+  const authorSees = await listCompanies(author, { q: stamp });
   check(
     "a rep sees exactly their own companies",
     authorSees.rows.length === mine.length &&
-      authorSees.rows.every((row) => mine.includes(row.companyId)),
+      authorSees.rows.every((row) => mine.includes(row.id)),
     `got ${authorSees.rows.length}`,
   );
-  const sharerSees = await coverage(sharer, { q: stamp });
+  const sharerSees = await listCompanies(sharer, { q: stamp });
   check(
     "a rep who holds one company through a share sees exactly that one",
-    sharerSees.rows.length === 1 &&
-      sharerSees.rows[0].companyId === companyA.id,
+    sharerSees.rows.length === 1 && sharerSees.rows[0].id === companyA.id,
     `got ${sharerSees.rows.length}`,
   );
   check(
     "a rep unconnected to any of them sees none",
-    (await coverage(stranger, { q: stamp })).rows.length === 0,
+    (await listCompanies(stranger, { q: stamp })).rows.length === 0,
   );
   check(
     "`sees_all_reps` sees all of them",
-    (await coverage(manager, { q: stamp })).rows.length === mine.length,
-    `got ${(await coverage(manager, { q: stamp })).rows.length}`,
+    (await listCompanies(manager, { q: stamp })).rows.length === mine.length,
+    `got ${(await listCompanies(manager, { q: stamp })).rows.length}`,
   );
-  check(
-    "and can narrow to one rep with ?rep=",
-    (await coverage(manager, { q: stamp, userId: sharerUser.id })).rows
-      .length === 1,
-  );
-  check(
-    "the rep filter offers a manager everyone and a rep only themselves",
-    (await coverageRepOptions(manager)).length > 1 &&
-      (await coverageRepOptions(author)).length === 1,
-  );
+  /* **The `?rep=` narrowing and its options list went with `coverage()`** in
+   * `28b`. `S88` deletes the coverage screen and the founder's call left the
+   * per-rep filter to `D39`'s team table, which is the rule that names a
+   * per-rep reading of quiet companies. Nothing else composed either function,
+   * so there is no narrowing left to assert and no options list to offer —
+   * asserting a deleted capability against `listCompanies`, which has no rep
+   * filter, would be inventing one to have something to check. The half that
+   * matters is above and unchanged: the SCOPE, in both directions. */
 
   /* --- 13. *** Real activity beside logged activity *** [20 §8] ---- */
 

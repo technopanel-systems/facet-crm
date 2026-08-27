@@ -15,6 +15,7 @@ import {
   updateQuotationLineAction,
   updateServiceLineAction,
 } from "../actions";
+import { Disclosure, rejected } from "../../_components/disclosure";
 import { lineLabel, lineParts } from "../line-display";
 import {
   LineFields,
@@ -129,54 +130,6 @@ function RowError({ state }: { state: FormState }) {
   );
 }
 
-/** Whether this form came back rejected — what reopens its `<details>`. */
-function rejected(state: FormState): boolean {
-  return Boolean(
-    state.error ?? Object.values(state.fieldErrors ?? {}).length > 0,
-  );
-}
-
-/**
- * A native disclosure. No script, no round trip, and its contents are in the
- * markup whether it is open or shut — which is what `D20`'s operability half
- * needs and what `useState` could never give it.
- *
- * The marker is hidden on both engines: `list-none` covers the standard
- * `display: list-item` marker and the `::-webkit-details-marker` rule covers
- * Safari, which still paints its own triangle. `D17` names the closed list of
- * motions and a disclosure is not on it, so it opens instantly rather than
- * animating.
- */
-function Disclosure({
-  label,
-  open,
-  act,
-  children,
-}: {
-  label: string;
-  open: boolean;
-  /** A DOM handle for `verify:routes`, which may not read a translated
-   *  string to tell two forms apart (`CLAUDE.md`). */
-  act: string;
-  children: React.ReactNode;
-}) {
-  return (
-    // **`open:w-full`, and it is layout rather than decoration.** Shut, the
-    // disclosure sits inline beside Remove; open, it claims the whole row so
-    // nine fields are not squeezed into a flex item beside a button, and Remove
-    // wraps beneath. `[open]` is a CSS selector, so the browser's own toggling
-    // keeps it true without React being told `D20`.
-    <details open={open} data-slot={act} className="open:w-full">
-      <Button asChild size="xs" variant="ghost">
-        <summary className="w-fit cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-          {label}
-        </summary>
-      </Button>
-      <div className="mt-3">{children}</div>
-    </details>
-  );
-}
-
 function ProductLine({
   line,
   updateLine,
@@ -248,10 +201,18 @@ function ProductLine({
       {editable ? (
         <>
           <div className="flex flex-wrap items-center gap-2">
+            {/* **`open:w-full` is layout rather than decoration**, and it is
+                the caller's now that `Disclosure` is shared. Shut, the
+                disclosure sits inline beside Remove; open, it claims the whole
+                row so nine fields are not squeezed into a flex item beside a
+                button, and Remove wraps beneath. `[open]` is a CSS selector,
+                so the browser's own toggling keeps it true without React being
+                told `D20`. */}
             <Disclosure
               label={t("common.edit")}
               open={rejected(updateState)}
               act="edit-line"
+              className="open:w-full"
             >
               <form
                 action={update}
@@ -358,6 +319,7 @@ function ServiceLine({
               label={t("common.edit")}
               open={rejected(updateState)}
               act="edit-service"
+              className="open:w-full"
             >
               <form
                 action={update}
@@ -456,6 +418,7 @@ function AddLineForm({
       label={t("quotations.detail.addLine")}
       open={rejected(state)}
       act="add-line-disclosure"
+      className="open:w-full"
     >
       <form action={action} data-act="add-line" className="flex flex-col gap-3">
         <LineFields
@@ -495,6 +458,7 @@ function AddServiceForm({
       label={t("quotations.detail.addService")}
       open={rejected(state)}
       act="add-service-disclosure"
+      className="open:w-full"
     >
       <form
         action={action}

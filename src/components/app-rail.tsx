@@ -2,7 +2,6 @@
 
 import {
   Activity,
-  BarChart3,
   Building2,
   FileText,
   FolderOpen,
@@ -17,20 +16,21 @@ import { Link, usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
 /**
- * The rail `D49` — eight items in two groups, plus Today.
+ * The rail `D49` — **seven items** in two groups, plus Today.
  *
- * **Eight, not `D49`'s seven, and deliberately.** `D49` merges Performance into
- * Targets, and that is a screen change: moving the rail item before the screens
- * merge would hide attainment from everyone who can reach it today. Performance
- * therefore stays, **last in `track`** so that deleting it leaves `D49`'s order
- * already correct. Session `28b` merges the two, and that is what takes the
- * rail to seven — recorded in `WORKFLOW §5`.
+ * Session `28b` took it there. It carried eight until then, deliberately:
+ * `D49` merges Performance into Targets and that is a screen change, so moving
+ * the rail item before the screens merged would have hidden attainment from
+ * everyone who could reach it. Performance sat **last in `track`** precisely so
+ * that deleting one line would leave `D49`'s order already correct, which is
+ * what happened.
  *
  * It replaced a twelve-item horizontal nav. Contacts, Reports, Coverage,
  * Follow-ups and Notifications are still not top-level: contacts live inside a
- * company, coverage merged into Performance, and follow-ups and notifications
- * became the Today count and the bell. **Every one of those routes still
- * works** — this was navigation, not routing.
+ * company, coverage is `/companies` and `/follow-ups` `S88`, and follow-ups and
+ * notifications became the Today count and the bell. `/reports` and
+ * `/performance` are gone as routes; **every other one of those still works** —
+ * that was navigation, not routing.
  *
  * `D50` governs how it is gated: this component is `"use client"` and cannot
  * call `can()`, so the `(app)` layout computes the flags and passes them down
@@ -57,8 +57,6 @@ const GROUPS = [
     items: [
       { href: "/activity", key: "activity", Icon: Activity },
       { href: "/targets", key: "targets", Icon: Target },
-      // Last, and temporary — see the header. `28b` deletes this line.
-      { href: "/performance", key: "performance", Icon: BarChart3 },
       { href: "/users", key: "team", Icon: Users, requires: "canManageUsers" },
     ],
   },

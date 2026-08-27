@@ -78,11 +78,12 @@ export function periodStart(period: string): string {
 /**
  * The first day of the following month — the exclusive upper bound.
  *
- * **Exported for `/performance`**, which needs both bounds to hand to
+ * **Exported for `/users/[id]`**, which needs both bounds to hand to
  * `requestOriginForPeriod` `S123`. That function lives in `dispatches.ts` and
  * takes the pair as strings, exactly as `dispatchesInPeriod` beside it does, so
  * neither module imports the other and there is one definition of where a month
- * ends.
+ * ends. It was `/performance`'s until `28b` moved that block onto one person's
+ * own page.
  */
 export function nextPeriodStart(period: string): string {
   const [year, month] = periodStart(period).split("-").map(Number);

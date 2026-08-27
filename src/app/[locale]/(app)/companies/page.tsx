@@ -140,6 +140,17 @@ export default async function CompaniesPage({
                 <TableHead className="text-start">
                   {t("common.city")}
                 </TableHead>
+                {/* **The Log action, gained in `28b`.** `/companies` was the
+                    only company list without one — `/follow-ups`, the
+                    dashboard waiting list and the company detail `D46` all
+                    carry it, and the coverage table that also did was deleted
+                    with `/performance` `S88`. No rule asks for it; the
+                    inconsistency was the reason. It is what turns the list
+                    from a directory into a work queue, and logging is what
+                    takes a company off the quiet group above `S32`. */}
+                <TableHead className="text-start">
+                  {t("common.actions")}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -204,7 +215,7 @@ function renderGrouped(
         data-count={String(count)}
         className="hover:bg-transparent"
       >
-        <TableCell colSpan={5} className="text-start">
+        <TableCell colSpan={6} className="text-start">
           {/* No `dir="auto"` anywhere on this header: it holds a translated
               label and a number, never a company name, and putting it on the
               block is precisely the defect the dashboard's planned-group
@@ -296,6 +307,13 @@ function CompanyRow({
       </TableCell>
       <TableCell className="text-start">
         {pickName(locale, row.cityNameEn, row.cityNameAr) ?? t("common.none")}
+      </TableCell>
+      <TableCell className="text-start">
+        <Button asChild size="xs" variant="outline">
+          <Link href={`/reports/new?companyId=${row.id}`}>
+            {t("reports.new")}
+          </Link>
+        </Button>
       </TableCell>
     </TableRow>
   );

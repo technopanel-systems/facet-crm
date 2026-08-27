@@ -35,8 +35,8 @@ export const dynamic = "force-dynamic";
  * Follow-ups `[07 D5]`, `[21 §9]` — one work queue over everything past its
  * threshold, oldest first.
  *
- * **Not gated, scoped** — the same shape `/performance`'s coverage section
- * uses `[20 §7]`. A rep sees their own, `sees_all_reps` sees everyone's, and
+ * **Not gated, scoped** — the shape every silence reader uses `[20 §7]`. A
+ * rep sees their own, `sees_all_reps` sees everyone's, and
  * no permission flag exists for either. The predicates are
  * `visibleCompaniesFilter`, `visibleProjectsFilter` and
  * `visibleQuotationThreadsFilter`, reused; this phase writes none of its own.
@@ -45,8 +45,13 @@ export const dynamic = "force-dynamic";
  * which is why a company that was chased yesterday and logged this morning is
  * simply absent today, with nothing to clean up.
  *
- * Coverage is deliberately left alone `[21 §9]`: it lists every company with
- * its age, which is the leading indicator. This lists only what is overdue.
+ * **`/companies` is the leading indicator and this is the queue.** That list
+ * carries every company with its silence meter, grouped quiet-first `D25`;
+ * this one carries only what is past a threshold, across all six kinds. There
+ * is no third screen between them: `S88` deleted the coverage table in `28b`,
+ * and the sentence that used to stand here — *coverage is deliberately left
+ * alone, it lists every company with its age* — had been describing
+ * `/companies` since the silence meter landed.
  */
 export default async function FollowUpsPage({
   params,

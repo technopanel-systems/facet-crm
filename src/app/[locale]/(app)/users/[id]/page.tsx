@@ -17,7 +17,9 @@ import {
 } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
 import { can, getManagedUser, requireSession } from "@/lib/authz";
+import { requestOriginForPeriod } from "@/lib/dispatches";
 import { lookupName } from "@/lib/lookups";
+import { currentPeriod, nextPeriodStart } from "@/lib/targets";
 
 import { deactivateUserAction, reactivateUserAction } from "../actions";
 import { AccountActionForm } from "./account-actions";
@@ -40,6 +42,30 @@ export default async function UserDetailPage({
 
   const t = await getTranslations();
   const format = await getFormatter();
+
+  /* `S123` — **who created a record is a measure**, for this one person.
+   *
+   * **It lives here since `28b`**, and it used to be a third table on
+   * `/performance` beside attainment. Three figures in a row under one heading
+   * needed a paragraph saying they could not be combined, and a caveat is a
+   * design failing rather than a disclaimer. Two of the three DO combine —
+   * `raised` is the denominator `raisedForThem` is a subset of, *and of nothing
+   * else* — so the fraction below is the honest shape and the third figure
+   * stands alone with its own window. The two labels are `S123`'s *two
+   * questions, two figures, and a screen showing both must say which is which*.
+   *
+   * **The current month, and no picker.** The clock here is the ACT, not the
+   * dispatch date; a control offering other months would put a second clock
+   * back on a page that has none. `userId` NARROWS `visibleMeasuredUsersFilter`
+   * and cannot widen it, so a reader who may not measure this person gets no
+   * row and `D70` leaves the block out entirely. */
+  const period = currentPeriod();
+  const [origin] = await requestOriginForPeriod(
+    session,
+    period,
+    nextPeriodStart(period),
+    { userId: user.id },
+  );
 
   // `19 §5` — you may not deactivate yourself, so the control is not offered.
   // The data layer refuses regardless; this only avoids showing a dead button.
@@ -125,6 +151,63 @@ export default async function UserDetailPage({
           </Button>
         </CardContent>
       </Card>
+
+      {/* `D70` — an empty block is absent, not an empty shell. */}
+      {origin ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("team.origin.title")}</CardTitle>
+            <CardDescription>
+              {t("team.origin.hint", {
+                month: format.dateTime(new Date(`${period}T00:00:00Z`), {
+                  month: "long",
+                  year: "numeric",
+                  timeZone: "UTC",
+                }),
+              })}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Facts>
+              {/* A fraction, not two columns: `raised` is this figure's own
+                  denominator and nothing else's. */}
+              <Fact
+                label={t("team.origin.raisedForThem")}
+                name="origin-raised-for-them"
+                numeric
+              >
+                {/* **`dir="auto"`, and `dir="ltr"` was wrong here** `D62`.
+                    This is a PHRASE with a translated word between two
+                    numbers, not a bare figure. Under an LTR base the Arabic
+                    *3 من 14* lays out with the 3 on the left, and an Arabic
+                    reader scanning right-to-left reads it as *14 من 3* — the
+                    numerator and the denominator swapped, silently, on the one
+                    figure that is a ratio. `auto` resolves off the first STRONG
+                    character: `م` in Arabic and the `o` of *of* in English,
+                    because European digits are weak and cannot decide it. The
+                    figure beside this one keeps `dir="ltr"` — a bare number has
+                    no order to get wrong. */}
+                <span dir="auto">
+                  {t("team.origin.outOf", {
+                    part: origin.raisedForThem,
+                    whole: origin.raised,
+                  })}
+                </span>
+              </Fact>
+              {/* Its own window, said in its own label — it counts edits made
+                  this month to requests raised in ANY month, so it is not a
+                  share of anything beside it. */}
+              <Fact
+                label={t("team.origin.editedByAnother")}
+                name="origin-edited-by-another"
+                numeric
+              >
+                <span dir="ltr">{origin.editedByAnother}</span>
+              </Fact>
+            </Facts>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>

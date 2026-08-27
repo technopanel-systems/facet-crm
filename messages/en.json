@@ -20,7 +20,6 @@
     "notifications": "Notifications",
     "followUps": "Follow-ups",
     "today": "Today",
-    "performance": "Performance",
     "sell": "Sell",
     "track": "Track",
     "brand": "Technopanel",
@@ -746,7 +745,8 @@
       "viewActivity": "Open activity"
     },
     "actions": {
-      "setTarget": "Set"
+      "setTarget": "Set",
+      "openTarget": "Set a target"
     },
     "errors": {
       "setTargetsOnly": "Only a manager or an executive may set targets.",
@@ -790,6 +790,13 @@
       "handover": "Handover",
       "handoverHint": "Review everything this person still holds and pass it to a colleague.",
       "handoverClosed": "Handover opens once the account is deactivated."
+    },
+    "origin": {
+      "title": "How their requests arrived",
+      "hint": "Counts what was done in {month}, not when the goods moved.",
+      "raisedForThem": "Raised for them",
+      "outOf": "{part} of {whole}",
+      "editedByAnother": "Edited by someone else, raised any month"
     },
     "actions": {
       "edit": "Edit",
@@ -974,32 +981,6 @@
       "attribution": "Every event counts for whoever performed it, not for whoever was credited. A rep's recorded column looks thin because the coordinator does much of the quotation chain — that is correct, not a fault.",
       "teamTotal": "Team total",
       "notACombinedScore": "Activity is never combined with target progress into a single score."
-    }
-  },
-  "coverage": {
-    "empty": "No companies to cover.",
-    "emptyFiltered": "No companies match this search.",
-    "searchPlaceholder": "Search by company name",
-    "fields": {
-      "company": "Company",
-      "reps": "Reps",
-      "lastInteraction": "Last interaction",
-      "status": "Status",
-      "allReps": "Everyone",
-      "never": "Never",
-      "quiet": "Quiet",
-      "covered": "Covered",
-      "onHold": "On hold",
-      "filterAll": "All companies",
-      "filterQuiet": "Quiet only",
-      "neverLogged": "Nothing ever recorded",
-      "quietFor": "Nothing recorded for {count} days",
-      "coveredFor": "Last recorded {count} days ago"
-    },
-    "detail": {
-      "thresholds": "Quiet means {qualified} days without an interaction for a company that has asked for a quotation, and {unqualified} days for one that has not.",
-      "onHoldUntil": "On hold until {date}",
-      "yours": "Logging a visit is what takes a company off this list."
     }
   },
   "notifications": {
@@ -1200,24 +1181,6 @@
       "dispatches": "To decide",
       "dispatchesEmpty": "No dispatch request is waiting for a decision.",
       "seeAll": "See all"
-    }
-  },
-  "performance": {
-    "title": "Performance",
-    "detail": {
-      "hint": "Targets and coverage, side by side.",
-      "targets": "Target attainment",
-      "coverage": "Coverage"
-    },
-    "origin": {
-      "title": "How requests arrived",
-      "noteActs": "Counts acts performed in this month, not dispatch dates — so a request raised in July and edited in August is an August edit.",
-      "noteWindow": "Edited by someone else counts requests edited this month whenever they were raised, so it is not a share of Raised.",
-      "noteNoArithmetic": "The three figures do not add or subtract. Nothing is derived by combining them.",
-      "raised": "Raised",
-      "raisedForThem": "Raised for them",
-      "editedByAnother": "Edited by someone else",
-      "empty": "Nobody is measured this month."
     }
   }
 }

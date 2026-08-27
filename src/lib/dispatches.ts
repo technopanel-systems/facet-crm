@@ -2723,16 +2723,29 @@ export type RequestOriginRow = {
  * reads everyone's. `S123` is *never an enforcement*: nothing in this module or
  * the screen above it blocks, warns or refuses on either figure.
  *
- * **The month bounds the ACT, not the dispatch date.** Every other figure on
- * `/performance` is bounded by `dispatch_date`; these two are bounded by when
- * somebody did something, because that is what `S123` measures — and because
- * the second figure has no other date to use. An edit made in March is a fact
- * about March, not about the month the goods moved. The screen says so.
+ * **`userId` NARROWS, it never widens.** It is `and`-ed after
+ * `visibleMeasuredUsersFilter` and can only remove a row the caller could
+ * already read — the shape `coverage.ts::repFilter` documents, which is why it
+ * lives here and not in `authz`. `/users/[id]` passes it: since `28b` these two
+ * figures render on one person's own page rather than as a third table beside
+ * attainment `S123`, so the common case now asks for exactly one row.
+ *
+ * **The month bounds the ACT, not the dispatch date.** `/targets`' attainment
+ * is bounded by `dispatch_date`; these two are bounded by when somebody did
+ * something, because that is what `S123` measures — and because the second
+ * figure has no other date to use. An edit made in March is a fact about March,
+ * not about the month the goods moved.
+ *
+ * **That difference is why the block moved off the targets screen.** Two clocks
+ * under one heading needed a paragraph to say so, and a caveat is a design
+ * failing rather than a disclaimer. On one person's page there is no second
+ * clock to disagree with; the block names its month and its window itself.
  */
 export async function requestOriginForPeriod(
   session: AuthSession,
   periodStart: string,
   nextPeriodStart: string,
+  options: { userId?: string } = {},
 ): Promise<RequestOriginRow[]> {
   // 1. Whose numbers may this identity read? The predicate lives in `authz`,
   //    and it is the one `achievementForPeriod` asks two sections above on the
@@ -2740,7 +2753,14 @@ export async function requestOriginForPeriod(
   const measured = await db
     .select({ id: users.id, name: users.name })
     .from(users)
-    .where(and(eq(users.isActive, true), visibleMeasuredUsersFilter(session)))
+    .where(
+      and(
+        eq(users.isActive, true),
+        visibleMeasuredUsersFilter(session),
+        // NARROWING, never widening — see the note above.
+        options.userId ? eq(users.id, options.userId) : undefined,
+      ),
+    )
     .orderBy(asc(users.name));
   if (measured.length === 0) return [];
 

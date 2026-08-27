@@ -545,7 +545,6 @@ const STATIC_ROUTES = [
   "/follow-ups",
   "/notifications",
   "/targets",
-  "/performance",
   "/users",
   "/users/new",
 ] as const;
@@ -659,17 +658,19 @@ const MARKERS: Record<string, readonly string[]> = {
   // `D45` — the filter column, and `D24`'s day groups. Section 25 does the
   // arithmetic; these are the frame.
   "/activity": ['data-slot="stream-filters"', 'data-slot="stream-day"'],
-  // `/coverage` carried this marker until feature slice 6 moved the table
-  // it comes from onto `/performance` and deleted the route `[26 §2]`.
+  // `D49` — Targets absorbed `/performance` in `28b`. Three markers became
+  // two, and both are claims the merge has to keep true:
   //
-  // `S123`'s section is the third on the screen. The `border-s` is asserted
-  // with it and is not decoration: it is the half of the no-arithmetic guard
-  // a translated note cannot carry, so a sweep that drops it must fail here.
-  "/performance": [
-    'data-slot="turn"',
-    'data-slot="request-origin"',
-    "border-line border-s",
-  ],
+  //  - `attainment` is the screen itself. The route survived and the other one
+  //    was deleted, so a 200 alone would pass on the wrong one of the two.
+  //  - `target-edit` is `AD20`'s answer. `D58` sends the control out of the
+  //    cell and `D49` still asks for one PER ROW, so the disclosure must be in
+  //    the markup for `can_set_targets`. §23 sees its field with scripts off
+  //    and **§17 POSTs the form**, which is the half a marker cannot prove.
+  //
+  // `data-slot="turn"` went with the coverage table `S88`; §11, §22 and §24
+  // assert the turn cell on the three lists that still render one.
+  "/targets": ['data-slot="attainment"', 'data-slot="target-edit"'],
 };
 
 const MARKER_IDENTITY = "manager@example.test";
@@ -957,6 +958,33 @@ async function main(): Promise<void> {
         `  ${email} ${locale} rail ${holdsUsers ? "shows" : "hides"} /users`,
         rail.body.includes(`href="/${locale}/users"`) === holdsUsers,
       );
+      // **`D49`'s count, asserted rather than described.** Seven — Today, four
+      // under *Sell*, two under *Track* — plus user management for those who
+      // hold it `D50`. The rail carried eight until `28b` deleted
+      // `/performance`, and a rule whose whole content is a number is one
+      // nothing was checking: the eighth item could have come back and every
+      // check above would still be green.
+      //
+      // Counted off the `<nav>` alone, so the header, the footer and the
+      // page's own links cannot inflate it. Today is `href="/en"` with no
+      // trailing segment, which is why the segment is optional in the pattern.
+      const nav = rail.body.slice(
+        rail.body.indexOf("<nav"),
+        rail.body.indexOf("</nav>"),
+      );
+      const railItems = (
+        nav.match(new RegExp(`href="/${locale}(/[a-z-]+)?"`, "g")) ?? []
+      ).length;
+      const expected = holdsUsers ? 8 : 7;
+      check(
+        `  ${email} ${locale} rail carries ${expected} items [D49]`,
+        railItems === expected,
+        `got ${railItems}`,
+      );
+      check(
+        `  ${email} ${locale} rail has no /performance [D49]`,
+        !rail.body.includes(`href="/${locale}/performance"`),
+      );
       await walk(jar, email, locale);
     }
   }
@@ -1074,6 +1102,31 @@ async function main(): Promise<void> {
         handover === 404,
         `got ${handover}`,
       );
+
+      /* **`S123`'s two figures, on the page they moved to in `28b`.**
+       *
+       * *Two questions, two figures, and a screen showing both must say which
+       * is which.* `data-fact` is the handle, never the label: the label is a
+       * translated string next-intl ships to every page whether it rendered or
+       * not, so asserting on it would pass on a page that rendered neither.
+       *
+       * **Both, in one check that fails if either is missing.** They were three
+       * columns in one row until this session and the founder's call was that
+       * figures which cannot be combined must not share a heading — reduced to
+       * one, the block would be back to a single number with no second question
+       * beside it, which is the shape `S123` forbids.
+       *
+       * Driven in both locales because the fraction interpolates two numbers
+       * into a translated string, and a `{part} of {whole}` that lost a
+       * placeholder in Arabic renders silently wrong rather than failing. */
+      for (const locale of ["en", "ar"]) {
+        const { body: detail } = await get(jar, `/${locale}/users/${id}`);
+        check(
+          `  ${locale} a user detail carries both S123 figures [S123]`,
+          detail.includes('data-fact="origin-raised-for-them"') &&
+            detail.includes('data-fact="origin-edited-by-another"'),
+        );
+      }
     }
   }
 
@@ -3994,6 +4047,7 @@ async function main(): Promise<void> {
     // carrying its elapsed time.
     const repJar = jars["rep-a@example.test"];
     const coordJar = jars["coordinator@example.test"];
+    const managerJar = jars["manager@example.test"];
 
     /** Every id a list page links to, in document order. */
     const idsOf = (body: string, section: string, locale: string): string[] => [
@@ -4173,6 +4227,39 @@ async function main(): Promise<void> {
         `${locale}: a project with an add-participant form is reachable`,
         participantsDriven,
       );
+
+      /* --- the target editor, moved out of its cell in `28b` ----------- */
+
+      // **`AD20`'s answer, driven rather than assumed.** `D58` sent this
+      // control out of the `<TableCell>` and into a `<details>` in a row of
+      // its own, and `D49` still asks for one PER ROW — so `/targets` renders
+      // one bound action per measured person, which is precisely the
+      // repeated-row shape this section exists for. The bind is at the call
+      // site, in `AttainmentTable`; the `useActionState` is one level down in
+      // `TargetRow`. Moving markup is exactly the edit that quietly moves a
+      // `.bind()`, so the form is driven at its new address.
+      //
+      // The manager, because the control is gated by `can_set_targets` and
+      // nobody else renders it at all. An empty `sqm`, so the POST is a
+      // refusal that writes nothing: `setTargetAction` always INSERTS a
+      // superseding row `S84`, and a suite that set a real target would move
+      // every attainment percentage §18 and §4401 read.
+      const targetsPage = await get(managerJar, `/${locale}/targets`);
+      const setTarget = actForm(targetsPage.body, "set-target");
+      check(
+        `${locale}: /targets offers a per-row target editor [D49], [D58]`,
+        setTarget !== undefined,
+        "no form carries data-act=\"set-target\"",
+      );
+      if (setTarget) {
+        await drives(
+          `${locale}: *** setTarget, out of the cell ***`,
+          managerJar,
+          `/${locale}/targets`,
+          setTarget,
+          { sqm: "" },
+        );
+      }
 
       /* --- the coordinator's three, and the line rows ------------------ */
 
@@ -4398,7 +4485,7 @@ async function main(): Promise<void> {
     /* **The rounding asserted at every reader, not one** (`CLAUDE.md`). A
        four-decimal text node is what a raw `numeric(14,4)` renders as. */
     const RAW_SQM = />\s*\d+\.\d{4}\s*</;
-    for (const route of ["/", "/targets", "/performance", "/dispatches"]) {
+    for (const route of ["/", "/targets", "/dispatches"]) {
       const { body } = await get(rep, `/en${route === "/" ? "" : route}`);
       check(
         `${route} carries no raw four-decimal figure [D32]`,

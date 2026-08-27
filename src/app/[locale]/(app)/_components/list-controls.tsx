@@ -97,7 +97,7 @@ export async function FilterNav({
   options: FilterOption[];
   active?: string;
   query?: string;
-  /** Other parameters to preserve, e.g. `/performance`'s `period`. */
+  /** Other parameters to preserve, e.g. `/companies`' `sort`. */
   extra?: Record<string, string | undefined>;
 }) {
   const t = await getTranslations();

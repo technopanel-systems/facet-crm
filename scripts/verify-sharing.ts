@@ -83,7 +83,6 @@ import {
 import { listComments } from "@/lib/comments";
 import { getCompany, listCompanies, updateCompany } from "@/lib/companies";
 import { listContacts } from "@/lib/contacts";
-import { coverage } from "@/lib/coverage";
 import { getDispatch, listDispatches } from "@/lib/dispatches";
 import {
   NOTIFICATION_TYPES,
@@ -759,12 +758,12 @@ async function main(): Promise<void> {
     "visibleCommentsFilter, through the company branch [25 §10]",
     (await listComments(repB, "company", company.id)).length === 1,
   );
-  check(
-    "coverage — the shared company is the shared rep's to work [20 §7]",
-    (await coverage(repB, { q: stamp })).rows.some(
-      (row) => row.companyId === company.id,
-    ),
-  );
+  // **The coverage assertion came out in `28b` rather than being rewritten.**
+  // It read `coverage()`, a SECOND reader composing `visibleCompaniesFilter`,
+  // so it proved something the `visibleCompaniesFilter` check above could not.
+  // `S88` deleted that reader; pointed at `listCompanies` the check becomes
+  // character-for-character the one four assertions up, and a duplicate that
+  // can only ever agree with itself is not evidence.
   check(
     "*** and NOT the project-level report, which needs the project too [04 Q7] ***",
     !(await reportsIn(repB, { q: stamp })).some(
