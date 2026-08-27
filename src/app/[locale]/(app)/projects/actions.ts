@@ -20,8 +20,7 @@ import { readFields, ruleErrorState, type FormState } from "@/lib/validation";
 function readProjectForm(formData: FormData) {
   const fields = readFields(formData);
   const input: ProjectInput = {
-    nameEn: fields.text("nameEn", { required: true, max: 200 }) ?? "",
-    nameAr: fields.text("nameAr", { max: 200 }),
+    name: fields.text("name", { required: true, max: 200 }) ?? "",
     // numeric(14,4) — kept as a string so a forecast the business is measured
     // on never passes through a float.
     sqmExpected: fields.decimal("sqmExpected", { min: 0, maxScale: 4 }),

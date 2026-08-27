@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
-import { lookupName } from "@/lib/lookups";
 import {
   listNotifications,
   sweepNotifications,
@@ -101,7 +100,6 @@ export default async function NotificationsPage({
                       row={row}
                       t={t}
                       format={format}
-                      locale={locale}
                     />
                   ))}
                 </CardContent>
@@ -120,7 +118,6 @@ export default async function NotificationsPage({
                       row={row}
                       t={t}
                       format={format}
-                      locale={locale}
                     />
                   ))}
                 </CardContent>
@@ -163,13 +160,10 @@ function NotificationEntry({
   row,
   t,
   format,
-  locale,
 }: {
   row: NotificationRow;
   t: Translator;
   format: Formatter;
-  /** `S129`'s project still carries a name pair, so `lookupName` needs it. */
-  locale: string;
 }) {
   const title = row.typeName
     ? t(`enums.notificationType.${row.typeName}`)
@@ -333,13 +327,7 @@ function NotificationEntry({
               className="text-start text-sm hover:underline"
               dir="auto"
             >
-              {lookupName(
-                {
-                  nameEn: row.payload.projectNameEn ?? "",
-                  nameAr: row.payload.projectNameAr,
-                },
-                locale,
-              )}
+              {row.payload.projectName}
             </Link>
           ) : (
             <span className="text-muted-foreground text-start text-sm">

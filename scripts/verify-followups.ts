@@ -84,6 +84,7 @@ import {
   type User,
 } from "@/lib/authz";
 import { FOLLOW_UP_KINDS, SAUDI_CODE, type FollowUpKind } from "@/lib/enums";
+import { normalizeName } from "@/lib/normalize";
 import {
   followUps,
   followUpsForRecipient,
@@ -342,7 +343,7 @@ async function main(): Promise<void> {
       .insert(companies)
       .values({
         name: `${stamp} ${slug}`,
-        nameNormalized: `${stamp}-${slug}`,
+        nameNormalized: normalizeName(`${stamp} ${slug}`),
         phone: `+9665${stamp.slice(-7)}${phoneSeq}`,
         countryId: saudiId,
         createdBy: ownerUser.id,
@@ -363,8 +364,8 @@ async function main(): Promise<void> {
     const [project] = await db
       .insert(projects)
       .values({
-        nameEn: `${stamp} ${slug}`,
-        nameNormalized: `${stamp}-${slug}`,
+        name: `${stamp} ${slug}`,
+        nameNormalized: normalizeName(`${stamp} ${slug}`),
         ownerUserId: ownerUser.id,
         createdBy: ownerUser.id,
         createdAt: instantDaysAgo(ageDays),
@@ -1037,18 +1038,18 @@ async function main(): Promise<void> {
   console.log("\n15. The new kinds honour the filters that already exist");
 
   const strangerRows = (await followUps(stranger)).rows.filter((row) =>
-    row.anchorNameEn.startsWith(stamp),
+    row.anchorName.startsWith(stamp),
   );
   check(
     "a rep who holds none of these records sees none of them",
     strangerRows.length === 0,
-    `got ${strangerRows.map((row) => `${row.kind}:${row.anchorNameEn}`).join(", ")}`,
+    `got ${strangerRows.map((row) => `${row.kind}:${row.anchorName}`).join(", ")}`,
   );
 
   // The positive half, so the negative one above cannot be passing because
   // the rows do not exist at all.
   const ownerRows = (await followUps(owner)).rows.filter((row) =>
-    row.anchorNameEn.startsWith(stamp),
+    row.anchorName.startsWith(stamp),
   );
   check(
     "while the owner sees them",
@@ -1097,7 +1098,7 @@ async function main(): Promise<void> {
   check("a stranger's scope exists", strangerScope !== null);
   if (strangerScope) {
     const leaked = (await followUpsForRecipient(strangerScope)).filter((row) =>
-      row.anchorNameEn.startsWith(stamp),
+      row.anchorName.startsWith(stamp),
     );
     check(
       "and holds none of this run's follow-ups — 00 §1.13's bug stays fixed",

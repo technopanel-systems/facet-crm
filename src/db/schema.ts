@@ -924,8 +924,8 @@ export const projects = pgTable(
   "projects",
   {
     id: pk(),
-    nameEn: text("name_en").notNull(),
-    nameAr: text("name_ar"),
+    /** One field, English or Arabic `S26`, the shape `S12` gives a company. */
+    name: text("name").notNull(),
     nameNormalized: text("name_normalized").notNull(),
     ownerUserId: uuid("owner_user_id")
       .notNull()

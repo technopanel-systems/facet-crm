@@ -28,7 +28,7 @@ import {
   ZERO,
 } from "@/lib/decimal";
 import { listDispatches } from "@/lib/dispatches";
-import { lookupName, pickName } from "@/lib/lookups";
+import { pickName } from "@/lib/lookups";
 import { getProject } from "@/lib/projects";
 import { listQuotationThreads } from "@/lib/quotations";
 import { projectTimeline, TIMELINE_CARD_LIMIT } from "@/lib/timeline";
@@ -169,7 +169,7 @@ export default async function ProjectDetailPage({
   return (
     <div className="flex flex-col gap-6">
       <DetailHeader
-        name={lookupName(project, locale)}
+        name={project.name}
         state={[project.ownerName, t(projectStateKey(project))]
 
           .filter(Boolean)
@@ -294,9 +294,10 @@ export default async function ProjectDetailPage({
         </CardHeader>
         <CardContent className="px-0">
           <Facts>
-            <Fact label={t("common.nameEn")}>{project.nameEn}</Fact>
-            <Fact label={t("common.nameAr")}>
-              {project.nameAr ?? dash}
+            {/* One field `S26`, the shape `S12` gives a company.
+                `dir="auto"` on the value, never on the row `D62`. */}
+            <Fact label={t("common.name")}>
+              <span dir="auto">{project.name}</span>
             </Fact>
             <Fact label={t("projects.fields.owner")}>
               {project.ownerName}

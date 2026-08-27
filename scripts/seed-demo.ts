@@ -692,8 +692,7 @@ function projectInput(
 ): ProjectInput {
   const row = id(projectRow, key, "project");
   return {
-    nameEn: row.nameEn,
-    nameAr: row.nameAr,
+    name: row.name,
     sqmExpected: row.sqmExpected,
     cityId: row.city ? need(look.cityId, row.city, "city") : null,
     endState: null,

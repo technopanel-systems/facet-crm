@@ -16,7 +16,6 @@ import { requireSession, can } from "@/lib/authz";
 import { chainOwner } from "@/lib/chain";
 import { formatSqm } from "@/lib/decimal";
 import { hasUsableCompany } from "@/lib/companies";
-import { lookupName } from "@/lib/lookups";
 import { listProjectBoard, listProjects } from "@/lib/projects";
 
 import { FilterNav, ListCard, SearchForm } from "../_components/list-controls";
@@ -136,11 +135,7 @@ export default async function ProjectsPage({
             ) : null}
           </div>
         ) : (
-          <ProjectBoardView
-            board={board}
-            locale={locale}
-            tableHref={tableHref}
-          />
+          <ProjectBoardView board={board} tableHref={tableHref} />
         )
       ) : null}
 
@@ -181,12 +176,10 @@ export default async function ProjectsPage({
                   <TableHead className="text-start">
                     {t("projects.fields.lastMoved")}
                   </TableHead>
-                  {/* `common.name`, not `common.nameEn`: a column header is
-                      not the place for a schema detail, and the cell has
-                      always picked by locale. Whether a project should carry
-                      two name fields at all is `SPEC §16`'s open question and
-                      `WORKFLOW §5`'s row — a schema decision this screen does
-                      not need. */}
+                  {/* One name field `S26`, so there is nothing here to pick
+                      between. The header lost `common.nameEn` in the board
+                      slice, and the schema question behind it is now answered
+                      rather than deferred. */}
                   <TableHead className="text-start">
                     {t("common.name")}
                   </TableHead>
@@ -238,7 +231,7 @@ export default async function ProjectsPage({
                         className="hover:underline"
                       >
                         {/* `dir="auto"` on the NAME, never on the cell `D62`. */}
-                        <span dir="auto">{lookupName(row, locale)}</span>
+                        <span dir="auto">{row.name}</span>
                       </Link>
                     </TableCell>
                     <TableCell className="text-start">

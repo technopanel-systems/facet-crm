@@ -29,8 +29,8 @@ type Action = (state: FormState, formData: FormData) => Promise<FormState>;
 
 export type ProjectOption = {
   id: string;
-  nameEn: string;
-  nameAr: string | null;
+  /** One field, English or Arabic `S26`. */
+  name: string;
   /** The project's live company links — the only companies a quotation on it
    *  may name `[16 §6]`. */
   companies: { id: string; name: string }[];
@@ -87,9 +87,6 @@ export function QuotationForm({
     (contact) => contact.companyId === companyId,
   );
 
-  const name = (row: { nameEn: string; nameAr: string | null }) =>
-    locale === "ar" ? row.nameAr || row.nameEn : row.nameEn;
-
   return (
     <FormShell
       action={formAction}
@@ -125,10 +122,11 @@ export function QuotationForm({
           <Combobox
             name="projectId"
             defaultValue={projectId}
+            // No `altLabel`: it carried the other-language name so a search
+            // could match either, and a project has one name now `S26`.
             options={projects.map((row) => ({
               value: row.id,
-              label: name(row),
-              altLabel: locale === "ar" ? row.nameEn : (row.nameAr ?? undefined),
+              label: row.name,
             }))}
             placeholder={t("common.none")}
             searchPlaceholder={t("common.search")}
@@ -178,7 +176,7 @@ export function QuotationForm({
               href={`/projects/${project.id}`}
               className="text-primary underline underline-offset-4"
             >
-              {name(project)}
+              <span dir="auto">{project.name}</span>
             </Link>
           </p>
         ) : null}

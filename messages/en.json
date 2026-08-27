@@ -50,8 +50,6 @@
     "createdAt": "Created",
     "createdBy": "Created by",
     "name": "Name",
-    "nameEn": "Name (English)",
-    "nameAr": "Name (Arabic)",
     "phone": "Phone",
     "email": "Email",
     "notes": "Notes",

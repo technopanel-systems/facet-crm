@@ -112,7 +112,9 @@ import {
   cities,
   commentMentions,
   comments,
+  companies,
   companyCategories,
+  contacts,
   lossReasons,
   projects,
   roles,
@@ -127,6 +129,7 @@ import {
   SAUDI_CODE,
 } from "@/lib/enums";
 import { listCountries } from "@/lib/lookups";
+import { normalizeName } from "@/lib/normalize";
 import { createProject, listProjects, updateProject } from "@/lib/projects";
 
 import { seedLookups } from "./seed-lookups";
@@ -902,8 +905,7 @@ async function main(): Promise<void> {
   const openProject = await createProject(
     rep,
     {
-      nameEn: `${stamp} open project`,
-      nameAr: null,
+      name: `${stamp} open project`,
       sqmExpected: null,
       cityId: null,
       endState: null,
@@ -1225,8 +1227,7 @@ async function main(): Promise<void> {
   const lostProject = await createProject(
     rep,
     {
-      nameEn: `${stamp} lost project`,
-      nameAr: null,
+      name: `${stamp} lost project`,
       sqmExpected: null,
       cityId: null,
       endState: "lost",
@@ -1260,8 +1261,7 @@ async function main(): Promise<void> {
   // different code path from creation — `updateProject` diffs against the row.
   await allows("marking an open project lost is allowed [25 §5]", async () => {
     const updated = await updateProject(rep, openProject.id, {
-      nameEn: openProject.nameEn,
-      nameAr: null,
+      name: openProject.name,
       sqmExpected: null,
       cityId: null,
       endState: "lost",
@@ -1285,8 +1285,7 @@ async function main(): Promise<void> {
     .where(eq(projects.id, openProject.id))
     .limit(1);
   const resaved = await updateProject(rep, openProject.id, {
-    nameEn: `${openProject.nameEn} (edited)`,
-    nameAr: null,
+    name: `${openProject.name} (edited)`,
     sqmExpected: null,
     cityId: null,
     endState: "lost",
@@ -1305,8 +1304,7 @@ async function main(): Promise<void> {
   // longer sticky the way the pre-screen default was `[23]`.
   await allows("re-editing a lost project to a different reason is allowed [25 §5]", async () => {
     const corrected = await updateProject(rep, openProject.id, {
-      nameEn: openProject.nameEn,
-      nameAr: null,
+      name: openProject.name,
       sqmExpected: null,
       cityId: null,
       endState: "lost",
@@ -1333,8 +1331,7 @@ async function main(): Promise<void> {
     "projects.errors.lossReasonDetailRequired",
     () =>
       updateProject(rep, openProject.id, {
-        nameEn: openProject.nameEn,
-        nameAr: null,
+        name: openProject.name,
         sqmExpected: null,
         cityId: null,
         endState: "lost",
@@ -1350,8 +1347,7 @@ async function main(): Promise<void> {
     "projects.errors.lossReasonDetailForbidden",
     () =>
       updateProject(rep, openProject.id, {
-        nameEn: openProject.nameEn,
-        nameAr: null,
+        name: openProject.name,
         sqmExpected: null,
         cityId: null,
         endState: "lost",
@@ -1364,8 +1360,7 @@ async function main(): Promise<void> {
 
   await allows("a non-'other' reason with no detail is allowed [25 §5]", () =>
     updateProject(rep, openProject.id, {
-      nameEn: openProject.nameEn,
-      nameAr: null,
+      name: openProject.name,
       sqmExpected: null,
       cityId: null,
       endState: "lost",
@@ -1381,8 +1376,7 @@ async function main(): Promise<void> {
     "projects.errors.lossReasonRequired",
     () =>
       updateProject(rep, openProject.id, {
-        nameEn: openProject.nameEn,
-        nameAr: null,
+        name: openProject.name,
         sqmExpected: null,
         cityId: null,
         endState: "lost",
@@ -1402,8 +1396,7 @@ async function main(): Promise<void> {
   // is the only place left to move to, and it exercises the same clause.
   await allows("re-opening a lost project clears the loss [25 §5]", async () => {
     const reopened = await updateProject(rep, openProject.id, {
-      nameEn: openProject.nameEn,
-      nameAr: null,
+      name: openProject.name,
       sqmExpected: null,
       cityId: null,
       endState: null,
@@ -1427,8 +1420,7 @@ async function main(): Promise<void> {
   // is the whole of what "deliberately unverified" leaves to check.
   await allows("in_production round-trips through updateProject [25 §4]", async () => {
     const updated = await updateProject(rep, openProject.id, {
-      nameEn: openProject.nameEn,
-      nameAr: null,
+      name: openProject.name,
       sqmExpected: null,
       cityId: null,
       endState: null,
@@ -2869,6 +2861,67 @@ async function repositoryMatchesDatabase(): Promise<void> {
     book.live_memberships > 0,
     `${book.live_memberships} live membership(s)`,
   );
+
+  /* --- 22. The normalized name key, over every row [S12], [S19], [S26] - */
+
+  console.log(
+    "\n22. *** Every normalized name key equals normalizeName(name) *** [S12], [S19], [S26]",
+  );
+
+  // **What this guards is a migration, not a form.** `0030` collapsed the
+  // project's two name columns into one and moved 49 of 50 rows onto their
+  // Arabic name — and `name_normalized` had to move with each of them, because
+  // it was only ever `normalizeName(name_en)`. That fold was written in SQL,
+  // since `normalizeName` cannot run inside a migration, and SQL agreeing with
+  // TypeScript is exactly the kind of claim that is true on the day it is
+  // measured and quietly false later.
+  //
+  // So it is asserted from the function itself rather than from a second copy
+  // of the algorithm: every row is read, folded here, and compared. A drift
+  // between the two is a record a rep can see and cannot find by name — the
+  // silent half, because search returns an empty list rather than an error.
+  //
+  // All three tables that carry the key, not projects alone. The invariant is
+  // `normalizeName`'s and the writers are three create/update pairs, so one
+  // loop covers what three would.
+  for (const [label, rows] of [
+    [
+      "company",
+      await db
+        .select({ name: companies.name, key: companies.nameNormalized })
+        .from(companies),
+    ],
+    [
+      "contact",
+      await db
+        .select({ name: contacts.name, key: contacts.nameNormalized })
+        .from(contacts),
+    ],
+    [
+      "project",
+      await db
+        .select({ name: projects.name, key: projects.nameNormalized })
+        .from(projects),
+    ],
+  ] as const) {
+    const drifted = rows.filter((row) => normalizeName(row.name) !== row.key);
+    console.log(`  --    ${rows.length} ${label}(s) folded`);
+    check(
+      `*** every ${label}'s name_normalized equals normalizeName(name) *** [S12], [S19], [S26]`,
+      drifted.length === 0,
+      drifted
+        .slice(0, 3)
+        .map((row) => `${row.name} -> ${row.key}`)
+        .join(" | "),
+    );
+    // The negative half: with no rows the filter is empty and the check above
+    // goes green having compared nothing.
+    check(
+      `…and there were ${label} rows to fold, so an empty read fails here`,
+      rows.length > 0,
+      `${rows.length} row(s)`,
+    );
+  }
 
   console.log("\n13. *** The repository and the database agree ***");
 

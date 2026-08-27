@@ -85,6 +85,7 @@ import {
   type User,
 } from "@/lib/authz";
 import { coverage, coverageRepOptions, daysBetween } from "@/lib/coverage";
+import { normalizeName } from "@/lib/normalize";
 import {
   dailyActivity,
   dailyActivityEntries,
@@ -401,7 +402,7 @@ async function main(): Promise<void> {
     .insert(companies)
     .values({
       name: `${stamp} Company A`,
-      nameNormalized: `${stamp}-a`,
+      nameNormalized: normalizeName(`${stamp} Company A`),
       phone: nextPhone(),
       countryId: saudiId,
       createdBy: authorUser.id,
@@ -411,7 +412,7 @@ async function main(): Promise<void> {
     .insert(companies)
     .values({
       name: `${stamp} Company B`,
-      nameNormalized: `${stamp}-b`,
+      nameNormalized: normalizeName(`${stamp} Company B`),
       phone: nextPhone(),
       countryId: saudiId,
       createdBy: authorUser.id,
@@ -422,7 +423,7 @@ async function main(): Promise<void> {
     .insert(companies)
     .values({
       name: `${stamp} Company Quiet`,
-      nameNormalized: `${stamp}-quiet`,
+      nameNormalized: normalizeName(`${stamp} Company Quiet`),
       phone: nextPhone(),
       countryId: saudiId,
       createdBy: authorUser.id,
@@ -433,7 +434,7 @@ async function main(): Promise<void> {
     .insert(companies)
     .values({
       name: `${stamp} Company Never`,
-      nameNormalized: `${stamp}-never`,
+      nameNormalized: normalizeName(`${stamp} Company Never`),
       phone: nextPhone(),
       countryId: saudiId,
       createdBy: authorUser.id,
@@ -463,7 +464,7 @@ async function main(): Promise<void> {
     .values({
       companyId: companyA.id,
       name: `${stamp} Contact A`,
-      nameNormalized: `${stamp}-contact-a`,
+      nameNormalized: normalizeName(`${stamp} Contact A`),
       createdBy: authorUser.id,
     })
     .returning();
@@ -472,7 +473,7 @@ async function main(): Promise<void> {
     .values({
       companyId: companyB.id,
       name: `${stamp} Contact B`,
-      nameNormalized: `${stamp}-contact-b`,
+      nameNormalized: normalizeName(`${stamp} Contact B`),
       createdBy: authorUser.id,
     })
     .returning();
@@ -480,8 +481,8 @@ async function main(): Promise<void> {
   const [projectA] = await db
     .insert(projects)
     .values({
-      nameEn: `${stamp} Project A`,
-      nameNormalized: `${stamp}-project-a`,
+      name: `${stamp} Project A`,
+      nameNormalized: normalizeName(`${stamp} Project A`),
       ownerUserId: authorUser.id,
       createdBy: authorUser.id,
     })
@@ -490,8 +491,8 @@ async function main(): Promise<void> {
   const [projectLoose] = await db
     .insert(projects)
     .values({
-      nameEn: `${stamp} Project Loose`,
-      nameNormalized: `${stamp}-project-loose`,
+      name: `${stamp} Project Loose`,
+      nameNormalized: normalizeName(`${stamp} Project Loose`),
       ownerUserId: authorUser.id,
       createdBy: authorUser.id,
     })

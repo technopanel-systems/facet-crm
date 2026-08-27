@@ -124,6 +124,7 @@ import {
   users,
 } from "@/db/schema";
 import { canOpenRecord, canViewRecord, type AuthSession } from "@/lib/authz";
+import { normalizeName } from "@/lib/normalize";
 import { addComment } from "@/lib/comments";
 import {
   createContact,
@@ -507,7 +508,7 @@ async function main(): Promise<void> {
     .insert(companies)
     .values({
       name: `${stamp} Co`,
-      nameNormalized: stamp,
+      nameNormalized: normalizeName(`${stamp} Co`),
       phone: `+9665${stamp.slice(-7)}1`,
       countryId: saudiId,
       createdBy: repA.user.id,
@@ -522,8 +523,8 @@ async function main(): Promise<void> {
   const [project] = await db
     .insert(projects)
     .values({
-      nameEn: `${stamp} Project`,
-      nameNormalized: stamp,
+      name: `${stamp} Project`,
+      nameNormalized: normalizeName(`${stamp} Project`),
       ownerUserId: repA.user.id,
       createdBy: repA.user.id,
     })
@@ -1540,7 +1541,7 @@ async function main(): Promise<void> {
     .insert(companies)
     .values({
       name: `${stamp} Buyer Two`,
-      nameNormalized: `${stamp}-buyer-two`,
+      nameNormalized: normalizeName(`${stamp} Buyer Two`),
       phone: `+9665${stamp.slice(-7)}2`,
       countryId: saudiId,
       createdBy: repA.user.id,
@@ -1556,7 +1557,7 @@ async function main(): Promise<void> {
     .insert(companies)
     .values({
       name: `${stamp} Bystander`,
-      nameNormalized: `${stamp}-bystander`,
+      nameNormalized: normalizeName(`${stamp} Bystander`),
       phone: `+9665${stamp.slice(-7)}3`,
       countryId: saudiId,
       createdBy: repA.user.id,
@@ -1731,8 +1732,7 @@ async function main(): Promise<void> {
   const otherProject = await createProject(
     repA,
     {
-      nameEn: `${stamp} Other Project`,
-      nameAr: null,
+      name: `${stamp} Other Project`,
       sqmExpected: null,
       cityId: null,
       endState: null,
@@ -1765,7 +1765,7 @@ async function main(): Promise<void> {
     .insert(companies)
     .values({
       name: `${stamp} Outsider`,
-      nameNormalized: `${stamp}-outsider`,
+      nameNormalized: normalizeName(`${stamp} Outsider`),
       phone: `+9665${stamp.slice(-7)}4`,
       countryId: saudiId,
       createdBy: repA.user.id,
@@ -1895,8 +1895,7 @@ async function main(): Promise<void> {
 
     repA,
     {
-      nameEn: `${stamp} Lost Project`,
-      nameAr: null,
+      name: `${stamp} Lost Project`,
       sqmExpected: null,
       cityId: null,
       endState: "lost",
@@ -1940,8 +1939,7 @@ async function main(): Promise<void> {
   const stale = await createProject(
     repA,
     {
-      nameEn: `${stamp} Stale Project`,
-      nameAr: null,
+      name: `${stamp} Stale Project`,
       sqmExpected: null,
       cityId: null,
       endState: null,
@@ -2030,8 +2028,7 @@ async function main(): Promise<void> {
     "projects.errors.notFound",
     () =>
       updateProject(coordinator, project.id, {
-        nameEn: `${stamp} Renamed By Coordinator`,
-        nameAr: null,
+        name: `${stamp} Renamed By Coordinator`,
         sqmExpected: null,
         cityId: null,
         endState: null,
@@ -2686,7 +2683,7 @@ async function main(): Promise<void> {
     .insert(companies)
     .values({
       name: `${stamp} Coordinator Co`,
-      nameNormalized: `${stamp}-coord`,
+      nameNormalized: normalizeName(`${stamp} Coordinator Co`),
       phone: `+9665${stamp.slice(-7)}4`,
       countryId: saudiId,
       createdBy: herUser.id,
@@ -2840,7 +2837,7 @@ async function main(): Promise<void> {
     .insert(companies)
     .values({
       name: `${stamp} Writeback Co`,
-      nameNormalized: `${stamp}-wb`,
+      nameNormalized: normalizeName(`${stamp} Writeback Co`),
       phone: `+9665${stamp.slice(-7)}5`,
       countryId: saudiId,
       createdBy: repA.user.id,
@@ -2855,8 +2852,8 @@ async function main(): Promise<void> {
   const [target] = await db
     .insert(projects)
     .values({
-      nameEn: `${stamp} Writeback Project`,
-      nameNormalized: `${stamp}-wb`,
+      name: `${stamp} Writeback Project`,
+      nameNormalized: normalizeName(`${stamp} Writeback Project`),
       ownerUserId: repA.user.id,
       createdBy: repA.user.id,
     })
@@ -3861,8 +3858,7 @@ async function main(): Promise<void> {
   const winnable = await createProject(
     repA,
     {
-      nameEn: `${stamp} Winnable Project`,
-      nameAr: null,
+      name: `${stamp} Winnable Project`,
       sqmExpected: null,
       cityId: null,
       endState: null,
@@ -3994,8 +3990,7 @@ async function main(): Promise<void> {
   const promised = await createProject(
     repA,
     {
-      nameEn: `${stamp} Promised Project`,
-      nameAr: null,
+      name: `${stamp} Promised Project`,
       sqmExpected: null,
       cityId: null,
       endState: null,
@@ -4030,8 +4025,7 @@ async function main(): Promise<void> {
   // The rep clears it the same way they set it — `S29` says they set it, and
   // a judgement that cannot be withdrawn is not a judgement.
   const withdrawn = await updateProject(repA, promised.id, {
-    nameEn: promised.nameEn,
-    nameAr: null,
+    name: promised.name,
     sqmExpected: null,
     cityId: null,
     endState: null,
@@ -4063,8 +4057,7 @@ async function main(): Promise<void> {
   const undoneProject = await createProject(
     repA,
     {
-      nameEn: `${stamp} Undone Project`,
-      nameAr: null,
+      name: `${stamp} Undone Project`,
       sqmExpected: null,
       cityId: null,
       endState: null,
@@ -4432,7 +4425,7 @@ async function main(): Promise<void> {
     .insert(companies)
     .values({
       name: `${stamp} Origin Co`,
-      nameNormalized: `${stamp}-origin`,
+      nameNormalized: normalizeName(`${stamp} Origin Co`),
       phone: `+9665${stamp.slice(-7)}5`,
       countryId: saudiId,
       createdBy: repA.user.id,
@@ -4447,8 +4440,8 @@ async function main(): Promise<void> {
   const [s123Project] = await db
     .insert(projects)
     .values({
-      nameEn: `${stamp} Origin Project`,
-      nameNormalized: `${stamp}-origin`,
+      name: `${stamp} Origin Project`,
+      nameNormalized: normalizeName(`${stamp} Origin Project`),
       ownerUserId: repA.user.id,
       createdBy: repA.user.id,
     })

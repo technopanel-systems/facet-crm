@@ -3,7 +3,6 @@ import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "@/i18n/navigation";
 import { formatSqm } from "@/lib/decimal";
-import { lookupName } from "@/lib/lookups";
 import { projectState, type ProjectBoard } from "@/lib/projects";
 
 /**
@@ -51,12 +50,10 @@ import { projectState, type ProjectBoard } from "@/lib/projects";
  */
 export async function ProjectBoardView({
   board,
-  locale,
   /** The table view of the same query — `D59`, so it carries the search. */
   tableHref,
 }: {
   board: ProjectBoard;
-  locale: string;
   tableHref: string;
 }) {
   const t = await getTranslations();
@@ -111,7 +108,7 @@ export async function ProjectBoardView({
                         href={`/projects/${card.id}`}
                         className="text-[13px] font-semibold hover:underline"
                       >
-                        <span dir="auto">{lookupName(card, locale)}</span>
+                        <span dir="auto">{card.name}</span>
                       </Link>
 
                       {/* **One line, truncated.** `D70` — what leads is chosen

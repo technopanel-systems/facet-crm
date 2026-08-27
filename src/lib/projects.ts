@@ -111,8 +111,7 @@ export { PROJECT_END_STATES, REGIONS };
 export type { ProjectEndState };
 
 export type ProjectInput = {
-  nameEn: string;
-  nameAr: string | null;
+  name: string;
   sqmExpected: string | null;
   /** Optional, and deliberately not conditioned on anything: a project has no
    *  country, so `S15`'s "mandatory when Saudi" has nothing to hang on here.
@@ -523,8 +522,7 @@ async function chainByProject(
 
 export type ProjectListRow = {
   id: string;
-  nameEn: string;
-  nameAr: string | null;
+  name: string;
   ownerName: string;
   sqmExpected: string | null;
   endState: ProjectEndState | null;
@@ -620,8 +618,7 @@ export async function listProjects(
   const found = await db
     .select({
       id: projects.id,
-      nameEn: projects.nameEn,
-      nameAr: projects.nameAr,
+      name: projects.name,
       ownerName: users.name,
       sqmExpected: projects.sqmExpected,
       endState: projects.endState,
@@ -698,8 +695,7 @@ export async function listProjects(
 /** One card on the board `D29`. */
 export type ProjectBoardCard = {
   id: string;
-  nameEn: string;
-  nameAr: string | null;
+  name: string;
   ownerName: string;
   sqmExpected: string | null;
   won: boolean;
@@ -758,8 +754,7 @@ export async function listProjectBoard(
   const found = await db
     .select({
       id: projects.id,
-      nameEn: projects.nameEn,
-      nameAr: projects.nameAr,
+      name: projects.name,
       ownerName: users.name,
       sqmExpected: projects.sqmExpected,
       won: projectIsWon(),
@@ -808,8 +803,7 @@ export async function listProjectBoard(
     if (!slot) continue;
     slot.cards.push({
       id: row.id,
-      nameEn: row.nameEn,
-      nameAr: row.nameAr,
+      name: row.name,
       ownerName: row.ownerName,
       sqmExpected: row.sqmExpected,
       won: row.won,
@@ -1194,7 +1188,7 @@ export async function createProject(
         ...input,
         ...loss,
         region,
-        nameNormalized: normalizeName(input.nameEn),
+        nameNormalized: normalizeName(input.name),
         // Created by a rep and belongs to him `[07 A8]`.
         ownerUserId: session.user.id,
         createdBy: session.user.id,
@@ -1220,8 +1214,7 @@ export async function createProject(
 }
 
 const EDITABLE = [
-  "nameEn",
-  "nameAr",
+  "name",
   "sqmExpected",
   "region",
   "cityId",
@@ -1270,7 +1263,7 @@ export async function updateProject(
 
     const [after] = await tx
       .update(projects)
-      .set({ ...values, nameNormalized: normalizeName(values.nameEn) })
+      .set({ ...values, nameNormalized: normalizeName(values.name) })
       .where(eq(projects.id, id))
       .returning();
 

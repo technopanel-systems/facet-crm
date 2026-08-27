@@ -14,7 +14,6 @@ import {
 import { Link } from "@/i18n/navigation";
 import { can, requireSession } from "@/lib/authz";
 import { chainState } from "@/lib/chain";
-import { lookupName } from "@/lib/lookups";
 import { getCompany } from "@/lib/companies";
 import { listQuotationThreads } from "@/lib/quotations";
 
@@ -143,16 +142,10 @@ export default async function QuotationsPage({
                   </TableCell>
                   <TableCell className="text-start">
                     {/* `S50` — no project is a state, not a blank cell. */}
-                    {row.projectNameEn === null ? (
+                    {row.projectName === null ? (
                       <Absent>{t("quotations.detail.noProject")}</Absent>
                     ) : (
-                      lookupName(
-                        {
-                          nameEn: row.projectNameEn,
-                          nameAr: row.projectNameAr,
-                        },
-                        locale,
-                      )
+                      <span dir="auto">{row.projectName}</span>
                     )}
                   </TableCell>
                   <TableCell className="text-start">

@@ -28,7 +28,6 @@ import { Link } from "@/i18n/navigation";
 import { formatSqm } from "@/lib/decimal";
 import { can, requireSession } from "@/lib/authz";
 import { getDispatch } from "@/lib/dispatches";
-import { lookupName } from "@/lib/lookups";
 import { recordTimeline } from "@/lib/timeline";
 
 import { lineParts } from "../../quotations/line-display";
@@ -258,22 +257,10 @@ export default async function DispatchPage({
                   href={`/projects/${dispatch.projectId}`}
                   className="hover:underline"
                 >
-                  {lookupName(
-                    {
-                      nameEn: dispatch.projectNameEn ?? "",
-                      nameAr: dispatch.projectNameAr,
-                    },
-                    locale,
-                  )}
+                  <span dir="auto">{dispatch.projectName}</span>
                 </Link>
               ) : (
-                lookupName(
-                  {
-                    nameEn: dispatch.projectNameEn ?? "",
-                    nameAr: dispatch.projectNameAr,
-                  },
-                  locale,
-                )
+                <span dir="auto">{dispatch.projectName}</span>
               )}
             </Fact>
             {/* `S72` — the state, named. The turn panel above says whose move

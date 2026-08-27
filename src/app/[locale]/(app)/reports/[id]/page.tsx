@@ -45,9 +45,7 @@ export default async function ReportDetailPage({
     });
 
   const companyName = report.companyName;
-  const projectName = report.projectNameEn
-    ? lookupName({ nameEn: report.projectNameEn, nameAr: report.projectNameAr }, locale)
-    : null;
+  const projectName = report.projectName;
 
   return (
     <div className="flex flex-col gap-6">

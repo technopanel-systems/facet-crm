@@ -959,12 +959,11 @@ async function main(): Promise<void> {
             unescapeHtml(input[0].match(/value="([^"]*)"/)?.[1] ?? ""),
           );
         }
-        // `readFields` requires the project's `nameEn` and nothing else here.
-        // Projects keep a name pair; only companies and contacts lost theirs
-        // `S12` `S19`. The rest are sent empty, exactly as an untouched form
+        // `readFields` requires the project's `name` and nothing else here.
+        // One field `S26`, the shape `S12` and `S19` already gave a company and
+        // a contact. The rest are sent empty, exactly as an untouched form
         // would send them.
-        fields.set("nameEn", nameOf(page.body) ?? "Project");
-        fields.set("nameAr", "");
+        fields.set("name", nameOf(page.body) ?? "Project");
         fields.set("sqmExpected", "");
         fields.set("cityId", "");
         // No `region`: the project form no longer renders one, so an untouched
@@ -4918,7 +4917,7 @@ function unescapeHtml(value: string): string {
 /** The project's own name, off its edit form, so the POST does not rename it. */
 function nameOf(body: string): string | undefined {
   const value = body
-    .match(/<input[^>]*name="nameEn"[^>]*>/)?.[0]
+    .match(/<input[^>]*name="name"[^>]*>/)?.[0]
     .match(/value="([^"]*)"/)?.[1];
   return value === undefined ? undefined : unescapeHtml(value);
 }

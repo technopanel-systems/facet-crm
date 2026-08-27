@@ -416,7 +416,7 @@ export default async function CompanyDetailPage({
                 href={`/projects/${project.id}`}
                 // `dir="auto"` on the NAME, never on the row — the row also
                 // holds a state label and a square-metre figure `D62`.
-                title={<span dir="auto">{lookupName(project, locale)}</span>}
+                title={<span dir="auto">{project.name}</span>}
                 // The same answer the projects list and the project's own
                 // screen give — one precedence `[projectState]`, so a project
                 // cannot read as won here and open there.

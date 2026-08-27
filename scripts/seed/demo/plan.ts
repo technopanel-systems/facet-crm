@@ -37,8 +37,10 @@ import type { PersonKey } from "./people";
 
 export type ProjectRow = {
   key: string;
-  nameEn: string;
-  nameAr: string;
+  /** One field, English or Arabic `S26` — the shape `S12` gives a company.
+   *  Arabic here, as every company name in this fixture is: a demo that reads
+   *  half in the wrong language teaches the screens wrong. */
+  name: string;
   owner: PersonKey;
   /** Participants `S25`. The first is the one that quotes and dispatches. */
   companies: readonly string[];
@@ -59,8 +61,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   /* --- Faisal ------------------------------------------------------- */
   {
     key: "P01",
-    nameEn: "Al Malqa administrative offices",
-    nameAr: "مكاتب إدارية - حي الملقا",
+    name: "مكاتب إدارية - حي الملقا",
     owner: "faisal",
     companies: ["شركة أنماء للمقاولات", "مكتب المعمار الحديث للاستشارات الهندسية"],
     city: "Riyadh",
@@ -69,8 +70,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P02",
-    nameEn: "King Fahd Road office tower",
-    nameAr: "برج مكاتب طريق الملك فهد",
+    name: "برج مكاتب طريق الملك فهد",
     owner: "faisal",
     companies: ["شركة تمكين للمقاولات"],
     city: "Riyadh",
@@ -80,8 +80,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P03",
-    nameEn: "Diriyah private villa",
-    nameAr: "فيلا خاصة - الدرعية",
+    name: "فيلا خاصة - الدرعية",
     owner: "faisal",
     companies: ["شركة رؤى العمران للمقاولات"],
     city: "Ad Diriyah",
@@ -91,8 +90,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P04",
-    nameEn: "Al Kharj road stations",
-    nameAr: "محطات طريق الخرج",
+    name: "محطات طريق الخرج",
     owner: "faisal",
     companies: ["شركة محطات الطريق لإدارة المحطات"],
     city: "Al Kharj",
@@ -101,8 +99,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P05",
-    nameEn: "Private hospital facade",
-    nameAr: "واجهة مستشفى خاص",
+    name: "واجهة مستشفى خاص",
     owner: "faisal",
     companies: ["شركة الحصن للمقاولات العامة"],
     city: "Riyadh",
@@ -112,8 +109,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P06",
-    nameEn: "Commercial complex refurbishment",
-    nameAr: "تجديد مجمع تجاري",
+    name: "تجديد مجمع تجاري",
     owner: "faisal",
     companies: ["شركة أملاك المستقبل العقارية"],
     city: "Riyadh",
@@ -122,8 +118,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P07",
-    nameEn: "Qassim private school",
-    nameAr: "مدرسة أهلية - القصيم",
+    name: "مدرسة أهلية - القصيم",
     owner: "faisal",
     companies: ["شركة مداد العمار للمقاولات"],
     city: "Buraydah",
@@ -132,8 +127,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P08",
-    nameEn: "Twenty-two storey residential tower",
-    nameAr: "برج سكني اثنان وعشرون دوراً",
+    name: "برج سكني اثنان وعشرون دوراً",
     owner: "faisal",
     companies: ["شركة النهضة للمقاولات", "مصنع الرواد للألمنيوم"],
     city: "Riyadh",
@@ -143,8 +137,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P09",
-    nameEn: "Warehouse cladding, Second Industrial",
-    nameAr: "تكسية مستودعات - الصناعية الثانية",
+    name: "تكسية مستودعات - الصناعية الثانية",
     owner: "faisal",
     companies: ["شركة الأمانة للمقاولات"],
     city: "Riyadh",
@@ -153,8 +146,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P10",
-    nameEn: "Three villas, Al Yasmin",
-    nameAr: "ثلاث فلل - حي الياسمين",
+    name: "ثلاث فلل - حي الياسمين",
     owner: "faisal",
     companies: ["شركة قصور الرياض"],
     city: "Riyadh",
@@ -163,8 +155,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P11",
-    nameEn: "Car showroom facade, Buraydah",
-    nameAr: "واجهة معرض سيارات - بريدة",
+    name: "واجهة معرض سيارات - بريدة",
     owner: "faisal",
     companies: ["شركة الياقوت للمقاولات"],
     city: "Buraydah",
@@ -173,8 +164,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P12",
-    nameEn: "Tabuk factory extension",
-    nameAr: "توسعة مصنع تبوك",
+    name: "توسعة مصنع تبوك",
     owner: "faisal",
     companies: ["مصنع تبوك الحديثة للألمنيوم"],
     city: "Tabuk",
@@ -184,8 +174,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P13",
-    nameEn: "Hotel facade, Northern Ring Road",
-    nameAr: "واجهة فندق - الدائري الشمالي",
+    name: "واجهة فندق - الدائري الشمالي",
     owner: "faisal",
     companies: ["شركة واجهات المملكة للمقاولات"],
     city: "Riyadh",
@@ -194,8 +183,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P14",
-    nameEn: "Rest house facade, Al Ammariyah",
-    nameAr: "واجهة استراحة - العمارية",
+    name: "واجهة استراحة - العمارية",
     owner: "faisal",
     companies: ["فهد بن عبدالله العتيبي"],
     city: "Riyadh",
@@ -204,8 +192,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P15",
-    nameEn: "Three residential compounds",
-    nameAr: "ثلاثة مجمعات سكنية",
+    name: "ثلاثة مجمعات سكنية",
     owner: "faisal",
     companies: ["شركة ناصر بن عبدالله الحقباني للاستثمار والتطوير العقاري"],
     city: "Riyadh",
@@ -214,8 +201,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P16",
-    nameEn: "Al Majma'ah municipality building",
-    nameAr: "مبنى بلدية المجمعة",
+    name: "مبنى بلدية المجمعة",
     owner: "faisal",
     companies: ["مؤسسة ركائز البناء"],
     city: "Al Majma'ah",
@@ -229,8 +215,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P17",
-    nameEn: "Branch signage programme",
-    nameAr: "برنامج لوحات الفروع",
+    name: "برنامج لوحات الفروع",
     owner: "faisal",
     companies: ["شركة رسم للدعاية والإعلان"],
     city: "Riyadh",
@@ -239,8 +224,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P18",
-    nameEn: "Doors and windows supply, Q4",
-    nameAr: "توريد أبواب ونوافذ - الربع الأخير",
+    name: "توريد أبواب ونوافذ - الربع الأخير",
     owner: "faisal",
     companies: ["مصنع الرياض للأبواب والنوافذ"],
     city: "Riyadh",
@@ -249,8 +233,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P19",
-    nameEn: "Al Zulfi station canopies",
-    nameAr: "مظلات محطة الزلفي",
+    name: "مظلات محطة الزلفي",
     owner: "faisal",
     companies: ["مؤسسة واحة الوقود لإدارة المحطات"],
     city: "Az Zulfi",
@@ -259,8 +242,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P20",
-    nameEn: "Ha'il contractor framework",
-    nameAr: "اتفاقية إطارية - حائل",
+    name: "اتفاقية إطارية - حائل",
     owner: "faisal",
     companies: ["مؤسسة درب الشمال للمقاولات"],
     city: "Ha'il",
@@ -269,8 +251,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P21",
-    nameEn: "Workshop offcuts, standing order",
-    nameAr: "بواقي ورشة - طلب دائم",
+    name: "بواقي ورشة - طلب دائم",
     owner: "faisal",
     companies: ["ورشة الإتقان للتشكيل المعدني"],
     city: "Riyadh",
@@ -279,8 +260,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P22",
-    nameEn: "Al Muzahimiyah panel supply",
-    nameAr: "توريد ألواح - المزاحمية",
+    name: "توريد ألواح - المزاحمية",
     owner: "faisal",
     companies: ["مصنع البيان للتشكيل المعدني"],
     city: "Al Muzahimiyah",
@@ -289,8 +269,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P23",
-    nameEn: "Al Nakheel showroom signage",
-    nameAr: "لوحات معرض النخيل",
+    name: "لوحات معرض النخيل",
     owner: "faisal",
     companies: ["مؤسسة نبض للدعاية والإعلان"],
     city: "Riyadh",
@@ -301,8 +280,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   /* --- Saad --------------------------------------------------------- */
   {
     key: "P24",
-    nameEn: "Port administration building",
-    nameAr: "مبنى إدارة الميناء",
+    name: "مبنى إدارة الميناء",
     owner: "saad",
     companies: ["شركة مرافئ الدمام للمقاولات"],
     city: "Dammam",
@@ -312,8 +290,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P25",
-    nameEn: "Corniche residential towers",
-    nameAr: "أبراج سكنية على الكورنيش",
+    name: "أبراج سكنية على الكورنيش",
     owner: "saad",
     companies: ["شركة الشاطئ الأزرق للمقاولات", "مصنع الخليج الأول للألمنيوم"],
     city: "Al Khobar",
@@ -323,8 +300,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P26",
-    nameEn: "Al Ahsa schools, three phases",
-    nameAr: "مدارس الأحساء - ثلاث مراحل",
+    name: "مدارس الأحساء - ثلاث مراحل",
     owner: "saad",
     companies: ["شركة الربيع للمقاولات العامة"],
     city: "Hofuf",
@@ -333,8 +309,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P27",
-    nameEn: "Jubail road stations, five sites",
-    nameAr: "محطات طريق الجبيل - خمسة مواقع",
+    name: "محطات طريق الجبيل - خمسة مواقع",
     owner: "saad",
     companies: ["شركة مسار لإدارة المحطات"],
     city: "Dammam",
@@ -343,8 +318,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P28",
-    nameEn: "Khobar shopping centre",
-    nameAr: "مركز تجاري - الخبر",
+    name: "مركز تجاري - الخبر",
     owner: "saad",
     companies: ["Silver Line Contracting"],
     city: "Al Khobar",
@@ -353,8 +327,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P29",
-    nameEn: "Office block refurbishment",
-    nameAr: "تجديد مبنى مكاتب",
+    name: "تجديد مبنى مكاتب",
     owner: "saad",
     companies: ["مجموعة الرمال القابضة"],
     city: "Al Khobar",
@@ -363,8 +336,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P30",
-    nameEn: "Private hospital, Dammam",
-    nameAr: "مستشفى خاص - الدمام",
+    name: "مستشفى خاص - الدمام",
     owner: "saad",
     companies: ["شركة الرافد للمقاولات"],
     city: "Dammam",
@@ -373,8 +345,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P31",
-    nameEn: "Qatif factory panels",
-    nameAr: "ألواح مصنع القطيف",
+    name: "ألواح مصنع القطيف",
     owner: "saad",
     companies: ["مصنع صدف للصناعات المعدنية"],
     city: "Qatif",
@@ -384,8 +355,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P32",
-    nameEn: "Jubail contractor framework",
-    nameAr: "اتفاقية إطارية - الجبيل",
+    name: "اتفاقية إطارية - الجبيل",
     owner: "saad",
     companies: ["شركة بوابة الشرق للمقاولات"],
     city: "Jubail",
@@ -394,8 +364,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P33",
-    nameEn: "Restaurant signage, Khobar",
-    nameAr: "لوحات مطاعم - الخبر",
+    name: "لوحات مطاعم - الخبر",
     owner: "saad",
     companies: ["مؤسسة ألوان الشرق للدعاية والإعلان"],
     city: "Al Khobar",
@@ -404,8 +373,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P34",
-    nameEn: "Ras Tanura panel supply",
-    nameAr: "توريد ألواح - رأس تنورة",
+    name: "توريد ألواح - رأس تنورة",
     owner: "saad",
     companies: ["مصنع الساحل للألمنيوم"],
     city: "Ras Tanura",
@@ -414,8 +382,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P35",
-    nameEn: "Al Mubarraz batch order",
-    nameAr: "طلب دفعات - المبرز",
+    name: "طلب دفعات - المبرز",
     owner: "saad",
     companies: ["مصنع النخبة للتشكيل المعدني"],
     city: "Al Mubarraz",
@@ -426,8 +393,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   /* --- Majed -------------------------------------------------------- */
   {
     key: "P36",
-    nameEn: "Madinah Road office tower",
-    nameAr: "برج مكاتب طريق المدينة",
+    name: "برج مكاتب طريق المدينة",
     owner: "majed",
     companies: ["شركة صروح جدة للمقاولات", "مصنع البحر الأحمر للألمنيوم"],
     city: "Jeddah",
@@ -437,8 +403,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P37",
-    nameEn: "Jeddah hills residential compound",
-    nameAr: "مجمع سكني - تلال جدة",
+    name: "مجمع سكني - تلال جدة",
     owner: "majed",
     companies: ["شركة تلال جدة للمقاولات"],
     city: "Jeddah",
@@ -447,8 +412,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P38",
-    nameEn: "Corniche hotel refurbishment",
-    nameAr: "تجديد فندق الكورنيش",
+    name: "تجديد فندق الكورنيش",
     owner: "majed",
     companies: ["شركة مراسي جدة"],
     city: "Jeddah",
@@ -458,8 +422,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P39",
-    nameEn: "Yanbu first order",
-    nameAr: "أول طلب - ينبع",
+    name: "أول طلب - ينبع",
     owner: "majed",
     companies: ["مصنع الينابيع للصناعات المعدنية"],
     city: "Yanbu",
@@ -468,8 +431,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P40",
-    nameEn: "Jeddah towers, design pending",
-    nameAr: "أبراج جدة - بانتظار التصميم",
+    name: "أبراج جدة - بانتظار التصميم",
     owner: "majed",
     companies: ["شركة مرافئ العقارية"],
     city: "Jeddah",
@@ -478,8 +440,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P41",
-    nameEn: "Madinah factory supply",
-    nameAr: "توريد مصنع المدينة",
+    name: "توريد مصنع المدينة",
     owner: "majed",
     companies: ["مصنع الأصالة للألمنيوم"],
     city: "Madinah",
@@ -491,8 +452,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   /* --- Turki -------------------------------------------------------- */
   {
     key: "P42",
-    nameEn: "Abha municipality building",
-    nameAr: "مبنى بلدية أبها",
+    name: "مبنى بلدية أبها",
     owner: "turki",
     companies: ["شركة ديار الجنوب للمقاولات"],
     city: "Abha",
@@ -501,8 +461,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P43",
-    nameEn: "Jazan corniche project",
-    nameAr: "مشروع كورنيش جازان",
+    name: "مشروع كورنيش جازان",
     owner: "turki",
     companies: ["شركة الياسمين للمقاولات"],
     city: "Jazan",
@@ -511,8 +470,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P44",
-    nameEn: "Mountain resort, Asir",
-    nameAr: "منتجع جبلي - عسير",
+    name: "منتجع جبلي - عسير",
     owner: "turki",
     companies: ["شركة جبال السروات للمقاولات"],
     city: "Abha",
@@ -522,8 +480,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P45",
-    nameEn: "Bisha road station",
-    nameAr: "محطة طريق بيشة",
+    name: "محطة طريق بيشة",
     owner: "turki",
     companies: ["مؤسسة الطريق السريع لإدارة المحطات"],
     city: "Bisha",
@@ -534,8 +491,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   /* --- Nouf `S127` -------------------------------------------------- */
   {
     key: "P46",
-    nameEn: "Office signage, direct account",
-    nameAr: "لوحات مكتبية - حساب مباشر",
+    name: "لوحات مكتبية - حساب مباشر",
     owner: "nouf",
     companies: ["شركة لمسات للدعاية والإعلان"],
     city: "Riyadh",
@@ -546,8 +502,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   /* --- no quotation at all: `D29`'s first column, `new` ------------- */
   {
     key: "P47",
-    nameEn: "Commercial building, Al Narjis",
-    nameAr: "مبنى تجاري - حي النرجس",
+    name: "مبنى تجاري - حي النرجس",
     owner: "faisal",
     companies: ["شركة الرافدين للمقاولات"],
     city: "Riyadh",
@@ -556,8 +511,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P48",
-    nameEn: "Warehouse extension, Jubail",
-    nameAr: "توسعة مستودع - الجبيل",
+    name: "توسعة مستودع - الجبيل",
     owner: "saad",
     companies: ["مؤسسة حصاد البناء"],
     city: "Jubail",
@@ -566,8 +520,7 @@ export const PROJECTS: readonly ProjectRow[] = [
   },
   {
     key: "P49",
-    nameEn: "Showroom refit, Madinah",
-    nameAr: "تجديد صالة عرض - المدينة",
+    name: "تجديد صالة عرض - المدينة",
     owner: "majed",
     companies: ["مؤسسة الأفنان للتجارة"],
     city: "Madinah",
@@ -592,8 +545,7 @@ export const PROJECTS: readonly ProjectRow[] = [
    */
   {
     key: "P50",
-    nameEn: "Buraydah retail frontage",
-    nameAr: "واجهة محلات تجارية - بريدة",
+    name: "واجهة محلات تجارية - بريدة",
     owner: "faisal",
     companies: ["شركة البنيان الراسخ للمقاولات"],
     city: "Buraydah",

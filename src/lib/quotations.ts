@@ -209,8 +209,7 @@ export type QuotationThreadListRow = {
   id: string;
   /** Null when the quotation has no project yet `S50`. */
   projectId: string | null;
-  projectNameEn: string | null;
-  projectNameAr: string | null;
+  projectName: string | null;
   companyId: string;
   companyName: string;
   raisedByName: string;
@@ -243,7 +242,7 @@ function searchFilter(query: string | undefined): SQL | undefined {
   const pattern = `%${trimmed}%`;
   return or(
     sql`${quotationVersions.smacReference} ilike ${pattern}`,
-    sql`${projects.nameEn} ilike ${pattern}`,
+    sql`${projects.name} ilike ${pattern}`,
     sql`${companies.name} ilike ${pattern}`,
   );
 }
@@ -305,8 +304,7 @@ export async function listQuotationThreads(
       .select({
         id: quotationThreads.id,
         projectId: quotationThreads.projectId,
-        projectNameEn: projects.nameEn,
-        projectNameAr: projects.nameAr,
+        projectName: projects.name,
         companyId: quotationThreads.companyId,
         companyName: companies.name,
         raisedByName: users.name,
@@ -396,8 +394,7 @@ export async function quotedCount(
 
 export type QuotationProjectOption = {
   id: string;
-  nameEn: string;
-  nameAr: string | null;
+  name: string;
   companies: { id: string; name: string }[];
 };
 
@@ -442,12 +439,11 @@ export async function listQuotationFormOptions(
     db
       .select({
         id: projects.id,
-        nameEn: projects.nameEn,
-        nameAr: projects.nameAr,
+        name: projects.name,
       })
       .from(projects)
       .where(ownProjectsFilter(session))
-      .orderBy(asc(projects.nameEn)),
+      .orderBy(asc(projects.name)),
     // The project-less half `S50`. Ordinary company visibility, the same rule
     // `listCompanyOptions` composes for the contact and project forms.
     db
@@ -569,8 +565,7 @@ export type QuotationVersionDetail = QuotationVersion & {
 
 export type QuotationThreadDetail = QuotationThread & {
   /** Null when the quotation has no project yet `S50`. */
-  projectNameEn: string | null;
-  projectNameAr: string | null;
+  projectName: string | null;
   companyName: string;
   contactName: string | null;
   raisedByName: string;
@@ -758,8 +753,7 @@ export async function getQuotationThread(
   const [row] = await db
     .select({
       thread: quotationThreads,
-      projectNameEn: projects.nameEn,
-      projectNameAr: projects.nameAr,
+      projectName: projects.name,
       companyName: companies.name,
       contactName: contacts.name,
       raisedByName: users.name,
@@ -808,8 +802,7 @@ export async function getQuotationThread(
 
   return {
     ...row.thread,
-    projectNameEn: row.projectNameEn,
-    projectNameAr: row.projectNameAr,
+    projectName: row.projectName,
     companyName: row.companyName,
     contactName: row.contactName,
     raisedByName: row.raisedByName,

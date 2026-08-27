@@ -414,7 +414,7 @@ async function main(): Promise<void> {
   const [project] = await db
     .insert(projects)
     .values({
-      nameEn: `${stamp} Project`,
+      name: `${stamp} Project`,
       nameNormalized: normalizeName(`${stamp} Project`),
       ownerUserId: repA.user.id,
       createdBy: repA.user.id,
@@ -781,8 +781,7 @@ async function main(): Promise<void> {
   // a different filter reaching the same answer `[14 §2]`.
   const shared = await getProject(repB, project.id);
   await updateProject(repB, project.id, {
-    nameEn: shared!.nameEn,
-    nameAr: shared!.nameAr,
+    name: shared!.name,
     sqmExpected: "1234.5000",
     cityId: shared!.cityId,
     endState: shared!.endState,
@@ -885,7 +884,7 @@ async function main(): Promise<void> {
   const [lonelyProject] = await db
     .insert(projects)
     .values({
-      nameEn: `${stamp} Lonely Project`,
+      name: `${stamp} Lonely Project`,
       nameNormalized: normalizeName(`${stamp} Lonely Project`),
       ownerUserId: repA.user.id,
       createdBy: repA.user.id,

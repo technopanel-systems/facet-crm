@@ -142,6 +142,14 @@ dispatched against it. No participant is marked as the buyer by hand, and two
 participants may both have bought. A project shows its dispatched square metres
 per participant.
 
+**A project has one name field**, written in English or Arabic — the shape S12
+gives a company and S19 a contact. It carried two until now, and no rule ever
+asked for the pair: §16 recorded that as an open question and could cite nothing
+to amend, which is why the answer lands here rather than on a rule of its own.
+Only one of the two was ever searchable, so a project named in Arabic could not
+be found by its Arabic name; one field ends that as a side effect rather than as
+a fix.
+
 **S27.** A project keeps at least one participant. A participant can be removed;
 it is hidden, not deleted, and can be re-linked.
 
@@ -1025,6 +1033,3 @@ for being empty.
 - **What stops a moving quotation being chased** once payment leaves the
   quotation (S133). Two follow-up conditions suppress themselves on a confirmed
   payment today and lose their test with the column.
-- **Project names.** Companies and contacts have one name field (S12, S19).
-  Projects still have two, and no rule says why. Same reasoning appears to
-  apply. Decide before the projects slice.

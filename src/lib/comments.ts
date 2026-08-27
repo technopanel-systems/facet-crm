@@ -519,7 +519,7 @@ export async function commentRecordName(
   }
   if (recordType === "project") {
     const [row] = await db
-      .select({ name: projects.nameEn })
+      .select({ name: projects.name })
       .from(projects)
       .where(eq(projects.id, recordId))
       .limit(1);

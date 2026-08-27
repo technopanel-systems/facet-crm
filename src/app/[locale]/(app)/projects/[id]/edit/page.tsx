@@ -35,7 +35,7 @@ export default async function EditProjectPage({
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
-      <PageHeader title={t("projects.editTitle")} description={project.nameEn} />
+      <PageHeader title={t("projects.editTitle")} description={project.name} />
       {/* No company field here: links are managed row by row on the detail
           page, where each can be edited or removed on its own `[14 §4]`. */}
       <ProjectForm

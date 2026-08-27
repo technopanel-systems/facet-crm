@@ -91,6 +91,7 @@ import {
   type User,
 } from "@/lib/authz";
 import { creditForDispatches } from "@/lib/credit-splits";
+import { normalizeName } from "@/lib/normalize";
 import { SAUDI_CODE } from "@/lib/enums";
 import { listCountries } from "@/lib/lookups";
 import { verifyPassword } from "@/lib/passwords";
@@ -565,7 +566,7 @@ async function main(): Promise<void> {
     .insert(companies)
     .values({
       name: `${stamp} Company A`,
-      nameNormalized: `${stamp}-a`,
+      nameNormalized: normalizeName(`${stamp} Company A`),
       phone: nextPhone(),
       countryId: saudiId,
       createdBy: departing.user.id,
@@ -575,7 +576,7 @@ async function main(): Promise<void> {
     .insert(companies)
     .values({
       name: `${stamp} Company Shared`,
-      nameNormalized: `${stamp}-shared`,
+      nameNormalized: normalizeName(`${stamp} Company Shared`),
       phone: nextPhone(),
       countryId: saudiId,
       createdBy: departing.user.id,
@@ -615,7 +616,7 @@ async function main(): Promise<void> {
     .insert(companies)
     .values({
       name: `${stamp} Company Past`,
-      nameNormalized: `${stamp}-past`,
+      nameNormalized: normalizeName(`${stamp} Company Past`),
       phone: nextPhone(),
       countryId: saudiId,
       createdBy: departing.user.id,
@@ -634,15 +635,15 @@ async function main(): Promise<void> {
   await db.insert(contacts).values({
     companyId: companyA.id,
     name: `${stamp} Contact`,
-    nameNormalized: `${stamp}-contact`,
+    nameNormalized: normalizeName(`${stamp} Contact`),
     createdBy: departing.user.id,
   });
 
   const [project] = await db
     .insert(projects)
     .values({
-      nameEn: `${stamp} Project`,
-      nameNormalized: `${stamp}-p`,
+      name: `${stamp} Project`,
+      nameNormalized: normalizeName(`${stamp} Project`),
       ownerUserId: departing.user.id,
       createdBy: departing.user.id,
     })
@@ -650,8 +651,8 @@ async function main(): Promise<void> {
   const [otherProject] = await db
     .insert(projects)
     .values({
-      nameEn: `${stamp} Other Project`,
-      nameNormalized: `${stamp}-op`,
+      name: `${stamp} Other Project`,
+      nameNormalized: normalizeName(`${stamp} Other Project`),
       ownerUserId: bystander.user.id,
       createdBy: bystander.user.id,
     })
@@ -761,7 +762,7 @@ async function main(): Promise<void> {
   check(
     "the owned project is listed, the bystander's is not",
     book.projects.length === 1 && book.projects[0].id === project.id,
-    `got ${book.projects.map((p) => p.nameEn).join(", ")}`,
+    `got ${book.projects.map((p) => p.name).join(", ")}`,
   );
   check(
     "the raised thread is listed",
@@ -900,8 +901,8 @@ async function main(): Promise<void> {
   const [strandedProject] = await db
     .insert(projects)
     .values({
-      nameEn: `${stamp} Stranded Project`,
-      nameNormalized: `${stamp}-sp`,
+      name: `${stamp} Stranded Project`,
+      nameNormalized: normalizeName(`${stamp} Stranded Project`),
       ownerUserId: strandedUser.id,
       createdBy: strandedUser.id,
     })
@@ -910,7 +911,7 @@ async function main(): Promise<void> {
     .insert(companies)
     .values({
       name: `${stamp} Stranded Company`,
-      nameNormalized: `${stamp}-sc`,
+      nameNormalized: normalizeName(`${stamp} Stranded Company`),
       phone: nextPhone(),
       countryId: saudiId,
       createdBy: strandedUser.id,
@@ -1167,17 +1168,35 @@ async function main(): Promise<void> {
    * reached through the project and the company that do — which also catches
    * the membership rows the handover CREATES, whose ids the script never sees.
    */
+  // **The stamp has to be folded, not used raw.** `name_normalized` is
+  // `normalizeName(name)` for every fixture here, and `normalizeName` turns
+  // every non-alphanumeric into a space — including the hyphen inside the stamp
+  // itself, so `verify11-1787…` is stored as `verify11 1787…`. A raw `LIKE`
+  // matched nothing, the four handover actions below went missing, and the
+  // empty-set guard still passed because `ownUsers` matches on EMAIL and filled
+  // it on its own. `verify-sharing.ts` recorded exactly this fold in its own
+  // fixture comment; this is the same trap at the reading end.
   const stamped = `${stamp}%`;
+  // **The name lookups need the stamp FOLDED; the email lookup needs it raw.**
+  // `name_normalized` is `normalizeName(name)` for every fixture here, and
+  // `normalizeName` turns every non-alphanumeric into a space — including the
+  // hyphen inside the stamp itself, so `verify11-1787…` is stored as
+  // `verify11 1787…`. A raw `LIKE` on the normalized column matched nothing and
+  // the four handover actions below went missing, while the empty-set guard
+  // still passed because `ownUsers` matches on EMAIL and filled it alone.
+  // `verify-sharing.ts` recorded this fold in its own fixture comment; this is
+  // the same trap at the reading end, and it needs both spellings, not one.
+  const stampedName = `${normalizeName(stamp)}%`;
   const [ownUsers, ownCompanies, ownProjects] = await Promise.all([
     db.select({ id: users.id }).from(users).where(like(users.email, stamped)),
     db
       .select({ id: companies.id })
       .from(companies)
-      .where(like(companies.nameNormalized, stamped)),
+      .where(like(companies.nameNormalized, stampedName)),
     db
       .select({ id: projects.id })
       .from(projects)
-      .where(like(projects.nameNormalized, stamped)),
+      .where(like(projects.nameNormalized, stampedName)),
   ]);
   const companyIds = ownCompanies.map((row) => row.id);
   const projectIds = ownProjects.map((row) => row.id);

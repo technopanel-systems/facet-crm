@@ -70,6 +70,7 @@ import {
   users,
 } from "@/db/schema";
 import { canOpenRecord, type AuthSession } from "@/lib/authz";
+import { normalizeName } from "@/lib/normalize";
 import {
   addComment,
   getComment,
@@ -292,7 +293,7 @@ async function main(): Promise<void> {
     .insert(companies)
     .values({
       name: `${stamp} Co`,
-      nameNormalized: stamp,
+      nameNormalized: normalizeName(`${stamp} Co`),
       phone: `+9665${stamp.slice(-7)}1`,
       countryId: saudiId,
       createdBy: repA.user.id,
@@ -307,8 +308,8 @@ async function main(): Promise<void> {
   const [project] = await db
     .insert(projects)
     .values({
-      nameEn: `${stamp} Project`,
-      nameNormalized: stamp,
+      name: `${stamp} Project`,
+      nameNormalized: normalizeName(`${stamp} Project`),
       ownerUserId: repA.user.id,
       createdBy: repA.user.id,
     })
@@ -322,7 +323,7 @@ async function main(): Promise<void> {
     .values({
       companyId: company.id,
       name: `${stamp} Contact`,
-      nameNormalized: stamp,
+      nameNormalized: normalizeName(`${stamp} Contact`),
       createdBy: repA.user.id,
     })
     .returning();

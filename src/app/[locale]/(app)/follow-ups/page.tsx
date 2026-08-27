@@ -19,7 +19,6 @@ import {
   FOLLOW_UP_GROUPS,
 } from "@/lib/enums";
 import { followUps } from "@/lib/follow-ups";
-import { lookupName } from "@/lib/lookups";
 import { cn } from "@/lib/utils";
 
 import { anchorHref } from "../_components/anchors";
@@ -169,7 +168,7 @@ export default async function FollowUpsPage({
                   </TableCell>
                   <TableCell className="text-start font-medium">
                     <Link href={anchorHref(row.anchorType, row.anchorId)} className="hover:underline">
-                      {lookupName({ nameEn: row.anchorNameEn, nameAr: row.anchorNameAr }, locale)}
+                      <span dir="auto">{row.anchorName}</span>
                     </Link>
                   </TableCell>
                   <TableCell className="text-start">

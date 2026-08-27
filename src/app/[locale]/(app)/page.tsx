@@ -197,18 +197,14 @@ export default async function TodayPage({
           neither flag — which today is every rep *and* the manager, whose own
           blocks `D39`-`D41` are not built. */}
       {mayIssue || mayDecide ? (
-        <RequestsBlock session={session} locale={locale} limit={REQUEST_ROWS} />
+        <RequestsBlock session={session} limit={REQUEST_ROWS} />
       ) : null}
 
       <CountsStrip counts={follow.counts} />
 
       {/* `D34` takes the **whole** scope: its planned section holds the rows
           that sort last, so a page of the queue would show it empty. */}
-      <WaitingList
-        rows={follow.rows}
-        locale={locale}
-        slippingLimit={SLIPPING_ROWS}
-      />
+      <WaitingList rows={follow.rows} slippingLimit={SLIPPING_ROWS} />
     </div>
   );
 }

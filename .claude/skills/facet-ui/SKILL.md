@@ -170,8 +170,9 @@ do not drag** `D29`. Build order `D31`.
   Decimals stay **strings** end to end; square metres are computed, never typed `S55`.
 - Dates: `format.dateTime(new Date(value + "T00:00:00Z"), { dateStyle: "medium", timeZone:
   "UTC" })` from `getFormatter()` — a calendar day in Riyadh, not an instant. **One name
-  field** `S12` `S19`: a company or contact renders `row.name`. `lookupName` covers what
-  still carries a pair — the lookup tables and projects; `bilingualName` is gone.
+  field** `S12` `S19` `S26`: a company, contact **or project** renders `row.name`.
+  `lookupName` covers what still carries a pair — the lookup tables alone, since `S26`
+  took projects off that list; `bilingualName` is gone.
 
 Screen contents when you need them: the dashboard's block model `D64` · its no-flag case
 `D32`–`D37` · what a flag adds `D38`–`D41` · the coordinator `D65` · Marketing and the

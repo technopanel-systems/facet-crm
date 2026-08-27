@@ -70,6 +70,7 @@ import {
   users,
 } from "@/db/schema";
 import type { AuthSession } from "@/lib/authz";
+import { normalizeName } from "@/lib/normalize";
 import { chainState } from "@/lib/chain";
 import { getCompany } from "@/lib/companies";
 import { NOTIFICATION_TYPES, SAUDI_CODE } from "@/lib/enums";
@@ -197,7 +198,7 @@ async function main(): Promise<void> {
     .insert(companies)
     .values({
       name: `${stamp} Co`,
-      nameNormalized: stamp,
+      nameNormalized: normalizeName(`${stamp} Co`),
       phone: nextPhone(),
       countryId: saudiId,
       createdBy: repA.user.id,
@@ -212,8 +213,8 @@ async function main(): Promise<void> {
   const [project] = await db
     .insert(projects)
     .values({
-      nameEn: `${stamp} Project`,
-      nameNormalized: stamp,
+      name: `${stamp} Project`,
+      nameNormalized: normalizeName(`${stamp} Project`),
       ownerUserId: repA.user.id,
       createdBy: repA.user.id,
     })
@@ -228,7 +229,7 @@ async function main(): Promise<void> {
     .insert(companies)
     .values({
       name: `${stamp} Unquoted`,
-      nameNormalized: `${stamp}-unquoted`,
+      nameNormalized: normalizeName(`${stamp} Unquoted`),
       phone: nextPhone(),
       countryId: saudiId,
       createdBy: repA.user.id,
@@ -531,7 +532,7 @@ async function main(): Promise<void> {
   // moved: `verify:slice3` §16 holds the refusals that prove it.
   check(
     "the coordinator gets the project title",
-    Boolean(coordinatorView?.projectNameEn),
+    Boolean(coordinatorView?.projectName),
   );
   check(
     "the coordinator gets the company name",
@@ -566,7 +567,7 @@ async function main(): Promise<void> {
     .insert(companies)
     .values({
       name: `${stamp} Unlinked`,
-      nameNormalized: `${stamp}-unlinked`,
+      nameNormalized: normalizeName(`${stamp} Unlinked`),
       phone: nextPhone(),
       countryId: saudiId,
       createdBy: repA.user.id,

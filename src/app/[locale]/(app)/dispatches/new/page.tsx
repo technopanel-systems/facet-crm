@@ -16,7 +16,6 @@ import {
   listProductFireRatings,
   listProductSuppliers,
   listProductThicknesses,
-  lookupName,
 } from "@/lib/lookups";
 
 import { requestDispatchAction } from "../actions";
@@ -159,12 +158,7 @@ export default async function NewDispatchPage({
           // `S50` — the quotation may have no project, in which case the
           // option names its company instead of leaving a gap between two
           // separators, and the form offers the picker `S74`.
-          const projectLabel = thread.projectNameEn
-            ? lookupName(
-                { nameEn: thread.projectNameEn, nameAr: thread.projectNameAr },
-                locale,
-              )
-            : null;
+          const projectLabel = thread.projectName;
           return {
             id: thread.id,
             label: `${thread.smacReference} · ${projectLabel ?? thread.companyName} · ${t("dispatches.fields.dispatchedSoFar")} ${formatSqm(thread.dispatchedSqm)}`,
@@ -191,7 +185,7 @@ export default async function NewDispatchPage({
         reps={reps}
         projects={projects.map((project) => ({
           id: project.id,
-          label: lookupName(project, locale),
+          label: project.name,
         }))}
         products={{ suppliers, classes, fireRatings, thicknesses }}
         locale={locale}

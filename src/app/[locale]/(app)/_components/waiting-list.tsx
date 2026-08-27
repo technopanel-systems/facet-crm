@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
 import type { FollowUpAnchorType, FollowUpRow } from "@/lib/follow-ups";
-import { lookupName } from "@/lib/lookups";
 import { today } from "@/lib/reports";
 
 import { anchorHref } from "./anchors";
@@ -82,12 +81,10 @@ function groupByCompany(rows: FollowUpRow[]): FollowUpRow[][] {
 
 export async function WaitingList({
   rows,
-  locale,
   slippingLimit,
 }: {
   /** The whole scope, oldest first — never a page. */
   rows: FollowUpRow[];
-  locale: string;
   /** How much of Slipping the dashboard shows before deferring to the list. */
   slippingLimit: number;
 }) {
@@ -162,10 +159,7 @@ export async function WaitingList({
         }
         title={
           <span dir="auto">
-            {lookupName(
-              { nameEn: entry.anchorNameEn, nameAr: entry.anchorNameAr },
-              locale,
-            )}
+            {entry.anchorName}
           </span>
         }
         // One line of **why**, in plain words `D34`. The kind name is gone —

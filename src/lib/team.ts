@@ -67,16 +67,14 @@ export type HandoverCompany = {
 
 export type HandoverProject = {
   id: string;
-  nameEn: string;
-  nameAr: string | null;
+  name: string;
 };
 
 export type HandoverThread = {
   id: string;
   /** Null when the quotation has no project `S50` — the screen names it by
    *  its company instead, which `S51` guarantees is there. */
-  projectNameEn: string | null;
-  projectNameAr: string | null;
+  projectName: string | null;
   companyName: string;
   createdAt: Date;
 };
@@ -153,18 +151,16 @@ export async function getHandoverBook(
     db
       .select({
         id: projects.id,
-        nameEn: projects.nameEn,
-        nameAr: projects.nameAr,
+        name: projects.name,
       })
       .from(projects)
       .where(eq(projects.ownerUserId, userId))
-      .orderBy(asc(projects.nameEn)),
+      .orderBy(asc(projects.name)),
 
     db
       .select({
         id: quotationThreads.id,
-        projectNameEn: projects.nameEn,
-        projectNameAr: projects.nameAr,
+        projectName: projects.name,
         companyName: companies.name,
         createdAt: quotationThreads.createdAt,
       })
@@ -175,7 +171,7 @@ export async function getHandoverBook(
       .leftJoin(projects, eq(quotationThreads.projectId, projects.id))
       .innerJoin(companies, eq(quotationThreads.companyId, companies.id))
       .where(eq(quotationThreads.raisedByUserId, userId))
-      .orderBy(asc(projects.nameEn)),
+      .orderBy(asc(projects.name)),
   ]);
 
   return {

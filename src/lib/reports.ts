@@ -170,8 +170,7 @@ export type ReportListRow = {
   companyId: string | null;
   companyName: string | null;
   projectId: string | null;
-  projectNameEn: string | null;
-  projectNameAr: string | null;
+  projectName: string | null;
   contactName: string | null;
   cityNameEn: string | null;
   cityNameAr: string | null;
@@ -614,8 +613,7 @@ const listColumns = {
   companyId: repReports.companyId,
   companyName: companies.name,
   projectId: repReports.projectId,
-  projectNameEn: projects.nameEn,
-  projectNameAr: projects.nameAr,
+  projectName: projects.name,
   contactName: contacts.name,
   cityNameEn: cities.nameEn,
   cityNameAr: cities.nameAr,

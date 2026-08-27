@@ -98,7 +98,7 @@ export default async function NewReportPage({
         }))}
         projects={projects.map((project) => ({
           id: project.id,
-          label: lookupName(project, locale),
+          label: project.name,
         }))}
         cities={cities.map((city) => ({
           id: city.id,

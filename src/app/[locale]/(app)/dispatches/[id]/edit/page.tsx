@@ -9,7 +9,6 @@ import {
   listProductFireRatings,
   listProductSuppliers,
   listProductThicknesses,
-  lookupName,
 } from "@/lib/lookups";
 
 import { updateDispatchRequestAction } from "../../actions";
@@ -93,22 +92,12 @@ export default async function EditDispatchRequestPage({
         stock={dispatch.stock}
         shipment={dispatch.shipment}
         cargoDestination={dispatch.cargoDestination}
-        projectLabel={
-          dispatch.projectId
-            ? lookupName(
-                {
-                  nameEn: dispatch.projectNameEn ?? "",
-                  nameAr: dispatch.projectNameAr,
-                },
-                locale,
-              )
-            : null
-        }
+        projectLabel={dispatch.projectName}
         chooseProject={chooseProject}
         projectId={dispatch.projectId}
         projects={projects.map((project) => ({
           id: project.id,
-          label: lookupName(project, locale),
+          label: project.name,
         }))}
         products={{ suppliers, classes, fireRatings, thicknesses }}
         locale={locale}

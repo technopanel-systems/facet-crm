@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
 import type { AuthSession } from "@/lib/authz";
 import { listDispatches } from "@/lib/dispatches";
-import { lookupName } from "@/lib/lookups";
 import { listQuotationThreads } from "@/lib/quotations";
 import { riyadhDayOf } from "@/lib/working-days";
 
@@ -49,11 +48,9 @@ import { toneClass, turnTone } from "./turn";
  */
 export async function RequestsBlock({
   session,
-  locale,
   limit,
 }: {
   session: AuthSession;
-  locale: string;
   /** How much of each queue the dashboard shows before deferring. */
   limit: number;
 }) {
@@ -111,15 +108,8 @@ export async function RequestsBlock({
                       {/* `S51`'s ladder — the reference, else the project,
                           else the company, which `S50` guarantees is there. */}
                       {thread.smacReference ??
-                        (thread.projectNameEn
-                          ? lookupName(
-                              {
-                                nameEn: thread.projectNameEn,
-                                nameAr: thread.projectNameAr,
-                              },
-                              locale,
-                            )
-                          : thread.companyName)}
+                        thread.projectName ??
+                        thread.companyName}
                     </span>
                   }
                   meta={<span dir="auto">{thread.companyName}</span>}

@@ -261,8 +261,7 @@ export type CreditPayload = {
   setByUserId: string;
   setByName: string | null;
   recordViewable: boolean;
-  projectNameEn: string | null;
-  projectNameAr: string | null;
+  projectName: string | null;
   href: string | null;
 };
 
@@ -1044,7 +1043,7 @@ async function creditPayload(
 
   const [project] = viewable
     ? await db
-        .select({ nameEn: projects.nameEn, nameAr: projects.nameAr })
+        .select({ name: projects.name })
         .from(projects)
         .where(eq(projects.id, projectId))
         .limit(1)
@@ -1058,8 +1057,7 @@ async function creditPayload(
     setByUserId,
     setByName: setBy?.name ?? null,
     recordViewable: viewable,
-    projectNameEn: project?.nameEn ?? null,
-    projectNameAr: project?.nameAr ?? null,
+    projectName: project?.name ?? null,
     href: viewable ? recordHref("project", projectId) : null,
   };
 }

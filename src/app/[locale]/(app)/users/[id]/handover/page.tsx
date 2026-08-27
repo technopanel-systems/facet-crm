@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/page-header";
 import { can, listCompanyBookHolders, requireSession } from "@/lib/authz";
-import { lookupName } from "@/lib/lookups";
 import { getHandoverBook } from "@/lib/team";
 
 import { reassignHandoverAction } from "../../actions";
@@ -53,7 +52,7 @@ export default async function HandoverPage({
       empty: t("team.handover.noProjects"),
       rows: book.projects.map((row) => ({
         id: row.id,
-        label: lookupName(row, locale),
+        label: row.name,
       })),
     },
     {
@@ -64,12 +63,7 @@ export default async function HandoverPage({
         id: row.id,
         // `S50` — a project-less thread is named by its company instead, so
         // it can still be selected and handed over `[19 §3]`.
-        label: row.projectNameEn
-          ? lookupName(
-              { nameEn: row.projectNameEn, nameAr: row.projectNameAr },
-              locale,
-            )
-          : row.companyName,
+        label: row.projectName ?? row.companyName,
         note: row.companyName,
       })),
     },

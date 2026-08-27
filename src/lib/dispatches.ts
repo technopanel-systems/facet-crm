@@ -602,8 +602,7 @@ export type DispatchLineRow = {
 
 export type DispatchDetail = DispatchListRow & {
   projectId: string | null;
-  projectNameEn: string | null;
-  projectNameAr: string | null;
+  projectName: string | null;
   projectViewable: boolean;
   /**
    * `S74` — the QUOTATION's own project, which is a different question from the
@@ -686,8 +685,7 @@ export type DispatchableThread = {
   /** Null when the quotation has no project `S50` — the coordinator picks one
    *  as part of dispatching it `S74`. */
   projectId: string | null;
-  projectNameEn: string | null;
-  projectNameAr: string | null;
+  projectName: string | null;
   companyId: string;
   companyName: string;
   raisedByUserId: string;
@@ -2115,8 +2113,7 @@ export async function getDispatch(
       quotedSqm: quotationVersions.totalSqm,
       createdAt: dispatches.createdAt,
       projectId: dispatches.projectId,
-      projectNameEn: projects.nameEn,
-      projectNameAr: projects.nameAr,
+      projectName: projects.name,
       // `S74` — the thread's own, for the edit form's choose-or-show branch.
       threadProjectId: quotationThreads.projectId,
     })
@@ -2214,8 +2211,7 @@ export async function getDispatch(
   return {
     ...decorated,
     projectId: row.projectId,
-    projectNameEn: row.projectNameEn,
-    projectNameAr: row.projectNameAr,
+    projectName: row.projectName,
     threadProjectId: row.threadProjectId,
     refusalReason: row.refusalReason,
     cancellationReason: row.cancellationReason,
@@ -2333,8 +2329,7 @@ export async function listDispatchableThreads(
       versionId: quotationVersions.id,
       smacReference: quotationVersions.smacReference,
       projectId: quotationThreads.projectId,
-      projectNameEn: projects.nameEn,
-      projectNameAr: projects.nameAr,
+      projectName: projects.name,
       companyId: quotationThreads.companyId,
       companyName: companies.name,
       raisedByUserId: quotationThreads.raisedByUserId,
@@ -2470,12 +2465,11 @@ export async function searchDispatchCompanies(
  */
 export async function listDispatchProjectOptions(
   session: AuthSession,
-): Promise<{ id: string; nameEn: string; nameAr: string | null }[]> {
+): Promise<{ id: string; name: string }[]> {
   return db
     .select({
       id: projects.id,
-      nameEn: projects.nameEn,
-      nameAr: projects.nameAr,
+      name: projects.name,
     })
     .from(projects)
     .where(
@@ -2494,7 +2488,7 @@ export async function listDispatchProjectOptions(
       ),
 
     )
-    .orderBy(projects.nameEn);
+    .orderBy(projects.name);
 }
 
 /**

@@ -29,7 +29,6 @@ import { formatSqm } from "@/lib/decimal";
 import { can, requireSession } from "@/lib/authz";
 import { chainState } from "@/lib/chain";
 import { listDispatches } from "@/lib/dispatches";
-import { lookupName } from "@/lib/lookups";
 import {
   listProductClasses,
   listProductFireRatings,
@@ -137,12 +136,7 @@ export default async function QuotationDetailPage({
   // there, and the state line says what is missing and when it arrives. A
   // header reading "No project" would make the absence the loudest thing on a
   // screen that is about a quotation.
-  const projectName = thread.projectNameEn
-    ? lookupName(
-        { nameEn: thread.projectNameEn, nameAr: thread.projectNameAr },
-        locale,
-      )
-    : null;
+  const projectName = thread.projectName;
 
   return (
     <div className="flex flex-col gap-6">

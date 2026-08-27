@@ -83,6 +83,7 @@ import {
   type User,
 } from "@/lib/authz";
 import { companyTurn } from "@/lib/coverage";
+import { normalizeName } from "@/lib/normalize";
 import {
   archiveCompany,
   dormancyReviews,
@@ -477,7 +478,7 @@ async function main(): Promise<void> {
       .insert(companies)
       .values({
         name: `${stamp} ${slug}`,
-        nameNormalized: `${stamp}-${slug}`,
+        nameNormalized: normalizeName(`${stamp} ${slug}`),
         phone: nextPhone(),
         countryId: saudiId,
         createdBy: ownerUser.id,
@@ -533,8 +534,8 @@ async function main(): Promise<void> {
     const [project] = await db
       .insert(projects)
       .values({
-        nameEn: `${stamp} ${slug}`,
-        nameNormalized: `${stamp}-${slug}`,
+        name: `${stamp} ${slug}`,
+        nameNormalized: normalizeName(`${stamp} ${slug}`),
         ownerUserId: ownerUser.id,
         createdBy: ownerUser.id,
         createdAt: instantDaysAgo(ageDays + 5),
@@ -1248,7 +1249,7 @@ async function main(): Promise<void> {
       .insert(companies)
       .values({
         name: `${stamp} ${slug}`,
-        nameNormalized: `${stamp}-${slug}`,
+        nameNormalized: normalizeName(`${stamp} ${slug}`),
         phone: nextPhone(),
         countryId: saudiId,
         createdBy: departingUser.id,
@@ -1268,8 +1269,8 @@ async function main(): Promise<void> {
   const [departingProject] = await db
     .insert(projects)
     .values({
-      nameEn: `${stamp} handover project`,
-      nameNormalized: `${stamp}-handover-project`,
+      name: `${stamp} handover project`,
+      nameNormalized: normalizeName(`${stamp} handover project`),
       ownerUserId: departingUser.id,
       createdBy: departingUser.id,
     })

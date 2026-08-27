@@ -156,13 +156,9 @@ export type FollowUpRow = {
   kind: FollowUpKind;
   anchorType: FollowUpAnchorType;
   anchorId: string;
-  /**
-   * The anchor may be a project, which still carries two names, so this stays
-   * a pair. A company anchor fills the English slot and leaves the other null
-   * `S12`.
-   */
-  anchorNameEn: string;
-  anchorNameAr: string | null;
+  /** One name, whatever its anchor is: every one of the three carries a
+   *  single name field `S12` `S19` `S26`. */
+  anchorName: string;
   /** Null only for a project with no live company link left `[14 §4]`. */
   companyId: string | null;
   companyName: string | null;
@@ -197,19 +193,12 @@ export type FollowUpRow = {
  */
 type ThreadLabelParts = {
   smacReference: string | null;
-  projectNameEn: string | null;
-  projectNameAr: string | null;
+  projectName: string | null;
   companyName: string;
 };
 
 function threadLabel(parts: ThreadLabelParts): string {
-  return parts.smacReference ?? parts.projectNameEn ?? parts.companyName;
-}
-
-/** The Arabic half, which only a project ever fills `S12`. */
-function threadLabelAr(parts: ThreadLabelParts): string | null {
-  if (parts.smacReference || !parts.projectNameEn) return null;
-  return parts.projectNameAr;
+  return parts.smacReference ?? parts.projectName ?? parts.companyName;
 }
 
 export type FollowUpOptions = {
@@ -235,7 +224,7 @@ export type FollowUpResult = {
 function matchesSearch(row: FollowUpRow, query: string | undefined): boolean {
   const trimmed = query?.trim().toLowerCase();
   if (!trimmed) return true;
-  return [row.anchorNameEn, row.anchorNameAr, row.companyName].some((value) =>
+  return [row.anchorName, row.companyName].some((value) =>
     value?.toLowerCase().includes(trimmed),
   );
 }
@@ -287,8 +276,7 @@ async function quotationNoResponse(
       threadId: quotationThreads.id,
       companyId: quotationThreads.companyId,
       companyName: companies.name,
-      projectNameEn: projects.nameEn,
-      projectNameAr: projects.nameAr,
+      projectName: projects.name,
       smacReference: quotationVersions.smacReference,
       // The plain timestamp, converted below — see `riyadhDay`'s note.
       issuedAt: auditLog.createdAt,
@@ -347,8 +335,7 @@ async function quotationNoResponse(
       kind: "quotation_no_response" as const,
       anchorType: "quotation_thread" as const,
       anchorId: row.threadId,
-      anchorNameEn: threadLabel(row),
-      anchorNameAr: threadLabelAr(row),
+      anchorName: threadLabel(row),
       companyId: row.companyId,
       companyName: row.companyName,
       ownerNames: [],
@@ -421,8 +408,7 @@ async function quotationReturned(
       threadId: quotationThreads.id,
       companyId: quotationThreads.companyId,
       companyName: companies.name,
-      projectNameEn: projects.nameEn,
-      projectNameAr: projects.nameAr,
+      projectName: projects.name,
       smacReference: quotationVersions.smacReference,
       // The plain timestamp, converted below — see `riyadhDay`'s note.
       returnedAt: auditLog.createdAt,
@@ -489,8 +475,7 @@ async function quotationReturned(
       kind: "quotation_returned" as const,
       anchorType: "quotation_thread" as const,
       anchorId: row.threadId,
-      anchorNameEn: threadLabel(row),
-      anchorNameAr: threadLabelAr(row),
+      anchorName: threadLabel(row),
       companyId: row.companyId,
       companyName: row.companyName,
       ownerNames: [],
@@ -556,8 +541,7 @@ async function catalogueNoResponse(
     kind: "catalogue_no_response" as const,
     anchorType: "company" as const,
     anchorId: row.companyId,
-    anchorNameEn: row.companyName,
-    anchorNameAr: null,
+    anchorName: row.companyName,
     companyId: row.companyId,
     companyName: row.companyName,
     ownerNames: [],
@@ -599,8 +583,7 @@ async function projectStageUnchanged(
   const rows = await db
     .select({
       projectId: projects.id,
-      projectNameEn: projects.nameEn,
-      projectNameAr: projects.nameAr,
+      projectName: projects.name,
       createdAt: projects.createdAt,
       threadAt: moved.threadEvents.at,
       dispatchAt: moved.dispatchEvents.at,
@@ -656,8 +639,7 @@ async function projectStageUnchanged(
       kind: "project_stage_unchanged" as const,
       anchorType: "project" as const,
       anchorId: row.projectId,
-      anchorNameEn: row.projectNameEn,
-      anchorNameAr: row.projectNameAr,
+      anchorName: row.projectName,
       companyId: company?.id ?? null,
       companyName: company?.name ?? null,
       ownerNames: [],
@@ -754,8 +736,7 @@ async function companyQuiet(
       kind: "company_quiet" as const,
       anchorType: "company" as const,
       anchorId: row.companyId,
-      anchorNameEn: row.companyName,
-      anchorNameAr: null,
+      anchorName: row.companyName,
       companyId: row.companyId,
       companyName: row.companyName,
       ownerNames: [],
@@ -811,8 +792,7 @@ async function manualDateDue(session: AuthSession): Promise<FollowUpRow[]> {
     db
       .select({
         id: projects.id,
-        nameEn: projects.nameEn,
-        nameAr: projects.nameAr,
+        name: projects.name,
         due: projects.nextFollowUpAt,
       })
       .from(projects)
@@ -833,8 +813,7 @@ async function manualDateDue(session: AuthSession): Promise<FollowUpRow[]> {
         id: quotationThreads.id,
         companyId: quotationThreads.companyId,
         companyName: companies.name,
-        projectNameEn: projects.nameEn,
-        projectNameAr: projects.nameAr,
+        projectName: projects.name,
         due: quotationThreads.nextFollowUpAt,
       })
       .from(quotationThreads)
@@ -877,8 +856,7 @@ async function manualDateDue(session: AuthSession): Promise<FollowUpRow[]> {
       row({
         anchorType: "company",
         anchorId: company.id,
-        anchorNameEn: company.name,
-        anchorNameAr: null,
+        anchorName: company.name,
         companyId: company.id,
         companyName: company.name,
         since: company.due as string,
@@ -889,8 +867,7 @@ async function manualDateDue(session: AuthSession): Promise<FollowUpRow[]> {
       return row({
         anchorType: "project",
         anchorId: project.id,
-        anchorNameEn: project.nameEn,
-        anchorNameAr: project.nameAr,
+        anchorName: project.name,
         companyId: company?.id ?? null,
         companyName: company?.name ?? null,
         since: project.due as string,
@@ -901,8 +878,7 @@ async function manualDateDue(session: AuthSession): Promise<FollowUpRow[]> {
       return row({
         anchorType: "quotation_thread",
         anchorId: thread.id,
-        anchorNameEn: threadLabel({ ...thread, smacReference: reference }),
-        anchorNameAr: threadLabelAr({ ...thread, smacReference: reference }),
+        anchorName: threadLabel({ ...thread, smacReference: reference }),
         companyId: thread.companyId,
         companyName: thread.companyName,
         since: thread.due as string,
