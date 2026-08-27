@@ -313,12 +313,22 @@ function renderGrouped(
       >
         <TableCell colSpan={columns} className="text-start">
           {/* No `dir="auto"` anywhere on this header: it holds a translated
-              label and a number, never a name `D62`. */}
-          <span className="text-faint text-[10.5px] font-semibold tracking-[.09em] uppercase">
-            {t(groupKey(group, viewerIsCoordinator))}
-          </span>
-          <span className="text-faint num ms-2 text-[10.5px]" dir="ltr">
-            {counts[group]}
+              label and a number, never a name `D62`.
+
+              **A flex row with a gap, never `ms-*` on the count.** The count
+              carries `dir="ltr"`, and `margin-inline-start` resolves against
+              the element's OWN direction — so `ms-2` compiled to `margin-left`
+              and in Arabic the gap landed on the count's outer edge while the
+              number ran into the label. English worked by accident. `gap` has
+              no side to get wrong `D57`, which is what the board header
+              already does correctly. */}
+          <span className="flex items-baseline gap-2">
+            <span className="text-faint text-[10.5px] font-semibold tracking-[.09em] uppercase">
+              {t(groupKey(group, viewerIsCoordinator))}
+            </span>
+            <span className="text-faint num text-[10.5px]" dir="ltr">
+              {counts[group]}
+            </span>
           </span>
         </TableCell>
       </TableRow>,
