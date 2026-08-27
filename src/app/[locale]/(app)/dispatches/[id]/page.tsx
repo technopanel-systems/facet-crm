@@ -297,8 +297,18 @@ export default async function DispatchPage({
               ) : null}
             </Fact>
             {/* `S70` `S71` — how the customer is paying, recorded by the
-                coordinator at approval `S73`. Absent until then, which is what
-                a request not yet approved means: nobody has answered it. */}
+                coordinator at approval `S73`.
+
+                **A sentence rather than a dash before then.** The value is
+                genuinely absent and `S73` says why — no route to `approved`
+                bypasses a payment method, so an unapproved request has one for
+                exactly as long as it is unapproved. A dash says *missing*,
+                which is a different claim: it reads as data somebody failed to
+                enter. `D52` makes an empty LIST say what would make it
+                non-empty; this is the same instinct one level down, and it is
+                an extension of that rule rather than a citation of it — `D52`
+                covers a list and nothing yet covers a fact. `WORKFLOW §5`
+                carries the question. */}
             <Fact label={t("dispatches.fields.paymentMethod")} name="payment">
               {dispatch.paymentMethod ? (
                 <span data-payment={dispatch.paymentMethod}>
@@ -311,12 +321,123 @@ export default async function DispatchPage({
                   ) : null}
                 </span>
               ) : (
-                dash
+                <span className="text-muted-foreground" data-payment="none">
+                  {t("dispatches.detail.paymentNotYetAsked")}
+                </span>
               )}
             </Fact>
           </Facts>
         </CardContent>
       </Card>
+
+      {/* `S77` — **what was quoted, against what has actually gone out.**
+          *The gap is the point, not drift to be prevented*, and it is the one
+          comparison the founder most wants tracked.
+
+          **Its own card, and above the lines.** These figures were the last
+          rows of the Source card — below the quotation link, the approver and
+          the difference sentence, and below two full line tables before that.
+          They rendered; nobody found them. `D70`: what leads is chosen by what
+          the reader is doing when they open the screen, and on a dispatch that
+          is *did what went out match what we sold?*
+
+          **Gated on the VERSION, not on the figure.** It read
+          `quotedSqm === null`, and `quotation_versions.total_sqm` is nullable —
+          so a version carrying no total would have taken the whole block away
+          silently, the shape the company-detail slice found. It is null on 0 of
+          the issued versions today, so nothing was hidden; the gate moves
+          anyway, because a block that vanishes when a column is null is a
+          defect whether or not the column is ever null.
+
+          **Absent on a free entry** `S75` — no quotation to be measured
+          against, and `S120` puts it *outside the question entirely*. `D70`
+          again: an empty block is absent, not an empty shell.
+
+          Three figures rather than two: one quotation produces any number of
+          dispatches, so this one's own metres against the version's total would
+          read a lawful partial dispatch as a deviation nobody made. The middle
+          figure is every APPROVED dispatch raised from that version `S72`. They
+          ARE square metres, what a rep is measured on `S83`, so they are mono
+          and end-aligned like every magnitude `D11` `D24`. */}
+      {dispatch.quotationVersionId === null ? null : (
+        <Card data-slot="against-quotation">
+          <CardHeader>
+            <CardTitle className="text-start">
+              {t("dispatches.difference.title")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-0">
+            <Facts>
+              <Fact
+                label={t("dispatches.difference.quotedSqm")}
+                name="quotedSqm"
+                numeric
+              >
+                <span dir="ltr">
+                  {formatSqm(dispatch.quotedSqm ?? "0")} {t("common.sqm")}
+                </span>
+              </Fact>
+              <Fact
+                label={t("dispatches.difference.dispatchedAgainstVersion")}
+                name="dispatchedAgainstVersion"
+                numeric
+              >
+                <span dir="ltr">
+                  {formatSqm(dispatch.dispatchedAgainstVersionSqm ?? "0")}{" "}
+                  {t("common.sqm")}
+                </span>
+              </Fact>
+              <Fact
+                label={t("dispatches.difference.thisDispatch")}
+                name="thisDispatchSqm"
+                numeric
+              >
+                <span dir="ltr">
+                  {formatSqm(dispatch.sqm)} {t("common.sqm")}
+                </span>
+              </Fact>
+              {/* `S120`'s flag and **who made the difference**, beside the
+                  figures it is about. `D66` — *recorded, never flagged*: it is
+                  a sentence on the record, and since this slice it is on the
+                  record ONLY. The list no longer carries the badge.
+
+                  `wide`, because it is a sentence rather than a datum. Absent
+                  on a DRAFT, where both stored halves are still null: nothing
+                  has been handed over, so no attribution has been recorded, and
+                  the turn panel above already says whose it is. The badge still
+                  shows — a rep editing a draft can see they have moved away
+                  from the quotation. */}
+              {dispatch.differsFromQuotation === null ? null : (
+                <Fact
+                  label={t("dispatches.difference.flag")}
+                  name="difference"
+                  wide
+                >
+                  {dispatch.differsFromQuotation ? (
+                    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <Badge variant="outline" data-differs="yes">
+                        {t("dispatches.difference.flag")}
+                      </Badge>
+                      {attribution ? <span>{t(attribution)}</span> : null}
+                    </span>
+                  ) : (
+                    <span data-differs="no">
+                      {t("dispatches.difference.matches")}
+                      {/* The fifth case: the rep deviated and the coordinator
+                          brought it back. Nothing differs now, and the rep's
+                          own half is kept — `S120`'s flag is permanent, and
+                          this is the reading a later figure must not lose. */}
+                      {dispatch.differedAtSubmission === true
+                        ? ` ${t("dispatches.difference.correctedBack")}`
+                        : ""}
+                    </span>
+                  )}
+                </Fact>
+              )}
+            </Facts>
+          </CardContent>
+        </Card>
+      )}
 
       {/* `S116` — **what a dispatch carries**, and what the invoice is made
           from once it is approved. Editing them is `S125`'s act and lives on
@@ -425,93 +546,10 @@ export default async function DispatchPage({
                 : ""}
             </Fact>
 
-            {/* `S120` — the flag and **who made the difference**, on the card
-                that already says where this came from.
-
-                Nothing renders on a free entry `S75`: `differsFromQuotation`
-                is null there, and saying either "differs" or "matches" about a
-                dispatch with no quotation would be a claim the record cannot
-                support — the reason the column is nullable rather than
-                defaulting to false.
-
-                The sentence is `wide`, because it is a sentence rather than a
-                datum. It is absent on a DRAFT, where both stored halves are
-                still null: nothing has been handed over, so no attribution has
-                been recorded, and the turn panel above already says whose it
-                is. The badge still shows — a rep editing a draft can see they
-                have moved away from the quotation. */}
-            {dispatch.differsFromQuotation === null ? null : (
-              <Fact
-                label={t("dispatches.difference.title")}
-                name="difference"
-                wide
-              >
-                {dispatch.differsFromQuotation ? (
-                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <Badge variant="outline" data-differs="yes">
-                      {t("dispatches.difference.flag")}
-                    </Badge>
-                    {attribution ? <span>{t(attribution)}</span> : null}
-                  </span>
-                ) : (
-                  <span data-differs="no">
-                    {t("dispatches.difference.matches")}
-                    {/* The fifth case: the rep deviated and the coordinator
-                        brought it back. Nothing differs now, and the rep's own
-                        half is kept — `S120`'s flag is permanent, and this is
-                        the reading a later figure must not lose. */}
-                    {dispatch.differedAtSubmission === true
-                      ? ` ${t("dispatches.difference.correctedBack")}`
-                      : ""}
-                  </span>
-                )}
-              </Fact>
-            )}
-
-            {/* `S77` — **what was quoted against what was actually
-                dispatched.** Three figures rather than two: *one quotation
-                produces any number of dispatches*, so this dispatch's own
-                square metres set against the version's total would read a
-                lawful partial dispatch as a deviation nobody made. The middle
-                figure is every APPROVED dispatch raised from the same version
-                `S72`, which is what makes the pair mean something.
-
-                Below square metres in prominence is `S117`'s rule for money;
-                these ARE square metres, which is what a rep is measured on
-                `S83`, so they are mono and end-aligned like every magnitude
-                `D11` `D24`. */}
-            {dispatch.quotedSqm === null ? null : (
-              <>
-                <Fact
-                  label={t("dispatches.difference.quotedSqm")}
-                  name="quotedSqm"
-                  numeric
-                >
-                  <span dir="ltr">
-                    {formatSqm(dispatch.quotedSqm)} {t("common.sqm")}
-                  </span>
-                </Fact>
-                <Fact
-                  label={t("dispatches.difference.dispatchedAgainstVersion")}
-                  name="dispatchedAgainstVersion"
-                  numeric
-                >
-                  <span dir="ltr">
-                    {formatSqm(dispatch.dispatchedAgainstVersionSqm ?? "0")}{" "}
-                    {t("common.sqm")}
-                  </span>
-                </Fact>
-                <Fact
-                  label={t("dispatches.difference.thisDispatch")}
-                  name="thisDispatchSqm"
-                  numeric
-                >
-                  <span dir="ltr">
-                    {formatSqm(dispatch.sqm)} {t("common.sqm")}
-                  </span>
-                </Fact>
-              </>
-            )}
+            {/* `S120`'s flag and `S77`'s three figures **left this card
+                together**, for their own one above the lines. See it for why.
+                What stays here is where the dispatch came from, which is what
+                the card is called. */}
           </Facts>
         </CardContent>
       </Card>

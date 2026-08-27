@@ -408,7 +408,10 @@ function QuotationRow({
         // **Blank where the reader raised it**, and blank means *mine* `D2`.
         // The cell still renders, so every row keeps the same column count as
         // its header. `dir="auto"` stays on the NAME `D62`, never the cell.
-        <TableCell className="text-start">
+        <TableCell
+          className="text-start"
+          data-raiser={row.raisedByUserId === viewerUserId ? "self" : "other"}
+        >
           {row.raisedByUserId === viewerUserId ? null : (
             <span className="block truncate" dir="auto" title={row.raisedByName}>
               {row.raisedByName}

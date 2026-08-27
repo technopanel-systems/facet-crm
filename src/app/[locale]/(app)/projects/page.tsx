@@ -280,7 +280,16 @@ export default async function ProjectsPage({
                       // **Blank where the reader owns it**, and blank means
                       // *mine*. The cell still renders so the row keeps its
                       // column count. `dir="auto"` stays on the name `D62`.
-                      <TableCell className="text-start">
+                      // `data-owner`, not `data-slot`: `TableCell` spreads
+                      // props over its own marker `WORKFLOW §5`. This is what
+                      // `verify:routes` §22 asserts the blank half against —
+                      // presence alone passes for the rule this replaced.
+                      <TableCell
+                        className="text-start"
+                        data-owner={
+                          row.ownerUserId === session.user.id ? "self" : "other"
+                        }
+                      >
                         {row.ownerUserId === session.user.id ? null : (
                           <span dir="auto">{row.ownerName}</span>
                         )}

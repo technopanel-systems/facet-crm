@@ -1,8 +1,4 @@
-import {
-  getFormatter,
-  getTranslations,
-  setRequestLocale,
-} from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -17,9 +13,15 @@ import {
 } from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
 import { formatSqm } from "@/lib/decimal";
-import { requireSession } from "@/lib/authz";
+import { can, requireSession } from "@/lib/authz";
 import { getCompany } from "@/lib/companies";
-import { asDispatchStatus, listDispatches } from "@/lib/dispatches";
+import {
+  DISPATCH_GROUPS,
+  listDispatches,
+  type DispatchGroup,
+  type DispatchGroupCounts,
+  type DispatchListRow,
+} from "@/lib/dispatches";
 
 import {
   FilterNav,
@@ -27,13 +29,27 @@ import {
   ScopeChip,
   SearchForm,
 } from "../_components/list-controls";
-import {
-  Turn,
-  dispatchTurnKey,
-  dispatchTurnNames,
-} from "../_components/turn";
+import { daysSince } from "../_components/turn";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * `D25`'s group heading key, in the **second person where the reader is that
+ * person** — `/quotations`' `groupKey` exactly, and for the same reason: the
+ * coordinator is the one identity FACET can name precisely `D2`.
+ *
+ * The rep half is NOT second-person. A draft pile holds every rep's drafts for
+ * a manager or the coordinator, and there is no one name a header could carry —
+ * `D29` settled that a header naming a person makes the person the subject. So
+ * the pile says *waiting on the rep who raised it* and the row's RAISED BY
+ * column says which, exactly as `/quotations` splits the same work.
+ */
+function groupKey(group: DispatchGroup, viewerIsCoordinator: boolean): string {
+  if (group === "coordinator" && viewerIsCoordinator) {
+    return "dispatches.groups.yours";
+  }
+  return `dispatches.groups.${group}`;
+}
 
 export default async function DispatchesPage({
   params,
@@ -44,37 +60,48 @@ export default async function DispatchesPage({
     q?: string;
     page?: string;
     direct?: string;
-    status?: string;
+    archive?: string;
     userId?: string;
     companyId?: string;
   }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const { q, page, direct, status, userId, companyId } = await searchParams;
+  const { q, page, direct, archive, userId, companyId } = await searchParams;
 
   const session = await requireSession();
   const t = await getTranslations();
-  const format = await getFormatter();
 
-  // **One query parameter, no second screen** `D28`. `S122` keeps a refused
-  // request out of the working lists, so the default scope excludes it and the
-  // archive is reached by asking for it — not by a second route with its own
-  // filters to keep in step.
-  const scope = asDispatchStatus(status);
+  // `D2` speaks in the second person to the identity that owes the move, and
+  // `S72` makes that identity the one holding `can_dispatch`.
+  const viewerIsCoordinator = can(session, "canDispatch");
+
+  // **Two scopes, not five, and the piles carry what the chips used to say.**
+  // The status row was `Open · Awaiting approval · Approved · Draft · Refused`
+  // — four of those five are now group headers `D25`, and a chip that
+  // duplicates a header is a control that reorders nothing. What is left is the
+  // one scope a group cannot express: `S122` keeps a refused request OUT of the
+  // working lists, so the archive is a different set of rows rather than a
+  // different arrangement of them.
+  const archived = archive === "1";
   const currentPage = Number(page) || 1;
-  const { rows, total } = await listDispatches(session, {
+  const { rows, total, groupCounts, foreignRepCount } = await listDispatches(session, {
     q,
     page: currentPage,
     userId,
     companyId,
-    status: scope,
-    // `07 C6` — the direct route has to be countable, so it is filterable.
-    direct: direct === "1" ? true : direct === "0" ? false : undefined,
+    grouped: true,
+    status: archived ? "refused" : undefined,
+    // **The one route chip that survives**, and it is a narrowing rather than a
+    // three-way switch: `?direct=1` shows free entries `S75`, absent shows
+    // everything. No rule requires it — `[07 C6]` is an archive document and
+    // `CLAUDE.md` says those are never authority — so it stands on the
+    // founder's own reason, that free entries are 29% of the dataset and the
+    // number he wants to move.
+    direct: direct === "1" ? true : undefined,
   });
 
   const basePath = "/dispatches";
-  const dash = t("common.none");
 
   // **The scope is named or it is not applied** `D59`. A company detail card
   // links here for the sixth dispatch onward `D70`, and a list that silently
@@ -84,6 +111,14 @@ export default async function DispatchesPage({
   // `visibleDispatchesFilter` had already decided which rows come back, and
   // company membership is not one of its terms `[18 §2]`.
   const scopedTo = companyId ? await getCompany(session, companyId) : null;
+
+  // **The rep column earns its place the way `/quotations`' raiser does** `D2`
+  // — only where the list holds somebody else's work, counted over the whole
+  // visible scope so it cannot appear on page 1 and vanish on page 2, and
+  // **blank on the reader's own rows**. The third screen to ask this question
+  // and the third to ask it in the data layer.
+  const namesRep = foreignRepCount > 0;
+  const columns = namesRep ? 6 : 5;
 
   return (
     <div className="flex flex-col gap-6">
@@ -105,193 +140,318 @@ export default async function DispatchesPage({
         basePath={basePath}
         defaultValue={q}
         placeholder={t("dispatches.searchPlaceholder")}
-        hidden={{ direct, status, userId, companyId }}
+        hidden={{ direct, archive, userId, companyId }}
       />
 
       {scopedTo ? (
         <ScopeChip label={scopedTo.name} clearHref={basePath} />
       ) : null}
 
-      {/* `S72`'s four states, and the archive among them `S122`. A chip that
-          dropped the current search threw the query away, which broke three
-          lists `D59` — so every chip set carries the others' values. */}
-      <FilterNav
-        basePath={basePath}
-        name="status"
-        active={scope}
-        query={q}
-        extra={{ direct, userId, companyId }}
-        options={[
-          { label: t("dispatches.status.open") },
-          { value: "submitted", label: t("dispatches.status.submitted") },
-          { value: "approved", label: t("dispatches.status.approved") },
-          { value: "draft", label: t("dispatches.status.draft") },
-          { value: "refused", label: t("dispatches.status.refused") },
-        ]}
-      />
+      {/* **One row, four controls.** Every chip carries the others' values and
+          the current search — a chip navigating to a bare `?archive=1` throws
+          the query away, which broke three lists `D59`.
 
-      {/* `userId` is the attainment table's deep-link target and has no control
+          `userId` is the attainment table's deep-link target and has no control
           of its own, so the chips carry it rather than dropping it. */}
-      <FilterNav
-        basePath={basePath}
-        name="direct"
-        active={direct === "0" || direct === "1" ? direct : undefined}
-        query={q}
-        extra={{ status, userId, companyId }}
-        options={[
-          { label: t("dispatches.fields.filterAll") },
-          { value: "0", label: t("dispatches.fields.filterLinked") },
-          { value: "1", label: t("dispatches.fields.filterDirect") },
-        ]}
-      />
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <FilterNav
+          basePath={basePath}
+          name="archive"
+          active={archived ? "1" : undefined}
+          query={q}
+          extra={{ direct, userId, companyId }}
+          options={[
+            { label: t("dispatches.scope.working") },
+            { value: "1", label: t("dispatches.scope.archive") },
+          ]}
+        />
+        <FilterNav
+          basePath={basePath}
+          name="direct"
+          active={direct === "1" ? "1" : undefined}
+          query={q}
+          extra={{ archive, userId, companyId }}
+          options={[
+            { label: t("dispatches.fields.filterAll") },
+            { value: "1", label: t("dispatches.fields.filterDirect") },
+          ]}
+        />
+      </div>
 
       {rows.length === 0 ? (
         // `D52` `D60` — outside `ListCard`, where a pagination footer would
         // make an empty list read as broken, and a different key when a filter
-        // is what emptied it.
-        <p className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-          {q || scope || direct
-            ? t("dispatches.emptyFiltered")
-            : t("dispatches.empty")}
-        </p>
+        // is what emptied it. The filtered half's action is the way back.
+        <div
+          data-slot="dispatches-empty"
+          data-filtered={q || archived || direct ? "true" : "false"}
+          className="border-line flex flex-col items-center gap-3 rounded-[14px] border border-dashed p-8 text-center"
+        >
+          <p className="text-muted-foreground text-sm">
+            {q || archived || direct
+              ? t("dispatches.emptyFiltered")
+              : t("dispatches.empty")}
+          </p>
+          {q || archived || direct ? (
+            <Button asChild size="sm" variant="outline">
+              <Link href={basePath}>{t("quotations.emptyFilteredAction")}</Link>
+            </Button>
+          ) : (
+            <Button asChild size="sm">
+              <Link href="/dispatches/new">{t("dispatches.request")}</Link>
+            </Button>
+          )}
+        </div>
       ) : (
         <ListCard
           basePath={basePath}
           page={currentPage}
           total={total}
           query={q}
-          extra={{ direct, status, userId, companyId }}
+          extra={{ direct, archive, userId, companyId }}
         >
-          <Table>
+          {/* **`table-fixed`, and it is not cosmetic** — the lesson
+              `/quotations` paid for in session 26. `TableCell` carries
+              `whitespace-nowrap`, so under auto layout the table's min-content
+              width is the sum of every string in it, and a company name runs to
+              59 characters. Fixed layout makes the declared widths bind and
+              lets the name columns truncate. The row is 688px, or 816 with the
+              rep, against the 1078 a 1366 laptop has after the rail and `D22`'s
+              padding — `/quotations` sits at 912/1040, so this one has room the
+              other does not. */}
+          <Table className="table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead className="text-start">
-                  {t("dispatches.fields.dispatchDate")}
+                {/* `D26`'s lead cell — **the square metres, mono, large**, and
+                    it answers that object's question before a word is read:
+                    *how much went out?* The dispatch DATE led this table until
+                    now, which answered nothing and pushed the one figure a rep
+                    is measured on `S83` into the middle of the row. */}
+                <TableHead className="w-32" numeric>
+                  {t("dispatches.fields.sqm")}
                 </TableHead>
-                <TableHead className="text-start">
+                {/* One unit, calendar days, one clock `[lastMovedAt]`. Headed
+                    for what it measures rather than *whose move* — the pile
+                    above the row already answers that `D2`, and `/projects`
+                    heads the same kind of figure the same way. */}
+                <TableHead className="w-24 text-start">
+                  {t("dispatches.fields.lastMoved")}
+                </TableHead>
+                <TableHead className="w-56 text-start">
                   {t("dispatches.fields.company")}
                 </TableHead>
-                <TableHead className="text-start">
-                  {t("dispatches.fields.rep")}
-                </TableHead>
-                <TableHead numeric>{t("dispatches.fields.sqm")}</TableHead>
-                <TableHead className="text-start">
+                <TableHead className="w-28 text-start">
                   {t("dispatches.fields.source")}
                 </TableHead>
-                {/* `D2` — **a row says whose move it is, not what the status
-                    is**, and since `S72` a dispatch row has a move to name: a
-                    draft waits on the rep who raised it, a submitted request
-                    on the coordinator `S88`. This replaces the *recorded by*
-                    column rather than joining it — the raiser's name is what
-                    the draft line already says, and a seventh column at 1366px
-                    is what `S118` refused on `/quotations`. */}
-                <TableHead className="text-start">
-                  {t("dispatches.fields.turn")}
+                {/* What the pile cannot say: approved and cancelled share the
+                    bottom group because neither owes anybody, and only the row
+                    can tell them apart `S31` `S73`. */}
+                <TableHead className="w-32 text-start">
+                  {t("dispatches.fields.status")}
                 </TableHead>
+                {/* **`data-column`, not `data-slot`** — `TableHead` spreads
+                    props over its own marker, so a `data-slot` here silently
+                    replaces it. `WORKFLOW §5` carries the pattern. */}
+                {namesRep ? (
+                  <TableHead data-column="rep" className="w-32 text-start">
+                    {t("dispatches.fields.rep")}
+                  </TableHead>
+                ) : null}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell className="num text-start font-medium" dir="ltr">
-                    <Link
-                      href={`/dispatches/${row.id}`}
-                      className="hover:underline"
-                    >
-                      {format.dateTime(
-                        new Date(`${row.dispatchDate}T00:00:00Z`),
-                        {
-                          dateStyle: "medium",
-                          timeZone: "UTC",
-                        },
-                      )}
-                    </Link>
-                  </TableCell>
-                  {/* `18 §2` — the name always; the link only for someone who
-                      may open the record. */}
-                  <TableCell className="text-start">
-                    {row.companyViewable ? (
-                      <Link
-                        href={`/companies/${row.companyId}`}
-                        className="hover:underline"
-                      >
-                        {row.companyName}
-                      </Link>
-                    ) : (
-                      row.companyName
-                    )}
-                  </TableCell>
-                  <TableCell className="text-start">{row.userName}</TableCell>
-                  <TableCell numeric dir="ltr">
-                    {formatSqm(row.sqm)} {t("common.sqm")}
-                  </TableCell>
-                  <TableCell className="text-start">
-                    {/* `S120` — the marker sits under the reference it is
-                        about, so the cell reads "this quotation, and this
-                        dispatch differs from it". This is the signal the
-                        coordinator's queue had none of (`WORKFLOW §5`): at
-                        12–15 requests a day she opened every screen to learn
-                        which three needed reading.
-
-                        **Plain outline, no tone** `D6`. Colour describes how
-                        long something has waited, never how good the outcome
-                        is, and a difference is a state of the record rather
-                        than an elapsed time — a red or amber pill here would
-                        also read as a verdict, which `S77` explicitly refuses:
-                        *the gap is the point, not drift to be prevented*.
-
-                        Rendered only on `true`. `null` is a free entry `S75`
-                        with no quotation to differ from, and marking it either
-                        way would say something the record cannot support. */}
-                    <span className="flex flex-col items-start gap-1.5">
-                      {row.isDirect ? (
-                        <Badge variant="outline">
-                          {t("dispatches.fields.direct")}
-                        </Badge>
-                      ) : row.threadViewable ? (
-                        <Link
-                          href={`/quotations/${row.quotationThreadId}`}
-                          className="hover:underline"
-                          dir="ltr"
-                        >
-                          {row.smacReference ?? t("common.none")}
-                        </Link>
-                      ) : (
-                        <span dir="ltr">
-                          {row.smacReference ?? t("common.none")}
-                        </span>
-                      )}
-                      {row.differsFromQuotation === true ? (
-                        <Badge variant="outline" data-differs="yes">
-                          {t("dispatches.difference.flag")}
-                        </Badge>
-                      ) : null}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-start">
-                    {/* Approved and refused owe nobody `D26`: one is an event
-                        that happened, the other is archived `S122`. Both name
-                        who ended it instead. */}
-                    <Turn
-                      line={t(
-                        dispatchTurnKey(row.status),
-                        dispatchTurnNames(row.status)
-                          ? {
-                              name:
-                                (row.status === "approved"
-                                  ? row.approvedByName
-                                  : row.recordedByName) ?? dash,
-                            }
-                          : undefined,
-                      )}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
+              {renderGrouped(
+                rows,
+                t,
+                groupCounts,
+                viewerIsCoordinator,
+                namesRep,
+                columns,
+                session.user.id,
+              )}
             </TableBody>
           </Table>
         </ListCard>
       )}
     </div>
+  );
+}
+
+type Translate = Awaited<ReturnType<typeof getTranslations>>;
+
+/**
+ * `D25`'s piles, with `D24`'s counts.
+ *
+ * **The count is the whole scope's, not the page's** — `listDispatches` folds
+ * the counts into its own count query, so a header cannot read *· 35* on every
+ * page but the last.
+ *
+ * The rows arrive in `DISPATCH_GROUPS` order because the SQL ordered them that
+ * way, so a group is a contiguous run and nothing is re-sorted here. An empty
+ * pile renders no header at all — `D70`, a block with nothing in it is absent
+ * rather than an empty shell.
+ */
+function renderGrouped(
+  rows: DispatchListRow[],
+  t: Translate,
+  counts: DispatchGroupCounts,
+  viewerIsCoordinator: boolean,
+  namesRep: boolean,
+  columns: number,
+  viewerUserId: string,
+) {
+  return DISPATCH_GROUPS.flatMap((group) => {
+    const groupRows = rows.filter((row) => row.group === group);
+    if (groupRows.length === 0) return [];
+    return [
+      <TableRow
+        key={`group-${group}`}
+        data-slot="dispatch-group"
+        data-group={group}
+        data-count={String(counts[group])}
+        className="hover:bg-transparent"
+      >
+        <TableCell colSpan={columns} className="text-start">
+          {/* No `dir="auto"` anywhere on this header: it holds a translated
+              label and a number, never a name `D62`. */}
+          <span className="text-faint text-[10.5px] font-semibold tracking-[.09em] uppercase">
+            {t(groupKey(group, viewerIsCoordinator))}
+          </span>
+          <span className="text-faint num ms-2 text-[10.5px]" dir="ltr">
+            {counts[group]}
+          </span>
+        </TableCell>
+      </TableRow>,
+      ...groupRows.map((row) => (
+        <DispatchRow
+          key={row.id}
+          row={row}
+          t={t}
+          namesRep={namesRep}
+          viewerUserId={viewerUserId}
+        />
+      )),
+    ];
+  });
+}
+
+function DispatchRow({
+  row,
+  t,
+  namesRep,
+  viewerUserId,
+}: {
+  row: DispatchListRow;
+  t: Translate;
+  namesRep: boolean;
+  viewerUserId: string;
+}) {
+  return (
+    // `data-status` is the row's own answer and `data-group` the pile it landed
+    // in; `verify:routes` §24 pairs them, which is what catches a row ordered
+    // into one pile while claiming another.
+    <TableRow
+      data-slot="dispatch-row"
+      data-id={row.id}
+      data-status={row.status}
+      data-group={row.group}
+    >
+      {/* `D26`'s lead cell, and the row's link. The company name carried the
+          link on `/quotations`' idiom — the row's identity going to its own
+          record — but a dispatch's identity is a quantity, which is what `D26`
+          says answers its question. The company keeps its own link below. */}
+      <TableCell numeric className="font-medium" data-lead="sqm">
+        <Link
+          href={`/dispatches/${row.id}`}
+          className="num text-[15px] hover:underline"
+          dir="ltr"
+        >
+          {formatSqm(row.sqm)}{" "}
+          <span className="text-faint text-xs font-normal">
+            {t("common.sqm")}
+          </span>
+        </Link>
+      </TableCell>
+      {/* Uncoloured on purpose `D6`. Colour describes how long something has
+          waited against a threshold, and **no document sets one for a dispatch
+          request** — `S89` orders the coordinator's queue by when it was
+          submitted and names no lateness at all. A tone invented here would
+          become the number everyone believes in. */}
+      <TableCell className="text-start">
+        <span className="num text-faint text-xs font-semibold" dir="ltr">
+          {t("followUps.fields.days", { count: daysSince(row.lastMovedAt) })}
+        </span>
+      </TableCell>
+      {/* `18 §2` — the name always; the link only for someone who may open the
+          record. `dir="auto"` on the NAME, never the cell `D62`. */}
+      <TableCell className="text-start">
+        {row.companyViewable ? (
+          <Link
+            href={`/companies/${row.companyId}`}
+            className="block hover:underline"
+          >
+            <span className="block truncate" dir="auto" title={row.companyName}>
+              {row.companyName}
+            </span>
+          </Link>
+        ) : (
+          <span className="block truncate" dir="auto" title={row.companyName}>
+            {row.companyName}
+          </span>
+        )}
+      </TableCell>
+      {/* Where this came from `S75`, and nothing about how it differs.
+          **The `S120` marker is gone from this list** `D66`: *a dispatch's
+          difference from its quotation is recorded, never flagged*, because
+          roughly half of all dispatches differ and a warning that fires half
+          the time is not a warning. Measured on this dataset it is worse than
+          the rule assumed — see `WORKFLOW §5`. It renders on the dispatch
+          itself, which is where `D66` says the rep, the coordinator and the
+          manager already see it. */}
+      <TableCell
+        className="text-start"
+        data-source={row.isDirect ? "direct" : "linked"}
+      >
+        {row.isDirect ? (
+          <Badge variant="outline">{t("dispatches.fields.direct")}</Badge>
+        ) : row.threadViewable ? (
+          <Link
+            href={`/quotations/${row.quotationThreadId}`}
+            className="num hover:underline"
+            dir="ltr"
+          >
+            {row.smacReference ?? t("common.none")}
+          </Link>
+        ) : (
+          <span className="num" dir="ltr">
+            {row.smacReference ?? t("common.none")}
+          </span>
+        )}
+      </TableCell>
+      {/* No tone `D6` — a cancellation is a state of a record rather than an
+          elapsed time, and `S77` refuses to read the gap as a verdict. */}
+      <TableCell className="text-start">
+        <Badge
+          variant={row.status === "approved" ? "default" : "outline"}
+          data-status={row.status}
+        >
+          <span className="truncate">{t(`dispatches.status.${row.status}`)}</span>
+        </Badge>
+      </TableCell>
+      {namesRep ? (
+        // **Blank where the row credits the reader**, and blank means *mine*
+        // `D2` — `/quotations`' raiser cell exactly.
+        <TableCell
+          className="text-start"
+          data-rep={row.userId === viewerUserId ? "self" : "other"}
+        >
+          {row.userId === viewerUserId ? null : (
+            <span className="block truncate" dir="auto" title={row.userName}>
+              {row.userName}
+            </span>
+          )}
+        </TableCell>
+      ) : null}
+    </TableRow>
   );
 }

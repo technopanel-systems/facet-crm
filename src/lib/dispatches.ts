@@ -108,6 +108,7 @@ import {
   desc,
   eq,
   gte,
+  ilike,
   inArray,
   isNotNull,
   isNull,
@@ -170,6 +171,7 @@ import {
  * resolved when something runs.
  */
 import { raise } from "@/lib/notifications";
+import { normalizeName } from "@/lib/normalize";
 import {
   productLineMoney,
   quotationVersionLines,
@@ -212,6 +214,115 @@ export const DISPATCH_STATUSES = dispatchStatusEnum.enumValues;
 export function asDispatchStatus(value: string | undefined): DispatchStatus | undefined {
   return DISPATCH_STATUSES.find((status) => status === value);
 }
+
+/* ------------------------------------------------------------------ *
+ * `D25`'s piles — whose move it is, not what the status is `D2`
+ * ------------------------------------------------------------------ */
+
+/**
+ * **The three piles `/dispatches` is grouped into**, in order.
+ *
+ * `D25` groups a list by whose move it is. A dispatch has five states `S72`
+ * `S73` and only three answers to that question, so the states are not the
+ * piles — two of them share one:
+ *
+ *  - `coordinator` — a **submitted** request. She checks it and approves or
+ *    refuses it `S72`, and `S88` says it waits on her and never on a rep.
+ *  - `rep` — a **draft**. Still the raiser's own to edit `S125`, and `S132`
+ *    makes the same distinction one level up: a draft is not *ready to ship*,
+ *    because it can sit indefinitely.
+ *  - `none` — **approved**, **cancelled** and **refused**. One is an event that
+ *    already happened, one is history that credits nothing `S31` `S73`, one is
+ *    archived `S122`. None of the three owes anybody the next action.
+ *
+ * **Three piles, not five, and the row's state badge separates the bottom
+ * one.** Giving approved and cancelled a header each would be two headers
+ * answering one question — `AD16`, which `/quotations` hit when `D25`'s third
+ * group selected the same rows as its first. A pile is not a status `D29`.
+ *
+ * `refused` sits in `none` and is normally out of the scope entirely `S122`;
+ * it has a pile at all so the archive renders through the same code path
+ * rather than a second one.
+ */
+export const DISPATCH_GROUPS = ["coordinator", "rep", "none"] as const;
+export type DispatchGroup = (typeof DISPATCH_GROUPS)[number];
+
+/**
+ * **The one map, and the only place a status becomes a pile.**
+ *
+ * A `Record` over `DispatchStatus` rather than a `switch`, so adding a sixth
+ * state is a type error here rather than a row that silently lands in `none`.
+ * The SQL below is generated from this object — see `groupRank`.
+ */
+const GROUP_OF: Record<DispatchStatus, DispatchGroup> = {
+  submitted: "coordinator",
+  draft: "rep",
+  approved: "none",
+  cancelled: "none",
+  refused: "none",
+};
+
+export function dispatchGroup(status: DispatchStatus): DispatchGroup {
+  return GROUP_OF[status];
+}
+
+export type DispatchGroupCounts = Record<DispatchGroup, number>;
+
+/**
+ * The pile as a number, for `order by` — **generated from `GROUP_OF` rather
+ * than written out beside it.**
+ *
+ * A hand-written `case` here would be a second definition of which state sits
+ * in which pile, and the two would drift the way `follow-ups.ts` and
+ * `coverage.ts` drifted over "quiet" `21 §7`. Built from the same object, a
+ * change to the map moves the SQL with it.
+ *
+ * **The table is named outright** `CLAUDE.md`. Nothing is interpolated, so
+ * there is no Drizzle column to lose its qualifier; `sql.raw` is safe because
+ * every value comes from the pg enum and an index into a literal tuple, never
+ * from a caller.
+ */
+const groupRank = sql.raw(
+  `(case "dispatches"."status" ` +
+    DISPATCH_STATUSES.map(
+      (status) =>
+        `when '${status}' then ${DISPATCH_GROUPS.indexOf(GROUP_OF[status])}`,
+    ).join(" ") +
+    ` end)`,
+);
+
+/**
+ * **When this row last did anything** — the clock the elapsed column reads and
+ * the order inside a pile.
+ *
+ * `coalesce(approved_at, submitted_at, created_at)`, which is one clock rather
+ * than three: a draft reads from when it was raised, a submitted request from
+ * when it was handed over — the coordinator's actual wait, not the rep's — and
+ * an approved one from when it was approved. A **cancelled** dispatch keeps
+ * `approved_at` `S73`, so it reads from its approval, which is the last event
+ * it records; a **refused** one has no `approved_at` and falls to
+ * `submitted_at`, likewise its last. There is no `cancelled_at` or `refused_at`
+ * column and this slice does not add one — `CLAUDE.md`, a column needs its
+ * writer and no rule asks for these.
+ *
+ * The screen showed a dispatch DATE beside no elapsed figure at all. Rendering
+ * both would be the two-clock defect `D70` names, so the date leaves the list
+ * and stays on the record.
+ *
+ * **`.mapWith(dispatches.createdAt)` is load-bearing, and `sql<Date>` alone is
+ * a lie.** The generic is a type ASSERTION — Drizzle applies a column's decoder
+ * only to that column, and a raw expression comes back as the driver left it,
+ * which here is a string. `typecheck`, `lint` and `build` all passed and every
+ * `/dispatches` request then 500'd on `a.getTime is not a function` inside
+ * `daysSince`. Borrowing the column's own mapper is what makes the asserted
+ * type true, and reusing `created_at`'s rather than writing `new Date(...)`
+ * means the decoder cannot drift from the one the schema uses.
+ */
+const lastMovedAt = sql<Date>`coalesce(
+  "dispatches"."approved_at",
+  "dispatches"."submitted_at",
+  "dispatches"."created_at"
+)`.mapWith(dispatches.createdAt);
 
 const PAGE_SIZE = 25;
 
@@ -563,6 +674,11 @@ export type DispatchListRow = {
    */
   differsFromQuotation: boolean | null;
   createdAt: Date;
+  /** `D25`'s pile — a fold of `status` and nothing else `[dispatchGroup]`. */
+  group: DispatchGroup;
+  /** When this row last did anything `[lastMovedAt]` — the elapsed figure the
+   *  list renders, and the order inside its pile. */
+  lastMovedAt: Date;
 };
 
 /**
@@ -630,6 +746,18 @@ export type DispatchDetail = DispatchListRow & {
    */
   quotedSqm: string | null;
   dispatchedAgainstVersionSqm: string | null;
+  /**
+   * `S126` — the version this dispatch was raised from, and **the gate the
+   * screen branches on**.
+   *
+   * The comparison card used to test `quotedSqm === null`, which is
+   * `quotation_versions.total_sqm` — a NULLABLE column. A version carrying no
+   * total would have taken all three figures off the screen silently, with
+   * nothing to say they were missing rather than absent by rule. This is the
+   * honest gate: null here means a free entry `S75`, which is the one case
+   * `S120` puts *outside the question entirely*.
+   */
+  quotationVersionId: string | null;
   /**
    * The version's own lines, to render beside the dispatched ones `S120` `S77`
    * — *the gap is the point, not drift to be prevented*.
@@ -1705,13 +1833,36 @@ export async function setDispatchSmacNumber(
  * Reading
  * ------------------------------------------------------------------ */
 
+/**
+ * The company half folded, the rep half not — and the asymmetry is the point.
+ *
+ * **The company name goes through `name_normalized`** `[09 §1]`, exactly as
+ * `companies.ts`, `contacts.ts`, `projects.ts` and `quotations.ts` already do.
+ * Until now this screen `ilike`d the raw name, so the same company was findable
+ * on one screen and not another — `WORKFLOW §5`'s row, and the last of the
+ * three it named. **40 Arabic-named companies carry dispatches**, and typing
+ * any of them in its normalised form — ه for ة, a bare alef for أ إ آ — matched
+ * nothing at all.
+ *
+ * **`users.name` stays raw, and that is not a decision this function is allowed
+ * to make.** There is no `users.name_normalized` column, `CLAUDE.md` forbids
+ * landing one without its writer — the user form, not this slice — and no rule
+ * asks for it. The cost is real and measured: **7 of 9 active users are
+ * hyphenated**, so `Al Harbi` finds 0 where `Al-Harbi` finds 49. The box says
+ * *search by company or rep*, which is a promise the rep half only keeps if you
+ * type the hyphen. That is a `WORKFLOW §5` row of its own, and the label may
+ * have to shrink before the column is built.
+ *
+ * **The SMAC reference is deliberately not here.** It is an identifier rather
+ * than a name and `normalizeName` would collapse `RE-9592` into `re9592` — the
+ * same reason `companies.ts` leaves `phone` out of its folded half.
+ */
 function searchFilter(query: string | undefined) {
   const trimmed = query?.trim();
   if (!trimmed) return undefined;
-  const pattern = `%${trimmed}%`;
   return or(
-    sql`${companies.name} ilike ${pattern}`,
-    sql`${users.name} ilike ${pattern}`,
+    ilike(companies.nameNormalized, `%${normalizeName(trimmed)}%`),
+    ilike(users.name, `%${trimmed}%`),
   );
 }
 
@@ -1742,11 +1893,44 @@ export async function listDispatches(
      * cannot advance a chain.
      */
     status?: DispatchStatus;
+    /**
+     * **Order by `D25`'s piles** rather than by date — `/dispatches` and
+     * nothing else.
+     *
+     * Opt-in, the `withChain` precedent, because every other caller renders a
+     * card or a figure and would have its order changed underneath it for no
+     * reason. `groupCounts` comes back either way: it is filtered aggregates
+     * inside the count query this function already runs, so it costs nothing
+     * to compute and nothing to ignore.
+     */
+    grouped?: boolean;
     from?: string;
     to?: string;
     page?: number;
   } = {},
-): Promise<{ rows: DispatchListRow[]; total: number; page: number }> {
+): Promise<{
+  rows: DispatchListRow[];
+  total: number;
+  page: number;
+  /** Whole-scope counts per pile, **before pagination** `CLAUDE.md` — so a
+   *  header cannot read one number on page 1 and another on page 2. */
+  groupCounts: DispatchGroupCounts;
+  /**
+   * Distinct credited reps **other than the reader**, across the whole visible
+   * scope — what decides whether the row names one at all `D2`.
+   *
+   * `listQuotationThreads`' `foreignRaiserCount` and `listProjects`'
+   * `foreignOwnerCount` ask the identical question; this is the third and last
+   * screen that asks it. Over the **scope** and never the page, so the column
+   * cannot appear on page 1 and vanish on page 2 — which is the whole reason
+   * the other two count it in the data layer rather than in the screen.
+   *
+   * It reads `user_id`, the rep a dispatch CREDITS `S78`, not
+   * `recorded_by_user_id` — the coordinator may raise one for somebody `S123`,
+   * and the name a reader wants on the row is whose month it moves.
+   */
+  foreignRepCount: number;
+}> {
   const page = Math.max(1, options.page ?? 1);
   const recordedBy = alias(users, "recorded_by");
   const approvedBy = alias(users, "approved_by");
@@ -1802,6 +1986,10 @@ export async function listDispatches(
       // same defect wearing a different coat.
       differsFromQuotation: dispatchDiffers,
       createdAt: dispatches.createdAt,
+      // Resolved in SQL beside the rest, because it is what the rows are
+      // ORDERED by — computing it after the page is fetched would order a page
+      // rather than the list `CLAUDE.md`.
+      lastMovedAt,
     })
     .from(dispatches)
     .innerJoin(companies, eq(companies.id, dispatches.companyId))
@@ -1815,27 +2003,76 @@ export async function listDispatches(
       eq(quotationVersions.id, dispatches.quotationVersionId),
     )
     .where(where)
-    // **The submitted scope is a QUEUE, and a queue is oldest first** `S87`.
-    // It is what the coordinator works through, so the request that has been
-    // waiting longest is the one at the top; every other scope is a record of
-    // what happened, and reads newest first like every other list.
+    // **Grouped: the pile, then attention inside it** `D25` — resolved in SQL,
+    // before the LIMIT, because ordering a page after fetching it is the defect
+    // `CLAUDE.md` records shipping once, and it fails silently: page two would
+    // simply hold rows belonging on page one.
+    //
+    // **The two live piles read oldest first and the settled one newest.** A
+    // queue is oldest first `S87` — the request waiting longest is the one the
+    // coordinator should take next, and a draft the rep has sat on longest is
+    // the one he should look at. The bottom pile owes nobody and is a record of
+    // what happened, so it reads newest first like every history list. One
+    // `order by`, two directions, selected by the pile: the `case` is null for
+    // every row the other term orders, so neither disturbs the other.
+    //
+    // **This replaces the `status === "submitted"` special case rather than
+    // joining it.** That branch existed to make the coordinator's queue read
+    // oldest-first; the pile order now does it for every scope, including the
+    // dashboard's, which passes `status: "submitted"` and lands in one pile.
     .orderBy(
-      ...(options.status === "submitted"
-        ? [asc(dispatches.submittedAt)]
-        : [desc(dispatches.dispatchDate), desc(dispatches.createdAt)]),
+      ...(options.grouped
+        ? [
+            sql`${groupRank} asc`,
+            sql`(case when ${groupRank} < 2 then ${lastMovedAt} end) asc`,
+            sql`(case when ${groupRank} = 2 then ${lastMovedAt} end) desc`,
+            desc(dispatches.createdAt),
+          ]
+        : options.status === "submitted"
+          ? [asc(dispatches.submittedAt)]
+          : [desc(dispatches.dispatchDate), desc(dispatches.createdAt)]),
     )
     .limit(PAGE_SIZE)
     .offset((page - 1) * PAGE_SIZE);
 
+  // **The pile counts ride the count query**, as filtered aggregates over the
+  // same `where` — one statement, whole scope, before pagination. A second
+  // query would be a second answer to keep in step, and a header reading a
+  // page's count is how a group says *· 25* on every page but the last.
   const [totals] = await db
-    .select({ total: count() })
+    .select({
+      total: count(),
+      coordinator: sql<number>`count(*) filter (where ${groupRank} = 0)`.mapWith(
+        Number,
+      ),
+      rep: sql<number>`count(*) filter (where ${groupRank} = 1)`.mapWith(Number),
+      none: sql<number>`count(*) filter (where ${groupRank} = 2)`.mapWith(
+        Number,
+      ),
+      // Both tables named outright `CLAUDE.md`; `mapWith(Number)` because a
+      // bigint count comes back as a string and `> 0` would pass by coercion.
+      foreignReps: sql<number>`count(distinct "dispatches"."user_id")
+        filter (where "dispatches"."user_id" <> ${session.user.id})`.mapWith(
+        Number,
+      ),
+    })
     .from(dispatches)
     .innerJoin(companies, eq(companies.id, dispatches.companyId))
     .innerJoin(users, eq(users.id, dispatches.userId))
     .where(where);
 
   const decorated = await decorate(session, rows);
-  return { rows: decorated, total: totals?.total ?? 0, page };
+  return {
+    rows: decorated,
+    total: totals?.total ?? 0,
+    page,
+    groupCounts: {
+      coordinator: totals?.coordinator ?? 0,
+      rep: totals?.rep ?? 0,
+      none: totals?.none ?? 0,
+    },
+    foreignRepCount: totals?.foreignReps ?? 0,
+  };
 }
 
 type BareRow = {
@@ -1862,6 +2099,7 @@ type BareRow = {
   smacDispatchNumber: string | null;
   differsFromQuotation: boolean | null;
   createdAt: Date;
+  lastMovedAt: Date;
 };
 
 /**
@@ -1918,6 +2156,11 @@ async function decorate(
       ? (threadViewable.get(row.quotationThreadId) ?? false)
       : false,
     isDirect: row.quotationThreadId === null,
+    // `D25`'s pile, from the one map `[dispatchGroup]`. Attached here rather
+    // than selected, because it is a pure fold of a column already on the row —
+    // and `groupRank` orders by the same map, so the pile a row says it is in
+    // is the pile the ORDER BY put it in.
+    group: dispatchGroup(row.status),
   }));
 }
 
@@ -2032,6 +2275,11 @@ export async function getDispatch(
       // the same quantity a dispatch's own square metres measure.
       quotedSqm: quotationVersions.totalSqm,
       createdAt: dispatches.createdAt,
+      // The same clock the list orders by `[lastMovedAt]`, selected here
+      // because `decorate` is shared and both readers must answer alike —
+      // `S116`'s lesson: a derived figure checked at the reader that is easiest
+      // to reach ships wrong at the one that is not.
+      lastMovedAt,
       projectId: dispatches.projectId,
       projectName: projects.name,
     })
@@ -2144,6 +2392,7 @@ export async function getDispatch(
     linesChangedAfterSubmission: row.linesChangedAfterSubmission,
     quotedSqm: row.quotedSqm,
     dispatchedAgainstVersionSqm,
+    quotationVersionId: row.quotationVersionId,
     quotedLines,
     credit: credits?.get(row.id) ?? null,
   };

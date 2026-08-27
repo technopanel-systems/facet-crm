@@ -366,8 +366,17 @@ lead cell.
 | **Company** | a **silence meter** — a small bar and a day count, coloured by lateness | have I neglected this? |
 | **Project** | a **six-dot mini-chain** showing chain position, plus a quoted-vs-dispatched bar | where is this? |
 | **Quotation** | an **avatar and whose move it is** — "Rawan · signatures", "You · confirm payment" | who does this wait on? |
-| **Dispatch** | the square metres, mono, large | how much went out? A **submitted request** owes the coordinator (S88); an **approved dispatch** owes nobody. |
+| **Dispatch** | the square metres, mono, large | how much went out? A **draft** owes the rep who raised it (S125); a **submitted request** owes the coordinator (S72); an **approved**, **refused** (S122) or **cancelled** (S73) dispatch owes nobody. |
 | **Contact** | name and position | who is this? |
+
+**The dispatch clause answered for two states and the screen renders five**
+`AD33`. It named a submitted request and an approved dispatch, and had nothing
+for a draft, a refusal or a cancellation — all three of which `/dispatches` has
+shown since `S73` gave cancellation its own line. It also cited `S88`, which is
+`[BUILD]`, for behaviour that ships under `S72`; the citation is corrected with
+the widening. **Five states, three answers** — which is why the list groups into
+three piles and not five: approved, refused and cancelled owe nobody, and the
+row's own state badge is what separates them.
 
 **D27.** The mini-chain draws from `src/lib/chain.ts` and nothing else. Done
 dots green, the current dot amber with a soft ring, future dots hollow. It

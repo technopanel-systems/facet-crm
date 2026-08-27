@@ -127,7 +127,16 @@ export async function RequestsBlock({
               label={t("today.requests.dispatches")}
               total={dispatches.total}
               shown={Math.min(limit, dispatches.rows.length)}
-              href="/dispatches?status=submitted"
+              // **`/dispatches` bare, and that is the grouping paying for
+              // itself.** This was `?status=submitted`, a scope that no longer
+              // exists: `D25`'s piles replaced the five status chips, and the
+              // pile she owes — *waiting on the coordinator* `S72` `S88` — is
+              // the FIRST one on the list. So the unfiltered list already opens
+              // on her queue, with what she has yet to hand back visible below
+              // it rather than hidden behind a chip she has to remember to
+              // clear. A stale `?status=` would have been read as no filter at
+              // all and shown her everything, silently.
+              href="/dispatches"
               seeAll={t("today.requests.seeAll")}
               empty={t("today.requests.dispatchesEmpty")}
             >

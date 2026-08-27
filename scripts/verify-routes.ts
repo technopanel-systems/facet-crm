@@ -95,6 +95,23 @@
  *      Arabic the DOM order is **identical** to English, because the mirror is
  *      CSS `D57`.
  *
+ *  24. **The dispatches list and detail** `D25` `D26` `D66` `S77` — the list
+ *      is grouped into `DISPATCH_GROUPS`' three piles, **read out of
+ *      `src/lib/dispatches.ts` rather than copied here**; each pile is a
+ *      contiguous run, its header's count is the whole scope's and the three
+ *      sum to the card's own total; every row's `data-status` agrees with the
+ *      pile it landed in, which is what catches the one map that orders the SQL
+ *      drifting from the one that labels the row. No refused request is in the
+ *      working list `S122` and the archive chip reaches them. The lead cell is
+ *      asserted **by position** — `data-lead="sqm"` is the first `<td>` of
+ *      every row `D26` — and the difference badge is asserted **absent**
+ *      `D66`. One linked dispatch and one free entry are picked off the list by
+ *      their own marker and driven **together**: the comparison card renders on
+ *      the first and is absent on the second, because a card that never
+ *      rendered would pass the absence check alone. The payment sentence on an
+ *      unapproved request `S73`, the rep column blank on the reader's own rows
+ *      `D2`, and in Arabic the DOM order is identical to English `D57`.
+ *
  *  23. **Operability** `D20` — for every form this walk reaches, in either
  *      locale, as any of the three identities: each field the screen says its
  *      action requires is present as a **native, focusable control carrying
@@ -3654,10 +3671,7 @@ async function main(): Promise<void> {
       const flagId = path.split("/").pop() as string;
       let row = "";
       for (let page = 1; page <= 60; page += 1) {
-        const queue = await get(
-          coordJar,
-          `/${locale}/dispatches?status=submitted&page=${page}`,
-        );
+        const queue = await get(coordJar, `/${locale}/dispatches?page=${page}`);
         const at = queue.body.indexOf(`/dispatches/${flagId}"`);
         if (at !== -1) {
           row = queue.body.slice(at, queue.body.indexOf("</tr>", at));
@@ -3666,10 +3680,34 @@ async function main(): Promise<void> {
         // An empty page is the end of the queue, whatever the footer says.
         if (!/\/dispatches\/[0-9a-f-]{36}"/.test(queue.body)) break;
       }
+      /*
+       * **This assertion is inverted, and the inversion is the point** `D66`.
+       *
+       * It used to require `data-differs="yes"` on the row: session 15 put the
+       * marker on the coordinator's queue so she could see which requests
+       * needed reading. `D66` was written afterwards and takes it back — *a
+       * dispatch's difference from its quotation is recorded, never flagged to
+       * her*, because a warning that fires on a large share of rows is one
+       * people learn to click past. So the row must NOT carry it.
+       *
+       * **The walk to find the row is kept**, and it still earns its place: it
+       * proves the row is reachable by paging, which is what `?status=submitted`
+       * used to guarantee and the pile order now does. It also keeps the
+       * absence honest — a marker missing from a row that never rendered would
+       * prove nothing, which is why `row === ""` is a failure and not a skip.
+       *
+       * Where the difference IS stated is asserted in section 24, on the
+       * record, both halves.
+       */
       check(
-        `${locale}: *** and the LIST row carries the marker, resolved in SQL *** [S120]`,
-        row.includes('data-differs="yes"'),
-        row === "" ? "the row is not on the queue" : "no marker on the row",
+        `${locale}: the differing request is reachable on the coordinator's list [D25]`,
+        row !== "",
+        "the row is not on the list at all",
+      );
+      check(
+        `${locale}: *** …and the LIST row does NOT flag the difference *** [D66]`,
+        row !== "" && !row.includes('data-differs="'),
+        row === "" ? "no row to read" : "the marker is still on the row",
       );
 
       /* --- 4. she refuses it, with a reason [S124] ------------------- */
@@ -3720,9 +3758,15 @@ async function main(): Promise<void> {
         `${locale}: *** and it is OUT of the working list *** [S122]`,
         !working.body.includes(`/dispatches/${id}"`),
       );
-      const archive = await get(coordJar, `/${locale}/dispatches?status=refused`);
+      // `?archive=1`, not `?status=refused` — the five status chips became
+      // `D25`'s three piles and the one scope a pile cannot express kept a chip
+      // of its own. **The `D28` citation is dropped rather than carried over**:
+      // `AD31` recorded that `D28` is specifically `?view=` on Projects and
+      // Quotations and states no general principle about query parameters, so
+      // it never backed this assertion. `S122` alone does.
+      const archive = await get(coordJar, `/${locale}/dispatches?archive=1`);
       check(
-        `${locale}: …and in the archive, which is one query parameter [S122], [D28]`,
+        `${locale}: …and reachable in the archive [S122]`,
         archive.body.includes(`/dispatches/${id}"`),
       );
 
@@ -5148,6 +5192,42 @@ async function main(): Promise<void> {
         wide.body.includes('data-slot="project-owner"'),
       );
 
+      /* ── D2: and the cell is BLANK where the reader owns it ───────────
+       *
+       * **The two checks above pass for the rule this replaced.** They test
+       * whether the column renders, and `ownerCount > 1` and
+       * `foreignOwnerCount > 0` give the same answer on this fixture — so
+       * presence alone is not evidence about which rule is in force. What
+       * separates them is the cell: the reader's own rows are blank, and blank
+       * means *mine*.
+       *
+       * Driven as the COORDINATOR, who is the only identity that reads a wide
+       * list AND owns something in it — `S127` lets her hold a company like any
+       * rep. A manager owns nothing here, so every cell would be filled and the
+       * blank half would go undriven. */
+      const hers = await get(
+        jars["coordinator@example.test"],
+        `/${locale}/projects?view=table`,
+      );
+      const ownerCells = [...hers.body.matchAll(/data-owner="(self|other)"/g)].map(
+        (m) => m[1],
+      );
+      check(
+        `${locale}: the coordinator's own projects are on the page — the blank half is driven [S127]`,
+        ownerCells.includes("self"),
+        `cells were ${ownerCells.join(",") || "none"}`,
+      );
+      check(
+        `${locale}: *** …and her own row's owner cell is EMPTY — blank means mine *** [D2]`,
+        /data-owner="self"[^>]*><\/td>/.test(hers.body),
+        "a self-owned row printed the reader's own name",
+      );
+      check(
+        `${locale}: …while somebody else's row names them [D2]`,
+        /data-owner="other"[^>]*>\s*<span[^>]*>[^<]+<\/span>/.test(hers.body),
+        "a foreign-owned row rendered no name",
+      );
+
       /* ── D57: RTL mirrors by CSS, never by reordering the DOM ────────── */
 
       if (locale === "ar") {
@@ -5194,6 +5274,315 @@ async function main(): Promise<void> {
         onBoard + lost === showing,
         `board ${onBoard} + lost ${lost} against table ${showing}`,
       );
+    }
+  }
+
+  /* ── 24 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n24. The dispatches list and detail — three piles, the lead cell, and where the difference lives [D25], [D26], [D66], [S77]",
+  );
+  {
+    /*
+     * **The piles are read out of `src/lib/dispatches.ts`, not typed here** —
+     * the device section 22 uses for `CHAIN_COLUMNS`, and for the same reason:
+     * a copy of a list in an assertion goes stale in silence. This file still
+     * imports nothing from `src/`.
+     */
+    const groups = (
+      readFileSync("src/lib/dispatches.ts", "utf8")
+        .match(/export const DISPATCH_GROUPS = \[([\s\S]*?)\] as const;/)?.[1] ??
+      ""
+    )
+      .split(",")
+      .map((entry) => entry.trim().replace(/^"|"$/g, ""))
+      .filter(Boolean);
+
+    check(
+      "the three piles were read from dispatches.ts, not copied into this script",
+      groups.length === 3,
+      `${groups.length} found`,
+    );
+
+    for (const locale of ["en", "ar"] as const) {
+      /* ── D25: grouped by whose move, and the counts are the SCOPE's ──── */
+
+      // The coordinator, because this is her screen — `S72` makes her the one
+      // who checks and approves, and `D65` lands her here from her dashboard.
+      const jar = jars["coordinator@example.test"];
+      const list = await get(jar, `/${locale}/dispatches`);
+      check(`${locale}: /dispatches answers 200`, list.status === 200);
+
+      /*
+       * **Parsed by element, never by attribute ORDER.** The first version of
+       * this section matched `data-slot="…" data-group="…" data-count="…"` as
+       * one literal sequence and found nothing, while the row check beside it —
+       * same markup, different attribute order — passed. A black-box script
+       * that depends on the order JSX happens to emit is asserting on the
+       * renderer rather than on the screen.
+       */
+      const attr = (tag: string, name: string) =>
+        tag.match(new RegExp(`${name}="([^"]*)"`))?.[1] ?? "";
+      const tags = (body: string, slot: string) =>
+        [...body.matchAll(/<tr\b[^>]*>/g)]
+          .map((m) => m[0])
+          .filter((tag) => tag.includes(`data-slot="${slot}"`));
+
+      const rendered = [...list.body.matchAll(/data-group="(\w+)"/g)].map(
+        (m) => m[1],
+      );
+      const headers = tags(list.body, "dispatch-group").map(
+        (tag) =>
+          [tag, attr(tag, "data-group"), attr(tag, "data-count")] as const,
+      );
+      check(
+        `${locale}: *** the list is GROUPED, not flat *** [D25]`,
+        headers.length > 0,
+        "no pile header rendered",
+      );
+      // **Guarded on there being something to read.** `every()` over an empty
+      // array is `true`, so this and the two below would all have gone green on
+      // a 500 — which is exactly what happened on the first run of this
+      // section, beside four honest failures. `B1`–`B4` in `WORKFLOW §5` are
+      // the same shape: an assertion that passes without reading anything.
+      check(
+        `${locale}: every pile it renders is one of the three [D25]`,
+        headers.length > 0 && headers.every(([, group]) => groups.includes(group)),
+        headers.map(([, g]) => g).join(",") || "nothing rendered",
+      );
+      // A pile is a contiguous run, or the header lies about what follows it.
+      const order = rendered.filter((g) => groups.includes(g));
+      const ranked = order.map((g) => groups.indexOf(g));
+      check(
+        `${locale}: *** each pile is a contiguous run — resolved in SQL, not re-sorted *** [D25]`,
+        ranked.length > 0 &&
+          ranked.every((rank, i) => i === 0 || rank >= ranked[i - 1]),
+        `order was ${order.join(",") || "nothing rendered"}`,
+      );
+      // `D24` — a group header states its count, and it is the whole scope's.
+      // The card's own total is `D70`'s *states its total*, already asserted
+      // elsewhere; here the two must agree, which is what catches a header
+      // reading a PAGE's count.
+      const cardTotal = Number(
+        list.body.match(/data-slot="list-card"[^>]*data-total="(\d+)"/)?.[1] ??
+          "-1",
+      );
+      const summed = headers.reduce((n, [, , count]) => n + Number(count), 0);
+      check(
+        `${locale}: *** the pile counts sum to the card's own total *** [D24], [D70]`,
+        cardTotal >= 0 && summed === cardTotal,
+        `piles summed ${summed}, card says ${cardTotal}`,
+      );
+      // The pile a row landed in is the pile the row says it is in. One map
+      // orders the SQL and labels the row `[dispatchGroup]`; this is what
+      // catches them drifting apart.
+      const rows = tags(list.body, "dispatch-row").map(
+        (tag) =>
+          [tag, attr(tag, "data-status"), attr(tag, "data-group")] as const,
+      );
+      const EXPECTED: Record<string, string> = {
+        submitted: "coordinator",
+        draft: "rep",
+        approved: "none",
+        cancelled: "none",
+        refused: "none",
+      };
+      check(
+        `${locale}: *** every row's status agrees with the pile it is in *** [S72], [D25]`,
+        rows.length > 0 && rows.every(([, s, g]) => EXPECTED[s] === g),
+        rows
+          .filter(([, s, g]) => EXPECTED[s] !== g)
+          .map(([, s, g]) => `${s} in ${g}`)
+          .join(", ") || `${rows.length} rows`,
+      );
+      // `S122` — a refusal is out of the working list, and reachable.
+      check(
+        `${locale}: *** no refused request is in the working list *** [S122]`,
+        rows.length > 0 && !rows.some(([, status]) => status === "refused"),
+        rows.length === 0 ? "nothing rendered" : "a refusal was in the working list",
+      );
+      const archive = await get(jar, `/${locale}/dispatches?archive=1`);
+      check(
+        `${locale}: …and the archive chip reaches them [S122], [D59]`,
+        archive.status === 200 &&
+          (archive.body.includes('data-status="refused"') ||
+            archive.body.includes('data-slot="dispatches-empty"')),
+      );
+      // `D59` — a chip carries the current search, or the list silently
+      // returns the wrong rows. This broke three lists.
+      const searched = await get(jar, `/${locale}/dispatches?q=zzz`);
+      check(
+        `${locale}: the archive and direct chips carry the search [D59]`,
+        /q=zzz&(amp;)?archive=1/.test(searched.body) &&
+          /q=zzz&(amp;)?direct=1/.test(searched.body),
+        "a chip dropped the query",
+      );
+
+      /* ── D26: the lead cell, and D66: what is NOT on the row ──────────── */
+
+      // **The lead cell is asserted by POSITION, not by class.** `D26` says
+      // each object type's FIRST column is the visual answering its question,
+      // and for a dispatch that is the square metres — so the check is that
+      // `data-lead="sqm"` is the first `<td>` of a row, which a restyle cannot
+      // quietly satisfy by putting the marker somewhere else.
+      const leadFirst = [
+        ...list.body.matchAll(/data-slot="dispatch-row"[^>]*>(<td[^>]*>)/g),
+      ].map((m) => m[1]);
+      check(
+        `${locale}: *** the lead cell is the square metres, not the date *** [D26]`,
+        leadFirst.length > 0 &&
+          leadFirst.every((td) => td.includes('data-lead="sqm"')),
+        `${leadFirst.filter((td) => !td.includes('data-lead="sqm"')).length} row(s) lead with something else`,
+      );
+      // Guarded the same way: an absence check on a page that did not render
+      // is not evidence about the absence.
+      check(
+        `${locale}: *** the difference badge is NOT on the list *** [D66]`,
+        rows.length > 0 && !list.body.includes('data-differs="yes"'),
+        rows.length === 0
+          ? "nothing rendered"
+          : "the list still flags a difference to the coordinator",
+      );
+
+      /* ── D2: the rep column, and the blank half ───────────────────────── */
+
+      const repCells = [...list.body.matchAll(/data-rep="(self|other)"/g)].map(
+        (m) => m[1],
+      );
+      if (repCells.includes("self")) {
+        check(
+          `${locale}: *** a row crediting the reader leaves the rep cell EMPTY *** [D2]`,
+          /data-rep="self"[^>]*><\/td>/.test(list.body),
+          "the reader's own name was printed back at them",
+        );
+      } else {
+        console.log(
+          `  --    ${locale}: no row on page 1 credits the coordinator — blank half not driven`,
+        );
+      }
+      const repA = await get(jars["rep-a@example.test"], `/${locale}/dispatches`);
+      check(
+        `${locale}: …and a rep whose every dispatch is his own gets no column at all [D2]`,
+        repA.body.includes('data-slot="dispatch-row"') &&
+          !repA.body.includes('data-column="rep"'),
+        repA.body.includes('data-slot="dispatch-row"')
+          ? "the rep column rendered on a single-rep list"
+          : "rep-a's list rendered no rows at all",
+      );
+
+      /* ── S77: the comparison, on the detail, and absent on a free entry ─ */
+
+      /*
+       * **Both sides, or neither proves anything.** A card that never rendered
+       * would pass an "absent on a free entry" check on its own, which is the
+       * `B1`–`B4` shape `WORKFLOW §5` already records: an assertion that can
+       * pass without reading anything. So one linked dispatch and one free
+       * entry are picked off the list by their own marker and driven together.
+       */
+      // Split on the row boundary rather than matching across it — one row's
+      // cells cannot then be read as the next row's.
+      const chunks = list.body.split('data-slot="dispatch-row"').slice(1);
+      const idOf = (source: "linked" | "direct") =>
+        chunks
+          .find((chunk) => chunk.includes(`data-source="${source}"`))
+          ?.match(/data-id="([0-9a-f-]{36})"/)?.[1];
+
+      const linkedId = idOf("linked");
+      const freeId = idOf("direct");
+      check(
+        `${locale}: the list offers both a linked dispatch and a free entry to drive [S75]`,
+        Boolean(linkedId) && Boolean(freeId),
+        `linked=${Boolean(linkedId)} free=${Boolean(freeId)}`,
+      );
+
+      if (linkedId) {
+        const detail = await get(jar, `/${locale}/dispatches/${linkedId}`);
+        check(`${locale}: a dispatch detail answers 200`, detail.status === 200);
+        check(
+          `${locale}: *** S77's comparison card renders on a linked dispatch *** [S77]`,
+          detail.body.includes('data-slot="against-quotation"'),
+          "the card the founder most wants is missing",
+        );
+        // Three figures, not two — `S77` says two would read a lawful partial
+        // dispatch as a deviation nobody made.
+        for (const figure of [
+          "quotedSqm",
+          "dispatchedAgainstVersion",
+          "thisDispatchSqm",
+        ]) {
+          check(
+            `${locale}: …and it carries ${figure} [S77]`,
+            detail.body.includes(`data-fact="${figure}"`),
+            "the fact did not render",
+          );
+        }
+        // `D66` — the difference is recorded HERE, which is the other half of
+        // taking it off the list.
+        check(
+          `${locale}: *** the difference is recorded on the record *** [D66], [S120]`,
+          detail.body.includes('data-differs="yes"') ||
+            detail.body.includes('data-differs="no"'),
+          "neither differs nor matches was stated",
+        );
+      }
+
+      if (freeId) {
+        const detail = await get(jar, `/${locale}/dispatches/${freeId}`);
+        check(
+          `${locale}: *** a free entry has NO comparison card — absent, not an empty shell *** [S75], [D70]`,
+          detail.status === 200 &&
+            !detail.body.includes('data-slot="against-quotation"'),
+          "a dispatch with no quotation rendered a comparison against one",
+        );
+        check(
+          `${locale}: …and it states neither differs nor matches [S120]`,
+          !detail.body.includes('data-differs="'),
+          "a free entry was marked as differing from a quotation it does not have",
+        );
+      }
+
+      /* ── S73 / D52's instinct: payment says not-yet-asked, never a dash ─ */
+
+      const pending = rows.find(([, status]) =>
+        status === "draft" || status === "submitted",
+      );
+      if (pending) {
+        const id = list.body.match(
+          new RegExp(
+            `data-slot="dispatch-row" data-id="([0-9a-f-]{36})"[^>]*data-status="${pending[1]}"`,
+          ),
+        );
+        if (id) {
+          const detail = await get(jar, `/${locale}/dispatches/${id[1]}`);
+          check(
+            `${locale}: *** an unapproved dispatch says payment is not yet asked, not "—" *** [S73], [D52]`,
+            detail.body.includes('data-payment="none"'),
+            "the payment fact rendered a dash",
+          );
+        }
+      } else {
+        console.log(
+          `  --    ${locale}: no unapproved dispatch on page 1 — the payment sentence not driven`,
+        );
+      }
+
+      /* ── D57: RTL mirrors by CSS, never by reordering the DOM ─────────── */
+
+      if (locale === "ar") {
+        const english = await get(jar, "/en/dispatches");
+        const cols = (body: string) =>
+          [...body.matchAll(/data-column="([a-zA-Z]+)"/g)].map((m) => m[1]).join(",");
+        const piles = (body: string) =>
+          [...body.matchAll(/data-slot="dispatch-group" data-group="(\w+)"/g)]
+            .map((m) => m[1])
+            .join(",");
+        check(
+          "ar: *** the DOM order is identical to English — the mirror is CSS *** [D57]",
+          cols(list.body) === cols(english.body) &&
+            piles(list.body) === piles(english.body),
+          `ar ${piles(list.body)} vs en ${piles(english.body)}`,
+        );
+      }
     }
   }
 
