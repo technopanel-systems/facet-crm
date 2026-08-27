@@ -419,9 +419,8 @@ export async function canViewRecord(
       if (await hasActiveShare(userId, "quotation_thread", recordId)) {
         return true;
       }
-      // No project, no third term `S50`. The SQL twin below reaches the same
-      // answer without a branch: its `exists` matches nothing on a null.
-      if (!thread.projectId) return false;
+      // The third term is unconditional since `S50` — every thread names a
+      // project, so there is no null for the SQL twin below to fall through.
       return canViewProject(userId, thread.projectId);
     }
     case "dispatch": {
@@ -649,11 +648,11 @@ export function visibleProjectsFilter(session: AuthSession): SQL | undefined {
  *
  * The project term is the founder decision in `11 §2`: project visibility
  * cascades to the threads raised on it, or a rep would lose sight of their own
- * deal for want of a share click. **A thread with no project `S50` falls
- * through it**: the correlated `exists` matches no row on a null `project_id`,
- * which is the same answer `canViewRecord` reaches with an explicit branch. Note what none of this does: company
- * membership is still never consulted, here or in `visibleProjectsFilter`.
- * Company → projects does not cascade `[04 Q7]`.
+ * deal for want of a share click. Since `S50` every thread has a project, so
+ * the correlated `exists` always has a row to match and the branch
+ * `canViewRecord` used to carry beside it is gone. Note what none of this
+ * does: company membership is still never consulted, here or in
+ * `visibleProjectsFilter`. Company → projects does not cascade `[04 Q7]`.
  */
 export function visibleQuotationThreadsFilter(
   session: AuthSession,

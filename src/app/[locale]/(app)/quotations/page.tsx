@@ -1,6 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
-import { Absent, PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -141,12 +141,9 @@ export default async function QuotationsPage({
                     </Link>
                   </TableCell>
                   <TableCell className="text-start">
-                    {/* `S50` — no project is a state, not a blank cell. */}
-                    {row.projectName === null ? (
-                      <Absent>{t("quotations.detail.noProject")}</Absent>
-                    ) : (
-                      <span dir="auto">{row.projectName}</span>
-                    )}
+                    {/* `S50` — always there, and it may hold either script
+                        `D62`. */}
+                    <span dir="auto">{row.projectName}</span>
                   </TableCell>
                   <TableCell className="text-start">
                     {row.companyName}

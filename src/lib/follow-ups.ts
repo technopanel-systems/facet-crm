@@ -186,14 +186,13 @@ export type FollowUpRow = {
  * What names a quotation on the list: its SMAC reference, else its project,
  * else its company `S51`.
  *
- * The third term is `S50`'s: a quotation raised before its project exists has
- * neither of the first two while it is still `requested`, and a row with no
- * name is a row nobody can act on. The company is the fact that is always
- * there, and it is already on every one of these queries.
+ * The third term survives `S50`. A quotation always names a project now, so
+ * the second is never missing — but the company stays as the last resort
+ * because it costs nothing and it is already on every one of these queries.
  */
 type ThreadLabelParts = {
   smacReference: string | null;
-  projectName: string | null;
+  projectName: string;
   companyName: string;
 };
 
@@ -291,7 +290,10 @@ async function quotationNoResponse(
     )
     .innerJoin(auditLog, eq(auditLog.entityId, quotationVersions.id))
     .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
-    .leftJoin(projects, eq(projects.id, quotationThreads.projectId))
+    // INNER since `S50`: every quotation names a project, so a LEFT join could
+    // only widen the row type with a null nothing produces. The same is true
+    // of the two below.
+    .innerJoin(projects, eq(projects.id, quotationThreads.projectId))
     .where(
       and(
         visibleQuotationThreadsFilter(session),
@@ -426,7 +428,7 @@ async function quotationReturned(
     )
     .innerJoin(auditLog, eq(auditLog.entityId, quotationVersions.id))
     .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
-    .leftJoin(projects, eq(projects.id, quotationThreads.projectId))
+    .innerJoin(projects, eq(projects.id, quotationThreads.projectId))
     .where(
       and(
         visibleQuotationThreadsFilter(session),
@@ -818,7 +820,7 @@ async function manualDateDue(session: AuthSession): Promise<FollowUpRow[]> {
       })
       .from(quotationThreads)
       .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
-      .leftJoin(projects, eq(projects.id, quotationThreads.projectId))
+      .innerJoin(projects, eq(projects.id, quotationThreads.projectId))
       .where(
         and(
           visibleQuotationThreadsFilter(session),

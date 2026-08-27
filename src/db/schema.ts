@@ -1180,11 +1180,12 @@ export const deleteRequests = pgTable(
 /**
  * `09 §5.2` — one thread, many versions.
  *
- * **The project is optional** `S50`: reps sometimes need to quote before a
- * project exists, so `08 C3`'s "required even though SMAC does not require
- * one" is exactly what S50 reverses. A thread with none gains one at dispatch
- * `S74`, and that is the ONLY place FACET fills it in — SPEC §16 leaves open
- * whether anything else ever should, so nothing else may.
+ * **The project is required** `S50`. It was optional until `0031`, on the
+ * reasoning that a rep sometimes needs to quote before a project exists; the
+ * gap was then refused one step later at dispatch, and S50 now closes it at
+ * the moment it is cheap to close instead. Raising asks for the company, then
+ * for one of its projects or a new one named from what the rep already typed.
+ * The write-back at dispatch went with the null case `S74`.
  *
  * Payment confirmation is one tick by the rep with a date, because the rep
  * receives the payment — not an amounts ledger `[07 C3]`. Two application
@@ -1197,8 +1198,10 @@ export const quotationThreads = pgTable(
   "quotation_threads",
   {
     id: pk(),
-    /** Optional `S50`; written back at dispatch when it is null `S74`. */
-    projectId: uuid("project_id").references(() => projects.id),
+    /** Always set `S50`; a dispatch takes it rather than writing it `S74`. */
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id),
     companyId: uuid("company_id")
       .notNull()
       .references(() => companies.id),

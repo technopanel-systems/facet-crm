@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
 import { COMMENT_BODY_MAX, SMAC_VERIFICATIONS, STOCKS } from "@/lib/enums";
+import { createProject } from "@/lib/projects";
 import {
   acceptThread,
   addQuotationLine,
@@ -96,9 +97,14 @@ export async function createQuotationAction(
   const session = await requireSession();
   const fields = readFields(formData);
 
-  // Optional `S50`. Null means the project is chosen at dispatch `S74`, and
-  // the data layer applies the company rule that goes with each case.
+  // `S50` — one of the two, never neither. An empty `projectId` is the form's
+  // NEW-project branch rather than an omission, so the name is what is
+  // required there; the browser asks for it too, and this asks again because a
+  // POST is reachable without the form.
   const projectId = fields.uuid("projectId");
+  const newProjectName = projectId
+    ? null
+    : fields.text("newProjectName", { required: true, max: 200 });
   const companyId = fields.uuid("companyId", { required: true });
   const contactId = fields.uuid("contactId");
   // `S118` — the rep chooses the stock when requesting, from a fixed list.
@@ -127,9 +133,38 @@ export async function createQuotationAction(
 
   let threadId: string;
   try {
+    // `S50` — the project is created FIRST, in its own transaction, and the
+    // thread then names it. Two transactions rather than one: threading this
+    // through `createProject`'s own `withAudit` would be a refactor of the
+    // audit layer to avoid a residue that is not a defect. A failure between
+    // them leaves a project with no quotation, which `S24` makes a legal
+    // record and which `/projects/new` already produces every day.
+    //
+    // Only a name and the chosen company. Expected square metres, the city and
+    // the rest stay on `/projects/new` and the edit form — this is the one
+    // action `S50` asks for, not a second project form.
+    const anchorId =
+      projectId ??
+      (
+        await createProject(
+          session,
+          {
+            name: newProjectName ?? "",
+            sqmExpected: null,
+            cityId: null,
+            endState: null,
+            lostReasonId: null,
+            lossReason: null,
+            inProduction: false,
+            committed: false,
+          },
+          [{ companyId }],
+        )
+      ).id;
+
     const thread = await createQuotationThread(
       session,
-      { projectId, companyId, contactId },
+      { projectId: anchorId, companyId, contactId },
       { stock },
       lines,
       serviceLines,

@@ -144,7 +144,6 @@ import {
   dispatchCompanyLookupFilter,
   visibleDispatchesFilter,
   visibleMeasuredUsersFilter,
-  visibleProjectsFilter,
   visibleQuotationThreadsFilter,
   type AuthSession,
 } from "@/lib/authz";
@@ -171,7 +170,6 @@ import {
  * resolved when something runs.
  */
 import { raise } from "@/lib/notifications";
-import { ensureProjectParticipant } from "@/lib/projects";
 import {
   productLineMoney,
   quotationVersionLines,
@@ -604,15 +602,6 @@ export type DispatchDetail = DispatchListRow & {
   projectId: string | null;
   projectName: string | null;
   projectViewable: boolean;
-  /**
-   * `S74` — the QUOTATION's own project, which is a different question from the
-   * dispatch's and the one the edit form needs: a request whose thread has a
-   * project of its own has nothing to choose, and one whose thread has none
-   * `S50` is where the choice — and the write-back at approval — lives.
-   *
-   * Null on a free entry, where there is no thread to ask.
-   */
-  threadProjectId: string | null;
   lines: DispatchLineRow[];
   /**
    * `S120`'s two stored halves — the part of the rule no reading of the rows
@@ -682,10 +671,9 @@ export type DispatchableThread = {
   /** Never null: `issueVersion` is what writes it, and only issued threads
    *  reach this list `S126`. */
   smacReference: string;
-  /** Null when the quotation has no project `S50` — the coordinator picks one
-   *  as part of dispatching it `S74`. */
-  projectId: string | null;
-  projectName: string | null;
+  /** Always set `S50`, and the dispatch takes it rather than choosing `S74`. */
+  projectId: string;
+  projectName: string;
   companyId: string;
   companyName: string;
   raisedByUserId: string;
@@ -852,42 +840,23 @@ async function writeLines(
 }
 
 /**
- * `S74` — which project the dispatch records, and whether it is a choice.
+ * `S74` — which project the dispatch records. One branch, because `S50` leaves
+ * only one: the dispatch takes the quotation's own, shown and never chosen.
  *
- * Two branches and one rule. When the thread has a project the dispatch takes
- * it, shown and never chosen, and a disagreeing input is **refused rather than
- * silently corrected**: a dispatch that disagrees with the quotation it is
- * against is a mistake worth naming. When the thread has none `S50`, whoever is
- * raising or editing chooses, checked against the same filter the picker is
- * built from so the form never offers what this refuses.
+ * A disagreeing input is **refused rather than silently corrected** — a
+ * dispatch that disagrees with the quotation it is against is a mistake worth
+ * naming. No form can post one now that the picker is gone, which is why the
+ * refusal lives here rather than on a screen.
  *
- * For a rep that filter is their own projects and their shares `S30`; for the
- * coordinator it is every project, which is `S76` and not a widening this slice
- * made.
+ * The second branch — whoever is raising picks, checked against the filter the
+ * picker was built from — went with the null case it existed for, and took the
+ * `projectRequired` and `projectNotVisible` refusals with it.
  */
-async function projectForThread(
-  session: AuthSession,
-  threadProjectId: string | null,
-  chosen: string | null,
-): Promise<string> {
-  if (threadProjectId) {
-    if (chosen && chosen !== threadProjectId) {
-      throw new RuleError("dispatches.errors.projectNotOnThread", "projectId");
-    }
-    return threadProjectId;
+function projectForThread(threadProjectId: string, chosen: string | null): string {
+  if (chosen && chosen !== threadProjectId) {
+    throw new RuleError("dispatches.errors.projectNotOnThread", "projectId");
   }
-  if (!chosen) {
-    throw new RuleError("dispatches.errors.projectRequired", "projectId");
-  }
-  const [pickable] = await db
-    .select({ id: projects.id })
-    .from(projects)
-    .where(and(eq(projects.id, chosen), visibleProjectsFilter(session)))
-    .limit(1);
-  if (!pickable) {
-    throw new RuleError("dispatches.errors.projectNotVisible", "projectId");
-  }
-  return chosen;
+  return threadProjectId;
 }
 
 /**
@@ -999,7 +968,7 @@ export async function requestDispatch(
     // `07 D3`'s worry is that the credited person becomes a dropdown choice
     // rather than a fact of the quotation chain.
     userId = thread.raisedByUserId;
-    projectId = await projectForThread(session, thread.projectId, projectId);
+    projectId = projectForThread(thread.projectId, projectId);
   } else {
     if (!companyId) {
       throw new RuleError("dispatches.errors.companyRequired", "companyId");
@@ -1138,7 +1107,7 @@ export async function updateDispatchRequest(
     if (!thread) {
       throw new RuleError("dispatches.errors.threadNotVisible", "quotationThreadId");
     }
-    projectId = await projectForThread(session, thread.projectId, input.projectId);
+    projectId = projectForThread(thread.projectId, input.projectId);
   }
 
   await withAudit(session.actor, async (tx, log) => {
@@ -1373,60 +1342,11 @@ export async function approveDispatchRequest(
     );
   }
 
+  // Nothing about the project happens here any more. `S74` — the write-back,
+  // the participant it added and the disagreement it could discover at
+  // approval all went with `S50`'s null case: a thread has its project before
+  // it is ever dispatched, so approval has nothing left to fill in.
   await withAudit(session.actor, async (tx, log) => {
-    if (request.quotationThreadId) {
-      const [thread] = await tx
-        .select({ projectId: quotationThreads.projectId })
-        .from(quotationThreads)
-        .where(eq(quotationThreads.id, request.quotationThreadId))
-        .limit(1);
-      if (!thread) {
-        throw new RuleError("dispatches.errors.threadNotVisible");
-      }
-
-      if (!thread.projectId && request.projectId) {
-        const written = await tx
-          .update(quotationThreads)
-          .set({ projectId: request.projectId })
-          .where(
-            and(
-              eq(quotationThreads.id, request.quotationThreadId),
-              isNull(quotationThreads.projectId),
-            ),
-          )
-          .returning({ id: quotationThreads.id });
-        if (written.length !== 1) {
-          throw new RuleError("dispatches.errors.projectAlreadySet", "projectId");
-        }
-        log({
-          action: "quotation_thread.project_set",
-          entityType: "quotation_thread",
-          entityId: request.quotationThreadId,
-          before: { projectId: null },
-          after: { projectId: request.projectId },
-        });
-
-        // `S74` — and the quotation's company joins that project if it is not
-        // already a participant. Through `projects.ts`'s one writer, so `S27`
-        // holds for this route exactly as for a rep adding one by hand.
-        await ensureProjectParticipant(
-          tx,
-          log,
-          request.projectId,
-          request.companyId,
-        );
-      } else if (
-        thread.projectId &&
-        request.projectId &&
-        thread.projectId !== request.projectId
-      ) {
-        // The thread gained a different project between the request and this
-        // approval — another dispatch's write-back. A real disagreement, and
-        // refusing names it rather than silently picking one.
-        throw new RuleError("dispatches.errors.projectAlreadySet", "projectId");
-      }
-    }
-
     const [after] = await tx
       .update(dispatches)
       .set({
@@ -2114,8 +2034,6 @@ export async function getDispatch(
       createdAt: dispatches.createdAt,
       projectId: dispatches.projectId,
       projectName: projects.name,
-      // `S74` — the thread's own, for the edit form's choose-or-show branch.
-      threadProjectId: quotationThreads.projectId,
     })
     .from(dispatches)
     .innerJoin(companies, eq(companies.id, dispatches.companyId))
@@ -2212,7 +2130,6 @@ export async function getDispatch(
     ...decorated,
     projectId: row.projectId,
     projectName: row.projectName,
-    threadProjectId: row.threadProjectId,
     refusalReason: row.refusalReason,
     cancellationReason: row.cancellationReason,
     // `S76`'s own reason, on the screen it was written for: the coordinator
@@ -2351,7 +2268,9 @@ export async function listDispatchableThreads(
         eq(quotationVersions.status, "issued"),
       ),
     )
-    .leftJoin(projects, eq(projects.id, quotationThreads.projectId))
+    // INNER since `S50`: every quotation names a project, so a LEFT join
+    // could only ever widen the row type with a null nothing produces.
+    .innerJoin(projects, eq(projects.id, quotationThreads.projectId))
     .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
     .innerJoin(users, eq(users.id, quotationThreads.raisedByUserId))
     // **No payment term** since `S72`. The gate moved to the approval, so a rep
@@ -2437,58 +2356,6 @@ export async function searchDispatchCompanies(
     )
     .orderBy(companies.name)
     .limit(limit);
-}
-
-/**
- * Projects a `can_dispatch` holder may name on a dispatch `S74`.
- *
- * Ordered by name. **Only a LOST project is left out** `[07 C5]`: it is
- * finished, and offering one is offering a mistake. Everything else stays —
- * and `won` in particular, because `S31` makes a project won when the payment
- * arrives, which is the moment before the dispatch this picker exists for.
- * Filtering to `end_state is null` would have hidden exactly the projects most
- * likely to be dispatched against. `is distinct from` rather than `<>`, or
- * the null end state — the ordinary case — fails the comparison and every
- * live project disappears.
- *
- * **Ordinary project visibility since `S76`.** It used to compose a name-only
- * lookup filter of its own, because the only role holding `can_dispatch` could
- * not see a project at all while `S74` obliges that role to choose one; `S76`
- * made the coordinator's sight real and the stopgap came out with it. What is
- * left in the `where` is the picker's own rule, above, and no visibility rule
- * of its own.
- *
- * **It cannot be narrowed to the company's own projects.** `S74`'s second half
- * is that the company is ADDED to the project it did not belong to, so a
- * picker that only offered projects it already belonged to would make the rule
- * unusable.
- */
-export async function listDispatchProjectOptions(
-  session: AuthSession,
-): Promise<{ id: string; name: string }[]> {
-  return db
-    .select({
-      id: projects.id,
-      name: projects.name,
-    })
-    .from(projects)
-    .where(
-      and(
-        visibleProjectsFilter(session),
-        // **`end_state` carries only `'lost'` since `S31`**, so this and
-        // `is null` are now the same test. It stays written this way because
-        // it says what it means: a lost project is not something to dispatch
-        // against.
-        //
-        // **A won project stays in the picker.** `S77` — one quotation
-        // produces any number of dispatches, and `S31` wins the project on
-        // the first approved one. Excluding won projects here would make the
-        // second dispatch against a project impossible to raise.
-        sql`${projects.endState} is distinct from 'lost'`,
-      ),
-
-    )
-    .orderBy(projects.name);
 }
 
 /**

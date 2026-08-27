@@ -434,7 +434,8 @@
       "stock": "Stock",
       "verification": "Reference checked",
       "grandTotal": "Total",
-      "projectNone": "No project",
+      "projectNew": "A new project",
+      "projectNewName": "New project name",
       "rejectionReason": "Why it is being rejected"
     },
     "detail": {
@@ -477,10 +478,7 @@
       "cancelledBy": "Cancelled by",
       "cancellationReason": "Reason for cancellation",
       "turnSince": "Sitting here since {date}.",
-      "noProject": "No project yet",
-      "noProjectState": "No project yet — one is recorded when this is dispatched.",
-      "projectOptional": "Optional. A quotation raised without one gains a project when it is dispatched.",
-      "noProjectsYet": "You have no projects yet. This quotation can still be raised without one."
+      "projectNewHint": "Named after the company. Change it if the project has a name of its own."
     },
     "actions": {
       "coordinator": "Coordinator",
@@ -514,8 +512,7 @@
       "cancellationReasonRequired": "Cancelling needs a written reason.",
       "returnReasonRequired": "Say what needs changing. The reason goes to the rep as a comment.",
       "rejectionReasonRequired": "Say why you are rejecting it. The reason goes to the rep as a comment.",
-      "noSuppliers": "No product suppliers have been set up yet, so a line cannot be saved.",
-      "companyNotVisible": "That company cannot be found, or it is not one of yours."
+      "noSuppliers": "No product suppliers have been set up yet, so a line cannot be saved."
     }
   },
   "auth": {
@@ -558,7 +555,6 @@
       "filterLinked": "Against a quotation",
       "filterDirect": "Direct sales",
       "dispatchedSoFar": "dispatched so far:",
-      "projectPlaceholder": "Select a project",
       "status": "State",
       "raisedBy": "Raised by",
       "turn": "Whose move",
@@ -588,7 +584,6 @@
       "creditBySplit": "Divided equally by the credit split in force since {date}.",
       "creditByRep": "No credit split is in force, so the whole amount credits the rep on this dispatch.",
       "projectFromQuotation": "The project comes from the quotation. It is not chosen here.",
-      "projectWriteBack": "This quotation has no project. The one you choose is recorded on the quotation too, and its company joins that project.",
       "lines": "What went out",
       "linesPrefilled": "These lines come from the quotation. Change them, add to them or remove them — what you leave here is what went out.",
       "linesTyped": "Type what actually went out. Every line needs a price.",
@@ -644,10 +639,7 @@
       "companyNotVisible": "That company cannot be found.",
       "companyRequired": "A free entry needs a company.",
       "sqmPositive": "A dispatch must add up to some square metres. Check the pieces and dimensions on each line.",
-      "projectRequired": "This quotation has no project. Choose the project this dispatch belongs to.",
       "projectNotOnThread": "The project does not match the quotation.",
-      "projectNotVisible": "That project cannot be found.",
-      "projectAlreadySet": "This quotation gained a project a moment ago. Open the form again.",
       "quotationNotIssued": "That quotation has not been issued yet, so nothing can be dispatched against it.",
       "atLeastOneLine": "A dispatch needs at least one line.",
       "linePriceRequired": "Every dispatched line needs a price.",

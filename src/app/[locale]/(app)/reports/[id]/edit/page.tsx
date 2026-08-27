@@ -116,8 +116,8 @@ export default async function EditReportPage({
         submitLabel={t("reports.actions.save")}
         cancelHref={`/reports/${report.id}`}
         quotationHref={
-          report.projectId
-            ? `/quotations/new?projectId=${report.projectId}`
+          report.companyId
+            ? `/quotations/new?companyId=${report.companyId}`
             : "/quotations/new"
         }
       />

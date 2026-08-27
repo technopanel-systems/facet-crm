@@ -7,7 +7,6 @@ import { Link } from "@/i18n/navigation";
 import { formatSqm } from "@/lib/decimal";
 import { can, listActiveUsers, requireSession } from "@/lib/authz";
 import {
-  listDispatchProjectOptions,
   listDispatchableThreads,
   searchDispatchCompanies,
 } from "@/lib/dispatches";
@@ -67,7 +66,6 @@ export default async function NewDispatchPage({
     threads,
     companies,
     reps,
-    projects,
     suppliers,
     classes,
     fireRatings,
@@ -77,9 +75,6 @@ export default async function NewDispatchPage({
     mode === "direct" ? searchDispatchCompanies(session, query) : [],
     // `S108` — only somebody who may name another rep gets the picker at all.
     mode === "direct" && canNameRep ? listActiveUsers() : [],
-    // `S74` — only the linked form ever picks one: a direct dispatch names no
-    // project this slice `S75`.
-    mode === "linked" ? listDispatchProjectOptions(session) : [],
     listProductSuppliers(),
     listProductClasses(),
     listProductFireRatings(),
@@ -155,13 +150,12 @@ export default async function NewDispatchPage({
         mode={mode}
         canNameRep={canNameRep}
         threads={threads.map((thread) => {
-          // `S50` — the quotation may have no project, in which case the
-          // option names its company instead of leaving a gap between two
-          // separators, and the form offers the picker `S74`.
+          // `S50` — every quotation names one, so the option always has it and
+          // the company fallback that stood here is gone with the null.
           const projectLabel = thread.projectName;
           return {
             id: thread.id,
-            label: `${thread.smacReference} · ${projectLabel ?? thread.companyName} · ${t("dispatches.fields.dispatchedSoFar")} ${formatSqm(thread.dispatchedSqm)}`,
+            label: `${thread.smacReference} · ${projectLabel} · ${t("dispatches.fields.dispatchedSoFar")} ${formatSqm(thread.dispatchedSqm)}`,
             companyLabel: thread.companyName,
             raisedByName: thread.raisedByName,
             quotedSqm: thread.quotedSqm,
@@ -183,10 +177,6 @@ export default async function NewDispatchPage({
           label: company.name,
         }))}
         reps={reps}
-        projects={projects.map((project) => ({
-          id: project.id,
-          label: project.name,
-        }))}
         products={{ suppliers, classes, fireRatings, thicknesses }}
         locale={locale}
         companyQuery={query}

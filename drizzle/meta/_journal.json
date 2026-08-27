@@ -218,6 +218,13 @@
       "when": 1788009600000,
       "tag": "0030_one_name_field_on_projects",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1788048000000,
+      "tag": "0031_a_quotation_always_names_a_project",
+      "breakpoints": true
     }
   ]
 }

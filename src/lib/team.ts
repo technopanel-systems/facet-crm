@@ -72,9 +72,9 @@ export type HandoverProject = {
 
 export type HandoverThread = {
   id: string;
-  /** Null when the quotation has no project `S50` — the screen names it by
-   *  its company instead, which `S51` guarantees is there. */
-  projectName: string | null;
+  /** Always set `S50`. `S51`'s company fallback stays on the screen anyway:
+   *  it costs nothing and the column is already on the query. */
+  projectName: string;
   companyName: string;
   createdAt: Date;
 };
@@ -165,10 +165,11 @@ export async function getHandoverBook(
         createdAt: quotationThreads.createdAt,
       })
       .from(quotationThreads)
-      // LEFT `S50`: an inner join drops a project-less thread from the book,
-      // and a thread that cannot be listed cannot be handed over — it would
-      // stay with the departed account with nothing on screen to say so.
-      .leftJoin(projects, eq(quotationThreads.projectId, projects.id))
+      // INNER since `S50`. The LEFT it replaces guarded a real failure — a
+      // project-less thread dropping out of the book, so a thread that could
+      // not be listed could not be handed over — and that failure no longer
+      // exists: every thread names a project.
+      .innerJoin(projects, eq(quotationThreads.projectId, projects.id))
       .innerJoin(companies, eq(quotationThreads.companyId, companies.id))
       .where(eq(quotationThreads.raisedByUserId, userId))
       .orderBy(asc(projects.name)),

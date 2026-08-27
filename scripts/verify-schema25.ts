@@ -1694,11 +1694,12 @@ async function regionIsAlwaysDerived(): Promise<void> {
  * cannot express "equal to a column on another table" without a trigger or a
  * composite key nobody asked for.
  *
- * It is also the only thing that proves migration 0013's backfill. That
- * `UPDATE` is the one statement in the migration that can be **wrong without
- * failing**: `dispatchedSqmByCompany` reads `dispatches.project_id` since this
- * slice, so a backfill that missed rows would show up as figures that look
- * plausible and are quietly short — never as an error. Two counts, both zero.
+ * It is also the only thing that proves migration `0031`'s backfill — as it
+ * proved `0013`'s before it. That `UPDATE` is the one statement in either
+ * migration that can be **wrong without failing**: `dispatchedSqmByCompany`
+ * reads `dispatches.project_id`, so a backfill that missed rows would show up
+ * as figures that look plausible and are quietly short, never as an error.
+ * Two counts, both zero.
  *
  * **Counted in SQL, and asserted `=== 0`.** Not `!count`: the query returns a
  * string from `count(*)`, and a truthiness test on `"0"` passes for the wrong
@@ -1710,18 +1711,20 @@ async function projectMatchesThread(): Promise<void> {
   );
 
   /*
-   * **`S72` narrowed this claim, and the narrowing is the rule rather than a
-   * concession.** `S74`'s write-back *happens when the coordinator approves*.
-   * Before that a request may perfectly well name a project its quotation does
-   * not carry — that is precisely the state the write-back exists to resolve,
-   * and it is what a request against a project-less quotation `S50` looks like
-   * from the moment the rep raises it until the moment she approves it.
+   * **The claim stays narrowed to the approved even though `S50` closed the
+   * gap that narrowed it.** `S72` narrowed it because a request could name a
+   * project its quotation had not gained yet — the state the write-back
+   * existed to resolve. There is no such state now: `projectForThread` takes
+   * the thread's project and refuses a disagreeing one, so a request agrees
+   * from the moment it is raised. Asserting only over the approved is
+   * therefore weaker than it needs to be, and it stays that way deliberately:
+   * `S72` is what decides which dispatches this rule is about, and widening it
+   * here would be this script inventing a rule rather than reading one.
    *
-   * So the invariant is asserted over the approved, and the unapproved get
-   * their own claim below: they may disagree, and none of them may have
-   * written anything back. Asserting the old, wider version would have failed
-   * on the very state `S72` created — and quietly asserting nothing at all
-   * about the request would have been worse.
+   * `pending_writeback` is gone with the write-back. It counted requests
+   * disagreeing with their quotation, which is now a refusal rather than a
+   * state, and a count of a thing that cannot happen reads as tolerance for
+   * it.
    */
   const [row] = (await db.execute(sql`
     select
@@ -1729,13 +1732,10 @@ async function projectMatchesThread(): Promise<void> {
         where d.status = 'approved' and d.project_id is distinct from t.project_id
       )::int as disagreeing,
       count(*) filter (
-        where d.status = 'approved' and t.project_id is not null and d.project_id is null
+        where d.status = 'approved' and d.project_id is null
       )::int as unfilled,
       count(*) filter (where d.status = 'approved')::int as approved,
       count(*)::int as linked,
-      count(*) filter (
-        where d.status <> 'approved' and d.project_id is distinct from t.project_id
-      )::int as pending_writeback,
       (select count(*)::int from dispatches
         where quotation_thread_id is null and project_id is not null) as direct_with_project
     from dispatches d
@@ -1745,7 +1745,6 @@ async function projectMatchesThread(): Promise<void> {
     unfilled: number;
     approved: number;
     linked: number;
-    pending_writeback: number;
     direct_with_project: number;
   }[];
 
@@ -1758,44 +1757,38 @@ async function projectMatchesThread(): Promise<void> {
     `${row.disagreeing} disagree`,
   );
   check(
-    "*** none is null where its quotation has one — the 0013 backfill *** [S74]",
+    "*** none is null, since its quotation never is — the 0031 backfill *** [S74], [S50]",
     row.unfilled === 0,
     `${row.unfilled} unfilled`,
   );
-  console.log(
-    `  --    ${row.pending_writeback} request(s) naming a project their quotation has not gained yet [S74]`,
-  );
 
   /*
-   * The other half, and the one that would catch a write-back firing early.
+   * **The column itself, asserted twice, because either alone passes for the
+   * wrong reason.** A row count of zero orphans passes on an empty table; an
+   * `information_schema` answer passes on a column nothing has ever filled.
+   * Together they say what `S50` says: there is no project-less quotation, and
+   * there is no way to write one.
    *
-   * **Asked of the audit row, not of the thread's state.** A thread carrying a
-   * project proves nothing on its own: the rep may have named one when they
-   * raised the quotation `S50`, which is the ordinary case and has nothing to
-   * do with any dispatch. What `S72` moved is one specific write, and
-   * `quotation_thread.project_set` is written by that write and by nothing
-   * else — so every one of those rows must belong to a thread that has an
-   * approved dispatch. One that does not is a write-back that fired at request
-   * time, which is exactly the behaviour this slice moved.
+   * This is what replaces the audit half that stood here. That half read
+   * `quotation_thread.project_set` — an action `S74`'s write-back was the only
+   * writer of — and it went with the writer.
    */
-  const [early] = (await db.execute(sql`
+  const [column] = (await db.execute(sql`
     select
-      count(*)::int as writebacks,
-      count(*) filter (
-        where not exists (
-          select 1 from dispatches d
-          where d.quotation_thread_id = a.entity_id and d.status = 'approved'
-        )
-      )::int as unapproved
-    from audit_log a
-    where a.entity_type = 'quotation_thread'
-      and a.action = 'quotation_thread.project_set'
-  `)) as unknown as { writebacks: number; unapproved: number }[];
-  console.log(`  --    ${early.writebacks} write-back(s) ever performed [S74]`);
+      (select count(*)::int from quotation_threads where project_id is null) as orphans,
+      (select is_nullable from information_schema.columns
+        where table_schema = 'public' and table_name = 'quotation_threads'
+          and column_name = 'project_id') as is_nullable
+  `)) as unknown as { orphans: number; is_nullable: string }[];
   check(
-    "*** every write-back belongs to a thread with an APPROVED dispatch *** [S74], [S72]",
-    early.unapproved === 0,
-    `${early.unapproved} fired without one`,
+    "*** no quotation thread has a null project *** [S50]",
+    column.orphans === 0,
+    `${column.orphans} orphan(s)`,
+  );
+  check(
+    "*** …and the column refuses one — 0031 put the NOT NULL back *** [S50]",
+    column.is_nullable === "NO",
+    `is_nullable = ${column.is_nullable}`,
   );
 
   // `S75`'s stated-purpose half is session 6b. Until it lands, a dispatch with

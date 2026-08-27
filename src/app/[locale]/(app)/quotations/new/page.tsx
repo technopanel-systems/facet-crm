@@ -21,11 +21,13 @@ export default async function NewQuotationPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ projectId?: string }>;
+  searchParams: Promise<{ companyId?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const { projectId } = await searchParams;
+  // `S50` — the company is the form's first field, so it is the one a deep
+  // link can seed. It used to be the project, back when that was first.
+  const { companyId } = await searchParams;
 
   const session = await requireSession();
   const t = await getTranslations();
@@ -55,7 +57,7 @@ export default async function NewQuotationPage({
         products={{ suppliers, classes, fireRatings, thicknesses }}
         services={services}
         locale={locale}
-        defaultProjectId={projectId}
+        defaultCompanyId={companyId}
       />
     </div>
   );

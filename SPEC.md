@@ -382,7 +382,7 @@ counts once, not once per quotation beneath it.
 
 ## 8. Quotations
 
-**S50. [CHANGE]** A quotation **always names a project**. Every sale is on the
+**S50.** A quotation **always names a project**. Every sale is on the
 board (D29), and a sale with no project cannot appear on it.
 
 Raising asks for the company first. The rep then attaches the quotation to one
@@ -396,9 +396,10 @@ holding four unrelated jobs cannot be pulled apart.
 typed into a box is faster than creating a project, so it becomes the lazy path,
 and it produces a record nothing can quote against, count, or put in a column.
 
-The code today permits the null and then refuses it one step later: a
-project-less quotation cannot be dispatched at all (S74). This rule moves that
-refusal to the moment the gap is cheap to close, and closes the window to zero.
+The code permitted the null until migration `0031` and refused it one step
+later: a project-less quotation could not be dispatched at all (S74). The
+refusal now happens at the moment the gap is cheap to close, and the window is
+zero — `quotation_threads.project_id` is NOT NULL.
 
 **S51.** A quotation always names a **company**.
 
@@ -503,18 +504,17 @@ method, the SMAC number and its difference flag (S120) — and it credits nothin
 and wins nothing (S31). The reason reaches the rep and anyone whose credit it
 takes back (S128).
 
-**S74. [CHANGE]** **The project is recorded on the dispatch itself**, and it is
+**S74.** **The project is recorded on the dispatch itself**, and it is
 always the quotation's own. A dispatch raised from a quotation takes that
 quotation's project, shown and never chosen; a dispatch that names a different
 one is refused rather than silently corrected. A **free entry** names none
 (S75), because it has no quotation to have taken one from.
 
-**The write-back is gone, and it goes with S50's null case in the same slice.**
-It existed only because a quotation might have no project. Since S50 every
-quotation has one before it is ever dispatched, so there is nothing to write
-back and no participant to add — the picker at dispatch, the `projectRequired`
-refusal, and the approval-time update all come out together. Building the new
-rule beside the old mechanism is the failure mode this avoids.
+**The write-back is gone.** It existed only because a quotation might have no
+project. Since S50 every quotation has one before it is ever dispatched, so
+there was nothing to write back and no participant to add — the picker at
+dispatch, the `projectRequired` refusal and the approval-time update came out
+together with the null case, in one slice.
 
 **S75. [BUILD]** A dispatch is raised one of three ways: **exactly as a
 quotation** · **from a quotation, with edits** · **as a free entry with no
@@ -946,8 +946,6 @@ Ordered by what unblocks what.
 
 3. One name field on companies and contacts; phone mandatory; country added
 4. Drop project role labels
-5. Every quotation names a project (S50); the write-back at dispatch comes out
-   with it (S74)
 6. VAT fixed; validity and delivery period leave FACET; readable product fields
 7. Report split into shared half and private note; same-day edit
 8. Signals and loss reasons unified; loss cascade

@@ -82,18 +82,17 @@ export function preflight(): void {
 
   for (const row of THREADS) {
     company(`thread ${row.key}`, row.company, row.raised);
-    if (row.project) {
-      project(`thread ${row.key}`, row.project, row.raised);
-      // `S51` — a quotation always names a company, and `createQuotationThread`
-      // refuses one that is not a participant of the project it names.
-      if (!participants.get(row.project)?.has(row.company)) {
-        bad.push(`thread ${row.key}: ${row.company} is not on ${row.project}`);
-      }
-      // `S30` — a project is visible only to its owner, so the rep raising the
-      // quotation has to be the one who holds it.
-      if (projectOwner.get(row.project) !== ownerOf.get(row.company)) {
-        bad.push(`thread ${row.key}: ${row.project} belongs to another rep [S30]`);
-      }
+    // Unconditional since `S50` — every thread names a project.
+    project(`thread ${row.key}`, row.project, row.raised);
+    // `S51` — a quotation always names a company, and `createQuotationThread`
+    // refuses one that is not a participant of the project it names.
+    if (!participants.get(row.project)?.has(row.company)) {
+      bad.push(`thread ${row.key}: ${row.company} is not on ${row.project}`);
+    }
+    // `S30` — a project is visible only to its owner, so the rep raising the
+    // quotation has to be the one who holds it.
+    if (projectOwner.get(row.project) !== ownerOf.get(row.company)) {
+      bad.push(`thread ${row.key}: ${row.project} belongs to another rep [S30]`);
     }
     ordered(`thread ${row.key}`, [
       row.raised,
@@ -132,7 +131,6 @@ export function preflight(): void {
     } else {
       company(label, row.company, row.requested);
     }
-    if (row.project) project(label, row.project, row.requested);
     // `S119` — South and Dammam stock have no trucks, so a dispatch from
     // either is CT. The database holds the same rule; this says which row.
     if ((row.stock === "south" || row.stock === "dammam") && row.shipment !== "ct") {

@@ -115,7 +115,6 @@ import {
   projectCreditSplits,
   projects,
   quotationLines,
-  quotationThreads,
   quotationVersions,
   recordShares,
   roles,
@@ -153,7 +152,6 @@ import {
   cancelDispatch,
   dispatchesInPeriod,
   getDispatch,
-  listDispatchProjectOptions,
   listDispatchableThreads,
   listDispatches,
   refuseDispatchRequest,
@@ -168,7 +166,7 @@ import {
 } from "@/lib/dispatches";
 import { NOTIFICATION_TYPES, SAUDI_CODE } from "@/lib/enums";
 import { followUpsForRecipient, setNextFollowUp } from "@/lib/follow-ups";
-import { listCountries, listLossReasons } from "@/lib/lookups";
+import { listCountries } from "@/lib/lookups";
 import { listNotifications, type DecisionPayload } from "@/lib/notifications";
 import {
   addProjectCompany,
@@ -1758,163 +1756,26 @@ async function main(): Promise<void> {
       }),
   );
 
-  // Branch two: a quotation with NO project `S50`, taken to paid. Its company
-  // is deliberately one that is NOT a participant of `otherProject`, so the
-  // participant this dispatch adds is one that was not there before.
-  const [outsider] = await db
-    .insert(companies)
-    .values({
-      name: `${stamp} Outsider`,
-      nameNormalized: normalizeName(`${stamp} Outsider`),
-      phone: `+9665${stamp.slice(-7)}4`,
-      countryId: saudiId,
-      createdBy: repA.user.id,
-    })
-    .returning();
-  await db.insert(companyReps).values({
-    companyId: outsider.id,
-    userId: repA.user.id,
-    isPrimary: true,
-    origin: "self_registered",
-  });
-
-  const looseThread = await createQuotationThread(
-    repA,
-    { projectId: null, companyId: outsider.id, contactId: null },
-    version,
-    [line],
-    [],
-  );
-  check(
-    "*** a quotation can be raised with NO project *** [S50]",
-    looseThread.projectId === null,
-    `got ${looseThread.projectId}`,
-  );
-
-  await issueVersion(coordinator, looseThread.id, {
-    smacReference: `${stamp}-9594`,
-    verification: "unverified",
-  });
-  await acceptThread(coordinator, looseThread.id);
-
+  // …and raising with no project at all is refused **at the data layer**,
+  // not only by the form `S50`. This is what branch two of this section used
+  // to prove the opposite of: it took a project-less quotation through issue,
+  // payment and dispatch, and every step of that life is now unreachable.
   await refuses(
-    "dispatching it with no project chosen is refused [S74]",
-    "dispatches.errors.projectRequired",
+    "*** a quotation cannot be raised with no project *** [S50]",
+    "quotations.errors.projectNotVisible",
     () =>
-      approvedDispatch(coordinator, {
-    ...SHIP,
-        lines: linesOf("12.0000"),
-        dispatchDate: "2026-09-14",
-        quotationThreadId: looseThread.id,
-        companyId: null,
-        userId: null,
-        projectId: null,
-      }),
+      createQuotationThread(
+        repA,
+        {
+          projectId: "00000000-0000-0000-0000-000000000000",
+          companyId: company.id,
+          contactId: null,
+        },
+        version,
+        [line],
+        [],
+      ),
   );
-
-  const written = await approvedDispatch(coordinator, {
-    ...SHIP,
-    lines: linesOf("12.0000"),
-    dispatchDate: "2026-09-14",
-    quotationThreadId: looseThread.id,
-    companyId: null,
-    userId: null,
-    projectId: otherProject.id,
-  });
-  check(
-    "the dispatch carries the chosen project [S74]",
-    written.projectId === otherProject.id,
-    `got ${written.projectId}`,
-  );
-
-  const [rewritten] = await db
-    .select({ projectId: quotationThreads.projectId })
-    .from(quotationThreads)
-    .where(eq(quotationThreads.id, looseThread.id))
-    .limit(1);
-  check(
-    "*** and it is written back onto the QUOTATION *** [S74]",
-    rewritten?.projectId === otherProject.id,
-    `got ${rewritten?.projectId}`,
-  );
-
-  const participants = await listProjectCompanies(repA, otherProject.id);
-  const added = participants.find((row) => row.companyId === outsider.id);
-  check(
-    "*** the quotation's company joined that project as a participant *** [S74], [S27]",
-    added !== undefined,
-    participants.map((row) => row.companyName).join(" | "),
-  );
-  check(
-    "…and the derived figure reaches it, through the dispatch's own project [S26]",
-    added?.dispatchedSqm === "12.0000",
-    `got ${JSON.stringify(added?.dispatchedSqm)}`,
-  );
-
-  // **The participant is added ONCE.** A second dispatch on the same
-  // quotation finds the company already there and must not write a second
-  // link — `S27` keeps one live row per company, and the partial unique index
-  // would refuse it anyway. Nothing to write back either: the quotation now
-  // has a project, so this is branch one from here on.
-  const again = await approvedDispatch(coordinator, {
-    ...SHIP,
-    lines: linesOf("8.0000"),
-    dispatchDate: "2026-09-15",
-    quotationThreadId: looseThread.id,
-    companyId: null,
-    userId: null,
-    projectId: null,
-  });
-  check(
-    "a second dispatch on the same quotation now takes the project it gained [S74]",
-    again.projectId === otherProject.id,
-    `got ${again.projectId}`,
-  );
-  const afterSecond = await listProjectCompanies(repA, otherProject.id);
-  check(
-    "…and the company is still ONE participant, not two [S27]",
-    afterSecond.filter((row) => row.companyId === outsider.id).length === 1,
-    `got ${afterSecond.filter((row) => row.companyId === outsider.id).length}`,
-  );
-  check(
-    "…with both dispatches summed into its figure [S26]",
-    afterSecond.find((row) => row.companyId === outsider.id)?.dispatchedSqm ===
-      "20.0000",
-    `got ${JSON.stringify(afterSecond.find((row) => row.companyId === outsider.id)?.dispatchedSqm)}`,
-  );
-
-  // **What the coordinator may pick from** `S74`. The trap this was written
-  // for: `<> 'lost'` on a nullable column is null for every ordinary project,
-  // which hides all of them.
-  //
-  // The other half of it used to be asserted here with a hand-set `won`
-  // project. `S31` took that value out of the vocabulary — a project is won
-  // when a dispatch against it is approved, and nothing can set it — so the
-  // claim moved to §28, where a genuinely won project exists to make it.
-  const lostProject = await createProject(
-
-    repA,
-    {
-      name: `${stamp} Lost Project`,
-      sqmExpected: null,
-      cityId: null,
-      endState: "lost",
-      lostReasonId: (await listLossReasons())[0].id,
-      lossReason: null,
-      inProduction: false,
-      committed: false,
-    },
-    [{ companyId: company.id }],
-  );
-  const pickable = await listDispatchProjectOptions(coordinator);
-  const offered = new Set(pickable.map((row) => row.id));
-  check(
-    "the picker offers an ordinary open project, which a plain <> comparison would drop",
-    offered.has(project.id),
-    `${pickable.length} offered`,
-  );
-
-  check("…and never a lost one [07 C5]", !offered.has(lostProject.id));
 
   /* --- 16. S76 — the coordinator sees projects and contacts ------ */
 
@@ -1986,13 +1847,6 @@ async function main(): Promise<void> {
     "*** the dispatch screen may now LINK its project, not print it *** [S76], [S74]",
     linkedForCoordinator?.projectViewable === true,
   );
-  check(
-    "the picker is ordinary project visibility now — the stopgap is gone [S76]",
-    (await listDispatchProjectOptions(coordinator)).some(
-      (row) => row.id === project.id,
-    ),
-  );
-
   // The negative half, and the point of the slice: sight, not a hand.
   check(
     "the ACT gate still refuses the coordinator on a project [S76], [S62]",
@@ -2821,127 +2675,6 @@ async function main(): Promise<void> {
         })
       ).total ===
         beforeChain + 1,
-  );
-
-  /* --- 23. S74's write-back fires at the APPROVAL ---------------- */
-
-  console.log(
-    "\n23. *** The project is written back when she approves, not when he asks *** [S74], [S72]",
-  );
-
-  // `S74`'s second branch, timed. The quotation has no project of its own
-  // `S50`, the rep names one on the request, and the quotation must NOT gain
-  // it until the request is approved — a project written onto a quotation by a
-  // request nobody approved would be a decision nobody made.
-  const [loneCompany] = await db
-    .insert(companies)
-    .values({
-      name: `${stamp} Writeback Co`,
-      nameNormalized: normalizeName(`${stamp} Writeback Co`),
-      phone: `+9665${stamp.slice(-7)}5`,
-      countryId: saudiId,
-      createdBy: repA.user.id,
-    })
-    .returning();
-  await db.insert(companyReps).values({
-    companyId: loneCompany.id,
-    userId: repA.user.id,
-    isPrimary: true,
-    origin: "self_registered",
-  });
-  const [target] = await db
-    .insert(projects)
-    .values({
-      name: `${stamp} Writeback Project`,
-      nameNormalized: normalizeName(`${stamp} Writeback Project`),
-      ownerUserId: repA.user.id,
-      createdBy: repA.user.id,
-    })
-    .returning();
-
-  const projectless = await createQuotationThread(
-    repA,
-    { projectId: null, companyId: loneCompany.id, contactId: null },
-    version,
-    [line],
-    [],
-  );
-  await issueVersion(coordinator, projectless.id, {
-    smacReference: `${stamp}-wb`,
-    verification: "unverified",
-  });
-  await acceptThread(coordinator, projectless.id);
-
-  await refuses(
-    "a projectless quotation refuses a request that names no project [S74]",
-    "dispatches.errors.projectRequired",
-    () =>
-      requestDispatch(repA, {
-    ...SHIP,
-        lines: linesOf("6.0000", "60.00"),
-        dispatchDate: "2026-09-30",
-        quotationThreadId: projectless.id,
-        companyId: null,
-        userId: null,
-        projectId: null,
-      }),
-  );
-
-  const writeback = await requestDispatch(repA, {
-    ...SHIP,
-    lines: linesOf("6.0000", "60.00"),
-    dispatchDate: "2026-09-30",
-    quotationThreadId: projectless.id,
-    companyId: null,
-    userId: null,
-    projectId: target.id,
-  });
-  check(
-    "*** the request carries the project and the QUOTATION does not, yet *** [S74]",
-    writeback.projectId === target.id &&
-      (await getQuotationThread(repA, projectless.id))?.projectId === null,
-  );
-  check(
-    "…and the company has not joined the project either [S27], [S74]",
-    !(await listProjectCompanies(repA, target.id)).some(
-      (row) => row.companyId === loneCompany.id,
-    ),
-  );
-
-  await submitDispatchRequest(repA, writeback.id);
-  check(
-    "submitting still writes nothing back — asking is not deciding [S74]",
-    (await getQuotationThread(repA, projectless.id))?.projectId === null,
-  );
-
-  await approveDispatchRequest(coordinator, writeback.id, PAID);
-  check(
-    "*** approving writes the project onto the quotation *** [S74], [S72]",
-    (await getQuotationThread(repA, projectless.id))?.projectId === target.id,
-  );
-  check(
-    "*** …and adds its company to that project *** [S74], [S27]",
-    (await listProjectCompanies(repA, target.id)).some(
-      (row) => row.companyId === loneCompany.id,
-    ),
-  );
-
-  // A SECOND dispatch on the same thread must not fail on its predecessor's
-  // write-back. The thread already carries the project the request names, so
-  // there is nothing to write and nothing to refuse.
-  const second = await approvedDispatch(coordinator, {
-    ...SHIP,
-    lines: linesOf("2.0000", "60.00"),
-    dispatchDate: "2026-10-01",
-    quotationThreadId: projectless.id,
-    companyId: null,
-    userId: null,
-    projectId: null,
-  });
-  check(
-    "*** a second dispatch does not trip on the first one's write-back *** [S74]",
-    second.projectId === target.id && second.status === "approved",
-    `got project ${second.projectId}, status ${second.status}`,
   );
 
   /* --- 24. Shipment, and the CT rule [S119], [S130] --------------- */
@@ -3948,12 +3681,15 @@ async function main(): Promise<void> {
   );
 
   // `S77` — one quotation produces any number of dispatches, so a won project
-  // must stay dispatchable. §15's picker assertion, made where a real win is.
+  // must stay dispatchable. Asked of `listDispatchableThreads`, which is what
+  // the request form reads now that `S50` took the project picker off it: the
+  // question was never about a list of projects, it was about whether a second
+  // dispatch can be raised at all.
   check(
-    "…and the picker still offers it, so a second dispatch can be raised [S77], [S74]",
-    new Set(
-      (await listDispatchProjectOptions(coordinator)).map((row) => row.id),
-    ).has(winnable.id),
+    "…and its quotation is still offered, so a second dispatch can be raised [S77], [S74]",
+    (await listDispatchableThreads(coordinator)).some(
+      (row) => row.id === winnableThread.id && row.projectId === winnable.id,
+    ),
   );
 
   // **Nothing hand-sets it.** `end_state` carries one value now, so the type

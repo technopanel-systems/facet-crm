@@ -6,7 +6,6 @@ import {
 } from "next-intl/server";
 
 import {
-  Absent,
   DetailHeader,
   DetailRow,
   Fact,
@@ -131,22 +130,13 @@ export default async function QuotationDetailPage({
     hasSubmittedDispatch: submitted.total > 0,
   });
 
-  // `S50` — a quotation may have no project. The project is what normally
-  // names this screen; with none, the COMPANY does, which `S51` guarantees is
-  // there, and the state line says what is missing and when it arrives. A
-  // header reading "No project" would make the absence the loudest thing on a
-  // screen that is about a quotation.
-  const projectName = thread.projectName;
-
+  // `S50` — the project names this screen and the company is the state line
+  // under it. Both are always there now, so neither falls back to the other.
   return (
     <div className="flex flex-col gap-6">
       <DetailHeader
-        name={projectName ?? thread.companyName}
-        state={
-          projectName
-            ? thread.companyName
-            : t("quotations.detail.noProjectState")
-        }
+        name={thread.projectName}
+        state={thread.companyName}
         reference={live.smacReference ?? undefined}
         action={
           thread.endState ? (
@@ -211,17 +201,15 @@ export default async function QuotationDetailPage({
                 project. A coordinator sees every quotation and none of the
                 customer detail behind it `[16 §10]`. */}
             <Fact label={t("quotations.fields.project")} name="project">
-              {projectName === null ? (
-                <Absent>{t("quotations.detail.noProject")}</Absent>
-              ) : thread.projectViewable ? (
+              {thread.projectViewable ? (
                 <Link
                   href={`/projects/${thread.projectId}`}
                   className="hover:underline"
                 >
-                  {projectName}
+                  {thread.projectName}
                 </Link>
               ) : (
-                projectName
+                thread.projectName
               )}
             </Fact>
             <Fact label={t("quotations.fields.company")}>

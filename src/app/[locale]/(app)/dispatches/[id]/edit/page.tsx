@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/page-header";
 import { can, requireSession } from "@/lib/authz";
-import { getDispatch, listDispatchProjectOptions } from "@/lib/dispatches";
+import { getDispatch } from "@/lib/dispatches";
 import {
   listProductClasses,
   listProductFireRatings,
@@ -47,14 +47,11 @@ export default async function EditDispatchRequestPage({
   const hers = dispatch.status === "submitted" && can(session, "canDispatch");
   if (!mine && !hers) notFound();
 
-  // `S74` — a request against a quotation with no project of its own `S50` is
-  // the only one where the project is a choice. A free entry names none `S75`.
-  const chooseProject =
-    dispatch.quotationThreadId !== null && dispatch.threadProjectId === null;
-
-  const [projects, suppliers, classes, fireRatings, thicknesses] =
+  // No project picker here since `S50`: a linked request takes the
+  // quotation's, and a free entry names none `S75`. Both are shown, neither is
+  // chosen, so nothing on this page loads a list of projects any more.
+  const [suppliers, classes, fireRatings, thicknesses] =
     await Promise.all([
-      chooseProject ? listDispatchProjectOptions(session) : [],
       listProductSuppliers(),
       listProductClasses(),
       listProductFireRatings(),
@@ -93,12 +90,6 @@ export default async function EditDispatchRequestPage({
         shipment={dispatch.shipment}
         cargoDestination={dispatch.cargoDestination}
         projectLabel={dispatch.projectName}
-        chooseProject={chooseProject}
-        projectId={dispatch.projectId}
-        projects={projects.map((project) => ({
-          id: project.id,
-          label: project.name,
-        }))}
         products={{ suppliers, classes, fireRatings, thicknesses }}
         locale={locale}
       />

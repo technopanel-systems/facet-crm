@@ -780,7 +780,7 @@ function planThreads(look: Lookups): void {
       const created = await createQuotationThread(
         who(owner),
         {
-          projectId: row.project ? id(projectId, row.project, "project") : null,
+          projectId: id(projectId, row.project, "project"),
           companyId: id(companyId, row.company, "company"),
           contactId: row.contact ? (contactId.get(row.company) ?? null) : null,
         },
@@ -883,7 +883,10 @@ function planDispatches(look: Lookups): void {
           : null,
         companyId: row.thread ? null : id(companyId, company, "company"),
         userId: null,
-        projectId: row.project ? id(projectId, row.project, "project") : null,
+        // `S74` — never named here. A linked request takes the quotation's
+        // project and a free entry `S75` has none; the picker that used to put
+        // one on this call went with `S50`'s null case.
+        projectId: null,
         stock: row.stock,
         shipment: row.shipment,
         cargoDestination: row.cargo ?? null,
@@ -902,7 +905,7 @@ function planDispatches(look: Lookups): void {
           {
             lines: edited(source),
             dispatchDate: day(row.date),
-            projectId: row.project ? id(projectId, row.project, "project") : null,
+            projectId: null,
             stock: row.stock,
             shipment: row.shipment,
             cargoDestination: row.cargo ?? null,
@@ -934,9 +937,7 @@ function planDispatches(look: Lookups): void {
             {
               lines: edited(source),
               dispatchDate: day(row.date),
-              projectId: row.project
-                ? id(projectId, row.project, "project")
-                : null,
+              projectId: null,
               stock: row.stock,
               shipment: row.shipment,
               cargoDestination: row.cargo ?? null,

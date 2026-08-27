@@ -9,7 +9,7 @@ import {
   SelectField,
 } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
-import { Combobox } from "@/components/ui/combobox";
+import { Input } from "@/components/ui/input";
 import { Link } from "@/i18n/navigation";
 // A value import from a data module would bundle the Postgres driver here.
 // `enums.ts` imports nothing, on purpose, so a closed set is safe to read.
@@ -44,10 +44,15 @@ export type ContactOption = { id: string; companyId: string; name: string };
  * `[10 §4]` — status `requested`, no SMAC reference, which the coordinator
  * fills in later.
  *
- * **The project is optional** `S50`. Which companies may be named follows from
- * that: with a project, its live links and nothing wider `[16 §6]`; without
- * one, every company this rep may use. The server applies the same pair, so
- * neither list offers what the action would refuse.
+ * **The company is chosen first, then the project** `S50`. A quotation always
+ * names one, so the only question is which: a new project, pre-named from the
+ * company the rep has just picked, or one of that company's projects he can
+ * already see `S30` `[16 §6]`. **The default is the new project.**
+ *
+ * The empty value of the project `<select>` IS the new-project case rather than
+ * a blank — there is no blank left to offer — which is why the name input sits
+ * under it and no third control decides between them. The server applies the
+ * same rule, so neither list offers what the action would refuse.
  */
 export function QuotationForm({
   action,
@@ -57,7 +62,7 @@ export function QuotationForm({
   products,
   services,
   locale,
-  defaultProjectId,
+  defaultCompanyId,
 }: {
   action: Action;
   projects: ProjectOption[];
@@ -66,26 +71,35 @@ export function QuotationForm({
   products: ProductOptions;
   services: NamedOption[];
   locale: string;
-  defaultProjectId?: string;
+  defaultCompanyId?: string;
 }) {
   const t = useTranslations();
   const [state, formAction, pending] = useActionState(action, emptyFormState);
   const errors = state.fieldErrors ?? {};
 
-  const [projectId, setProjectId] = useState(
-    state.values?.projectId ?? defaultProjectId ?? "",
+  const [companyId, setCompanyId] = useState(
+    state.values?.companyId ?? defaultCompanyId ?? "",
   );
-  const [companyId, setCompanyId] = useState(state.values?.companyId ?? "");
+  const [projectId, setProjectId] = useState(state.values?.projectId ?? "");
+  // Null means *follow the company*, which is what the pre-name is. A rep who
+  // types over it owns the value from then on; changing the company clears it
+  // back to null so the suggestion follows again. No effect, no stale name.
+  const [typedName, setTypedName] = useState<string | null>(
+    state.values?.newProjectName ?? null,
+  );
   const [lineCount, setLineCount] = useState(1);
   const [serviceCount, setServiceCount] = useState(0);
 
-  const project = projects.find((row) => row.id === projectId);
-  // `16 §6` narrows to the project's participants; with no project `S50`
-  // there is nothing to narrow by, so it is ordinary company visibility.
-  const companyOptions = project ? project.companies : companies;
+  const company = companies.find((row) => row.id === companyId);
+  // `16 §6` — the projects this company is a live participant of, filtered
+  // from what the server already sent. The inversion added no query.
+  const projectOptions = projects.filter((row) =>
+    row.companies.some((link) => link.id === companyId),
+  );
   const contactOptions = contacts.filter(
     (contact) => contact.companyId === companyId,
   );
+  const newProjectName = typedName ?? company?.name ?? "";
 
   return (
     <FormShell
@@ -104,46 +118,11 @@ export function QuotationForm({
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        {/* A rep can hold many projects, so this is the second field to earn a
-            combobox after the city `[15 §5]` — same reasoning, list length. */}
-        {/* Not required `S50` — a rep sometimes quotes before the project
-            exists. The hint says what happens to the gap rather than leaving
-            it looking like a field somebody forgot. */}
-        <FormField
-          name="projectId"
-          label={t("quotations.fields.project")}
-          error={errors.projectId}
-          hint={
-            projects.length === 0
-              ? t("quotations.detail.noProjectsYet")
-              : t("quotations.detail.projectOptional")
-          }
-        >
-          <Combobox
-            name="projectId"
-            defaultValue={projectId}
-            // No `altLabel`: it carried the other-language name so a search
-            // could match either, and a project has one name now `S26`.
-            options={projects.map((row) => ({
-              value: row.id,
-              label: row.name,
-            }))}
-            placeholder={t("common.none")}
-            searchPlaceholder={t("common.search")}
-            emptyLabel={t("common.noMatches")}
-            clearLabel={t("quotations.fields.projectNone")}
-            disabled={projects.length === 0}
-            invalid={Boolean(errors.projectId)}
-            onChange={(value) => {
-              setProjectId(value);
-              setCompanyId(""); // the company list belongs to the project
-            }}
-          />
-        </FormField>
-
-        {/* Restricted to the project's live links `[16 §6]`, and the hint says
-            where to go when the customer is not one of them — a rule with no
-            next step gets worked around. */}
+        {/* The first field since `S50`: every company this rep may use, and
+            the project choice below is narrowed by it `[16 §6]`. A native
+            `<select>` `D20` — the list is long but it is not the city's ~200,
+            and whether it ever earns a fourth combobox exception has a trigger
+            of its own in `WORKFLOW §5`, not this form. */}
         <FormField
           name="companyId"
           label={t("quotations.fields.company")}
@@ -154,14 +133,20 @@ export function QuotationForm({
             id="companyId"
             name="companyId"
             value={companyId}
-            onChange={(event) => setCompanyId(event.target.value)}
-            disabled={companyOptions.length === 0}
+            onChange={(event) => {
+              setCompanyId(event.target.value);
+              // A project was chosen as this company's; it is not the next
+              // company's, and the pre-name follows the new one.
+              setProjectId("");
+              setTypedName(null);
+            }}
+            disabled={companies.length === 0}
             aria-invalid={Boolean(errors.companyId) || undefined}
             aria-describedby={errors.companyId ? "companyId-error" : undefined}
             className={selectClasses}
           >
             <option value="">{t("common.none")}</option>
-            {companyOptions.map((row) => (
+            {companies.map((row) => (
               <option key={row.id} value={row.id}>
                 {row.name}
               </option>
@@ -169,17 +154,55 @@ export function QuotationForm({
           </select>
         </FormField>
 
-        {project && companies.length === 0 ? (
-          <p className="text-muted-foreground text-start text-xs sm:col-span-2">
-            {t("quotations.errors.companyNotOnProject")}{" "}
-            <Link
-              href={`/projects/${project.id}`}
-              className="text-primary underline underline-offset-4"
+        {/* `S50` — a quotation always names a project, so the question is
+            which, never whether. **The empty value is the NEW project**, not
+            none, and it is the default; the name under it arrives pre-filled
+            with the company's, which invents nothing — it is what the rep has
+            just typed. `dir="auto"`, because a project name may hold either
+            script `D62`.
+
+            `data-project-mode` is the DOM handle `verify:routes` reads to tell
+            the two branches apart, which it may not do from a label. */}
+        <FormField
+          name="projectId"
+          label={t("quotations.fields.project")}
+          error={errors.projectId ?? errors.newProjectName}
+          hint={projectId ? undefined : t("quotations.detail.projectNewHint")}
+          required
+        >
+          <div
+            className="flex flex-col gap-2"
+            data-project-mode={projectId ? "existing" : "new"}
+          >
+            <select
+              id="projectId"
+              name="projectId"
+              value={projectId}
+              onChange={(event) => setProjectId(event.target.value)}
+              aria-invalid={Boolean(errors.projectId) || undefined}
+              className={selectClasses}
             >
-              <span dir="auto">{project.name}</span>
-            </Link>
-          </p>
-        ) : null}
+              <option value="">{t("quotations.fields.projectNew")}</option>
+              {projectOptions.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.name}
+                </option>
+              ))}
+            </select>
+            {projectId ? null : (
+              <Input
+                name="newProjectName"
+                value={newProjectName}
+                onChange={(event) => setTypedName(event.target.value)}
+                required
+                dir="auto"
+                aria-label={t("quotations.fields.projectNewName")}
+                aria-invalid={Boolean(errors.newProjectName) || undefined}
+                className="text-start"
+              />
+            )}
+          </div>
+        </FormField>
 
         <FormField
           name="contactId"

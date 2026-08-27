@@ -63,7 +63,7 @@ export const PROJECTS: readonly ProjectRow[] = [
     key: "P01",
     name: "مكاتب إدارية - حي الملقا",
     owner: "faisal",
-    companies: ["شركة أنماء للمقاولات", "مكتب المعمار الحديث للاستشارات الهندسية"],
+    companies: ["شركة أنماء للمقاولات", "مكتب المعمار الحديث للاستشارات الهندسية", "مصنع سدرة للصناعات المعدنية", "مؤسسة الصرح للمقاولات", "مصنع الأفق للألمنيوم"],
     city: "Riyadh",
     sqmExpected: "244",
     age: 112,
@@ -72,7 +72,7 @@ export const PROJECTS: readonly ProjectRow[] = [
     key: "P02",
     name: "برج مكاتب طريق الملك فهد",
     owner: "faisal",
-    companies: ["شركة تمكين للمقاولات"],
+    companies: ["شركة تمكين للمقاولات", "مؤسسة إبداع للدعاية والإعلان"],
     city: "Riyadh",
     sqmExpected: "2400",
     age: 99,
@@ -92,7 +92,7 @@ export const PROJECTS: readonly ProjectRow[] = [
     key: "P04",
     name: "محطات طريق الخرج",
     owner: "faisal",
-    companies: ["شركة محطات الطريق لإدارة المحطات"],
+    companies: ["شركة محطات الطريق لإدارة المحطات", "شركة البناء المتين للمقاولات"],
     city: "Al Kharj",
     sqmExpected: "380",
     age: 86,
@@ -262,7 +262,7 @@ export const PROJECTS: readonly ProjectRow[] = [
     key: "P22",
     name: "توريد ألواح - المزاحمية",
     owner: "faisal",
-    companies: ["مصنع البيان للتشكيل المعدني"],
+    companies: ["مصنع البيان للتشكيل المعدني", "شركة معالم الرياض للمقاولات"],
     city: "Al Muzahimiyah",
     sqmExpected: "250",
     age: 75,
@@ -271,7 +271,7 @@ export const PROJECTS: readonly ProjectRow[] = [
     key: "P23",
     name: "لوحات معرض النخيل",
     owner: "faisal",
-    companies: ["مؤسسة نبض للدعاية والإعلان"],
+    companies: ["مؤسسة نبض للدعاية والإعلان", "مصنع الرواد للألمنيوم"],
     city: "Riyadh",
     sqmExpected: "72",
     age: 79,
@@ -357,7 +357,7 @@ export const PROJECTS: readonly ProjectRow[] = [
     key: "P32",
     name: "اتفاقية إطارية - الجبيل",
     owner: "saad",
-    companies: ["شركة بوابة الشرق للمقاولات"],
+    companies: ["شركة بوابة الشرق للمقاولات", "مصنع الخليج الأول للألمنيوم"],
     city: "Jubail",
     sqmExpected: "600",
     age: 108,
@@ -552,6 +552,73 @@ export const PROJECTS: readonly ProjectRow[] = [
     sqmExpected: "540",
     age: 80,
   },
+
+  /* --- created as part of raising `S50` ------------------------------
+   *
+   * Six threads whose company held no project their rep could see when the
+   * quotation was raised. `S50`'s default is the new project, pre-named from
+   * the company — which is what these are, down to having that one company as
+   * their only participant and no city. The other eight of the fourteen that
+   * used to carry no project attach to a project their rep already held, so
+   * both halves of the rule appear in the fixture.
+   *
+   * No city, because the raise form asks for none: it supplies a name and the
+   * chosen company and nothing else, and the rest stays on `/projects/new`.
+   */
+  {
+    key: "P51",
+    name: "مؤسسة حصاد البناء",
+    owner: "saad",
+    companies: ["مؤسسة حصاد البناء"],
+    city: null,
+    sqmExpected: "280",
+    age: 31,
+  },
+  {
+    key: "P52",
+    name: "مؤسسة إتقان التعمير",
+    owner: "faisal",
+    companies: ["مؤسسة إتقان التعمير"],
+    city: null,
+    sqmExpected: "340",
+    age: 18,
+  },
+  {
+    key: "P53",
+    name: "مصنع الشعلة للألمنيوم",
+    owner: "faisal",
+    companies: ["مصنع الشعلة للألمنيوم"],
+    city: null,
+    sqmExpected: "400",
+    age: 6,
+  },
+  {
+    key: "P54",
+    name: "مصنع درة الشرق للصناعة",
+    owner: "saad",
+    companies: ["مصنع درة الشرق للصناعة"],
+    city: null,
+    sqmExpected: "600",
+    age: 113,
+  },
+  {
+    key: "P55",
+    name: "unico aluminum factory",
+    owner: "majed",
+    companies: ["unico aluminum factory"],
+    city: null,
+    sqmExpected: "700",
+    age: 92,
+  },
+  {
+    key: "P56",
+    name: "مصنع تهامة للألمنيوم",
+    owner: "turki",
+    companies: ["مصنع تهامة للألمنيوم"],
+    city: null,
+    sqmExpected: "260",
+    age: 82,
+  },
 ] as const;
 
 /* ------------------------------------------------------------------ *
@@ -568,8 +635,14 @@ export const PROJECTS: readonly ProjectRow[] = [
 export type ThreadRow = {
   key: string;
   company: string;
-  /** Null exercises `S50` — quote first, project at dispatch `S74`. */
-  project: string | null;
+  /**
+   * Always a project key `S50`. There is no null case left to exercise: the
+   * fourteen rows that carried one now name a project like every other, eight
+   * of them an existing project of the same rep `S30` and six a project of
+   * their own — which is the shape the raise form produces, and the shape
+   * `0031` gave the eight real orphans it backfilled.
+   */
+  project: string;
   /** Name the company's contact where it has one. */
   contact?: boolean;
   stock: Stock;
@@ -619,13 +692,13 @@ export const THREADS: readonly ThreadRow[] = [
   { key: "T12", company: "شركة جبال السروات للمقاولات", project: "P44", contact: true, stock: "south", sqm: 830, lines: 3, raised: 13 },
 
   /* --- returned for edits and not resubmitted `S62` ----------------- */
-  { key: "T13", company: "شركة معالم الرياض للمقاولات", project: null, stock: "riyadh", sqm: 300, lines: 2, raised: 62, returned: 46 },
-  { key: "T14", company: "مؤسسة حصاد البناء", project: null, stock: "dammam", sqm: 280, lines: 2, raised: 30, returned: 21 },
-  { key: "T15", company: "مؤسسة إتقان التعمير", project: null, contact: true, stock: "riyadh", sqm: 340, lines: 2, raised: 17, returned: 11 },
+  { key: "T13", company: "شركة معالم الرياض للمقاولات", project: "P22", stock: "riyadh", sqm: 300, lines: 2, raised: 62, returned: 46 },
+  { key: "T14", company: "مؤسسة حصاد البناء", project: "P51", stock: "dammam", sqm: 280, lines: 2, raised: 30, returned: 21 },
+  { key: "T15", company: "مؤسسة إتقان التعمير", project: "P52", contact: true, stock: "riyadh", sqm: 340, lines: 2, raised: 17, returned: 11 },
 
   /* --- carrying a service line `S59` -------------------------------- */
   { key: "T16", company: "شركة الياقوت للمقاولات", project: "P11", contact: true, stock: "riyadh", sqm: 320, lines: 2, services: 2, raised: 24 },
-  { key: "T17", company: "مصنع الشعلة للألمنيوم", project: null, contact: true, stock: "malham", sqm: 400, lines: 2, services: 1, raised: 5 },
+  { key: "T17", company: "مصنع الشعلة للألمنيوم", project: "P53", contact: true, stock: "malham", sqm: 400, lines: 2, services: 1, raised: 5 },
 
   /* --- issued, awaiting signature `D29` ----------------------------- */
   { key: "T18", company: "شركة تمكين للمقاولات", project: "P02", stock: "riyadh", sqm: 2400, lines: 3, raised: 97, issued: 93 },
@@ -648,16 +721,16 @@ export const THREADS: readonly ThreadRow[] = [
   { key: "T33", company: "شركة رسم للدعاية والإعلان", project: "P17", stock: "riyadh", sqm: 180, lines: 2, raised: 42, issued: 36, accepted: 28 },
 
   /* --- accepted, with a dispatch behind them `S132` ------------------ */
-  { key: "T34", company: "مؤسسة إبداع للدعاية والإعلان", project: null, stock: "riyadh", sqm: 90, lines: 1, raised: 90, issued: 84, accepted: 79 },
-  { key: "T35", company: "شركة البناء المتين للمقاولات", project: null, contact: true, stock: "riyadh", sqm: 380, lines: 2, raised: 82, issued: 76, accepted: 70 },
+  { key: "T34", company: "مؤسسة إبداع للدعاية والإعلان", project: "P02", stock: "riyadh", sqm: 90, lines: 1, raised: 90, issued: 84, accepted: 79 },
+  { key: "T35", company: "شركة البناء المتين للمقاولات", project: "P04", contact: true, stock: "riyadh", sqm: 380, lines: 2, raised: 82, issued: 76, accepted: 70 },
   { key: "T36", company: "مصنع النخبة للتشكيل المعدني", project: "P35", stock: "dammam", sqm: 350, lines: 2, raised: 44, issued: 38, accepted: 32 },
   { key: "T37", company: "Silver Line Contracting", project: "P28", contact: true, stock: "riyadh", sqm: 1320, lines: 3, raised: 33, issued: 27, accepted: 20 },
   { key: "T38", company: "شركة الياسمين للمقاولات", project: "P43", contact: true, stock: "south", sqm: 640, lines: 2, raised: 43, issued: 37, accepted: 31 },
 
   /* --- accepted, shipped, and still open `S77` ---------------------- */
-  { key: "T39", company: "مصنع سدرة للصناعات المعدنية", project: null, contact: true, stock: "riyadh", sqm: 480, lines: 2, raised: 110, issued: 105, accepted: 100 },
-  { key: "T40", company: "مصنع درة الشرق للصناعة", project: null, contact: true, stock: "dammam", sqm: 600, lines: 2, raised: 112, issued: 107, accepted: 102 },
-  { key: "T41", company: "unico aluminum factory", project: null, contact: true, stock: "riyadh", sqm: 700, lines: 2, raised: 91, issued: 85, accepted: 80 },
+  { key: "T39", company: "مصنع سدرة للصناعات المعدنية", project: "P01", contact: true, stock: "riyadh", sqm: 480, lines: 2, raised: 110, issued: 105, accepted: 100 },
+  { key: "T40", company: "مصنع درة الشرق للصناعة", project: "P54", contact: true, stock: "dammam", sqm: 600, lines: 2, raised: 112, issued: 107, accepted: 102 },
+  { key: "T41", company: "unico aluminum factory", project: "P55", contact: true, stock: "riyadh", sqm: 700, lines: 2, raised: 91, issued: 85, accepted: 80 },
 
   /* --- rejected `S62` ----------------------------------------------- */
   { key: "T42", company: "شركة الحصن للمقاولات العامة", project: "P05", contact: true, stock: "riyadh", sqm: 950, lines: 3, raised: 88, issued: 82, rejected: 40 },
@@ -673,19 +746,19 @@ export const THREADS: readonly ThreadRow[] = [
   /* --- revised: v1 superseded, v2 issued `S66` `S68` ---------------- */
   { key: "T49", company: "شركة مرافئ الدمام للمقاولات", project: "P24", contact: true, stock: "dammam", sqm: 780, lines: 2, raised: 100, revisions: [92], issued: 87 },
   { key: "T50", company: "شركة صروح جدة للمقاولات", project: "P36", contact: true, stock: "riyadh", sqm: 2600, lines: 3, raised: 107, revisions: [101], issued: 96 },
-  { key: "T51", company: "مؤسسة الصرح للمقاولات", project: null, stock: "riyadh", sqm: 260, lines: 2, raised: 111, revisions: [103], revisedBy: "coordinator", issued: 98 },
+  { key: "T51", company: "مؤسسة الصرح للمقاولات", project: "P01", stock: "riyadh", sqm: 260, lines: 2, raised: 111, revisions: [103], revisedBy: "coordinator", issued: 98 },
   { key: "T52", company: "شركة أملاك المستقبل العقارية", project: "P06", contact: true, stock: "riyadh", sqm: 640, lines: 2, raised: 90, revisions: [83], issued: 77 },
 
   /* --- three versions, so "the latest live version" means something -- */
   { key: "T53", company: "شركة النهضة للمقاولات", project: "P08", contact: true, stock: "riyadh", sqm: 2850, lines: 3, raised: 39, revisions: [33, 26], issued: 19 },
 
   /* --- issued and dispatched against `S126` ------------------------- */
-  { key: "T54", company: "مصنع الأفق للألمنيوم", project: null, contact: true, stock: "riyadh", sqm: 320, lines: 2, raised: 108, issued: 102, accepted: 97 },
-  { key: "T55", company: "مصنع الرواد للألمنيوم", project: null, contact: true, stock: "malham", sqm: 300, lines: 2, raised: 79, issued: 73, accepted: 68 },
-  { key: "T56", company: "مصنع الخليج الأول للألمنيوم", project: null, stock: "dammam", sqm: 450, lines: 2, raised: 103, issued: 96, accepted: 90 },
+  { key: "T54", company: "مصنع الأفق للألمنيوم", project: "P01", contact: true, stock: "riyadh", sqm: 320, lines: 2, raised: 108, issued: 102, accepted: 97 },
+  { key: "T55", company: "مصنع الرواد للألمنيوم", project: "P23", contact: true, stock: "malham", sqm: 300, lines: 2, raised: 79, issued: 73, accepted: 68 },
+  { key: "T56", company: "مصنع الخليج الأول للألمنيوم", project: "P32", stock: "dammam", sqm: 450, lines: 2, raised: 103, issued: 96, accepted: 90 },
   { key: "T57", company: "شركة مداد العمار للمقاولات", project: "P07", contact: true, stock: "riyadh", sqm: 410, lines: 2, raised: 66, issued: 60, accepted: 54 },
   { key: "T58", company: "مصنع البحر الأحمر للألمنيوم", project: "P36", contact: true, stock: "riyadh", sqm: 520, lines: 2, raised: 94, issued: 88, accepted: 82 },
-  { key: "T59", company: "مصنع تهامة للألمنيوم", project: null, contact: true, stock: "south", sqm: 260, lines: 2, raised: 82, issued: 76, accepted: 70 },
+  { key: "T59", company: "مصنع تهامة للألمنيوم", project: "P56", contact: true, stock: "south", sqm: 260, lines: 2, raised: 82, issued: 76, accepted: 70 },
   { key: "T60", company: "شركة لمسات للدعاية والإعلان", project: "P46", contact: true, stock: "riyadh", sqm: 80, lines: 1, raised: 86, issued: 80, accepted: 74 },
 
   /* --- with the customer: accepted, and nothing has shipped `S132` --- */
@@ -719,8 +792,6 @@ export type DispatchRow = {
   thread?: string | null;
   /** Free entry only — the company it is against. */
   company?: string;
-  /** Only reaches anything when the thread carries no project `S74`. */
-  project?: string;
   stock: Stock;
   shipment: ShipmentMethod;
   cargo?: string;
@@ -748,23 +819,23 @@ export type DispatchRow = {
 
 export const DISPATCHES: readonly DispatchRow[] = [
   /* --- from a quotation, lines untouched `S75` route one ------------ */
-  { key: "D01", thread: "T39", project: "P02", stock: "riyadh", shipment: "tt", date: 94, requested: 94, submitted: 94, approved: 93, payment: "bank_transfer_full", smac: "DN-24-100341" },
-  { key: "D02", thread: "T40", project: "P32", stock: "dammam", shipment: "ct", date: 96, requested: 96, submitted: 96, approved: 95, payment: "handled_by_finance", paymentNote: "تساهيل — المرجع في سماك", smac: "DN-24-100352" },
-  { key: "D03", thread: "T54", project: "P01", stock: "riyadh", shipment: "tt", date: 90, requested: 91, submitted: 91, approved: 90, payment: "bank_transfer_downpayment", smac: "DN-24-100377" },
-  { key: "D04", thread: "T56", project: "P24", stock: "dammam", shipment: "ct", date: 83, requested: 84, submitted: 84, approved: 83, payment: "on_delivery", smac: "DN-24-100405" },
+  { key: "D01", thread: "T39", stock: "riyadh", shipment: "tt", date: 94, requested: 94, submitted: 94, approved: 93, payment: "bank_transfer_full", smac: "DN-24-100341" },
+  { key: "D02", thread: "T40", stock: "dammam", shipment: "ct", date: 96, requested: 96, submitted: 96, approved: 95, payment: "handled_by_finance", paymentNote: "تساهيل — المرجع في سماك", smac: "DN-24-100352" },
+  { key: "D03", thread: "T54", stock: "riyadh", shipment: "tt", date: 90, requested: 91, submitted: 91, approved: 90, payment: "bank_transfer_downpayment", smac: "DN-24-100377" },
+  { key: "D04", thread: "T56", stock: "dammam", shipment: "ct", date: 83, requested: 84, submitted: 84, approved: 83, payment: "on_delivery", smac: "DN-24-100405" },
   { key: "D05", thread: "T58", stock: "riyadh", shipment: "tt", date: 74, requested: 75, submitted: 75, approved: 74, payment: "bank_transfer_full", smac: "DN-24-100448" },
   { key: "D06", thread: "T60", stock: "riyadh", shipment: "cargo", cargo: "الرياض - حي الصحافة", date: 67, requested: 68, submitted: 68, approved: 67, payment: "cash_in_office", smac: "DN-24-100496" },
-  { key: "D07", thread: "T55", project: "P02", stock: "malham", shipment: "tt", date: 61, requested: 62, submitted: 62, approved: 61, payment: "card_in_office", smac: "DN-24-100538" },
+  { key: "D07", thread: "T55", stock: "malham", shipment: "tt", date: 61, requested: 62, submitted: 62, approved: 61, payment: "card_in_office", smac: "DN-24-100538" },
   { key: "D08", thread: "T57", stock: "riyadh", shipment: "tt", date: 46, requested: 47, submitted: 47, approved: 46, payment: "bank_transfer_full", smac: "DN-24-100612" },
-  { key: "D09", thread: "T35", project: "P20", stock: "riyadh", shipment: "tt", date: 62, requested: 63, submitted: 63, approved: 62, payment: "bank_transfer_full", smac: "DN-24-100527" },
-  { key: "D10", thread: "T34", project: "P23", stock: "riyadh", shipment: "cargo", cargo: "بريدة - الشارع العام", date: 72, requested: 73, submitted: 73, approved: 72, payment: "cash_in_office", smac: "DN-24-100461" },
+  { key: "D09", thread: "T35", stock: "riyadh", shipment: "tt", date: 62, requested: 63, submitted: 63, approved: 62, payment: "bank_transfer_full", smac: "DN-24-100527" },
+  { key: "D10", thread: "T34", stock: "riyadh", shipment: "cargo", cargo: "بريدة - الشارع العام", date: 72, requested: 73, submitted: 73, approved: 72, payment: "cash_in_office", smac: "DN-24-100461" },
   { key: "D11", thread: "T36", stock: "dammam", shipment: "ct", date: 25, requested: 26, submitted: 26, approved: 25, payment: "on_delivery", smac: "DN-24-100701" },
   { key: "D12", thread: "T38", stock: "south", shipment: "ct", date: 23, requested: 24, submitted: 24, approved: 23, payment: "bank_transfer_downpayment", smac: "DN-24-100718" },
-  { key: "D13", thread: "T59", project: "P42", stock: "south", shipment: "ct", date: 63, requested: 64, submitted: 64, approved: 63, payment: "on_delivery", smac: "DN-24-100515" },
+  { key: "D13", thread: "T59", stock: "south", shipment: "ct", date: 63, requested: 64, submitted: 64, approved: 63, payment: "on_delivery", smac: "DN-24-100515" },
 
   /* --- from a quotation, with edits — the normal case `S75` --------- */
-  { key: "D14", thread: "T54", project: "P01", stock: "riyadh", shipment: "tt", date: 70, requested: 71, editedByRep: 71, submitted: 71, approved: 70, payment: "bank_transfer_full", smac: "DN-24-100472" },
-  { key: "D15", thread: "T56", project: "P24", stock: "riyadh", shipment: "tt", date: 55, requested: 56, editedByRep: 56, submitted: 56, approved: 55, payment: "handled_by_finance", paymentNote: "عقد شركة — التسوية في سماك", smac: "DN-24-100563" },
+  { key: "D14", thread: "T54", stock: "riyadh", shipment: "tt", date: 70, requested: 71, editedByRep: 71, submitted: 71, approved: 70, payment: "bank_transfer_full", smac: "DN-24-100472" },
+  { key: "D15", thread: "T56", stock: "riyadh", shipment: "tt", date: 55, requested: 56, editedByRep: 56, submitted: 56, approved: 55, payment: "handled_by_finance", paymentNote: "عقد شركة — التسوية في سماك", smac: "DN-24-100563" },
   { key: "D16", thread: "T57", stock: "malham", shipment: "tt", date: 31, requested: 32, editedByRep: 32, submitted: 32, approved: 31, payment: "bank_transfer_full", smac: "DN-24-100668" },
   { key: "D17", thread: "T37", stock: "riyadh", shipment: "cargo", cargo: "الخبر - طريق الملك فهد", date: 12, requested: 13, editedByRep: 13, submitted: 13, approved: 12, payment: "bank_transfer_downpayment", smac: "DN-24-100774" },
   { key: "D18", thread: "T30", stock: "dammam", shipment: "ct", date: 34, requested: 35, editedByRep: 35, submitted: 35, approved: 34, payment: "on_delivery", smac: "DN-24-100650" },
@@ -773,7 +844,7 @@ export const DISPATCHES: readonly DispatchRow[] = [
   { key: "D21", thread: "T29", stock: "riyadh", shipment: "tt", date: 20, requested: 21, editedByRep: 21, submitted: 21, approved: 20, payment: "bank_transfer_full", smac: "DN-24-100739" },
   { key: "D22", thread: "T33", stock: "riyadh", shipment: "cargo", cargo: "الرياض - المصانع الشرقية", date: 26, requested: 27, editedByRep: 27, submitted: 27, approved: 26, payment: "cash_in_office", smac: "DN-24-100694" },
   /* the coordinator corrects a submitted request `S62` `S125` `S123` */
-  { key: "D23", thread: "T55", project: "P02", stock: "malham", shipment: "tt", date: 44, requested: 46, submitted: 46, editedByCoord: 45, approved: 44, payment: "bank_transfer_full", smac: "DN-24-100628" },
+  { key: "D23", thread: "T55", stock: "malham", shipment: "tt", date: 44, requested: 46, submitted: 46, editedByCoord: 45, approved: 44, payment: "bank_transfer_full", smac: "DN-24-100628" },
   { key: "D24", thread: "T58", stock: "riyadh", shipment: "tt", date: 40, requested: 42, submitted: 42, editedByCoord: 41, approved: 40, payment: "on_delivery", smac: "DN-24-100641" },
   { key: "D25", thread: "T31", stock: "dammam", shipment: "ct", date: 7, requested: 8, submitted: 8, editedByCoord: 7, approved: 7, payment: "bank_transfer_downpayment", smac: "DN-24-100801" },
   /* approved, then cancelled — un-wins its project and de-credits `S73` */

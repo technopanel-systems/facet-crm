@@ -499,7 +499,6 @@ async function chainByProject(
     .where(inArray(quotationThreads.projectId, projectIds));
 
   for (const row of rows) {
-    if (!row.projectId) continue;
     const entry = answer.get(row.projectId);
     if (!entry) continue;
 
@@ -1292,11 +1291,11 @@ async function assertProjectEditable(
  * Link a company to a project unless it already is one `S27`, in the caller's
  * transaction. Returns false when a live link was already there.
  *
- * **This is the only place a participant row is written**, and it is exported
- * because `S74` has a second way in: dispatching a project-less quotation adds
- * the quotation's company to the project it gains. That write must obey the
- * same rules as a rep adding one by hand, and the only way to guarantee that
- * is for it to be the same statement.
+ * **This is the only place a participant row is written.** It was exported for
+ * `S74`'s second way in — dispatching a project-less quotation added the
+ * quotation's company to the project it gained — and that way in went with
+ * `S50`'s null case, so the export went with it. Both callers are in this
+ * file.
  *
  * "Already one" means a LIVE link. A removed link is re-linked with a new row
  * rather than resurrected, which is what `project_companies_key` — partial on
@@ -1306,7 +1305,7 @@ async function assertProjectEditable(
  * A rep must be able to use the company `[12 §6]`; the coordinator dispatching
  * has `can_dispatch`'s reach and no company visibility at all `[18 §2]`.
  */
-export async function ensureProjectParticipant(
+async function ensureProjectParticipant(
   tx: Tx,
   log: Log,
   projectId: string,

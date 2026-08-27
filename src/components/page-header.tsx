@@ -196,10 +196,12 @@ export function Fact({
  * A value that is deliberately not there **yet**, as against one that is
  * simply empty.
  *
- * `S50`'s project-less quotation is what this exists for. An em-dash is what
- * every other absent value renders as, and it says "nothing here" — which for
- * a quotation raised before its project exists is the wrong sentence. This one
- * says what is missing and what fills it, in normal weight rather than the
+ * `S50`'s project-less quotation is what this was built for, and that case no
+ * longer exists. What it is for now is the same shape wherever it recurs — a
+ * company's SMAC reference before the coordinator issues one is the surviving
+ * caller. An em-dash is what every other absent value renders as, and it says
+ * "nothing here", which is the wrong sentence for a value that is coming. This
+ * one says what is missing and what fills it, in normal weight rather than the
  * semibold a real value carries, so the row reads as answered-later rather
  * than as a field somebody skipped.
  *

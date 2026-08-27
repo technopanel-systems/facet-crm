@@ -33,12 +33,14 @@
  *      all; and the same payload sent twice — differing only in country — is
  *      REFUSED for Saudi Arabia, which needs a city, and accepted with neither
  *      city nor region for anywhere else.
- *  14. `S50` and `S74`, end to end: a quotation is raised with **no project**,
- *      paid, and dispatched — the coordinator choosing a project, which is
- *      written back onto the quotation and puts the quotation's company on
- *      that project as a participant carrying a dispatched figure `S26`. Then
- *      the other branch on the same thread: dispatching again takes the
- *      project it gained, and naming a different one is refused as a message.
+ *  14. `S50` and `S74`, end to end: a quotation is raised **creating its
+ *      project as part of raising**, which puts the quotation's company on
+ *      that project as a participant `S27` carrying a dispatched figure `S26`
+ *      once it is dispatched. A raise naming NEITHER a project nor a name is
+ *      refused as a message — 303 is no longer the answer. Then the same
+ *      company's second quotation, raised **onto that existing project**, which
+ *      is the other half of `S50`. Dispatching takes the project the quotation
+ *      already names, and naming a different one is refused as a message.
  *      `S118` rides along on the same form: the stock is posted, refused when
  *      cleared, and read back off the detail screen in both locales.
  *
@@ -1158,10 +1160,11 @@ async function main(): Promise<void> {
             continue;
           }
           if (!projectId) {
-            // Every identity that reaches a thread with a project may now open
-            // it — the coordinator too, since `S76`. No project on the thread
-            // is the only reason left to skip `S50`.
-            console.log(`  skip  ${label}: links no project`);
+            // Every thread names a project since `S50`, so this is no longer
+            // "no project" — it is no LINK. A thread reached through a share
+            // renders its project as plain text when the reader may not open
+            // it, and there is nothing to follow.
+            console.log(`  skip  ${label}: renders no project link`);
             continue;
           }
           check(
@@ -1869,15 +1872,16 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    "\n14. A quotation with no project, dispatched into one [S50], [S74]",
+    "\n14. A quotation creates its project, then attaches to it [S50], [S74]",
   );
   {
     // **The one chain no in-process script can drive.** `verify:slice3` §15
     // proves S74's rules against the data layer; this proves the SCREENS —
-    // that a rep can raise a quotation with the project field left alone, that
-    // the coordinator is offered a picker for exactly that quotation and not
-    // for the others, and that what comes back names the project on three
-    // screens: the dispatch, the quotation, and the project's participants.
+    // that a rep raising a quotation creates its project in the same act, that
+    // raising with neither a project nor a name is refused rather than
+    // redirecting, that the same company's next quotation can be raised ONTO
+    // that project, and that the project reads back on three screens: the
+    // quotation, the dispatch, and the project's own participants.
     //
     // That last one is why this section exists at all. `S26`'s derived figure
     // has never been asserted over HTTP, because no route-suite identity owned
@@ -1997,7 +2001,7 @@ async function main(): Promise<void> {
       }
       const companyId = registered.location.match(/[0-9a-f-]{36}/)?.[0];
 
-      /* --- 1. raised with NO project [S50] ------------------------------ */
+      /* --- 1. raised, creating its project in the same act [S50] -------- */
 
       const newQuotation = await get(repJar, `/${locale}/quotations/new`);
       const quotationForm = newQuotation.body.match(
@@ -2009,12 +2013,22 @@ async function main(): Promise<void> {
       );
       if (!quotationForm || !companyId) continue;
 
-      // `S50` — the company list is no longer the chosen project's links, so
-      // the company registered a moment ago is selectable with no project at
-      // all. That it is IN the markup is the form half of the rule.
+      // `S50` — the company is the FIRST field now, and the projects offered
+      // narrow to it. The company registered a moment ago holds none, so what
+      // the form must offer is the new-project branch: that it is IN the
+      // markup, and that the marker says which branch is showing.
       check(
-        `${locale}: the new company is offered with no project chosen [S50]`,
+        `${locale}: the new company is offered as the first field [S50]`,
         quotationForm.includes(`value="${companyId}"`),
+      );
+      check(
+        `${locale}: *** and the project defaults to a NEW one *** [S50]`,
+        quotationForm.includes('data-project-mode="new"'),
+        "no data-project-mode marker on the raise form",
+      );
+      check(
+        `${locale}: …with a name input beside it, not a bare picker [S50]`,
+        quotationForm.includes('name="newProjectName"'),
       );
 
       /** The first real option of a named `<select>` — never the placeholder. */
@@ -2061,10 +2075,13 @@ async function main(): Promise<void> {
       );
 
       const quotationFields = envelope(quotationForm);
-      // **The project is sent EMPTY**, exactly as an untouched form sends it:
-      // the combobox posts a hidden input whose value is "" until somebody
-      // picks something. This is the POST S50 exists for.
+      // **The project id is sent EMPTY and a NAME is sent beside it**, exactly
+      // as an untouched form sends it: the empty value of the `<select>` IS
+      // the new-project branch, and the name input under it carries what the
+      // project is called. This is the POST `S50` exists for.
+      const newProjectName = `${stamp}-${locale} project`;
       quotationFields.set("projectId", "");
+      quotationFields.set("newProjectName", newProjectName);
       quotationFields.set("companyId", companyId);
       quotationFields.set("contactId", "");
       for (const empty of ["paymentMethod", "shipmentTerms"]) {
@@ -2117,13 +2134,38 @@ async function main(): Promise<void> {
         "no stock-error marker in the re-rendered form",
       );
 
+      // **`S50`'s own refusal, and 303 is no longer the answer.** Neither a
+      // project nor a name is what the old form sent every time; it must now
+      // come back as a message on the field. Sent BEFORE the good one so it
+      // cannot be mistaken for a duplicate-submission refusal, and asserted
+      // the way the stockless POST above is: the action RAN and REFUSED.
+      const nameless = new FormData();
+      for (const [name, value] of quotationFields.entries()) {
+        nameless.append(name, name === "newProjectName" ? "" : value);
+      }
+      const refusedProject = await post(
+        repJar,
+        `/${locale}/quotations/new`,
+        nameless,
+      );
+      check(
+        `${locale}: *** raising with NO project and no name answers 200, not 303 *** [S50]`,
+        refusedProject.status === 200,
+        `got ${refusedProject.status} ${refusedProject.location}`,
+      );
+      check(
+        `${locale}: …and the error comes back ON the project field [S50]`,
+        refusedProject.body.includes('id="projectId-error"'),
+        "no projectId-error marker in the re-rendered form",
+      );
+
       const raised = await post(
         repJar,
         `/${locale}/quotations/new`,
         quotationFields,
       );
       check(
-        `${locale}: *** raising a quotation with NO project answers 303 *** [S50]`,
+        `${locale}: *** raising a quotation that CREATES its project answers 303 *** [S50]`,
         raised.status === 303,
         `got ${raised.status} ${raised.location}`,
       );
@@ -2132,20 +2174,32 @@ async function main(): Promise<void> {
       const threadPath = raised.location.replace(BASE, "");
       const threadId = threadPath.match(/[0-9a-f-]{36}/)?.[0] as string;
 
-      /* --- 2. and it READS as absent, not as a blank -------------------- */
+      /* --- 2. and the project it made is ON the quotation --------------- */
 
       const thread = await get(repJar, threadPath);
       check(
-        `${locale}: *** the missing project reads as deliberately absent *** [S50]`,
-        factHtmlOf(thread.body, "project").includes('data-slot="fact-absent"'),
+        `${locale}: *** the quotation names the project it created *** [S50]`,
+        factOf(thread.body, "project") === newProjectName,
         factOf(thread.body, "project"),
       );
-      // Not the em-dash every other empty value uses, which is the whole
-      // distinction: "nothing here" against "nobody has answered this yet".
+      // Neither of the two shapes an absent value takes. The `Absent` marker
+      // is what a project-less quotation used to render and no longer can;
+      // the em-dash is what every other empty value renders as.
       check(
-        `${locale}: …and not as the em-dash an empty value takes`,
-        factOf(thread.body, "project") !== DASH,
+        `${locale}: …not as absent and not as the em-dash [S50]`,
+        !factHtmlOf(thread.body, "project").includes('data-slot="fact-absent"') &&
+          factOf(thread.body, "project") !== DASH,
+        factHtmlOf(thread.body, "project"),
       );
+      const projectId = thread.body.match(
+        /href="\/(?:en|ar)\/projects\/([0-9a-f-]{36})"/i,
+      )?.[1] as string;
+      check(
+        `${locale}: …and links it, so the rep owns what he just made [S30]`,
+        Boolean(projectId),
+        "no project link on the quotation the rep raised",
+      );
+      if (!projectId) continue;
 
       // `S118` — the stock reads on the screen, through the translation layer.
       // The rendered text is recorded rather than compared to a literal: an
@@ -2262,27 +2316,33 @@ async function main(): Promise<void> {
           : `got ${issuePost.status}`,
       );
 
-      /* --- 4. the coordinator's form marks it as having no project ------ */
+      /* --- 4. the coordinator's form offers it, and asks for no project -- */
 
       const dispatchNew = await get(coordJar, `/${locale}/dispatches/new`);
       const option = dispatchNew.body.match(
         new RegExp(`<option[^>]*value="${threadId}"[^>]*>`),
       )?.[0];
       check(
-        `${locale}: the issued, project-less quotation is offered for dispatch [S74]`,
+        `${locale}: the issued quotation is offered for dispatch [S74]`,
         Boolean(option),
         "not in the list — did the issue POST fail?",
       );
+      // `S50` took the picker off this form: the project comes from the
+      // quotation, so a control here would be a value the coordinator could
+      // only get wrong. That the INPUT is gone is the assertion — a field the
+      // form still renders is a field somebody can still fill.
       check(
-        `${locale}: …and is marked as carrying no project of its own [S50]`,
-        option?.includes('data-project=""') ?? false,
-        option ?? "",
+        `${locale}: *** and the form offers NO project picker *** [S74], [S50]`,
+        !dispatchNew.body.includes('name="projectId"'),
+        "the dispatch form still renders a project input",
       );
 
-      /* --- 5. dispatched, choosing one of rep-a's projects [S74] -------- */
+      /* --- 5. dispatched, taking the project the quotation names [S74] -- */
 
+      // A second project of rep-a's, for the disagreement refusal in block 10.
+      // It is only ever posted by hand: no form offers it any more.
       const projectsList = await get(repJar, `/${locale}/projects`);
-      const projectIds = [
+      const otherIds = [
         ...new Set(
           [
             ...projectsList.body.matchAll(
@@ -2290,14 +2350,7 @@ async function main(): Promise<void> {
             ),
           ].map((match) => match[1]),
         ),
-      ];
-      if (projectIds.length === 0) {
-        // A rep with no project is a legitimate empty state; without one there
-        // is nothing for the write-back to write.
-        console.log(`  --    ${locale}: rep-a owns no project to dispatch into`);
-        continue;
-      }
-      const projectId = projectIds[0];
+      ].filter((id) => id !== projectId);
 
       const dispatchForm = dispatchNew.body.match(
         /<form[^>]*data-slot="form-shell"[\s\S]*?<\/form>/,
@@ -2306,6 +2359,9 @@ async function main(): Promise<void> {
         check(`${locale}: the dispatch form renders`, false);
         continue;
       }
+      // `S74` — the project is only ever posted by hand now, to reach the
+      // refusal. An empty string is what the real form sends, because it sends
+      // no project field at all.
       const dispatchFields = (project: string): FormData => {
         const fields = envelope(dispatchForm);
         fields.set("quotationThreadId", threadId);
@@ -2328,7 +2384,7 @@ async function main(): Promise<void> {
       const dispatched = await post(
         coordJar,
         `/${locale}/dispatches/new`,
-        dispatchFields(projectId),
+        dispatchFields(""),
       );
       check(
         `${locale}: *** dispatching it answers 303 *** [S74]`,
@@ -2409,19 +2465,15 @@ async function main(): Promise<void> {
         dispatchPage.body.includes(`/projects/${projectId}"`),
       );
 
-      /* --- 6. asking is not deciding [S74], [S72] ---------------------- */
+      /* --- 6. the request took the quotation's project, unasked [S74] --- */
 
-      // **The quotation must NOT have gained the project yet.** The write-back
-      // used to fire at record time, because there was no approval act to hang
-      // it on; `S72` made one, and a project written onto a quotation by a
-      // request nobody approved would be a decision nobody made.
-      const stillNone = await get(repJar, threadPath);
+      // The block that stood here proved a write-back had not fired yet. There
+      // is no write-back: what a request must do instead is arrive already
+      // carrying the quotation's project, with nobody having chosen it.
       check(
-        `${locale}: *** raising it writes NOTHING back onto the quotation *** [S74], [S72]`,
-        factHtmlOf(stillNone.body, "project").includes(
-          'data-slot="fact-absent"',
-        ),
-        factOf(stillNone.body, "project"),
+        `${locale}: *** the request carries the quotation's project, unchosen *** [S74]`,
+        dispatchPage.body.includes(`/projects/${projectId}"`),
+        factOf(dispatchPage.body, "project"),
       );
 
       /* --- 7. submit, then approve, through the real controls ---------- */
@@ -2454,13 +2506,6 @@ async function main(): Promise<void> {
         waiting.body.includes('data-status="submitted"'),
         factOf(waiting.body, "status"),
       );
-      check(
-        `${locale}: …and submitting still wrote nothing back [S74]`,
-        factHtmlOf((await get(repJar, threadPath)).body, "project").includes(
-          'data-slot="fact-absent"',
-        ),
-      );
-
       // **The rep may not approve it, and is not offered the control.** The
       // 404-shaped rule `D53` applied to a button: an unavailable act is not
       // rendered, and the action refuses it anyway `S109`.
@@ -2615,24 +2660,29 @@ async function main(): Promise<void> {
         );
       }
 
-      /* --- 8. and THAT is what writes back [S74] ----------------------- */
+      /* --- 8. and approval changed nothing about the project [S74] ----- */
 
+      // The write-back fired here. `S50` deleted it, so what has to be true
+      // now is the opposite: approving an APPROVED dispatch leaves the
+      // quotation naming exactly the project it was raised with.
       const rewritten = await get(repJar, threadPath);
       check(
-        `${locale}: *** the quotation now names that project *** [S74]`,
-        !factHtmlOf(rewritten.body, "project").includes('data-slot="fact-absent"'),
+        `${locale}: *** the quotation still names the project it was raised with *** [S74], [S50]`,
+        factOf(rewritten.body, "project") === newProjectName,
         factOf(rewritten.body, "project"),
       );
       check(
-        `${locale}: …and it links the project the dispatch took`,
+        `${locale}: …and it is the one the dispatch took`,
         rewritten.body.includes(`/projects/${projectId}"`),
       );
 
       /* --- 9. the company is a participant, with the derived figure ----- */
 
       const project = await get(repJar, `/${locale}/projects/${projectId}`);
+      // `S27` — the raise linked it, in the same act that made the project.
+      // `S74`'s write-back used to be what put it here.
       check(
-        `${locale}: *** the quotation's company joined the project *** [S74], [S27]`,
+        `${locale}: *** the quotation's company is on the project it made *** [S50], [S27]`,
         project.body.includes(`data-participant="${companyId}"`),
       );
       // **The point of the whole section.** `S26`'s figure is derived in SQL
@@ -2644,10 +2694,77 @@ async function main(): Promise<void> {
         project.body.includes(`data-dispatched="${companyId}"`),
       );
 
-      /* --- 10. the other branch, on the same thread [S74] --------------- */
+      /* --- 9b. the SAME company's next quotation attaches to it [S50] --- */
 
-      // It has a project now, so a second request takes it with nothing
-      // chosen — the "shown, not chosen" half of the rule.
+      // `S50`'s two branches: the first quotation made the project, and the
+      // next one is raised onto it. The company is seeded through the query
+      // string — the deep link `reports/[id]/edit` uses — because the project
+      // list narrows to the chosen company `[16 §6]` and a server-rendered
+      // form has no company chosen until one is.
+      //
+      // **The `existing` half of `data-project-mode` is not asserted, and that
+      // is deliberate.** It is rendered only after somebody picks, so a walk
+      // with no JavaScript can never see it. What the marker is here to prove
+      // is `S50`'s *"the default is the new project"*, which is the state the
+      // server renders — and the branch itself is proved by the POST below.
+      const seeded = await get(
+        repJar,
+        `/${locale}/quotations/new?companyId=${companyId}`,
+      );
+      const seededForm = seeded.body.match(
+        /<form[^>]*data-slot="form-shell"[\s\S]*?<\/form>/,
+      )?.[0];
+      check(
+        `${locale}: a company can be seeded into the raise form [S50]`,
+        Boolean(seededForm) && seeded.status === 200,
+        `got ${seeded.status}`,
+      );
+      if (seededForm) {
+        check(
+          `${locale}: *** and its own project is then offered *** [S50], [16 §6]`,
+          seededForm.includes(`value="${projectId}"`),
+          "the seeded company's project is not in the project select",
+        );
+        const attachFields = envelope(seededForm);
+        for (const [name, value] of quotationFields.entries()) {
+          if (
+            !["projectId", "newProjectName", "companyId", "$ACTION_ID"].some(
+              (skip) => name.startsWith(skip),
+            )
+          ) {
+            attachFields.set(name, value);
+          }
+        }
+        attachFields.set("companyId", companyId);
+        attachFields.set("projectId", projectId);
+        attachFields.set("newProjectName", "");
+        const attached = await post(
+          repJar,
+          `/${locale}/quotations/new`,
+          attachFields,
+        );
+        check(
+          `${locale}: *** raising ONTO an existing project answers 303 *** [S50]`,
+          attached.status === 303,
+          `got ${attached.status} ${attached.location}`,
+        );
+        if (attached.status === 303) {
+          const attachedThread = await get(
+            repJar,
+            attached.location.replace(BASE, ""),
+          );
+          check(
+            `${locale}: …and it names that project, not a second one [S50]`,
+            attachedThread.body.includes(`/projects/${projectId}"`),
+            factOf(attachedThread.body, "project"),
+          );
+        }
+      }
+
+      /* --- 10. dispatching it again takes the same project [S74] -------- */
+
+      // The "shown, not chosen" half of the rule, on a thread that has carried
+      // its project from the moment it was raised.
       const again = await post(
         coordJar,
         `/${locale}/dispatches/new`,
@@ -2675,12 +2792,11 @@ async function main(): Promise<void> {
       // rule refused is `verify:slice3` §15's assertion; this is the boundary
       // that no in-process script crosses.
       //
-      // It only became a refusal at the moment above: before the approval the
-      // quotation carried no project, so any visible one was lawful `S74`.
-      const otherId =
-        projectIds[1] ?? "00000000-0000-0000-0000-000000000000";
+      // It is a refusal from the moment the quotation exists now: `S50` means
+      // there was never a window in which any visible project was lawful.
+      const otherId = otherIds[0] ?? "00000000-0000-0000-0000-000000000000";
       console.log(
-        projectIds[1]
+        otherIds[0]
           ? `  --    ${locale}: refusal driven with a second real project`
           : `  --    ${locale}: rep-a owns one project, so the refusal uses an unknown id`,
       );
@@ -3122,11 +3238,11 @@ async function main(): Promise<void> {
         continue;
       }
 
-      const option = shell.match(
-        /<option value="([0-9a-f-]{36})"[^>]*data-project="set"/,
-      );
+      // `data-project` is gone with `S50`: every option carries a project, so
+      // the marker separated nothing and any option will do.
+      const option = shell.match(/<option value="([0-9a-f-]{36})"/);
       if (!option) {
-        console.log(`  --    ${locale}: no quotation with a project to request against`);
+        console.log(`  --    ${locale}: no quotation to request against`);
         continue;
       }
 
@@ -4875,9 +4991,11 @@ function factOf(body: string, name: string): string {
  * The raw markup of one `Fact`, by its `data-fact` handle.
  *
  * `factOf` strips the tags, which is right when the assertion is about the
- * VALUE. `S50`'s absent project is asserted on a marker inside the cell
- * instead — the difference between "deliberately not there yet" and an
- * em-dash is a `data-slot`, not a string this script may read.
+ * VALUE. Where the claim is about ABSENCE it is asserted on a marker inside
+ * the cell instead — the difference between "deliberately not there yet" and
+ * an em-dash is a `data-slot`, not a string this script may read. `S50`'s
+ * project-less quotation was what taught that distinction; a company's
+ * un-issued SMAC reference is what still uses it.
  */
 function factHtmlOf(body: string, name: string): string {
   return (

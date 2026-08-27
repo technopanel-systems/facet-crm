@@ -106,7 +106,9 @@ export async function RequestsBlock({
                   title={
                     <span dir="auto">
                       {/* `S51`'s ladder — the reference, else the project,
-                          else the company, which `S50` guarantees is there. */}
+                          which `S50` now guarantees is there. The company
+                          stays as the last rung: it costs nothing and it is
+                          already on the row. */}
                       {thread.smacReference ??
                         thread.projectName ??
                         thread.companyName}

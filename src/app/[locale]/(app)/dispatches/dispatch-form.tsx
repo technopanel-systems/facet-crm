@@ -40,9 +40,9 @@ export type ThreadOption = {
   raisedByName: string;
   quotedSqm: string | null;
   dispatchedSqm: string;
-  /** `S74` — the quotation's own project, already translated. Null when it
-   *  has none `S50`, which is what puts the picker on this form. */
-  projectLabel: string | null;
+  /** `S74` — the quotation's own project, already translated. Always there
+   *  since `S50`, which is what took the picker off this form. */
+  projectLabel: string;
   /**
    * `S118` — the quotation's own stock, offered as the **default** for the
    * dispatch's `S130`. A default and nothing more: *a dispatch may draw from a
@@ -59,7 +59,6 @@ export type ThreadOption = {
 
 export type CompanyOption = { id: string; label: string };
 export type RepOption = { id: string; name: string };
-export type ProjectOption = { id: string; label: string };
 
 /**
  * `S130` and `S119`'s three fields, rendered identically by the request form
@@ -182,12 +181,11 @@ function ShipmentFields({
  * already follows. Only the submit path is a client action.
  *
  * **The project and the LINES follow the chosen quotation** `S74` `S116`,
- * which is the one thing here that IS client state: the quotation carrying a
- * project shows it and offers nothing to change, the quotation with none `S50`
- * shows a picker, and the rows fill with the issued version's lines. The server
- * decides the project either way — it derives it from the thread and refuses a
- * disagreeing one — so that half only spares the coordinator a field they may
- * not answer.
+ * which is the one thing here that IS client state: the quotation's project is
+ * shown with nothing to change, and the rows fill with the issued version's
+ * lines. There is no picker beside it since `S50` — every quotation names a
+ * project, so the branch that let one be chosen here had nothing left to act
+ * on. The server derives it from the thread and refuses a disagreeing one.
  *
  * **The three routes of `S75` are two entry points here.** Keeping the
  * prefilled rows is *exactly as a quotation*; changing, adding or removing one
@@ -209,7 +207,6 @@ export function DispatchForm({
   companies,
   reps,
   canNameRep,
-  projects,
   products,
   locale,
   companyQuery,
@@ -230,7 +227,6 @@ export function DispatchForm({
    * without the flag, so this hides a field rather than being the rule.
    */
   canNameRep: boolean;
-  projects: ProjectOption[];
   products: ProductOptions;
   locale: string;
   companyQuery: string;
@@ -303,23 +299,18 @@ export function DispatchForm({
               invalid={!!errors.quotationThreadId}
             >
               {threads.map((row) => (
-                <option
-                  key={row.id}
-                  value={row.id}
-                  // A DOM handle for `verify:routes`, which may not read a
-                  // translated label to tell the two branches apart.
-                  data-project={row.projectLabel === null ? "" : "set"}
-                >
+                <option key={row.id} value={row.id}>
                   {row.label}
                 </option>
               ))}
             </SelectField>
           </FormField>
 
-          {/* `S74` — the project is shown, not chosen, when the quotation has
-              one. No input: the server takes it from the quotation, so a field
-              here would be a value the coordinator could only get wrong. */}
-          {thread && thread.projectLabel !== null ? (
+          {/* `S74` — the project is shown, never chosen. No input: the server
+              takes it from the quotation, so a field here would be a value the
+              coordinator could only get wrong. The picker that used to stand
+              beside this went with `S50`'s null case. */}
+          {thread ? (
             <FormField
               name="project"
               label={t("dispatches.fields.project")}
@@ -330,32 +321,6 @@ export function DispatchForm({
               <p id="project" dir="auto" className="text-sm font-medium">
                 {thread.projectLabel}
               </p>
-            </FormField>
-          ) : null}
-
-          {/* `S74` — and chosen when it has none `S50`. The hint says the
-              second half of the rule out loud, because writing the project
-              back onto the quotation is a consequence a coordinator should
-              not discover afterwards. */}
-          {thread && thread.projectLabel === null ? (
-            <FormField
-              name="projectId"
-              label={t("dispatches.fields.project")}
-              error={errors.projectId}
-              hint={t("dispatches.detail.projectWriteBack")}
-              required
-            >
-              <SelectField
-                name="projectId"
-                placeholder={t("dispatches.fields.projectPlaceholder")}
-                invalid={!!errors.projectId}
-              >
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.label}
-                  </option>
-                ))}
-              </SelectField>
             </FormField>
           ) : null}
         </>
@@ -526,9 +491,6 @@ export function DispatchEditForm({
   shipment,
   cargoDestination,
   projectLabel,
-  chooseProject,
-  projectId,
-  projects,
   products,
   locale,
   dispatchId,
@@ -542,16 +504,9 @@ export function DispatchEditForm({
   stock: Stock;
   shipment: ShipmentMethod;
   cargoDestination: string | null;
-  /** `S74` — the project it names, when there is one to show. */
+  /** `S74` — the project it names, or null on a free entry `S75`, which has
+   *  no quotation to have taken one from. */
   projectLabel: string | null;
-  /**
-   * `S74` — whether the project is a CHOICE here. True only when the request is
-   * against a quotation that has none of its own `S50`: then whoever is editing
-   * picks, from the projects they hold, and the write-back happens at approval.
-   */
-  chooseProject: boolean;
-  projectId: string | null;
-  projects: ProjectOption[];
   products: ProductOptions;
   locale: string;
   dispatchId: string;
@@ -583,9 +538,9 @@ export function DispatchEditForm({
         </>
       }
     >
-      {/* `S74` — shown when the quotation carries one, chosen when it does not
-          `S50`. Never both, and never neither on a linked request. */}
-      {projectLabel !== null && !chooseProject ? (
+      {/* `S74` — shown, never chosen. Null only on a free entry `S75`, which
+          names no project because it has no quotation to take one from. */}
+      {projectLabel !== null ? (
         <FormField
           name="project"
           label={t("dispatches.fields.project")}
@@ -594,29 +549,6 @@ export function DispatchEditForm({
           <p id="project" dir="auto" className="text-sm font-medium">
             {projectLabel}
           </p>
-        </FormField>
-      ) : null}
-
-      {chooseProject ? (
-        <FormField
-          name="projectId"
-          label={t("dispatches.fields.project")}
-          error={errors.projectId}
-          hint={t("dispatches.detail.projectWriteBack")}
-          required
-        >
-          <SelectField
-            name="projectId"
-            defaultValue={state.values?.projectId ?? projectId ?? ""}
-            placeholder={t("dispatches.fields.projectPlaceholder")}
-            invalid={!!errors.projectId}
-          >
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.label}
-              </option>
-            ))}
-          </SelectField>
         </FormField>
       ) : null}
 
