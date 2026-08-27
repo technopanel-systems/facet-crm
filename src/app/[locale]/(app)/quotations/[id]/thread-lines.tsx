@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
@@ -30,10 +30,42 @@ import {
  * its own form with its own action state, so one row's error cannot blank
  * another row's input.
  *
- * Editing is offered **only while the version is `requested`**. Once the
+ * Editing is offered **only while the version is `requested`** `S61`. Once the
  * coordinator has issued it the document exists in SMAC, and a change is a new
- * version rather than an edit `[07 C2]`. The server enforces that; this only
- * stops offering it.
+ * version rather than an edit `S66`. The server enforces that; this only stops
+ * offering it.
+ *
+ * **Every form here renders in the HTML** `D20`. Four of them — the two add
+ * forms and the two per-row editors — used to be behind `useState`, so with
+ * scripts off they were not merely inconvenient, they did not exist: a rep
+ * could read a quotation and could not add a line to one. That is *enablement*,
+ * which the rewritten `D20` makes a defect whatever it is called, and no amount
+ * of it being the ordinary React idiom changes what the sentence asks — turn
+ * scripts off, can the person still do the thing.
+ *
+ * **The disclosure is `<details>`, the browser's own.** It needs no script, it
+ * costs no round trip, and every field inside it reaches the HTML, so
+ * `verify:routes §23`'s operability scan sees all nine of a product line's
+ * controls where before it saw nothing at all. The alternatives were a `?line=`
+ * in the URL — a round trip to open an editor, and three links that must each
+ * carry the timeline's `?page=` or throw it away `D59` — and rendering nine
+ * fields per line unconditionally, which on an eight-line quotation is
+ * seventy-two visible controls.
+ *
+ * **A rejected editor reopens itself.** `open` is bound to whether that form's
+ * own state carries an error, so a scripts-off POST that comes back rejected
+ * re-renders with the row expanded and the message showing, rather than folding
+ * the error away where nobody would find it.
+ *
+ * **Every action is bound at the CALL SITE**, one level above the component
+ * that calls `useActionState` — `WORKFLOW §5`. Bound inside that component, a
+ * form answers no raw POST at all: the write lands and no response headers
+ * follow. Measured on this build, 10s abort before and 111ms after, and
+ * hoisting the `.bind()` to a `const` in the same component still hung, so what
+ * matters is which component evaluates it. The four forms this file used to
+ * keep their own `.bind()` inside were exempt only because they never reached
+ * the HTML; making them render is what makes the binding load-bearing, so both
+ * halves land together.
  */
 
 export type LineRow = {
@@ -71,6 +103,11 @@ export type ServiceRow = {
   lineTotal: string | null;
 };
 
+/** Bound by the caller; reads no form data. */
+type PlainAction = () => Promise<FormState>;
+/** Bound by the caller; reads the fields the editor posts. */
+type FieldAction = (state: FormState, formData: FormData) => Promise<FormState>;
+
 function Money({ value, sar }: { value: string | null; sar: string }) {
   if (!value) return <span className="text-muted-foreground">—</span>;
   return (
@@ -92,35 +129,73 @@ function RowError({ state }: { state: FormState }) {
   );
 }
 
+/** Whether this form came back rejected — what reopens its `<details>`. */
+function rejected(state: FormState): boolean {
+  return Boolean(
+    state.error ?? Object.values(state.fieldErrors ?? {}).length > 0,
+  );
+}
+
+/**
+ * A native disclosure. No script, no round trip, and its contents are in the
+ * markup whether it is open or shut — which is what `D20`'s operability half
+ * needs and what `useState` could never give it.
+ *
+ * The marker is hidden on both engines: `list-none` covers the standard
+ * `display: list-item` marker and the `::-webkit-details-marker` rule covers
+ * Safari, which still paints its own triangle. `D17` names the closed list of
+ * motions and a disclosure is not on it, so it opens instantly rather than
+ * animating.
+ */
+function Disclosure({
+  label,
+  open,
+  act,
+  children,
+}: {
+  label: string;
+  open: boolean;
+  /** A DOM handle for `verify:routes`, which may not read a translated
+   *  string to tell two forms apart (`CLAUDE.md`). */
+  act: string;
+  children: React.ReactNode;
+}) {
+  return (
+    // **`open:w-full`, and it is layout rather than decoration.** Shut, the
+    // disclosure sits inline beside Remove; open, it claims the whole row so
+    // nine fields are not squeezed into a flex item beside a button, and Remove
+    // wraps beneath. `[open]` is a CSS selector, so the browser's own toggling
+    // keeps it true without React being told `D20`.
+    <details open={open} data-slot={act} className="open:w-full">
+      <Button asChild size="xs" variant="ghost">
+        <summary className="w-fit cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+          {label}
+        </summary>
+      </Button>
+      <div className="mt-3">{children}</div>
+    </details>
+  );
+}
+
 function ProductLine({
-  threadId,
   line,
+  updateLine,
   removeLine,
   options,
   locale,
   editable,
 }: {
-  threadId: string;
   line: LineRow;
-  /**
-   * Already bound by `ThreadLines` — `WORKFLOW §5`'s hang. Bound here instead,
-   * this form answered no raw POST at all; bound by the caller it answers in
-   * milliseconds. Measured on this build.
-   *
-   * `update` below keeps its own `.bind()` deliberately. Its form renders only
-   * behind `open`, so it never reaches the HTML without JavaScript and the hang
-   * cannot be reproduced against it — and an unverifiable change is worse than
-   * none. `WORKFLOW §5` carries the row.
-   */
-  removeLine: () => Promise<FormState>;
+  /** Both already bound by `ThreadLines` — `WORKFLOW §5`. */
+  updateLine: FieldAction;
+  removeLine: PlainAction;
   options: ProductOptions;
   locale: string;
   editable: boolean;
 }) {
   const t = useTranslations();
-  const [open, setOpen] = useState(false);
   const [updateState, update, updating] = useActionState(
-    updateQuotationLineAction.bind(null, threadId, line.id),
+    updateLine,
     emptyFormState,
   );
   const [removeState, remove, removing] = useActionState(
@@ -172,16 +247,32 @@ function ProductLine({
 
       {editable ? (
         <>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              size="xs"
-              variant="ghost"
-              aria-expanded={open}
-              onClick={() => setOpen((value) => !value)}
+          <div className="flex flex-wrap items-center gap-2">
+            <Disclosure
+              label={t("common.edit")}
+              open={rejected(updateState)}
+              act="edit-line"
             >
-              {t("common.edit")}
-            </Button>
+              <form
+                action={update}
+                data-act="update-line"
+                className="flex flex-col gap-3"
+              >
+                <LineFields
+                  options={options}
+                  locale={locale}
+                  idPrefix={`line-${line.id}`}
+                  defaults={line}
+                  errors={updateState.fieldErrors ?? {}}
+                />
+                <RowError state={updateState} />
+                <div>
+                  <Button type="submit" size="xs" disabled={updating}>
+                    {updating ? t("common.saving") : t("common.save")}
+                  </Button>
+                </div>
+              </form>
+            </Disclosure>
             <form action={remove} data-act="remove-line">
               <Button
                 type="submit"
@@ -194,24 +285,6 @@ function ProductLine({
             </form>
           </div>
           <RowError state={removeState} />
-
-          {open ? (
-            <form action={update} className="flex flex-col gap-3">
-              <LineFields
-                options={options}
-                locale={locale}
-                idPrefix={`line-${line.id}`}
-                defaults={line}
-                errors={updateState.fieldErrors ?? {}}
-              />
-              <RowError state={updateState} />
-              <div>
-                <Button type="submit" size="xs" disabled={updating}>
-                  {updating ? t("common.saving") : t("common.save")}
-                </Button>
-              </div>
-            </form>
-          ) : null}
         </>
       ) : null}
     </div>
@@ -219,35 +292,26 @@ function ProductLine({
 }
 
 function ServiceLine({
-  threadId,
   service,
+  updateService,
   removeService,
   services,
   lines,
   locale,
   editable,
 }: {
-  threadId: string;
   service: ServiceRow;
-  /**
-   * Already bound by `ThreadLines`, for `ProductLine`'s reason — and this row
-   * is why "it does not reproduce" is not a reason to leave the shape alone.
-   * Bound in here it answered a raw POST while it was the only service line on
-   * the thread, and hung on every attempt once a second row rendered: `7` of
-   * `8`, then `3` of `4`, answering only on the last row remaining. So the
-   * shape is what hangs, and whether a given page reproduces it today is a
-   * property of the data, not of the code. `WORKFLOW §5`.
-   */
-  removeService: () => Promise<FormState>;
+  /** Both already bound by `ThreadLines` — `WORKFLOW §5`. */
+  updateService: FieldAction;
+  removeService: PlainAction;
   services: NamedOption[];
   lines: LineRow[];
   locale: string;
   editable: boolean;
 }) {
   const t = useTranslations();
-  const [open, setOpen] = useState(false);
   const [updateState, update, updating] = useActionState(
-    updateServiceLineAction.bind(null, threadId, service.id),
+    updateService,
     emptyFormState,
   );
   const [removeState, remove, removing] = useActionState(
@@ -289,47 +353,50 @@ function ServiceLine({
 
       {editable ? (
         <>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              size="xs"
-              variant="ghost"
-              aria-expanded={open}
-              onClick={() => setOpen((value) => !value)}
+          <div className="flex flex-wrap items-center gap-2">
+            <Disclosure
+              label={t("common.edit")}
+              open={rejected(updateState)}
+              act="edit-service"
             >
-              {t("common.edit")}
-            </Button>
+              <form
+                action={update}
+                data-act="update-service"
+                className="flex flex-col gap-3"
+              >
+                <ServiceFields
+                  services={services}
+                  locale={locale}
+                  idPrefix={`service-${service.id}`}
+                  defaults={service}
+                  errors={updateState.fieldErrors ?? {}}
+                />
+                <AppliesToField
+                  id={`service-${service.id}-appliesTo`}
+                  lines={lines}
+                  locale={locale}
+                  defaultValue={service.quotationLineId}
+                />
+                <RowError state={updateState} />
+                <div>
+                  <Button type="submit" size="xs" disabled={updating}>
+                    {updating ? t("common.saving") : t("common.save")}
+                  </Button>
+                </div>
+              </form>
+            </Disclosure>
             <form action={remove} data-act="remove-service">
-              <Button type="submit" size="xs" variant="ghost" disabled={removing}>
+              <Button
+                type="submit"
+                size="xs"
+                variant="ghost"
+                disabled={removing}
+              >
                 {t("common.remove")}
               </Button>
             </form>
           </div>
           <RowError state={removeState} />
-
-          {open ? (
-            <form action={update} className="flex flex-col gap-3">
-              <ServiceFields
-                services={services}
-                locale={locale}
-                idPrefix={`service-${service.id}`}
-                defaults={service}
-                errors={updateState.fieldErrors ?? {}}
-              />
-              <AppliesToField
-                id={`service-${service.id}-appliesTo`}
-                lines={lines}
-                locale={locale}
-                defaultValue={service.quotationLineId}
-              />
-              <RowError state={updateState} />
-              <div>
-                <Button type="submit" size="xs" disabled={updating}>
-                  {updating ? t("common.saving") : t("common.save")}
-                </Button>
-              </div>
-            </form>
-          ) : null}
         </>
       ) : null}
     </div>
@@ -371,6 +438,87 @@ function AppliesToField({
   );
 }
 
+/** The add-a-product-line form, so its hook sits below the `.bind()`. */
+function AddLineForm({
+  add,
+  options,
+  locale,
+}: {
+  add: FieldAction;
+  options: ProductOptions;
+  locale: string;
+}) {
+  const t = useTranslations();
+  const [state, action, pending] = useActionState(add, emptyFormState);
+
+  return (
+    <Disclosure
+      label={t("quotations.detail.addLine")}
+      open={rejected(state)}
+      act="add-line-disclosure"
+    >
+      <form action={action} data-act="add-line" className="flex flex-col gap-3">
+        <LineFields
+          options={options}
+          locale={locale}
+          idPrefix="new-line"
+          errors={state.fieldErrors ?? {}}
+        />
+        <RowError state={state} />
+        <div>
+          <Button type="submit" size="xs" disabled={pending}>
+            {pending ? t("common.saving") : t("common.add")}
+          </Button>
+        </div>
+      </form>
+    </Disclosure>
+  );
+}
+
+/** The add-a-service form, for `AddLineForm`'s reason. */
+function AddServiceForm({
+  add,
+  services,
+  lines,
+  locale,
+}: {
+  add: FieldAction;
+  services: NamedOption[];
+  lines: LineRow[];
+  locale: string;
+}) {
+  const t = useTranslations();
+  const [state, action, pending] = useActionState(add, emptyFormState);
+
+  return (
+    <Disclosure
+      label={t("quotations.detail.addService")}
+      open={rejected(state)}
+      act="add-service-disclosure"
+    >
+      <form
+        action={action}
+        data-act="add-service"
+        className="flex flex-col gap-3"
+      >
+        <ServiceFields
+          services={services}
+          locale={locale}
+          idPrefix="new-service"
+          errors={state.fieldErrors ?? {}}
+        />
+        <AppliesToField id="new-service-appliesTo" lines={lines} locale={locale} />
+        <RowError state={state} />
+        <div>
+          <Button type="submit" size="xs" disabled={pending}>
+            {pending ? t("common.saving") : t("common.add")}
+          </Button>
+        </div>
+      </form>
+    </Disclosure>
+  );
+}
+
 export function ThreadLines({
   threadId,
   lines,
@@ -389,16 +537,10 @@ export function ThreadLines({
   editable: boolean;
 }) {
   const t = useTranslations();
-  const [addingLine, setAddingLine] = useState(false);
-  const [addingService, setAddingService] = useState(false);
-  const [addLineState, addLine, addingLinePending] = useActionState(
-    addQuotationLineAction.bind(null, threadId),
-    emptyFormState,
-  );
-  const [addServiceState, addService, addingServicePending] = useActionState(
-    addServiceLineAction.bind(null, threadId),
-    emptyFormState,
-  );
+
+  // **No `useActionState` here.** Every form below owns its own hook and
+  // receives its action already bound — `WORKFLOW §5`'s hang, and
+  // `ThreadActions` is the same shape for the same reason.
 
   const unpriced = lines.some((line) => !line.unitPrice);
 
@@ -408,9 +550,9 @@ export function ThreadLines({
         {lines.map((line) => (
           <ProductLine
             key={line.id}
-            threadId={threadId}
             line={line}
             // Bound HERE, not in the row — `WORKFLOW §5`.
+            updateLine={updateQuotationLineAction.bind(null, threadId, line.id)}
             removeLine={removeQuotationLineAction.bind(null, threadId, line.id)}
             options={options}
             locale={locale}
@@ -418,6 +560,8 @@ export function ThreadLines({
           />
         ))}
 
+        {/* `S58` — a line with no price contributes nothing and the screen says
+            so, rather than showing a total quietly missing a line. */}
         {unpriced ? (
           <p className="text-muted-foreground mt-3 text-start text-xs">
             {t("quotations.detail.unpricedLines")}
@@ -426,39 +570,11 @@ export function ThreadLines({
 
         {editable ? (
           <div className="mt-4 border-t pt-4">
-            {addingLine ? (
-              <form action={addLine} className="flex flex-col gap-3">
-                <LineFields
-                  options={options}
-                  locale={locale}
-                  idPrefix="new-line"
-                  errors={addLineState.fieldErrors ?? {}}
-                />
-                <RowError state={addLineState} />
-                <div className="flex items-center gap-2">
-                  <Button type="submit" size="xs" disabled={addingLinePending}>
-                    {addingLinePending ? t("common.saving") : t("common.add")}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="ghost"
-                    onClick={() => setAddingLine(false)}
-                  >
-                    {t("common.cancel")}
-                  </Button>
-                </div>
-              </form>
-            ) : (
-              <Button
-                type="button"
-                size="xs"
-                variant="outline"
-                onClick={() => setAddingLine(true)}
-              >
-                {t("quotations.detail.addLine")}
-              </Button>
-            )}
+            <AddLineForm
+              add={addQuotationLineAction.bind(null, threadId)}
+              options={options}
+              locale={locale}
+            />
           </div>
         ) : null}
       </section>
@@ -477,9 +593,13 @@ export function ThreadLines({
             {serviceLines.map((service) => (
               <ServiceLine
                 key={service.id}
-                threadId={threadId}
                 service={service}
                 // Bound HERE, not in the row — `WORKFLOW §5`.
+                updateService={updateServiceLineAction.bind(
+                  null,
+                  threadId,
+                  service.id,
+                )}
                 removeService={removeServiceLineAction.bind(
                   null,
                   threadId,
@@ -494,51 +614,18 @@ export function ThreadLines({
           </div>
         )}
 
-        {editable ? (
+        {/* **No `disabled` on the way in.** The add control used to be a button
+            disabled when the lookup table was empty, which `D20`'s scan reads
+            as a field nobody can reach; there are service types seeded, and a
+            form the server would refuse is refused by the server `S109`. */}
+        {editable && services.length > 0 ? (
           <div className="mt-4 border-t pt-4">
-            {addingService ? (
-              <form action={addService} className="flex flex-col gap-3">
-                <ServiceFields
-                  services={services}
-                  locale={locale}
-                  idPrefix="new-service"
-                  errors={addServiceState.fieldErrors ?? {}}
-                />
-                <AppliesToField
-                  id="new-service-appliesTo"
-                  lines={lines}
-                  locale={locale}
-                />
-                <RowError state={addServiceState} />
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="submit"
-                    size="xs"
-                    disabled={addingServicePending}
-                  >
-                    {addingServicePending ? t("common.saving") : t("common.add")}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="ghost"
-                    onClick={() => setAddingService(false)}
-                  >
-                    {t("common.cancel")}
-                  </Button>
-                </div>
-              </form>
-            ) : (
-              <Button
-                type="button"
-                size="xs"
-                variant="outline"
-                disabled={services.length === 0}
-                onClick={() => setAddingService(true)}
-              >
-                {t("quotations.detail.addService")}
-              </Button>
-            )}
+            <AddServiceForm
+              add={addServiceLineAction.bind(null, threadId)}
+              services={services}
+              lines={lines}
+              locale={locale}
+            />
           </div>
         ) : null}
       </section>

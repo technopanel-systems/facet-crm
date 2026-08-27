@@ -15,6 +15,7 @@ import { Link } from "@/i18n/navigation";
 import { can, requireSession } from "@/lib/authz";
 import { CHAIN_GROUPS, chainOwner, type ChainGroup } from "@/lib/chain";
 import { getCompany } from "@/lib/companies";
+import { getProject } from "@/lib/projects";
 import { formatSqm } from "@/lib/decimal";
 import {
   listQuotationThreads,
@@ -58,11 +59,16 @@ export default async function QuotationsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ q?: string; page?: string; companyId?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    page?: string;
+    companyId?: string;
+    projectId?: string;
+  }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const { q, page, companyId } = await searchParams;
+  const { q, page, companyId, projectId } = await searchParams;
 
   const session = await requireSession();
   const t = await getTranslations();
@@ -72,7 +78,12 @@ export default async function QuotationsPage({
 
   const currentPage = Number(page) || 1;
   const { rows, total, groupCounts, foreignRaiserCount } =
-    await listQuotationThreads(session, { q, companyId, page: currentPage });
+    await listQuotationThreads(session, {
+      q,
+      companyId,
+      projectId,
+      page: currentPage,
+    });
 
   // **The scope is named or it is not applied** `D59`. A company detail card
   // links here for the sixth quotation onward `D70`, and a list that silently
@@ -81,10 +92,21 @@ export default async function QuotationsPage({
   // `?companyId=` naming a company they may not see scopes the list and names
   // nothing — the rows were already filtered by
   // `visibleQuotationThreadsFilter`, which company membership never widens.
-  const scopedTo = companyId ? await getCompany(session, companyId) : null;
+  //
+  // **`?projectId=` is the same shape and arrived with session 28**, because
+  // `D70` asks a capped card for *the way to the rest* and a project's
+  // quotations card had none — `/quotations` was indexed by company and not by
+  // project. `getProject` resolves the name through `visibleProjectsFilter`,
+  // which is the reader's own gate `S30`, so an id naming a project they may
+  // not open scopes nothing they could not already see.
+  const [scopedToCompany, scopedToProject] = await Promise.all([
+    companyId ? getCompany(session, companyId) : null,
+    projectId ? getProject(session, projectId) : null,
+  ]);
+  const scopedTo = scopedToCompany ?? scopedToProject;
   // Filters the search and the pager must carry, so neither throws the other
   // away `D59`.
-  const extra = { companyId };
+  const extra = { companyId, projectId };
   // **The reader's own name on every row says nothing** `D2`. The column earns
   // its place only where the list holds somebody ELSE's work, counted over the
   // whole visible scope so it cannot appear on page 1 and vanish on page 2.

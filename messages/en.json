@@ -390,14 +390,12 @@
       "removeCompany": "Remove",
       "hiddenCompany": "Not visible to you",
       "noCompanies": "No companies linked.",
-      "turnOwner": "Waiting on {name} — the next move on this project"
+      "noQuotations": "No quotations on this project yet.",
+      "movedFor": "Last moved {count} days ago"
     },
     "chain": {
       "title": "Quotation chain",
-      "manyThreads": "{count} open quotations on this project",
-      "manyThreadsHint": "Revise one rather than raising another — the same square metres are being quoted more than once.",
-      "quoted": "Quoted",
-      "expected": "Expected"
+      "manyThreads": "{count} open"
     },
     "errors": {
       "atLeastOneCompany": "A project needs at least one company.",
@@ -478,7 +476,8 @@
       "returnedRounds": "Returned for edit",
       "cancelledBy": "Cancelled by",
       "cancellationReason": "Reason for cancellation",
-      "turnSince": "Sitting here since {date}.",
+      "raisedDaysAgo": "Raised {count} days ago",
+      "noDispatches": "Nothing dispatched against this quotation yet.",
       "projectNewHint": "Named after the company. Change it if the project has a name of its own."
     },
     "actions": {

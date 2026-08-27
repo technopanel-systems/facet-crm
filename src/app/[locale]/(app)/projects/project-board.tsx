@@ -115,6 +115,12 @@ export async function ProjectBoardView({
                     <li
                       key={card.id}
                       data-slot="board-card"
+                      // The handle `/quotations` and `/dispatches` rows already
+                      // carry. `verify:routes` §8 pairs the column a card
+                      // landed in against the strip that project's own screen
+                      // draws — two readers of `chainByProject`, one ladder
+                      // `D27` — and it cannot do that by reading a name.
+                      data-id={card.id}
                       className="border-line border-t px-3.5 py-2.5 text-start first:border-t-0"
                     >
                       <Link

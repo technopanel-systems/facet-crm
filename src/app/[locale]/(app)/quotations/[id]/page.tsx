@@ -6,23 +6,17 @@ import {
 } from "next-intl/server";
 
 import {
+  Absent,
   DetailHeader,
   DetailRow,
   Fact,
   Facts,
+  RecordRow,
 } from "@/components/page-header";
 import { Timeline } from "@/components/timeline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
 import { formatSqm } from "@/lib/decimal";
 import { can, requireSession } from "@/lib/authz";
@@ -42,10 +36,17 @@ import { ChainStrip } from "../../_components/chain-strip";
 import { CommentBox } from "../../_components/comment-box";
 import { ListPagination } from "../../_components/list-controls";
 import { NextFollowUpPanel } from "../../_components/next-follow-up-panel";
+import {
+  RelatedCard,
+  RELATED_CARD_LIMIT,
+} from "../../_components/related-card";
 import { SharingPanel } from "../../_components/sharing-panel";
 import {
   TurnPanel,
   chainTurnKey,
+  daysSince,
+  dispatchTurnKey,
+  dispatchTurnNames,
   initials,
 } from "../../_components/turn";
 import { ThreadActions } from "./thread-actions";
@@ -81,31 +82,38 @@ export default async function QuotationDetailPage({
     services,
     dispatched,
     submitted,
+    dispatches,
   ] = await Promise.all([
-      listProductSuppliers(),
-      listProductClasses(),
-      listProductFireRatings(),
-      listProductThicknesses(),
-      listServiceTypes(),
-      // The two inputs `getQuotationThread` cannot carry, because dispatch
-      // lives in its own table `S132`. No new join: `listDispatches` already
-      // filters by thread. Safe by construction — `visibleDispatchesFilter`'s
-      // thread-cascade term means whoever can see this thread can see the
-      // dispatches against it, so neither node can read hollow to someone who
-      // ought to see it filled.
-      //
-      // **`approved` is `won`** `S31` `S72` — goods have moved.
-      listDispatches(session, { threadId: id, status: "approved" }),
-      // **`submitted` is `ready to ship`** `S132` `S88` — the coordinator is
-      // checking it. A `draft` is deliberately not asked for: `S132` says a
-      // draft is the rep's own to edit `S125` and can sit for ever, so it is
-      // not a place the deal has reached, and without that scope a rep would
-      // advance his own chain by opening a form.
-      listDispatches(session, { threadId: id, status: "submitted" }),
-    ]);
+    listProductSuppliers(),
+    listProductClasses(),
+    listProductFireRatings(),
+    listProductThicknesses(),
+    listServiceTypes(),
+    // The two inputs `getQuotationThread` cannot carry, because dispatch lives
+    // in its own table `S132`. No new join: `listDispatches` already filters by
+    // thread. Safe by construction — `visibleDispatchesFilter`'s thread-cascade
+    // term means whoever can see this thread can see the dispatches against it,
+    // so neither node can read hollow to someone who ought to see it filled.
+    //
+    // **`approved` is `won`** `S31` `S72` — goods have moved.
+    listDispatches(session, { threadId: id, status: "approved" }),
+    // **`submitted` is `ready to ship`** `S132` `S88` — the coordinator is
+    // checking it. A `draft` is deliberately not asked for: `S132` says a draft
+    // is the rep's own to edit `S125` and can sit for ever, so it is not a
+    // place the deal has reached, and without that scope a rep would advance
+    // his own chain by opening a form.
+    listDispatches(session, { threadId: id, status: "submitted" }),
+    // **The card, and it is a third query rather than a fold of the two
+    // above.** Those two are counts resolved in SQL; picking the approved rows
+    // out of an unfiltered page would be filtering after pagination, which
+    // `CLAUDE.md` names as the defect that returns silently empty screens.
+    // Default scope, so `S122`'s refused requests stay in the archive and
+    // `S31`'s cancelled ones stay visible as history.
+    listDispatches(session, { threadId: id }),
+  ]);
 
   // `25 §9` — one thread per record. A quotation has no derived events of its
-  // own on this screen (its versions are the table above), so this carries the
+  // own on this screen (its versions are the card below), so this carries the
   // conversation, and it pages rather than capping: there is no full-history
   // route to send anyone to.
   const timeline = await recordTimeline(session, "quotation_thread", id, {
@@ -119,7 +127,7 @@ export default async function QuotationDetailPage({
   const editable = live.status === "requested" && !thread.endState;
   const isCoordinator = can(session, "canApproveQuotation");
 
-  // `25 §3`'s chain position, from the one definition `[src/lib/chain.ts]`.
+  // `S132`'s chain position, from the one definition `[src/lib/chain.ts]`.
   const chain = chainState({
     versionStatus: live.status,
     endState: thread.endState,
@@ -145,7 +153,8 @@ export default async function QuotationDetailPage({
             <Badge
               data-end-state={thread.endState}
               variant={
-                thread.endState === "rejected" || thread.endState === "cancelled"
+                thread.endState === "rejected" ||
+                thread.endState === "cancelled"
                   ? "destructive"
                   : "secondary"
               }
@@ -157,35 +166,52 @@ export default async function QuotationDetailPage({
       />
 
       {/* The concept's `.chain-card`: the turn, then the six steps, then the
-          explanation. `22 §3` makes the turn panel the most important element
-          on the screen, and `22 §6.6`'s strip goes under it rather than beside
-          it — the sentence says whose move it is, the strip says how far this
-          has come and what happens next. Both read one `chainState()`. */}
+          explanation. `D24` makes the turn panel the most important element on
+          the screen, and `D27`'s strip goes under it rather than beside it —
+          the sentence says whose move it is, the strip says how far this has
+          come and what happens next. Both read one `chainState()`. */}
       <Card>
         <CardContent className="flex flex-col gap-5.5">
           <TurnPanel
             who={initials(thread.raisedByName)}
-            tone={chain.owedBy === null ? "calm" : "soon"}
+            /* **Uncoloured, and that is `D6` rather than an omission.** The
+               tone was amber wherever anybody owed the next action and calm
+               where nobody did — which colours the OUTCOME, not how long
+               something has waited. `/quotations` already reasoned this out
+               for the same object and left its own figure grey: no document
+               sets a lateness threshold for a quotation thread, `S67` removed
+               the one date that might have looked like one, and the single
+               threshold that exists `07 D5` covers one position of six and
+               lives in `follow-ups.ts`. A tone invented here would become the
+               number everyone believes in. */
+            tone="calm"
             line={t(chainTurnKey(chain, isCoordinator), {
               name: thread.raisedByName,
             })}
-            // "Sitting here since 3 August" under "Nothing outstanding —
-            // dispatched" contradicts itself, and `22 §4` colours *how long
-            // something has waited* — when nothing waits, there is no
-            // duration to give. Newly reachable: before `hasDispatch` was
-            // passed this page could not reach a position that owes nobody
-            // except a closed one.
+            /* **What the figure actually measures, said truthfully.** This
+               read *"Sitting here since 3 August"* from `thread.createdAt` —
+               the age of the THREAD — beneath a line naming the position it is
+               in now, so a thread raised in January and issued yesterday
+               claimed to have sat at *quoted* for six months. There is no
+               column recording when a position was entered, and inventing one
+               is a column no rule asks for. So it says what it has: how long
+               ago this was raised, which is exactly the figure `/quotations`
+               puts in its own lead cell, from the same field. Absent where
+               nothing waits — a duration under *"nothing outstanding"*
+               contradicts itself. */
             detail={
               chain.owedBy === null
                 ? undefined
-                : t("quotations.detail.turnSince", {
-                    date: format.dateTime(thread.createdAt, {
-                      dateStyle: "long",
-                    }),
+                : t("quotations.detail.raisedDaysAgo", {
+                    count: daysSince(thread.createdAt),
                   })
             }
           />
-          <ChainStrip chain={chain} viewerIsCoordinator={isCoordinator} explain />
+          <ChainStrip
+            chain={chain}
+            viewerIsCoordinator={isCoordinator}
+            explain
+          />
         </CardContent>
       </Card>
 
@@ -206,10 +232,10 @@ export default async function QuotationDetailPage({
                   href={`/projects/${thread.projectId}`}
                   className="hover:underline"
                 >
-                  {thread.projectName}
+                  <span dir="auto">{thread.projectName}</span>
                 </Link>
               ) : (
-                thread.projectName
+                <span dir="auto">{thread.projectName}</span>
               )}
             </Fact>
             <Fact label={t("quotations.fields.company")}>
@@ -218,30 +244,37 @@ export default async function QuotationDetailPage({
                   href={`/companies/${thread.companyId}`}
                   className="hover:underline"
                 >
-                  {thread.companyName}
+                  <span dir="auto">{thread.companyName}</span>
                 </Link>
               ) : (
-                thread.companyName
+                <span dir="auto">{thread.companyName}</span>
               )}
             </Fact>
             <Fact label={t("quotations.fields.contact")}>
-              {thread.contactName ?? dash}
+              {thread.contactName ? (
+                <span dir="auto">{thread.contactName}</span>
+              ) : (
+                dash
+              )}
             </Fact>
             <Fact label={t("quotations.fields.raisedBy")}>
-              {thread.raisedByName}
+              <span dir="auto">{thread.raisedByName}</span>
             </Fact>
-            <Fact label={t("quotations.detail.raisedOn")}>
+            <Fact label={t("quotations.detail.raisedOn")} numeric>
               {format.dateTime(thread.createdAt, { dateStyle: "medium" })}
             </Fact>
-
 
             {thread.endState === "cancelled" ? (
               <>
                 <Fact label={t("quotations.detail.cancelledBy")}>
-                  {thread.cancelledByName ?? t("common.unknownUser")}
+                  <span dir="auto">
+                    {thread.cancelledByName ?? t("common.unknownUser")}
+                  </span>
                 </Fact>
-                <Fact label={t("quotations.detail.cancellationReason")}>
-                  {thread.cancellationReason ?? dash}
+                {/* A sentence, not a datum `D70` — it spans the grid rather
+                    than being squeezed into one column. */}
+                <Fact label={t("quotations.detail.cancellationReason")} wide>
+                  <span dir="auto">{thread.cancellationReason ?? dash}</span>
                 </Fact>
               </>
             ) : null}
@@ -263,7 +296,9 @@ export default async function QuotationDetailPage({
               </Badge>
             </Fact>
             <Fact label={t("quotations.fields.reference")}>
-              <span dir="ltr">{live.smacReference ?? dash}</span>
+              <span dir="ltr" className="num">
+                {live.smacReference ?? dash}
+              </span>
               {live.smacReference ? (
                 <span className="text-muted-foreground ms-2 text-xs">
                   {t(
@@ -276,7 +311,7 @@ export default async function QuotationDetailPage({
               {t(`enums.quotationVersionOrigin.${live.origin}`)}
             </Fact>
             {live.returnForEditRound > 0 ? (
-              <Fact label={t("quotations.detail.returnedRounds")}>
+              <Fact label={t("quotations.detail.returnedRounds")} numeric>
                 <span dir="ltr">{live.returnForEditRound}</span>
               </Fact>
             ) : null}
@@ -311,7 +346,8 @@ export default async function QuotationDetailPage({
             <dl>
               <DetailRow label={t("quotations.detail.totalSqm")}>
                 <span dir="ltr">
-                  {live.totalSqm ? formatSqm(live.totalSqm) : dash} {t("common.sqm")}
+                  {live.totalSqm ? formatSqm(live.totalSqm) : dash}{" "}
+                  {t("common.sqm")}
                 </span>
               </DetailRow>
               <DetailRow label={t("quotations.detail.totalExclVat")}>
@@ -337,78 +373,13 @@ export default async function QuotationDetailPage({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-start text-sm">
-            {t("quotations.detail.versionHistory")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-start">
-                    {t("quotations.fields.version")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("quotations.fields.reference")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("quotations.fields.origin")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("quotations.fields.versionStatus")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("quotations.fields.grandTotal")}
-                  </TableHead>
-                  <TableHead className="text-start">
-                    {t("common.actions")}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {thread.versions.map((version) => (
-                  <TableRow key={version.id}>
-                    <TableCell className="text-start" dir="ltr">
-                      {version.versionNumber}
-                    </TableCell>
-                    <TableCell className="text-start" dir="ltr">
-                      {version.smacReference ?? dash}
-                    </TableCell>
-                    <TableCell className="text-start">
-                      {t(`enums.quotationVersionOrigin.${version.origin}`)}
-                    </TableCell>
-                    <TableCell className="text-start">
-                      <Badge variant="outline">
-                        {t(`enums.quotationVersionStatus.${version.status}`)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-start" dir="ltr">
-                      {version.grandTotal
-                        ? `${version.grandTotal} ${t("common.sar")}`
-                        : dash}
-                    </TableCell>
-                    <TableCell className="text-start">
-                      {version.status === "superseded" ? (
-                        <Button asChild size="xs" variant="ghost">
-                          <Link
-                            href={`/quotations/${thread.id}/versions/${version.id}`}
-                          >
-                            {t("common.view")}
-                          </Link>
-                        </Button>
-                      ) : null}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
+      {/* **Full width, above the split, and that is `D70` read the right way
+          round.** The two columns are balanced by height, and the narrow one is
+          where things a reader READS go. `S62`'s five acts — issue, return,
+          accept, reject, cancel — are what the coordinator opens this screen to
+          do, and a 1fr rail is not where the work goes. `ThreadActions` renders
+          nothing at all for a rep on a closed thread, so an identity with no
+          act available gets no shell `D70`. */}
       <Card>
         <CardHeader>
           <CardTitle className="text-start text-sm">
@@ -426,48 +397,160 @@ export default async function QuotationDetailPage({
         </CardContent>
       </Card>
 
-      {/* Sharing `[07 B1]`, `[07 B2]`. A thread share is the narrowest of the
-          three: it reveals this conversation and its dispatches `[18 §2]`, and
-          neither the project it was raised on nor the company behind it. A rep
-          brought in to help with one quotation gets one quotation. */}
-      <SharingPanel
-        session={session}
-        recordType="quotation_thread"
-        recordId={thread.id}
-      />
+      {/* `D24` — related records as cards, in the concept's two-column grid,
+          **balanced by height** `D70`. The conversation is the long side: on a
+          thread it is what this screen exists to replace WhatsApp for. */}
+      <div className="grid items-start gap-4 lg:grid-cols-[1.25fr_1fr]">
+        <div className="flex flex-col gap-4">
+          {/* `25 §9` — the thread the rep and the coordinator coordinate in,
+              and `25 §13`'s return-for-edit reason lands in this same
+              conversation rather than in a field of its own `S62`. */}
+          <Timeline
+            events={timeline.events}
+            total={timeline.total}
+            composer={
+              <CommentBox
+                session={session}
+                recordType="quotation_thread"
+                recordId={thread.id}
+              />
+            }
+          />
+          <ListPagination
+            basePath={`/quotations/${thread.id}`}
+            page={timeline.page}
+            total={timeline.total}
+          />
+        </div>
 
-      {/* `25 §18` — the rep's own date. On a thread it suppresses both the
-          no-response chase and `22 §6.11`'s returned-for-edits one until it
-          arrives, which is the escape hatch for a rep who has nothing to
-          change: they say when they will get to it, and the queue believes
-          them. */}
-      <NextFollowUpPanel
-        session={session}
-        recordType="quotation_thread"
-        recordId={thread.id}
-        value={thread.nextFollowUpAt}
-      />
+        <div className="flex flex-col gap-4">
+          {/* `S77` — one quotation produces any number of dispatches. The
+              thread had no way to reach any of them: `/dispatches` links here
+              and nothing linked back. Every row is the company page's
+              dispatches card exactly — `D26`'s square metres, and one ladder in
+              `turn.tsx` `[dispatchTurnKey]` — rather than a third variant. */}
+          <RelatedCard
+            title={t("dispatches.title")}
+            total={dispatches.total}
+            href={`/dispatches?threadId=${thread.id}`}
+            empty={t("quotations.detail.noDispatches")}
+          >
+            {dispatches.rows.slice(0, RELATED_CARD_LIMIT).map((row) => (
+              <RecordRow
+                key={row.id}
+                href={`/dispatches/${row.id}`}
+                title={
+                  <span className="num" dir="ltr">
+                    {row.smacReference ?? dash}
+                  </span>
+                }
+                // `D26` — a submitted request owes the coordinator `S72`; an
+                // approved, refused or cancelled one owes nobody. Five states,
+                // three answers.
+                meta={t(
+                  dispatchTurnKey(row.status),
+                  dispatchTurnNames(row.status)
+                    ? {
+                        name:
+                          (row.status === "approved"
+                            ? row.approvedByName
+                            : row.recordedByName) ?? dash,
+                      }
+                    : undefined,
+                )}
+                // `D26`'s lead figure — how much went out, mono.
+                when={`${formatSqm(row.sqm)} ${t("common.sqm")}`}
+              />
+            ))}
+          </RelatedCard>
 
-      {/* `25 §9` — the thread this screen exists to replace WhatsApp for. The
-          rep and the coordinator coordinate a quotation here instead, and
-          `25 §13`'s return-for-edit reason lands in this same conversation
-          rather than in a field of its own. */}
-      <Timeline
-        events={timeline.events}
-        total={timeline.total}
-        composer={
-          <CommentBox
+          {/* `S66` — a revision carries an RE number and supersedes the
+              previous one. This was a six-column `<Table>` inside a card, which
+              is the list archetype `D24` puts on a list screen; a related
+              record on a detail screen is a `RecordRow`.
+
+              **A plain card, not a `RelatedCard`, and neither half of that
+              component would be honest here.** `RELATED_CARD_LIMIT` exists for
+              a card whose rest live behind a filtered list `D70`, and no route
+              lists one thread's versions — a cap would hide rows with no way to
+              them. Nor can this card ever be empty: `S52` creates version 1
+              when the thread is raised, so an empty sentence would be a string
+              nothing can render. A version history is bounded by revisions
+              `S66`, which are rare. */}
+          <Card
+            data-slot="version-history"
+            data-total={String(thread.versions.length)}
+          >
+            <CardHeader>
+              <CardTitle className="text-start text-sm">
+                {t("quotations.detail.versionHistory")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="flex flex-col">
+                {thread.versions.map((version) => (
+                  <RecordRow
+                    key={version.id}
+                    title={
+                      version.smacReference ? (
+                        <span className="num" dir="ltr">
+                          {version.smacReference}
+                        </span>
+                      ) : (
+                        <Absent>{t("quotations.fields.endStateOpen")}</Absent>
+                      )
+                    }
+                    meta={[
+                      `${t("quotations.fields.version")} ${version.versionNumber}`,
+                      t(`enums.quotationVersionStatus.${version.status}`),
+                      t(`enums.quotationVersionOrigin.${version.origin}`),
+                    ].join(" · ")}
+                    when={
+                      version.grandTotal
+                        ? `${version.grandTotal} ${t("common.sar")}`
+                        : undefined
+                    }
+                    action={
+                      version.status === "superseded" ? (
+                        <Button asChild size="xs" variant="ghost">
+                          <Link
+                            href={`/quotations/${thread.id}/versions/${version.id}`}
+                          >
+                            {t("common.view")}
+                          </Link>
+                        </Button>
+                      ) : undefined
+                    }
+                  />
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+
+          {/* `25 §18` — the rep's own date. On a thread it suppresses both the
+              no-response chase and `22 §6.11`'s returned-for-edits one until it
+              arrives, which is the escape hatch for a rep who has nothing to
+              change: they say when they will get to it, and the queue believes
+              them. */}
+          <NextFollowUpPanel
+            session={session}
+            recordType="quotation_thread"
+            recordId={thread.id}
+            value={thread.nextFollowUpAt}
+          />
+
+          {/* Sharing `[07 B1]`, `[07 B2]`. A thread share is the narrowest of
+              the three: it reveals this conversation and its dispatches
+              `[18 §2]`, and neither the project it was raised on nor the
+              company behind it. A rep brought in to help with one quotation
+              gets one quotation. */}
+          <SharingPanel
             session={session}
             recordType="quotation_thread"
             recordId={thread.id}
           />
-        }
-      />
-      <ListPagination
-        basePath={`/quotations/${thread.id}`}
-        page={timeline.page}
-        total={timeline.total}
-      />
+        </div>
+      </div>
     </div>
   );
 }

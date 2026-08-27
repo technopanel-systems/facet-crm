@@ -15,6 +15,7 @@ import { Link } from "@/i18n/navigation";
 import { formatSqm } from "@/lib/decimal";
 import { can, requireSession } from "@/lib/authz";
 import { getCompany } from "@/lib/companies";
+import { getQuotationThread } from "@/lib/quotations";
 import {
   DISPATCH_GROUPS,
   listDispatches,
@@ -63,11 +64,13 @@ export default async function DispatchesPage({
     archive?: string;
     userId?: string;
     companyId?: string;
+    threadId?: string;
   }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const { q, page, direct, archive, userId, companyId } = await searchParams;
+  const { q, page, direct, archive, userId, companyId, threadId } =
+    await searchParams;
 
   const session = await requireSession();
   const t = await getTranslations();
@@ -90,6 +93,7 @@ export default async function DispatchesPage({
     page: currentPage,
     userId,
     companyId,
+    threadId,
     grouped: true,
     status: archived ? "refused" : undefined,
     // **The one route chip that survives**, and it is a narrowing rather than a
@@ -110,7 +114,22 @@ export default async function DispatchesPage({
   // naming a company they may not open scopes the list and names nothing —
   // `visibleDispatchesFilter` had already decided which rows come back, and
   // company membership is not one of its terms `[18 §2]`.
-  const scopedTo = companyId ? await getCompany(session, companyId) : null;
+  //
+  // **`?threadId=` is the same shape and arrived with session 28**, because
+  // `D70` asks a capped card for *the way to the rest* and a quotation's
+  // dispatches card had none — `/dispatches` was indexed by company and not by
+  // thread. `getQuotationThread` resolves the label through the reader's own
+  // filter, and the label is the SMAC reference where the coordinator has
+  // issued one and the project name `S50` until she has.
+  const [scopedToCompany, scopedToThread] = await Promise.all([
+    companyId ? getCompany(session, companyId) : null,
+    threadId ? getQuotationThread(session, threadId) : null,
+  ]);
+  const scopeLabel =
+    scopedToCompany?.name ??
+    (scopedToThread
+      ? (scopedToThread.live.smacReference ?? scopedToThread.projectName)
+      : null);
 
   // **The rep column earns its place the way `/quotations`' raiser does** `D2`
   // — only where the list holds somebody else's work, counted over the whole
@@ -140,11 +159,11 @@ export default async function DispatchesPage({
         basePath={basePath}
         defaultValue={q}
         placeholder={t("dispatches.searchPlaceholder")}
-        hidden={{ direct, archive, userId, companyId }}
+        hidden={{ direct, archive, userId, companyId, threadId }}
       />
 
-      {scopedTo ? (
-        <ScopeChip label={scopedTo.name} clearHref={basePath} />
+      {scopeLabel ? (
+        <ScopeChip label={scopeLabel} clearHref={basePath} />
       ) : null}
 
       {/* **One row, four controls.** Every chip carries the others' values and
@@ -159,7 +178,7 @@ export default async function DispatchesPage({
           name="archive"
           active={archived ? "1" : undefined}
           query={q}
-          extra={{ direct, userId, companyId }}
+          extra={{ direct, userId, companyId, threadId }}
           options={[
             { label: t("dispatches.scope.working") },
             { value: "1", label: t("dispatches.scope.archive") },
@@ -170,7 +189,7 @@ export default async function DispatchesPage({
           name="direct"
           active={direct === "1" ? "1" : undefined}
           query={q}
-          extra={{ archive, userId, companyId }}
+          extra={{ archive, userId, companyId, threadId }}
           options={[
             { label: t("dispatches.fields.filterAll") },
             { value: "1", label: t("dispatches.fields.filterDirect") },
@@ -208,7 +227,7 @@ export default async function DispatchesPage({
           page={currentPage}
           total={total}
           query={q}
-          extra={{ direct, archive, userId, companyId }}
+          extra={{ direct, archive, userId, companyId, threadId }}
         >
           {/* **`table-fixed`, and it is not cosmetic** — the lesson
               `/quotations` paid for in session 26. `TableCell` carries

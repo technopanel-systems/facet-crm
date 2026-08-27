@@ -1282,29 +1282,56 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log("\n8. The chain strip, on both screens that draw it");
+  console.log("\n8. The chain, on the three screens that draw it [S132] [D27]");
   {
-    // **The two screens are asserted TOGETHER**, which is the only way to make
-    // the project half mean anything: reading `data-position` off the
-    // quotation's own strip says whether that thread is live, and a live
-    // thread obliges the project behind it to draw something. Asserting the
-    // project screen on its own would be a tautology — it renders the card
-    // only when it has a thread to render it for.
+    // **Three readers of one ladder, paired against each other.** `D27` makes
+    // `chain.ts` the single definition and `S132` says a project's position is
+    // the furthest of its live threads — so the only assertion worth making is
+    // that two screens reading the same rule return the same answer. A section
+    // that asks one screen whether it drew *something* is a section that can
+    // only pass.
     //
-    // **It walks until it has seen each SHAPE once, not each row.** The strip
-    // has a shape per chain position and the project half has two — the strip
-    // for a single live thread, `25 §22`'s flag as soon as there are two — and
-    // which of them the first row reaches is an accident of the data. Twenty-
-    // five identical assertions prove nothing the first one did not, and the
-    // interesting ones (a `closed` thread, a `dispatched` one) can sort well
-    // past page 1. So it pages, and asserts a shape the first time it meets it.
+    // **That is what this used to be.** The project half asserted
+    // `projectStrip !== null || many` — a strip for one live thread, `25 §22`'s
+    // flag for more. Session 28 removed the flag, so every project draws a
+    // strip and that disjunction became true by construction: it would have
+    // gone green over a project reading `new` while its threads were `won`.
+    //
+    // The three pairings, in the order they are made:
+    //
+    //  **A. the quotations list ↔ each thread's own strip.** Unchanged, and
+    //  the shape the two below copy. `/quotations` passed no dispatch flag
+    //  before session 26, so a shipped thread read *with the customer* on the
+    //  list and *won* on its own page — one function, two screens, two
+    //  answers, and nothing failed.
+    //
+    //  **B. the board's column ↔ the project's own strip.** Both read
+    //  `chainByProject`, one through `listProjectBoard` and one through
+    //  `getProject`, and until session 28 the second did not exist — the screen
+    //  built its own answer from ONE thread plus two dispatch reads. A project
+    //  won by the direct route `S75`, or by a dispatch against a second thread,
+    //  was won on the board and blank on its own page. This is the pairing that
+    //  would have caught it, and it is `§24`'s shape exactly.
+    //
+    //  **C. the project's strip ↔ the furthest of its threads.** `S132` in so
+    //  many words, and it is drivable because `?projectId=` exists as of the
+    //  same slice. `won` and `readyToShip` are the two rungs a DISPATCH can
+    //  supply with no thread reaching them, so those two are asserted as
+    //  at-least rather than equal and the gap is printed as a note.
     const jar = jars["manager@example.test"];
     const PAGES = 4;
+    // How many projects to pair per locale. The board is unpaginated and this
+    // database carries 49; pairing every one twice over is 98 fetches to prove
+    // what a spread across the six columns already proves. Coverage is printed
+    // rather than assumed, so a column this run never reached says so.
+    const PROJECT_SAMPLE = 12;
     const shapes = new Set<string>();
-    const seen = { strip: 0, many: 0, closed: 0 };
+    const seen = { closed: 0, dispatchAhead: 0 };
 
     for (const locale of ["en", "ar"] as const) {
+      /* ── A. the list and each thread ─────────────────────────────────── */
       let found = 0;
+      const projectIds = new Set<string>();
 
       for (let page = 1; page <= PAGES; page += 1) {
         const list = await get(jar, `/${locale}/quotations?page=${page}`);
@@ -1338,51 +1365,51 @@ async function main(): Promise<void> {
         for (const id of ids) {
           const thread = await get(jar, `/${locale}/quotations/${id}`);
           const strip = stripOf(thread.body);
-          // **The assertion this slice was written for.** `/quotations` passed
-          // no dispatch flag, so a thread with an approved dispatch read *with
-          // the customer* on the list and *won* on its own page — one function,
-          // two screens, two answers, and nothing failed. Asserted at every
-          // row rather than at one, which is `CLAUDE.md`'s rule about a derived
-          // figure having more than one reader.
-          if (strip && listed.has(id)) {
+          if (!strip) {
+            // Every thread has a chain position, so this is a real failure
+            // rather than a shape not worth repeating.
+            check(
+              `${locale} ${id.slice(0, 8)}: the quotation draws the strip`,
+              false,
+            );
+            continue;
+          }
+          if (listed.has(id)) {
             check(
               `${locale} ${id.slice(0, 8)}: list and detail agree on position`,
               listed.get(id) === strip.position,
               `list ${listed.get(id)}, detail ${strip.position}`,
             );
           }
-          if (!strip) {
-            // Every thread has a chain position, so this is a real failure
-            // rather than a shape not worth repeating.
-            check(`${locale} ${id.slice(0, 8)}: the quotation draws the strip`, false);
-            continue;
-          }
-
-          const projectId = firstId(thread.body, "projects");
-          const project = projectId
-            ? await get(jar, `/${locale}/projects/${projectId}`)
-            : null;
-          const projectStrip = project ? stripOf(project.body) : null;
-          const many = project?.body.includes('data-slot="chain-many"') ?? false;
-          const half = projectStrip ? "strip" : many ? "flag" : "none";
-
-          if (projectStrip) seen.strip += 1;
-          else if (many) seen.many += 1;
           if (strip.position === "closed") seen.closed += 1;
 
-          const shape = `${locale} ${strip.position}/${half}`;
+          // The project this thread names, banked for B and C. A thread reached
+          // through a share renders its project as plain text where the reader
+          // may not open it `S30`, and there is nothing to follow.
+          const projectId = firstId(thread.body, "projects");
+          if (projectId) projectIds.add(projectId);
+
+          const shape = `${locale} ${strip.position}`;
           if (shapes.has(shape)) continue;
           shapes.add(shape);
 
           const label = `${shape} (${id.slice(0, 8)})`;
           // Six nodes, one per `S132` position. A dropped column fails here.
-          check(`${label}: six steps`, strip.steps.length === 6, `got ${strip.steps.length}`);
+          check(
+            `${label}: six steps`,
+            strip.steps.length === 6,
+            `got ${strip.steps.length}`,
+          );
           // **A node is ringed only while someone owes it** — so a won thread
           // rings none, and a closed one rings none either, showing instead
           // where it stopped.
           const now = strip.steps.filter((state) => state === "now").length;
           const owed = strip.position !== "closed" && strip.position !== "won";
-          check(`  it rings ${owed ? "one" : "no"} node`, now === (owed ? 1 : 0), `got ${now}`);
+          check(
+            `  it rings ${owed ? "one" : "no"} node`,
+            now === (owed ? 1 : 0),
+            `got ${now}`,
+          );
           if (strip.position === "closed") {
             check(
               "  a closed thread has done nodes but no current one",
@@ -1394,40 +1421,6 @@ async function main(): Promise<void> {
             "  the turn panel sits with it",
             thread.body.includes('data-slot="turn-panel"'),
           );
-
-          if (strip.position === "closed") {
-            // `S62` ends a thread at accepted, rejected or cancelled — `S67`
-            // took expiry out of that set, so a closed strip is one of three; the
-            // project behind it has no live thread on this account, so the
-            // project half is not this thread's to prove.
-            continue;
-          }
-          if (!projectId) {
-            // Every thread names a project since `S50`, so this is no longer
-            // "no project" — it is no LINK. A thread reached through a share
-            // renders its project as plain text when the reader may not open
-            // it, and there is nothing to follow.
-            console.log(`  skip  ${label}: renders no project link`);
-            continue;
-          }
-          check(
-            "  its project draws the chain",
-            projectStrip !== null || many,
-            `status ${project?.status}`,
-          );
-          if (projectStrip) {
-            check(
-              "    six steps there too",
-              projectStrip.steps.length === 6,
-              `got ${projectStrip.steps.length}`,
-            );
-          } else if (many) {
-            // `25 §22`'s flag is the count AND the figures behind it.
-            check(
-              "    the flag carries its figures",
-              project?.body.includes('data-slot="chain-many-figures"') ?? false,
-            );
-          }
         }
       }
 
@@ -1436,24 +1429,175 @@ async function main(): Promise<void> {
         // to walk, and that is a missing precondition rather than a failure.
         console.log(`  skip  ${locale}: no quotation thread to drive`);
       }
+
+      /* ── B and C. the board, each project, and its threads ────────────── */
+
+      // **The order comes from the product, not from a copy of it here.**
+      // `verify:routes` may not import `src/` (`CLAUDE.md`), so a restatement
+      // of the six position names would be a second definition of the very
+      // thing `D27` exists to keep single. The board renders `CHAIN_COLUMNS` in
+      // order, so reading its headers off the page IS the order — and asserting
+      // there are six of them is `D29` at the same time.
+      const board = await get(jar, `/${locale}/projects`);
+      const order = [
+        ...board.body.matchAll(/data-slot="board-column"[^>]*data-column="([a-zA-Z]+)"/g),
+      ].map((match) => match[1]);
+      check(
+        `${locale}: the board draws S132's six columns [D29]`,
+        order.length === 6,
+        `got ${order.length}: ${order.join(" ")}`,
+      );
+      if (order.length !== 6) continue;
+
+      // Each card's column. `split` cuts the body at every column marker, so a
+      // part holds that column's cards and no other's — a regex spanning from
+      // one column to the next would have to guess where the section ends.
+      const columnOf = new Map<string, string>();
+      for (const part of board.body.split('data-slot="board-column"').slice(1)) {
+        const column = part.match(/^[^>]*data-column="([a-zA-Z]+)"/)?.[1];
+        if (!column) continue;
+        for (const card of part.matchAll(
+          /data-slot="board-card"[^>]*data-id="([0-9a-f-]{36})"/g,
+        )) {
+          columnOf.set(card[1], column);
+        }
+      }
+      check(
+        `${locale}: the board's cards carry their id`,
+        columnOf.size > 0 || board.body.includes('data-slot="projects-empty"'),
+        `${columnOf.size} card(s) marked`,
+      );
+
+      // A spread across the columns first, then whatever the threads reached,
+      // so a sample of twelve is not twelve projects from one pile.
+      const byColumn = new Map<string, string[]>();
+      for (const [projectId, column] of columnOf) {
+        byColumn.set(column, [...(byColumn.get(column) ?? []), projectId]);
+      }
+      const sample = [
+        ...new Set([
+          ...order.flatMap((column) => byColumn.get(column)?.slice(0, 2) ?? []),
+          ...[...projectIds].filter((projectId) => columnOf.has(projectId)),
+        ]),
+      ].slice(0, PROJECT_SAMPLE);
+
+      const reachedColumns = new Set<string>();
+
+      for (const projectId of sample) {
+        const short = projectId.slice(0, 8);
+        const column = columnOf.get(projectId)!;
+        const project = await get(jar, `/${locale}/projects/${projectId}`);
+        const strip = stripOf(project.body);
+
+        // **B.** `S134` — a position is derived, so two screens deriving it
+        // from one function may not disagree.
+        check(
+          `${locale} ${short}: the project draws its strip`,
+          strip !== null,
+          `status ${project.status}`,
+        );
+        if (!strip) continue;
+        reachedColumns.add(strip.position);
+        check(
+          `  board column and the project's own strip agree`,
+          strip.position === column,
+          `board ${column}, project ${strip.position}`,
+        );
+        check(
+          "  the turn panel sits with it",
+          project.body.includes('data-slot="turn-panel"'),
+        );
+        // The strip is six nodes on this screen too, and a project is never
+        // `closed` — `chainByProject` skips closed threads, which is what lets
+        // the screen pass `reached: position` honestly rather than inventing a
+        // field.
+        check(
+          "  six steps there too",
+          strip.steps.length === 6,
+          `got ${strip.steps.length}`,
+        );
+        check(
+          "  a project is never closed",
+          strip.position !== "closed",
+          strip.position,
+        );
+
+        // **C.** Every thread on this project the reader can see, from the
+        // scope `D70` made the quotations card link to.
+        const threads = await get(
+          jar,
+          `/${locale}/quotations?projectId=${projectId}`,
+        );
+        const positions = [
+          ...threads.body.matchAll(
+            /data-slot="quotation-row"[^>]*data-position="([a-zA-Z]+)"/g,
+          ),
+        ].map((match) => match[1]);
+        // `listQuotationThreads` pages at 25. No project in this database comes
+        // near it, and a run that did would be measuring a truncated set — so
+        // it says so rather than asserting over half the threads.
+        if (positions.length >= 25) {
+          console.log(`  --    NOTE: ${short} filled a page of threads; C skipped`);
+          continue;
+        }
+        // A closed thread is not one of them `S132`.
+        const live = positions.filter((position) => position !== "closed");
+        const expected = live.reduce(
+          (furthest, position) =>
+            order.indexOf(position) > order.indexOf(furthest)
+              ? position
+              : furthest,
+          "new",
+        );
+        const ahead = order.indexOf(strip.position) - order.indexOf(expected);
+        check(
+          `  its position is at least the furthest of its ${live.length} live thread(s) [S132]`,
+          ahead >= 0,
+          `project ${strip.position}, threads reach ${expected}`,
+        );
+        if (ahead > 0) {
+          // The only honest explanation: `won` and `readyToShip` are facts
+          // about a DISPATCH against the project `S31` `S74`, which a thread
+          // need not name at all `S75`. Anything else ahead of its threads is
+          // a position nothing produced.
+          seen.dispatchAhead += 1;
+          check(
+            "    and anything beyond that is a dispatch rung [S31] [S74]",
+            strip.position === "won" || strip.position === "readyToShip",
+            `${strip.position} is ahead of ${expected} and no dispatch supplies it`,
+          );
+        }
+      }
+
+      console.log(
+        `  --    ${locale}: paired ${sample.length} project(s) across ` +
+          `${reachedColumns.size} of 6 position(s)`,
+      );
+      for (const column of order) {
+        if (!reachedColumns.has(column)) {
+          console.log(
+            `  --    NOTE: no project reached ${column} — that column is unproven by this run.`,
+          );
+        }
+      }
     }
 
     // **No silent coverage.** Which shapes exist at all depends on the fixture
     // data, so what was actually reached is printed rather than assumed.
     console.log(
-      `  --    reached ${seen.strip} project strip(s), ${seen.many} flag(s), ` +
-        `${seen.closed} closed thread(s)`,
+      `  --    reached ${seen.closed} closed thread(s), ` +
+        `${seen.dispatchAhead} project(s) ahead of their threads`,
     );
-    for (const [what, count] of [
-      ["a single-thread project (the strip)", seen.strip],
-      ["a multi-thread project (`25 §22`'s flag)", seen.many],
-      ["a closed thread", seen.closed],
-    ] as const) {
-      if (count === 0) {
-        console.log(
-          `  --    NOTE: this data never reached ${what} — that branch is unproven by this run.`,
-        );
-      }
+    if (seen.closed === 0) {
+      console.log(
+        "  --    NOTE: this data never reached a closed thread — that branch is unproven by this run.",
+      );
+    }
+    if (seen.dispatchAhead === 0) {
+      console.log(
+        "  --    NOTE: no project took its position from a dispatch rather than a thread —" +
+          " S75's direct route is unproven by this run.",
+      );
     }
   }
 
@@ -4014,10 +4158,23 @@ async function main(): Promise<void> {
 
       // Empty required fields throughout: each of these is a refusal that
       // writes nothing, so a stall cannot be blamed on what the action did.
+      //
+      // **The four that used to be asserted ABSENT are driven here now.**
+      // `WORKFLOW §5` row 226 kept them exempt from the call-site binding on
+      // the grounds that none reached the HTML, so the hang could not be
+      // reproduced against them. Session 28 made them render `D20`, which is
+      // what turns that exemption into a requirement — so they join the list
+      // they were the exception to. One empty required field each, so every
+      // POST is a refusal that writes nothing and a stall cannot be blamed on
+      // what the action did. The three line acts come BEFORE `remove-line`,
+      // which really removes one `S60`.
       const wanted: Array<[string, Record<string, string>]> = [
         ["issue", { smacReference: "", verification: "unverified" }],
         ["cancel", { cancellationReason: "" }],
         ["return", { reason: "" }],
+        ["add-line", { quantityPcs: "" }],
+        ["update-line", { quantityPcs: "" }],
+        ["add-service", { serviceQuantity: "" }],
         ["remove-line", {}],
       ];
       const driven = new Set<string>();
@@ -4034,59 +4191,69 @@ async function main(): Promise<void> {
           await drives(`${locale}: *** ${act} ***`, coordJar, path, form, fields);
         }
 
-        // **The four deliberate exceptions, asserted absent.** `WORKFLOW §5`
-        // keeps a row saying these four keep their `.bind()` inside the hook's
-        // own component because none of them can reach the HTML: each renders
-        // behind client state — `open` on a row, `addingLine` and
-        // `addingService` on the section. That row is only true while it stays
-        // true, so this is where it is checked rather than asserted in prose.
-        // The page reached here is editable by construction: `remove-line` is
-        // offered nowhere else, so the toggles WOULD be rendering if they ever
-        // rendered server-side.
-        // Its own flag, deliberately NOT a member of `driven`: that set's
-        // size is the loop's break condition, and a fifth member would end the
-        // scan before a service line is looked for.
+        // **The same four, asserted PRESENT — this is that row inverted.**
+        // It read *stays behind client state*, and passing meant the act did
+        // not exist with scripts off: a rep could read a quotation and not add
+        // a line to one, which the rewritten `D20` calls enablement. What is
+        // asserted now is the opposite fact, on the same markers, so the row
+        // cannot quietly regress in either direction.
+        //
+        // The page reached here is editable by construction — `remove-line` is
+        // offered nowhere else — so the editors WOULD be rendering if they
+        // rendered at all.
+        // Its own flag, deliberately NOT a member of `driven`: that set's size
+        // is the loop's break condition, and another member would end the scan
+        // before a service line is looked for.
         if (actForm(page.body, "remove-line") && !exceptionsChecked) {
           exceptionsChecked = true;
-          const hidden: Array<[string, boolean]> = [
+          const inHtml: Array<[string, boolean]> = [
             ["addQuotationLine", page.body.includes('"new-line-supplierId"')],
             ["addServiceLine", page.body.includes('"new-service-serviceTypeId"')],
             [
               "updateQuotationLine",
               /id="line-[0-9a-f-]{36}-supplierId"/.test(page.body),
             ],
-            [
-              "updateServiceLine",
-              /id="service-[0-9a-f-]{36}-serviceTypeId"/.test(page.body),
-            ],
           ];
-          for (const [name, present] of hidden) {
+          for (const [name, present] of inHtml) {
             check(
-              `${locale}: ${name}'s form stays behind client state [WORKFLOW §5]`,
-              !present,
-              "it reaches the HTML — bind it at the call site",
+              `${locale}: ${name}'s form renders server-side [D20]`,
+              present,
+              "it is behind client state — with scripts off the act does not exist",
             );
           }
+          // **The disclosure is the browser's, not a scripted toggle.** A
+          // `<details>` keeps its contents in the markup whether it is open or
+          // shut, which is the whole reason §23 above can see nine fields it
+          // could not see before.
+          for (const slot of ["edit-line", "add-line-disclosure"]) {
+            check(
+              `${locale}: ${slot} is a native <details> [D20]`,
+              new RegExp(`<details[^>]*data-slot="${slot}"`).test(page.body),
+            );
+          }
+          // `updateServiceLine` is not in the list above: its editor renders
+          // only where the thread carries a service line, so asserting it on
+          // every editable thread would be a permanent red line rather than a
+          // regression guard. It is driven below, where one exists.
         }
 
-        // The service row is driven where the fixtures happen to carry one.
-        // **Not a failure when they do not**: the add-service control sits
-        // behind client state, so nothing this script can post creates one, and
-        // asserting its presence would be a permanent red line rather than a
-        // regression guard. Said out loud rather than skipped in silence.
-        if (!driven.has("remove-service")) {
-          const service = actForm(page.body, "remove-service");
-          if (service) {
-            driven.add("remove-service");
-            await drives(
-              `${locale}: *** removeServiceLine ***`,
-              coordJar,
-              path,
-              service,
-            );
-          }
+        // The two service-row forms are driven where the fixtures happen to
+        // carry one. **Not a failure when they do not**: a service line is
+        // optional `S59` and nothing this script posts creates one — every POST
+        // it makes is a deliberate refusal — so asserting their presence on
+        // every thread would be a permanent red line rather than a regression
+        // guard. Said out loud below rather than skipped in silence.
+        for (const [act, fields] of [
+          ["remove-service", {}],
+          ["update-service", { serviceQuantity: "" }],
+        ] as Array<[string, Record<string, string>]>) {
+          if (driven.has(act)) continue;
+          const service = actForm(page.body, act);
+          if (!service) continue;
+          driven.add(act);
+          await drives(`${locale}: *** ${act} ***`, coordJar, path, service, fields);
         }
-        if (driven.size === wanted.length + 1) break;
+        if (driven.size === wanted.length + 2) break;
       }
       for (const [act] of wanted) {
         check(
@@ -4095,13 +4262,15 @@ async function main(): Promise<void> {
         );
       }
       check(
-        `${locale}: an editable thread was reached, so the four exceptions were checked`,
+        `${locale}: an editable thread was reached, so the editors were checked [D20]`,
         exceptionsChecked,
       );
-      if (!driven.has("remove-service")) {
-        console.log(
-          `  note  ${locale}: no thread carried a service line — removeServiceLine not driven`,
-        );
+      for (const act of ["remove-service", "update-service"]) {
+        if (!driven.has(act)) {
+          console.log(
+            `  note  ${locale}: no thread carried a service line — ${act} not driven`,
+          );
+        }
       }
     }
   }

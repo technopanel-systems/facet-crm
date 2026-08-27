@@ -390,14 +390,12 @@
       "removeCompany": "إزالة",
       "hiddenCompany": "غير مرئية لك",
       "noCompanies": "لا توجد شركات مرتبطة.",
-      "turnOwner": "بانتظار {name} — الخطوة التالية في هذا المشروع"
+      "noQuotations": "لا توجد عروض أسعار على هذا المشروع بعد.",
+      "movedFor": "آخر حركة قبل {count} يوم"
     },
     "chain": {
       "title": "سلسلة عرض السعر",
-      "manyThreads": "{count} عروض أسعار مفتوحة على هذا المشروع",
-      "manyThreadsHint": "عدّل أحدها بدل رفع عرض جديد — المساحة نفسها تُسعَّر أكثر من مرة.",
-      "quoted": "المُسعَّر",
-      "expected": "المتوقع"
+      "manyThreads": "{count} مفتوحة"
     },
     "errors": {
       "atLeastOneCompany": "يجب أن يرتبط المشروع بشركة واحدة على الأقل.",
@@ -478,7 +476,8 @@
       "returnedRounds": "أُعيد للتعديل",
       "cancelledBy": "ألغاه",
       "cancellationReason": "سبب الإلغاء",
-      "turnSince": "قائم هنا منذ {date}.",
+      "raisedDaysAgo": "رُفع قبل {count} يوم",
+      "noDispatches": "لم يُسلَّم شيء على عرض السعر هذا بعد.",
       "projectNewHint": "يُسمَّى باسم الشركة. غَيِّره إن كان للمشروع اسم خاص به."
     },
     "actions": {

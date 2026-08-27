@@ -452,6 +452,23 @@ function furthest(a: ChainColumn, b: ChainColumn): ChainColumn {
 }
 
 /**
+ * A position plus the movement figure, from the three parts every caller holds.
+ *
+ * One shape, in one place, because `/projects` and a project's own screen both
+ * render it — and `S89`'s threshold decided in two places is exactly the trap
+ * `projectMovement` above already records this codebase paying for once.
+ */
+function attentionOf(
+  chain: ProjectChain,
+  lastMovedOn: string,
+  thresholdDays: number,
+  now: string,
+): ProjectAttention {
+  const ageDays = calendarDaysBetween(lastMovedOn, now);
+  return { ...chain, ageDays, thresholdDays, stale: ageDays >= thresholdDays };
+}
+
+/**
  * **The two positions a thread cannot answer, seeded from the project itself.**
  *
  * `S132`'s last two rungs are facts about a DISPATCH against the project, not
@@ -694,15 +711,9 @@ export async function listProjects(
     rows: found.map((row) => {
       const position = chain?.get(row.id);
       if (!position) return { ...row, chain: null };
-      const ageDays = calendarDaysBetween(row.lastMovedOn, now);
       return {
         ...row,
-        chain: {
-          ...position,
-          ageDays,
-          thresholdDays,
-          stale: ageDays >= thresholdDays,
-        },
+        chain: attentionOf(position, row.lastMovedOn, thresholdDays, now),
       };
     }),
     total: totals?.total ?? 0,
@@ -880,6 +891,22 @@ export type ProjectDetail = Project & {
   /** Derived, never stored `S31` — see `projectIsWon`. `committed` arrives
    *  with the row, because that one IS a column. */
   won: boolean;
+  /**
+   * **Where this project sits, and how long it has sat there** `S132` `S89`.
+   *
+   * The same `ProjectAttention` `/projects` renders, from the same
+   * `chainByProject` — which is the whole point of carrying it here. The
+   * detail screen used to build its own answer out of ONE thread plus two
+   * `listDispatches` calls, so a project whose dispatch arrived by the direct
+   * route `S75` or against a second thread was won on the list and on the
+   * board and showed nothing on its own page. There is one project-level
+   * ladder and this is it `D27`.
+   *
+   * Never `closed`: `chainByProject` skips closed threads, so a project always
+   * carries one of `CHAIN_COLUMNS`. That is what lets the strip pass
+   * `reached: position` honestly rather than fabricating a field.
+   */
+  chain: ProjectAttention;
   ownerName: string;
 
   cityNameEn: string | null;
@@ -895,21 +922,36 @@ export async function getProject(
   session: AuthSession,
   id: string,
 ): Promise<ProjectDetail | null> {
+  // `listProjects`' own two joins, for the one clock a project has `D6`. The
+  // detail screen used to date its turn panel from the newest TIMELINE event —
+  // seven kinds, a comment included — while nothing coloured it at all, which
+  // is the two-clock defect the company panel was rebuilt for.
+  const moved = projectMovement();
+
   const [row] = await db
     .select({
       project: projects,
       won: projectIsWon(),
+      // `S132`'s fifth rung, in the same statement as `won` and for the same
+      // reason (`CLAUDE.md`): a derived condition is resolved in SQL.
+      readyToShip: projectHasSubmittedDispatch(),
       ownerName: users.name,
       cityNameEn: cities.nameEn,
       cityNameAr: cities.nameAr,
       lostReasonNameEn: lossReasons.nameEn,
       lostReasonNameAr: lossReasons.nameAr,
+      lastMovedOn: moved.at,
     })
 
     .from(projects)
     .innerJoin(users, eq(projects.ownerUserId, users.id))
     .leftJoin(cities, eq(projects.cityId, cities.id))
     .leftJoin(lossReasons, eq(projects.lostReasonId, lossReasons.id))
+    .leftJoin(moved.threadEvents, eq(moved.threadEvents.projectId, projects.id))
+    .leftJoin(
+      moved.dispatchEvents,
+      eq(moved.dispatchEvents.projectId, projects.id),
+    )
     .where(and(eq(projects.id, id), visibleProjectsFilter(session)))
     .limit(1);
 
@@ -923,11 +965,34 @@ export async function getProject(
         .limit(1)
     : [];
 
-  const links = await listProjectCompanies(session, id);
+  const [links, chain, thresholdDays] = await Promise.all([
+    listProjectCompanies(session, id),
+    // **The one project-level ladder** `S132` — furthest of the live threads,
+    // seeded with the two rungs a thread cannot answer. `chainByProject` takes
+    // a list because the board and `/projects` ask for a page of them; one id
+    // is the same call.
+    chainByProject(
+      [id],
+      new Map([[id, row.won]]),
+      new Map([[id, row.readyToShip]]),
+    ),
+    getPositiveIntSetting(
+      PROJECT_STAGE_UNCHANGED_KEY,
+      PROJECT_STAGE_UNCHANGED_DEFAULT,
+    ),
+  ]);
 
   return {
     ...row.project,
     won: row.won,
+    // `chainByProject` seeds every id it is given, so this is present by
+    // construction; the fallback is the type checker's, not a real branch.
+    chain: attentionOf(
+      chain.get(id) ?? { position: row.won ? "won" : "new", liveThreads: 0 },
+      row.lastMovedOn,
+      thresholdDays,
+      riyadhDayOf(new Date()),
+    ),
     ownerName: row.ownerName,
 
     cityNameEn: row.cityNameEn,
