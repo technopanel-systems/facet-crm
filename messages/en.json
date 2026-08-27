@@ -435,6 +435,7 @@
       "projectNew": "A new project",
       "projectNewName": "New project name",
       "rejectionReason": "Why it is being rejected",
+      "waiting": "Waiting",
       "position": "Position",
       "totalSqm": "Quoted"
     },

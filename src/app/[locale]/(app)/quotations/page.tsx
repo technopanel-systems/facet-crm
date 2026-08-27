@@ -71,10 +71,8 @@ export default async function QuotationsPage({
   const viewerIsCoordinator = can(session, "canApproveQuotation");
 
   const currentPage = Number(page) || 1;
-  const { rows, total, groupCounts, raiserCount } = await listQuotationThreads(
-    session,
-    { q, companyId, page: currentPage },
-  );
+  const { rows, total, groupCounts, foreignRaiserCount } =
+    await listQuotationThreads(session, { q, companyId, page: currentPage });
 
   // **The scope is named or it is not applied** `D59`. A company detail card
   // links here for the sixth quotation onward `D70`, and a list that silently
@@ -87,13 +85,16 @@ export default async function QuotationsPage({
   // Filters the search and the pager must carry, so neither throws the other
   // away `D59`.
   const extra = { companyId };
-  // **The reader's own name on every row says nothing** `D2`. It earns the
-  // column only where more than one person's work is in the list, counted over
-  // the whole visible scope so it cannot appear on page 1 and vanish on page 2
-  // — `listProjects`' `ownerCount` precedent. It is what a manager and the
-  // coordinator lacked entirely: the turn line named a rep on rep-owed rows
-  // only, and that line is gone from the row now.
-  const namesRaiser = raiserCount > 1;
+  // **The reader's own name on every row says nothing** `D2`. The column earns
+  // its place only where the list holds somebody ELSE's work, counted over the
+  // whole visible scope so it cannot appear on page 1 and vanish on page 2.
+  //
+  // **This was `raiserCount > 1` and the test was too weak.** Rep-a sees 71
+  // threads he raised and 1 reaching him through a shared project — two
+  // raisers, so the column rendered and printed his own name 71 times, which is
+  // the thing `D2` says says nothing. Counting only the others is the honest
+  // question, and `listProjects` now asks it the same way.
+  const namesRaiser = foreignRaiserCount > 0;
   const columns = namesRaiser ? 7 : 6;
 
   return (
@@ -162,20 +163,24 @@ export default async function QuotationsPage({
           <Table className="table-fixed">
             <TableHeader>
               <TableRow>
-                {/* `D26`'s lead cell — *who does this wait on?* The pile's name
+                {/* **The order is what a rep scans for**: how long, where it
+                    stands, what it is, how big. The company and the SMAC
+                    reference are lookup fields — you read them once you have
+                    found the row — so they follow rather than lead.
+
+                    `D26`'s lead cell — *who does this wait on?* The pile's name
                     answers the person; this carries how long it has stood, and
-                    the avatar where the row can name somebody. */}
+                    the avatar where the row can name somebody.
+
+                    **Headed `Waiting`, not `Whose move`.** The cell holds a day
+                    count and nothing else since the turn line moved to the pile
+                    header, and a header asking *whose move* over a bare number
+                    answers a question the column stopped answering.
+                    `common.whoseMove` is left alone — `/projects` and
+                    `coverage-table.tsx` both still head an actual whose-move
+                    column with it. */}
                 <TableHead className="w-28 text-start">
-                  {t("common.whoseMove")}
-                </TableHead>
-                <TableHead className="w-56 text-start">
-                  {t("quotations.fields.project")}
-                </TableHead>
-                <TableHead className="w-56 text-start">
-                  {t("quotations.fields.company")}
-                </TableHead>
-                <TableHead className="w-24 text-start">
-                  {t("quotations.fields.reference")}
+                  {t("quotations.fields.waiting")}
                 </TableHead>
                 {/* What the group header cannot say: WHICH move. Three
                     positions share the coordinator's pile and no two of them
@@ -183,12 +188,21 @@ export default async function QuotationsPage({
                 <TableHead className="w-36 text-start">
                   {t("quotations.fields.position")}
                 </TableHead>
+                <TableHead className="w-56 text-start">
+                  {t("quotations.fields.project")}
+                </TableHead>
                 {/* **Square metres, not riyals** `S6` — targets are measured in
                     square metres, never currency, and this is the screen a rep
                     opens to see what is waiting on him. The riyal total is the
                     coordinator's number and she has SMAC `S5` `S63`. */}
                 <TableHead className="w-28" numeric>
                   {t("quotations.fields.totalSqm")}
+                </TableHead>
+                <TableHead className="w-56 text-start">
+                  {t("quotations.fields.company")}
+                </TableHead>
+                <TableHead className="w-24 text-start">
+                  {t("quotations.fields.reference")}
                 </TableHead>
                 {/* **`data-column`, not `data-slot`.** `TableHead` sets
                     `data-slot="table-head"` and then spreads props over it, so
@@ -212,6 +226,7 @@ export default async function QuotationsPage({
                 viewerIsCoordinator,
                 namesRaiser,
                 columns,
+                session.user.id,
               )}
             </TableBody>
           </Table>
@@ -247,6 +262,7 @@ function renderGrouped(
   viewerIsCoordinator: boolean,
   namesRaiser: boolean,
   columns: number,
+  viewerUserId: string,
 ) {
   return CHAIN_GROUPS.flatMap((group) => {
     const groupRows = rows.filter((row) => row.group === group);
@@ -271,7 +287,13 @@ function renderGrouped(
         </TableCell>
       </TableRow>,
       ...groupRows.map((row) => (
-        <QuotationRow key={row.id} row={row} t={t} namesRaiser={namesRaiser} />
+        <QuotationRow
+          key={row.id}
+          row={row}
+          t={t}
+          namesRaiser={namesRaiser}
+          viewerUserId={viewerUserId}
+        />
       )),
     ];
   });
@@ -281,10 +303,12 @@ function QuotationRow({
   row,
   t,
   namesRaiser,
+  viewerUserId,
 }: {
   row: QuotationThreadListRow;
   t: Translate;
   namesRaiser: boolean;
+  viewerUserId: string;
 }) {
   // **The avatar renders only where the row names a person.** A thread carries
   // `raised_by_user_id` and no issuer or acceptor, nothing assigns a thread to
@@ -332,30 +356,6 @@ function QuotationRow({
           </span>
         </span>
       </TableCell>
-      {/* **The link moved to the project.** It sat on the SMAC reference, which
-          is null on a requested thread — so a rep clicked a dash. The name is
-          the row's identity, which is where `/companies` and `/projects` both
-          put it. */}
-      <TableCell className="text-start font-medium">
-        <Link href={`/quotations/${row.id}`} className="block hover:underline">
-          {/* `S50` — always there, and it may hold either script `D62`. On the
-              NAME, never the cell. */}
-          <span className="block truncate" dir="auto" title={row.projectName}>
-            {row.projectName}
-          </span>
-        </Link>
-      </TableCell>
-      <TableCell className="text-start">
-        {/* This carried no `dir` at all until session 26. One name field since
-            `S12`, written in either script, so an Arabic company name has to
-            read correctly on an English page `D62`. */}
-        <span className="block truncate" dir="auto" title={row.companyName}>
-          {row.companyName}
-        </span>
-      </TableCell>
-      <TableCell className="num text-start" dir="ltr">
-        {row.smacReference ?? t("common.none")}
-      </TableCell>
       {/* **Two columns became one.** The version STATUS and the end STATE each
           said what the group and this label already say; what neither said was
           which of the coordinator's three moves is owed. On a closed thread the
@@ -372,6 +372,19 @@ function QuotationRow({
           <span className="num" dir="ltr">{` · ${row.versionNumber}`}</span>
         </Badge>
       </TableCell>
+      {/* **The link moved to the project.** It sat on the SMAC reference, which
+          is null on a requested thread — so a rep clicked a dash. The name is
+          the row's identity, which is where `/companies` and `/projects` both
+          put it. */}
+      <TableCell className="text-start font-medium">
+        <Link href={`/quotations/${row.id}`} className="block hover:underline">
+          {/* `S50` — always there, and it may hold either script `D62`. On the
+              NAME, never the cell. */}
+          <span className="block truncate" dir="auto" title={row.projectName}>
+            {row.projectName}
+          </span>
+        </Link>
+      </TableCell>
       {/* `S59` — service-line metres are excluded, deliberately: targets
           measure cladding, not fabrication. `S68` forbids SUMMING quotations,
           which is why no total appears under this column and never will. */}
@@ -380,11 +393,27 @@ function QuotationRow({
           ? `${formatSqm(row.totalSqm)} ${t("common.sqm")}`
           : t("common.none")}
       </TableCell>
+      <TableCell className="text-start">
+        {/* This carried no `dir` at all until session 26. One name field since
+            `S12`, written in either script, so an Arabic company name has to
+            read correctly on an English page `D62`. */}
+        <span className="block truncate" dir="auto" title={row.companyName}>
+          {row.companyName}
+        </span>
+      </TableCell>
+      <TableCell className="num text-start" dir="ltr">
+        {row.smacReference ?? t("common.none")}
+      </TableCell>
       {namesRaiser ? (
+        // **Blank where the reader raised it**, and blank means *mine* `D2`.
+        // The cell still renders, so every row keeps the same column count as
+        // its header. `dir="auto"` stays on the NAME `D62`, never the cell.
         <TableCell className="text-start">
-          <span className="block truncate" dir="auto" title={row.raisedByName}>
-            {row.raisedByName}
-          </span>
+          {row.raisedByUserId === viewerUserId ? null : (
+            <span className="block truncate" dir="auto" title={row.raisedByName}>
+              {row.raisedByName}
+            </span>
+          )}
         </TableCell>
       ) : null}
     </TableRow>

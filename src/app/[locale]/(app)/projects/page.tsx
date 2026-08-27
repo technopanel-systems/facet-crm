@@ -135,7 +135,11 @@ export default async function ProjectsPage({
             ) : null}
           </div>
         ) : (
-          <ProjectBoardView board={board} tableHref={tableHref} />
+          <ProjectBoardView
+            board={board}
+            tableHref={tableHref}
+            viewerUserId={session.user.id}
+          />
         )
       ) : null}
 
@@ -195,11 +199,16 @@ export default async function ProjectsPage({
                   <TableHead className="text-start">
                     {t("projects.fields.state")}
                   </TableHead>
-                  {/* The reader's own name on every row says nothing `D2`. It
-                      earns the column only where more than one person's work
-                      is in the list, counted over the whole visible scope so
-                      it cannot appear on one page and vanish on the next. */}
-                  {list.ownerCount > 1 ? (
+                  {/* The reader's own name on every row says nothing `D2`, so
+                      the column earns its place only where the list holds
+                      somebody ELSE's work — counted over the whole visible
+                      scope, so it cannot appear on one page and vanish on the
+                      next.
+                      **Not `ownerCount > 1`**, which was the old test: one
+                      project reaching a rep through a share is a second owner,
+                      and the column then printed his own name down the whole
+                      page. `listProjects` carries the measurement. */}
+                  {list.foreignOwnerCount > 0 ? (
                     <TableHead data-slot="project-owner" className="text-start">
                       {t("projects.fields.owner")}
                     </TableHead>
@@ -267,9 +276,14 @@ export default async function ProjectsPage({
                     <TableCell className="text-start">
                       <ProjectStateBadge row={row} />
                     </TableCell>
-                    {list.ownerCount > 1 ? (
-                      <TableCell className="text-start" dir="auto">
-                        {row.ownerName}
+                    {list.foreignOwnerCount > 0 ? (
+                      // **Blank where the reader owns it**, and blank means
+                      // *mine*. The cell still renders so the row keeps its
+                      // column count. `dir="auto"` stays on the name `D62`.
+                      <TableCell className="text-start">
+                        {row.ownerUserId === session.user.id ? null : (
+                          <span dir="auto">{row.ownerName}</span>
+                        )}
                       </TableCell>
                     ) : null}
                   </TableRow>

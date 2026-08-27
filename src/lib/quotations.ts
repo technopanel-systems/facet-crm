@@ -231,6 +231,16 @@ export type QuotationThreadListRow = {
   companyId: string;
   companyName: string;
   raisedByName: string;
+  /**
+   * Who raised it, as an **id** — so a screen can ask *is this mine?* rather
+   * than comparing display names.
+   *
+   * The name alone was what made `chainTurnKey` name the rep in the third
+   * person: two people called Mohammed would read each other's turn as their
+   * own. This is the honest comparison, and it is free — `raisedByUserId` is
+   * already the join key the row's name comes through.
+   */
+  raisedByUserId: string;
   endState: QuotationThreadEndState | null;
   smacReference: string | null;
   versionNumber: number;
@@ -382,7 +392,7 @@ export async function listQuotationThreads(
   total: number;
   page: number;
   groupCounts: QuotationGroupCounts;
-  raiserCount: number;
+  foreignRaiserCount: number;
 }> {
   const page = Math.max(1, options.page ?? 1);
   const where = and(
@@ -412,6 +422,7 @@ export async function listQuotationThreads(
         companyId: quotationThreads.companyId,
         companyName: companies.name,
         raisedByName: users.name,
+        raisedByUserId: quotationThreads.raisedByUserId,
         endState: quotationThreads.endState,
         smacReference: quotationVersions.smacReference,
         versionNumber: quotationVersions.versionNumber,
@@ -459,7 +470,9 @@ export async function listQuotationThreads(
   const buckets = new Map<ChainGroup, QuotationThreadListRow[]>(
     CHAIN_GROUPS.map((group) => [group, []]),
   );
-  const raisers = new Set<string>();
+  // **Raisers who are not the reader**, by id. See the return below for why
+  // the reader is excluded rather than counted.
+  const foreignRaisers = new Set<string>();
 
   for (const row of found) {
     const { hasDispatch, hasSubmittedDispatch, ...rest } = row;
@@ -472,7 +485,9 @@ export async function listQuotationThreads(
     });
     const group = chainGroup(position);
     buckets.get(group)!.push({ ...rest, position, group });
-    raisers.add(rest.raisedByName);
+    if (rest.raisedByUserId !== session.user.id) {
+      foreignRaisers.add(rest.raisedByUserId);
+    }
   }
 
   // `CHAIN_GROUPS`' own order, so the piles read coordinator → customer →
@@ -489,13 +504,24 @@ export async function listQuotationThreads(
       customer: buckets.get("customer")!.length,
       none: buckets.get("none")!.length,
     },
-    // **What decides whether the row names its raiser at all** — the distinct
-    // raisers across the whole visible scope, never this page, so the column
-    // cannot appear on page 1 and vanish on page 2. `listProjects`' `ownerCount`
-    // makes the same argument: the reader's own name on every row says nothing
-    // `D2`, and a manager or the coordinator reading a coordinator-owed row had
-    // no way at all to tell whose deal it was.
-    raiserCount: raisers.size,
+    // **What decides whether the row names its raiser at all** — counted over
+    // the whole visible scope, never this page, so the column cannot appear on
+    // page 1 and vanish on page 2.
+    //
+    // **The reader is not one of them, and that is the correction.** This was
+    // `raiserCount`, every distinct raiser, and `> 1` was the test — the shape
+    // `listProjects` still carried. It fires on a scope that is almost entirely
+    // the reader's own work: rep-a sees **71 threads he raised and 1 reaching
+    // him through a shared project**, which is two raisers, so the column
+    // rendered and printed his own name 71 times. Counting only the others
+    // answers `D2` directly — *the reader's own name on every row says nothing*
+    // — and the two readings differ on exactly the case that matters.
+    //
+    // It is not a narrower column: a manager or the coordinator raised none of
+    // what they read, so every row still names somebody. What changes is the
+    // rep, for whom **the cell is blank where he raised it** and blank means
+    // *mine*.
+    foreignRaiserCount: foreignRaisers.size,
   };
 }
 

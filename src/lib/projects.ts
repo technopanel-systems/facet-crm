@@ -33,7 +33,6 @@ import {
   and,
   asc,
   count,
-  countDistinct,
   desc,
   eq,
   exists,
@@ -523,6 +522,10 @@ export type ProjectListRow = {
   id: string;
   name: string;
   ownerName: string;
+  /** Who owns it, as an **id**, so a screen can ask *is this mine?* without
+   *  comparing display names — `QuotationThreadListRow.raisedByUserId`'s twin,
+   *  and free: it is already the join key `ownerName` comes through. */
+  ownerUserId: string;
   sqmExpected: string | null;
   endState: ProjectEndState | null;
   /** Derived, never stored `S31` — see `projectIsWon`. */
@@ -564,11 +567,18 @@ function searchFilter(query: string | undefined): SQL | undefined {
  * ordered by attention, and creation date is not attention. `projectMovement`
  * is the key and it is resolved in SQL, before the LIMIT.
  *
- * **`ownerCount` is how the OWNER column earns its place.** It is the distinct
- * owners across the whole visible scope, not this page, so the column cannot
- * appear on page 2 and vanish on page 3; a rep reading their own list sees 1
- * and the column is not rendered at all. `D2` — a row says whose move it is,
- * and a column repeating the reader's own name on every row says nothing.
+ * **`foreignOwnerCount` is how the OWNER column earns its place.** It is the
+ * distinct owners **other than the reader**, across the whole visible scope and
+ * not this page, so the column cannot appear on page 2 and vanish on page 3.
+ * `D2` — a column repeating the reader's own name on every row says nothing.
+ *
+ * **The reader is excluded rather than counted, and that is a correction.** It
+ * was `ownerCount > 1`, every distinct owner — which fires on a scope that is
+ * almost entirely the reader's own book, because one project reaching them
+ * through a share is a second owner. `listQuotationThreads` carries the
+ * measurement that found it. The column is no narrower for a manager or the
+ * coordinator, who own none of what they read; what changes is the rep, whose
+ * own rows now render **blank**, and blank means *mine*.
  *
  * **`withChain` costs one extra query and is opt-in**, because only `/projects`
  * renders the position. It decorates a page already fetched rather than
@@ -587,7 +597,7 @@ export async function listProjects(
   rows: ProjectListRow[];
   total: number;
   page: number;
-  ownerCount: number;
+  foreignOwnerCount: number;
 }> {
   const page = Math.max(1, options.page ?? 1);
 
@@ -619,6 +629,7 @@ export async function listProjects(
       id: projects.id,
       name: projects.name,
       ownerName: users.name,
+      ownerUserId: projects.ownerUserId,
       sqmExpected: projects.sqmExpected,
       endState: projects.endState,
       // Resolved in SQL, before the LIMIT — a derived condition filtered or
@@ -649,8 +660,17 @@ export async function listProjects(
     .limit(PAGE_SIZE)
     .offset((page - 1) * PAGE_SIZE);
 
+  // **Both tables named outright** `CLAUDE.md`, and `mapWith(Number)` because
+  // `count()` over a bigint comes back as a string otherwise — a `> 0` test
+  // would still pass by coercion, which is exactly how a typed lie survives.
   const [totals] = await db
-    .select({ total: count(), owners: countDistinct(projects.ownerUserId) })
+    .select({
+      total: count(),
+      foreignOwners: sql<number>`count(distinct "projects"."owner_user_id")
+        filter (where "projects"."owner_user_id" <> ${session.user.id})`.mapWith(
+        Number,
+      ),
+    })
     .from(projects)
     .where(where);
 
@@ -687,7 +707,7 @@ export async function listProjects(
     }),
     total: totals?.total ?? 0,
     page,
-    ownerCount: totals?.owners ?? 0,
+    foreignOwnerCount: totals?.foreignOwners ?? 0,
   };
 }
 
@@ -696,6 +716,8 @@ export type ProjectBoardCard = {
   id: string;
   name: string;
   ownerName: string;
+  /** As `ProjectListRow` — the id, so a card can ask *is this mine?* */
+  ownerUserId: string;
   sqmExpected: string | null;
   won: boolean;
   committed: boolean;
@@ -711,8 +733,9 @@ export type ProjectBoard = {
   total: number;
   /** Lost, and therefore off the board `D29`. Stated, never silently dropped. */
   lost: number;
-  /** As `listProjects` — what decides whether a card names its owner. */
-  ownerCount: number;
+  /** As `listProjects` — what decides whether a card names its owner, and
+   *  counted the same way: owners **other than the reader**. */
+  foreignOwnerCount: number;
 };
 
 /**
@@ -755,6 +778,7 @@ export async function listProjectBoard(
       id: projects.id,
       name: projects.name,
       ownerName: users.name,
+      ownerUserId: projects.ownerUserId,
       sqmExpected: projects.sqmExpected,
       won: projectIsWon(),
       readyToShip: projectHasSubmittedDispatch(),
@@ -783,8 +807,15 @@ export async function listProjectBoard(
       .select({ total: count() })
       .from(projects)
       .where(and(visible, isNotNull(projects.endState))),
+    // Both tables named outright `CLAUDE.md`; `mapWith(Number)` because a
+    // bigint count returns a string otherwise.
     db
-      .select({ owners: countDistinct(projects.ownerUserId) })
+      .select({
+        foreignOwners: sql<number>`count(distinct "projects"."owner_user_id")
+          filter (where "projects"."owner_user_id" <> ${session.user.id})`.mapWith(
+          Number,
+        ),
+      })
       .from(projects)
       .where(onBoard),
   ]);
@@ -804,6 +835,7 @@ export async function listProjectBoard(
       id: row.id,
       name: row.name,
       ownerName: row.ownerName,
+      ownerUserId: row.ownerUserId,
       sqmExpected: row.sqmExpected,
       won: row.won,
       committed: row.committed,
@@ -816,7 +848,7 @@ export async function listProjectBoard(
     columns,
     total: found.length,
     lost: lostTotal?.total ?? 0,
-    ownerCount: owners?.owners ?? 0,
+    foreignOwnerCount: owners?.foreignOwners ?? 0,
   };
 }
 

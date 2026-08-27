@@ -52,14 +52,27 @@ export async function ProjectBoardView({
   board,
   /** The table view of the same query — `D59`, so it carries the search. */
   tableHref,
+  /**
+   * The reader, so a card can ask *is this mine?*. Passed in rather than
+   * resolved here: this component takes no session and imports no authz, and a
+   * board that fetched its own identity would be a second answer to a question
+   * the page already asked.
+   */
+  viewerUserId,
 }: {
   board: ProjectBoard;
   tableHref: string;
+  viewerUserId: string;
 }) {
   const t = await getTranslations();
-  // The owner's name earns its place only where the reader sees more than one
-  // person's work — `listProjects` counts them over the whole visible scope.
-  const showOwner = board.ownerCount > 1;
+  // The owner's name earns its place only where the reader sees somebody
+  // ELSE's work — `listProjectBoard` counts owners other than them, over the
+  // whole visible scope. A rep whose board is all his own gets no line at all;
+  // where he has one shared project the line renders **on that card only**,
+  // and its absence elsewhere is what says *mine* `D2`. A card already varies
+  // in height — the company and the expected metres are both conditional — so
+  // one more optional line is the shape this component already has.
+  const showOwner = board.foreignOwnerCount > 0;
 
   return (
     <div className="flex flex-col gap-3">
@@ -166,7 +179,7 @@ export async function ProjectBoardView({
                         ) : null}
                       </p>
 
-                      {showOwner ? (
+                      {showOwner && card.ownerUserId !== viewerUserId ? (
                         <p className="text-faint mt-1 text-[11px]" dir="auto">
                           {card.ownerName}
                         </p>
