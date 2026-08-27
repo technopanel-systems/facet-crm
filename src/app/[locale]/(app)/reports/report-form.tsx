@@ -8,12 +8,13 @@ import {
   FormShell,
   SelectField,
 } from "@/components/form-field";
+import { CityField } from "@/components/city-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "@/i18n/navigation";
+import type { CityRow } from "@/lib/lookups";
 import { emptyFormState, type FormState } from "@/lib/validation";
 import { useActionState } from "react";
 
@@ -81,7 +82,7 @@ export function ReportForm({
   companyLabel: string | null;
   contacts: Option[];
   projects: Option[];
-  cities: Option[];
+  cities: CityRow[];
   channels: readonly string[];
   outcomes: readonly string[];
   categories: readonly string[];
@@ -152,22 +153,26 @@ export function ReportForm({
               error={errors.companyId}
               required
             >
-              <Combobox
+              {/* A native `<select>` `D20`. It was a `Combobox` — an
+                  UNDECLARED use `AD19`: the exception `[15 §5]` recorded was
+                  the ~200-item city list, never a company picker, and no `D`
+                  rule was ever behind this one. `WORKFLOW §5` row 269 settled
+                  the shape on the raise form at ~126 rows and this is the same
+                  list. Required `reports.ts` — an interaction is about a
+                  company — so the browser refuses the placeholder. */}
+              <SelectField
                 name="companyId"
-                options={companies.map(
-                  (company): ComboboxOption => ({
-                    value: company.id,
-                    label: company.label,
-                    altLabel: company.altLabel,
-                  }),
-                )}
                 defaultValue={state.values?.companyId ?? values.companyId}
                 placeholder={t("reports.fields.companyPlaceholder")}
-                searchPlaceholder={t("common.search")}
-                emptyLabel={t("common.noMatches")}
-                clearLabel={t("common.clear")}
+                required
                 invalid={!!errors.companyId}
-              />
+              >
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.label}
+                  </option>
+                ))}
+              </SelectField>
             </FormField>
           )}
 
@@ -289,20 +294,13 @@ export function ReportForm({
             label={t("reports.fields.city")}
             error={errors.cityId}
           >
-            <Combobox
+            {/* Never required — `S33` allows a field note with no city. The
+                placeholder IS the empty option. */}
+            <CityField
               name="cityId"
-              options={cities.map(
-                (city): ComboboxOption => ({
-                  value: city.id,
-                  label: city.label,
-                  altLabel: city.altLabel,
-                }),
-              )}
+              cities={cities}
               defaultValue={state.values?.cityId ?? values.cityId}
               placeholder={t("reports.fields.cityPlaceholder")}
-              searchPlaceholder={t("common.searchCity")}
-              emptyLabel={t("common.noMatches")}
-              clearLabel={t("common.clear")}
               invalid={!!errors.cityId}
             />
           </FormField>

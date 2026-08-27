@@ -72,7 +72,7 @@ export function SignalFields({
                   name="signals"
                   value={signal}
                   defaultChecked={on}
-                  onCheckedChange={(value) => toggle(signal, value === true)}
+                  onChange={(event) => toggle(signal, event.target.checked)}
                 />
                 <Label htmlFor={`signal-${signal}`} className="text-start">
                   {t(`enums.reportSignal.${signal}`)}

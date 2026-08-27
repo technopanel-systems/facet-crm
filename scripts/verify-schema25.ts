@@ -1450,10 +1450,11 @@ async function main(): Promise<void> {
   // subquery `countries` to read the code behind a uuid. That is
   // `placeForCountry`, and this is where it is proved.
   //
-  // `verify:routes` §13 drives the same rule over HTTP, and stops at the
-  // region: the city is a `Combobox` in a portal, so no city id reaches the
-  // server HTML. Here one is a query away, which is the half that belongs
-  // in process.
+  // `verify:routes` §13 drives the same rule over HTTP. It used to stop at the
+  // region — the city was a `Combobox` in a portal, so no city id reached the
+  // server HTML — and since session 40 the control is a native `<select>`
+  // `D20`, so it asserts the ids are there for a browser to send. This stays
+  // the in-process half: what the COLUMNS permit, which no screen can show.
 
   const nullable = (key: string) => columns.get(key)?.is_nullable;
   check(

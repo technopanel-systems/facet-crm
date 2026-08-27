@@ -120,9 +120,10 @@ export function QuotationForm({
       <div className="grid gap-4 sm:grid-cols-2">
         {/* The first field since `S50`: every company this rep may use, and
             the project choice below is narrowed by it `[16 §6]`. A native
-            `<select>` `D20` — the list is long but it is not the city's ~200,
-            and whether it ever earns a fourth combobox exception has a trigger
-            of its own in `WORKFLOW §5`, not this form. */}
+            `<select>` `D20` — and there is no longer a combobox for it to be
+            weighed against: the city's is deleted and the ~200-item list is a
+            grouped native select too. The usability question at bulk-import
+            scale stays in `WORKFLOW §5`, not this form. */}
         <FormField
           name="companyId"
           label={t("quotations.fields.company")}

@@ -3,13 +3,13 @@
 import { useActionState, useState } from "react";
 import { useTranslations } from "next-intl";
 
+import { CityField } from "@/components/city-field";
 import {
   FormField,
   FormShell,
   SelectField,
 } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
-import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "@/i18n/navigation";
@@ -222,19 +222,15 @@ export function CompanyForm({
             hint={cities.length === 0 ? t("common.noOptions") : undefined}
             required
           >
-            <Combobox
+            {/* `required` on the control too, not only the label: the empty
+                option is the placeholder, and the browser refusing it saves a
+                round trip on the field `S15` will refuse anyway. */}
+            <CityField
               name="cityId"
+              cities={cities}
               defaultValue={value("cityId")}
-              options={cities.map((row) => ({
-                value: row.id,
-                label: optionName(row),
-                // The other language's name, so search works in both `[15 §5]`.
-                altLabel: locale === "ar" ? row.nameEn : row.nameAr,
-              }))}
               placeholder={t("common.none")}
-              searchPlaceholder={t("common.searchCity")}
-              emptyLabel={t("common.noMatches")}
-              // No `clearLabel`: a required field offers no "none" row.
+              required
               disabled={cities.length === 0}
               invalid={Boolean(errors.cityId)}
               onChange={setCityId}

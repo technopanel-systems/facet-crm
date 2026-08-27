@@ -16,8 +16,9 @@ import { emptyFormState, type FormState } from "@/lib/validation";
  *
  * **A native `<select>` for the person**, deliberately: no hidden-input bridge,
  * no client state, nothing to submit with JavaScript, and the browser places
- * the RTL popup. `15 §5`'s `Combobox` exception is for the ~200-item city list
- * and colleagues are a short list.
+ * the RTL popup. There is no exception to weigh this against any more: `D20`
+ * asks one question of a control — does it work with scripts off — and the
+ * `Combobox` that once held `[15 §5]`'s city exception is deleted.
  *
  * Both option types are re-declared here rather than imported. A client
  * component that value-imports a `@/lib` data module bundles the Postgres

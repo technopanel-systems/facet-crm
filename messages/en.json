@@ -57,8 +57,6 @@
     "region": "Region",
     "city": "City",
     "unknownUser": "Unknown",
-    "searchCity": "Search cities",
-    "noMatches": "No matches",
     "regionFromCity": "Set from the selected city",
     "sar": "SAR",
     "sqm": "m²",

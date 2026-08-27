@@ -12,7 +12,7 @@ import {
   REPORT_SIGNALS,
   SIGNALS_WITH_REFERENCE,
 } from "@/lib/enums";
-import { listCities, lookupName } from "@/lib/lookups";
+import { listCities } from "@/lib/lookups";
 import { listProjects } from "@/lib/projects";
 import { today } from "@/lib/reports";
 
@@ -100,11 +100,7 @@ export default async function NewReportPage({
           id: project.id,
           label: project.name,
         }))}
-        cities={cities.map((city) => ({
-          id: city.id,
-          label: lookupName(city, locale),
-          altLabel: city.nameAr,
-        }))}
+        cities={cities}
         channels={REPORT_CHANNELS}
         outcomes={REPORT_OUTCOMES}
         categories={FIELD_NOTE_CATEGORIES}

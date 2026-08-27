@@ -83,7 +83,17 @@ export function FormField({
   const t = useTranslations();
 
   return (
-    <div className="flex flex-col gap-1.5">
+    // `data-field` and `data-required` are what `verify:routes` §23 reads: the
+    // screen's own declaration of which fields its action needs, in a DOM
+    // marker rather than a translated label `D20`. Nothing else in the HTML
+    // carries it — a control may render without `required`, and a field the
+    // action needs may render with no control at all, which is the case §23
+    // exists to catch.
+    <div
+      className="flex flex-col gap-1.5"
+      data-field={name}
+      data-required={required ? "" : undefined}
+    >
       <Label htmlFor={name} className="text-start">
         {label}
         {required ? (
@@ -117,11 +127,12 @@ export function FormField({
  * browser also handles RTL popup placement for free. Radix `Select` can
  * replace this later without touching a single action.
  *
- * **One field is now an exception: the city** `[15 §5]`. A list of roughly two
- * hundred cities is unusable as a plain dropdown, so it uses
- * `components/ui/combobox`. That reversal is scoped to that control — every
- * short list on these forms still belongs here, and the reasoning above is
- * unchanged for them.
+ * **There is no exception any more** `D20`. The city was one — a searchable
+ * `Combobox` for roughly two hundred rows `[15 §5]` — and under the rewritten
+ * rule it was enablement rather than an enhancement: scripts off, it rendered
+ * a button and an empty hidden input, so a Saudi company could not be
+ * registered at all `S15`. It is a native `<select>` grouped by region now,
+ * in `components/city-field`. Every list on these forms belongs here.
  */
 export function SelectField({
   name,

@@ -21,8 +21,8 @@ type Action = (state: FormState, formData: FormData) => Promise<FormState>;
  * re-inclusion, and reassignment and archiving appear only with `can_assign`.
  * The data layer re-checks either way; this is presentation, never the gate.
  *
- * A native `<select>` for the recipient, deliberately — the rep list is short,
- * and `15 §5`'s `Combobox` exception is for the ~200-item city list only.
+ * A native `<select>` for the recipient, deliberately `D20`. `[15 §5]`'s city
+ * exception is gone with the control that held it; every picker is native.
  */
 /**
  * **The hint is gone** `D70`.

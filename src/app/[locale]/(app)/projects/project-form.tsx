@@ -9,8 +9,8 @@ import {
   SelectField,
 } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
+import { CityField } from "@/components/city-field";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -128,18 +128,14 @@ export function ProjectForm({
         error={errors.cityId}
         hint={cities.length === 0 ? t("common.noOptions") : undefined}
       >
-        <Combobox
+        {/* Not `required` — that turns on a country and a project has none.
+            The placeholder IS the empty option, which is this field's way
+            back to no city. */}
+        <CityField
           name="cityId"
+          cities={cities}
           defaultValue={value("cityId")}
-          options={cities.map((city) => ({
-            value: city.id,
-            label: locale === "ar" ? city.nameAr || city.nameEn : city.nameEn,
-            altLabel: locale === "ar" ? city.nameEn : city.nameAr,
-          }))}
           placeholder={t("common.none")}
-          searchPlaceholder={t("common.searchCity")}
-          emptyLabel={t("common.noMatches")}
-          clearLabel={t("common.none")}
           disabled={cities.length === 0}
           invalid={Boolean(errors.cityId)}
           onChange={setCityId}

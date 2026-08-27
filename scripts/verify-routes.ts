@@ -95,6 +95,19 @@
  *      Arabic the DOM order is **identical** to English, because the mirror is
  *      CSS `D57`.
  *
+ *  23. **Operability** `D20` — for every form this walk reaches, in either
+ *      locale, as any of the three identities: each field the screen says its
+ *      action requires is present as a **native, focusable control carrying
+ *      that name**. A `type="hidden"` input left empty, an `aria-hidden` one,
+ *      a `tabindex="-1"` one, a disabled one, or a `role="checkbox"` /
+ *      `role="combobox"` element standing where the name should be is a named
+ *      failure; every non-required one is printed as a note and becomes a
+ *      `WORKFLOW §5` row owned by its screen's session. `§17` already replays
+ *      the POST, but it writes the body itself, so it proves the action
+ *      answers and never that a person could have produced the body. This is
+ *      that second half, and it is why the two fixes beside it — the checkbox
+ *      primitive and the city field — had to land in the same slice.
+ *
  * Section 18 — `D69`'s two controls and `D32`'s panel — is in the code and was
  * never in this list either; 19 is listed the day it is written. Sections 20
  * and 21 — the companies list and the company detail — are the same omission;
@@ -217,6 +230,178 @@ function scanForUnresolvedKeys(path: string, body: string): void {
   }
 }
 
+/* ── D20's operability scan ───────────────────────────────────────────────── */
+
+/**
+ * **Can a person actually produce the body this form posts?**
+ *
+ * `D20`'s enforcement paragraph. Every one of this walk's other checks is
+ * already a scripts-off check — it fetches HTML and executes nothing — so the
+ * half that was missing was never *rendering*, it was **operability**: a
+ * control can render and do nothing. `§17` replays each POST, but it writes
+ * the body itself, so it proves the action answers and never that a person
+ * could have produced the body. This is that second half.
+ *
+ * **The test, per form, per field name.** A field is operable when something
+ * carrying that `name` is a native control a person can reach: an `<input>`
+ * whose type is not `hidden`, a `<select>` or a `<textarea>`, not `disabled`,
+ * not `aria-hidden`, not at `tabindex="-1"`.
+ *
+ * **Two things are deliberately NOT failures.**
+ *
+ *  - **A hidden input carrying a real value.** That value is the server's, not
+ *    the person's — a company handed in by URL and shown as text rather than
+ *    asked for — and there is nothing for anybody to fill. What fails is a
+ *    hidden input that is **empty**, because then the field cannot be given a
+ *    value at all. That is exactly the `Combobox` shape session 40 deleted,
+ *    and exactly `S15`'s unregisterable Saudi company.
+ *  - **A role attribute by itself.** `role="checkbox"` / `role="combobox"` is
+ *    not a defect; a native control may legitimately carry one. It is named in
+ *    the detail only where a role-bearing element is among the ONLY things
+ *    carrying that field's name, which is when it is standing in for it.
+ *
+ * **What counts as required is the screen's own declaration**, not the
+ * action's signature: `FormField` emits `data-required` beside `data-field`,
+ * and a native carrier may say `required` itself. A required field that fails
+ * is a **named failure**; every other failing field is printed as a **note**
+ * and becomes a `WORKFLOW §5` row owned by its screen's session. A form built
+ * without `FormField` is still scanned — the name-carrier test needs no marker
+ * — but nothing in it can be *required*, so its findings are notes.
+ *
+ * Hooked into `get()`, the one choke point `scanForUnresolvedKeys` already
+ * uses, so every page the walk reaches is covered at no extra fetch.
+ */
+type Operability = {
+  route: string;
+  form: string;
+  field: string;
+  detail: string;
+  required: boolean;
+};
+
+const operability = new Map<string, Operability>();
+let formsScanned = 0;
+let routesScanned = 0;
+
+/** `/en/projects/<uuid>/edit` → `/:locale/projects/:id/edit`, so one defect on
+ *  one screen is one finding rather than one per identity per locale. */
+function routeShape(path: string): string {
+  return path
+    .replace(/\?.*$/, "")
+    .replace(/[0-9a-f]{8}-[0-9a-f-]{27}/gi, ":id")
+    .replace(/^\/(en|ar)(?=\/|$)/, "/:locale");
+}
+
+function attrIn(tag: string, name: string): string | null {
+  return tag.match(new RegExp(`\\b${name}="([^"]*)"`))?.[1] ?? null;
+}
+
+/**
+ * A boolean attribute — `disabled`, `required` — by NAME, with every attribute
+ * VALUE stripped first.
+ *
+ * **Not a plain search over the tag**, which is what this was for one run and
+ * why 16 of its notes were wrong: `checkbox.tsx` carries the Tailwind class
+ * `group-has-disabled/field:opacity-50`, so a scan of the whole tag found
+ * `disabled` inside the class string and read every checkbox in the product as
+ * a disabled control — burying the ONE genuinely disabled control on the walk
+ * under fifteen inventions of it. Stripping `="…"` leaves attribute names
+ * only, and the lookahead stops `data-disabled` passing for `disabled`.
+ */
+function hasFlag(tag: string, name: string): boolean {
+  const names = tag.replace(/="[^"]*"/g, "=");
+  return new RegExp(`(?:^|\\s)${name}(?=[\\s=>/]|$)`).test(names);
+}
+
+function scanOperability(path: string, body: string): void {
+  if (!body.includes("<html")) return;
+  const route = routeShape(path);
+  routesScanned += 1;
+
+  for (const [index, match] of [
+    ...body.matchAll(/<form\b[\s\S]*?<\/form>/g),
+  ].entries()) {
+    const form = match[0];
+    const open = form.slice(0, form.indexOf(">") + 1);
+    formsScanned += 1;
+    const formKey =
+      attrIn(open, "data-act") ?? attrIn(open, "data-slot") ?? `form-${index}`;
+
+    // `FormField`'s markers: which fields this screen says its action needs.
+    const declaredRequired = new Set<string>();
+    for (const field of form.matchAll(/<div[^>]*\bdata-field="([^"]+)"[^>]*>/g)) {
+      if (hasFlag(field[0], "data-required")) {
+        declaredRequired.add(field[1]);
+      }
+    }
+
+    // Every element carrying a posted name, grouped by that name.
+    const carriers = new Map<string, string[]>();
+    for (const tag of form.matchAll(/<[a-z]+\b[^>]*\bname="[^"]*"[^>]*>/gi)) {
+      const name = attrIn(tag[0], "name");
+      // The server-action envelope is not a field anybody fills.
+      if (!name || name.startsWith("$ACTION")) continue;
+      carriers.set(name, [...(carriers.get(name) ?? []), tag[0]]);
+    }
+
+    const record = (field: string, detail: string, required: boolean): void => {
+      const key = `${route}|${formKey}|${field}`;
+      if (operability.has(key)) return;
+      operability.set(key, { route, form: formKey, field, detail, required });
+    };
+
+    for (const [field, tags] of carriers) {
+      const usable = tags.some((tag) => {
+        const element = tag.match(/^<([a-z]+)/i)?.[1].toLowerCase() ?? "";
+        if (!["input", "select", "textarea"].includes(element)) return false;
+        if ((attrIn(tag, "type") ?? "").toLowerCase() === "hidden") return false;
+        if (/\baria-hidden="?true"?/.test(tag)) return false;
+        if (attrIn(tag, "tabindex") === "-1") return false;
+        if (hasFlag(tag, "disabled")) return false;
+        return true;
+      });
+      if (usable) continue;
+
+      // A hidden input carrying a real value is the server's answer, not a
+      // question anybody was asked. Empty is the broken case.
+      const filled = tags.some(
+        (tag) =>
+          (attrIn(tag, "type") ?? "").toLowerCase() === "hidden" &&
+          (attrIn(tag, "value") ?? "") !== "",
+      );
+      if (filled) continue;
+
+      const detail = tags
+        .map((tag) => {
+          const element = tag.match(/^<([a-z]+)/i)?.[1].toLowerCase() ?? "?";
+          const role = attrIn(tag, "role");
+          if (role) return `<${element} role="${role}">`;
+          if ((attrIn(tag, "type") ?? "").toLowerCase() === "hidden") {
+            return `<input type="hidden" value="">`;
+          }
+          if (/\baria-hidden="?true"?/.test(tag)) return `<${element} aria-hidden>`;
+          if (attrIn(tag, "tabindex") === "-1") return `<${element} tabindex="-1">`;
+          if (hasFlag(tag, "disabled")) return `<${element} disabled>`;
+          return `<${element}>`;
+        })
+        .join(" + ");
+
+      record(
+        field,
+        detail,
+        declaredRequired.has(field) ||
+          tags.some((tag) => hasFlag(tag, "required")),
+      );
+    }
+
+    // A field the screen says the action needs, that NOTHING posts at all.
+    for (const field of declaredRequired) {
+      if (carriers.has(field)) continue;
+      record(field, "no element carries this name", true);
+    }
+  }
+}
+
 /* ── A cookie jar, because a session is a cookie ──────────────────────────── */
 
 type Jar = Map<string, string>;
@@ -266,6 +451,7 @@ async function get(
       store(jar, followed);
       const body = await followed.text();
       scanForUnresolvedKeys(next, body);
+      scanOperability(next, body);
       return { status: followed.status, body, url: next };
     }
   }
@@ -274,6 +460,7 @@ async function get(
   // the fetch is the one choke point, and the failure it guards against does
   // not announce itself on the screen you thought to check.
   scanForUnresolvedKeys(path, body);
+  scanOperability(path, body);
   return { status: response.status, body, url: path };
 }
 
@@ -1232,7 +1419,7 @@ async function main(): Promise<void> {
     // The company below carries a run stamp, so the unremovable row lands on a
     // record nobody reads as data.
     //
-    // Abroad, for §13's reason: the city is a `Combobox` in a Radix portal, so
+    // Abroad, for §13's old reason: the city was a `Combobox` in a portal, so
     // this script has no city id to post, and `S15` refuses a Saudi company
     // without one. Registered ONCE rather than per locale — `S18` makes rep-a
     // the primary rep, and that is what puts the composer on the screen in
@@ -1653,10 +1840,19 @@ async function main(): Promise<void> {
     // A rep, not the manager: `S18` makes the creating rep the primary rep, and
     // registering a company is the rep's screen `D55`.
     //
-    // **The city is out of reach here, deliberately.** It is a `Combobox` in a
-    // Radix portal, so its options are not in the server HTML and this script
-    // has no city id to post. `verify:schema25` §10 proves the positive half in
-    // process, where one is a query away.
+    // **The city IS in reach now, and that is session 40's point.** It was a
+    // `Combobox` in a Radix portal, so its options were not in the server HTML
+    // and this script had no city id to post; under the rewritten `D20` that
+    // was not an inconvenience for the walk, it was `S15`'s registration being
+    // impossible for a person with scripts off. It is a native `<select>`
+    // grouped by region, so the ids are in the markup.
+    //
+    // **What that adds here is the reachability half**, below: the city select
+    // offers real uuid options, which is the difference between a POST this
+    // script can write and a body a PERSON could have produced. The refusal
+    // this section drives is unchanged and is still the EMPTY-city path, so
+    // this section still writes no Saudi company — `§14` owns the accepted
+    // path, and `WORKFLOW §5` counts what every run writes.
     //
     // **This section used to assert the defect it was creating** `[AUDIT 1 F3]`.
     // It posted `region=center` with an empty `cityId` and then checked that
@@ -1725,6 +1921,30 @@ async function main(): Promise<void> {
       check(
         `${locale}: *** the register form asks for NO region *** [S15]`,
         !form.body.includes('name="region"'),
+      );
+
+      // **`D20`'s operability half, at the one field that proves it.** `S15`
+      // makes a city mandatory for a Saudi company, so if the control cannot
+      // offer one the record cannot be created at all with scripts off. This
+      // asserts the ids are in the markup a browser receives — the very thing
+      // the `Combobox` did not do, and the reason section 40 exists. §23
+      // asserts the control's SHAPE; this asserts it has something to say.
+      const citySelect = form.body.match(
+        /<select[^>]*name="cityId"[\s\S]*?<\/select>/,
+      )?.[0];
+      const cityOptions = citySelect
+        ? [...citySelect.matchAll(/<option value="([0-9a-f-]{36})"/g)].length
+        : 0;
+      check(
+        `${locale}: *** the city is a native select offering real cities *** [S15], [D20]`,
+        cityOptions > 0,
+        `${cityOptions} option(s)`,
+      );
+      // Grouped by region `S15` — the relationship the city already carries,
+      // and what makes 171 rows navigable in one control.
+      check(
+        `${locale}: the city select is grouped by region [S15]`,
+        (citySelect?.match(/<optgroup/g) ?? []).length > 1,
       );
 
       /**
@@ -1965,11 +2185,15 @@ async function main(): Promise<void> {
       const saudiId = newCompany.body
         .match(/<select[^>]*name="countryId"[\s\S]*?<\/select>/)?.[0]
         ?.match(/<option value="([0-9a-f-]{36})"[^>]*data-code="SA"/)?.[1];
-      // `S15` — a Saudi company needs a city, and the combobox does not put one
-      // in the HTML. Section 13 owns the refusal; this section only needs a
-      // company, so it takes an id from the database rather than proving
-      // anything about how it got there.
-      const cityId = await aCityId();
+      // `S15` — a Saudi company needs a city. It used to be taken from the
+      // database in raw SQL, because the `Combobox` put no option in the HTML;
+      // the control is a native `<select>` now `D20`, so the id comes off the
+      // very form this POST is filling, the way every other field here does.
+      // That deletes this file's only reach past HTTP. Section 13 owns both
+      // halves of the rule; this section only needs a company.
+      const cityId = newCompany.body
+        .match(/<select[^>]*name="cityId"[\s\S]*?<\/select>/)?.[0]
+        ?.match(/<option value="([0-9a-f-]{36})"/)?.[1];
       if (!companyForm || !saudiId || !cityId) {
         check(`${locale}: the company form is reachable`, false);
         continue;
@@ -4933,39 +5157,119 @@ async function main(): Promise<void> {
       );
     }
   }
+
+  /* ── 23 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n23. Operability — every form's fields, with scripts off [D20]",
+  );
+  {
+    // **Last, deliberately.** It reports on everything every section above
+    // fetched, the way section 12 reports on the message keys: the scan runs
+    // inside `get()`, so by the time this prints, every page this walk reached
+    // in either locale as any of the three identities has been through it.
+    //
+    // A green run here is not "no forms were looked at" — that is what the
+    // first assertion is for.
+    // **The scan is proved against the two shapes this slice deleted, before
+    // it is believed about anything else.** A section that has only ever been
+    // green has not been shown to work, and this one's whole value is that it
+    // goes red — so it is fed a synthetic page carrying the `Combobox`'s empty
+    // hidden input behind a trigger button and Radix's `role="checkbox"` with
+    // its `aria-hidden` bubble input, plus two shapes it must NOT flag. If the
+    // day comes that a refactor makes this scan inert, this fails first and
+    // the 1,000 checks above it stop being reassuring.
+    const SELF_TEST = "/en/__operability__";
+    scanOperability(
+      SELF_TEST,
+      `<html><body><form data-slot="self-test">` +
+        // The city, as it shipped: required, and nothing a person can fill.
+        `<div data-field="cityId" data-required="">` +
+        `<input type="hidden" name="cityId" value=""/>` +
+        `<button type="button" id="cityId">Pick</button></div>` +
+        // A checkbox, as Radix rendered it: the name is on the bubble input.
+        `<button type="button" role="checkbox" aria-checked="false"></button>` +
+        `<input type="checkbox" aria-hidden="true" tabindex="-1" ` +
+        `name="userIds" value="u1" style="pointer-events:none"/>` +
+        // Neither of these is a defect and neither may be reported.
+        `<select name="fine"><option value="a">a</option></select>` +
+        `<input type="hidden" name="known" value="already-decided"/>` +
+        `</form></body></html>`,
+    );
+    const shape = "/:locale/__operability__|self-test";
+    const cityFinding = operability.get(`${shape}|cityId`);
+    const bubbleFinding = operability.get(`${shape}|userIds`);
+    check(
+      "the scan catches an empty hidden input standing in for a required field [D20]",
+      cityFinding?.required === true,
+      cityFinding?.detail ?? "NOT CAUGHT",
+    );
+    check(
+      "the scan catches an aria-hidden input behind a role=checkbox [D20]",
+      bubbleFinding !== undefined && bubbleFinding.required === false,
+      bubbleFinding?.detail ?? "NOT CAUGHT",
+    );
+    check(
+      "…and it reports neither a native select nor a hidden input with a value",
+      !operability.has(`${shape}|fine`) && !operability.has(`${shape}|known`),
+    );
+    // Out of the report: these are this section's own fixtures, not findings
+    // about a screen. The counters go back too, so the totals printed below
+    // describe real pages only.
+    for (const field of ["cityId", "userIds", "fine", "known"]) {
+      operability.delete(`${shape}|${field}`);
+    }
+    formsScanned -= 1;
+    routesScanned -= 1;
+
+    check(
+      `the scan reached forms at all — ${formsScanned} forms over ${routesScanned} fetches`,
+      formsScanned > 0,
+    );
+
+    const findings = [...operability.values()].sort((a, b) =>
+      a.route.localeCompare(b.route),
+    );
+    const failures = findings.filter((finding) => finding.required);
+    const notes = findings.filter((finding) => !finding.required);
+
+    // **The named failures.** A field the screen says its action needs, that
+    // no native control carries — the person cannot produce the body, whatever
+    // the POST replay in §17 says.
+    for (const finding of failures) {
+      check(
+        `*** ${finding.route} ${finding.form}: "${finding.field}" is REQUIRED and has no native control *** [D20]`,
+        false,
+        finding.detail,
+      );
+    }
+    check(
+      `no required field stands behind JavaScript [D20]`,
+      failures.length === 0,
+      `${failures.length} of ${findings.length} finding(s) are required fields`,
+    );
+
+    // **The notes.** Not failures here: each one is a defect on somebody
+    // else's screen, and `WORKFLOW §5` is where it is owned rather than fixed
+    // by whoever happened to run this.
+    if (notes.length > 0) {
+      console.log(
+        `  note  ${notes.length} non-required field(s) are not operable with scripts off —`,
+      );
+      console.log("        each becomes a `WORKFLOW §5` row for its screen's session:");
+      for (const note of notes) {
+        console.log(
+          `        ${note.route}  ${note.form}  "${note.field}"  ${note.detail}`,
+        );
+      }
+    }
+  }
 }
 
 /** One `data-` attribute off the element carrying `data-slot="…"`. */
 function attrOf(body: string, slot: string, attr: string): string | null {
   const tag = body.match(new RegExp(`<[a-z]+[^>]*data-slot="${slot}"[^>]*>`));
   return tag?.[0].match(new RegExp(`${attr}="([^"]*)"`))?.[1] ?? null;
-}
-
-/**
- * Any seeded city's id, read straight from Postgres.
- *
- * `S15` makes the city mandatory for a Saudi company, and the city control is
- * a `Combobox` in a Radix portal — its options are not in the server HTML, so
- * a black-box POST has no id to send. Section 14 needs a Saudi company to hang
- * a quotation on, so it needs one id.
- *
- * Read over the driver in raw SQL: this is fixture setup, not an assertion, so
- * nothing about what the section proves depends on where it came from. **This
- * file still never imports `src/`.**
- *
- * Section 13 deliberately does NOT use it. Its subject is what a browser can
- * post, and a browser without a city id is precisely the case `S15` must
- * refuse.
- */
-async function aCityId(): Promise<string | null> {
-  const { default: postgres } = await import("postgres");
-  const sql = postgres(process.env.DATABASE_URL ?? "", { max: 1 });
-  try {
-    const rows = await sql`select id from cities order by name_en limit 1`;
-    return (rows[0]?.id as string | undefined) ?? null;
-  } finally {
-    await sql.end({ timeout: 5 });
-  }
 }
 
 /** `common.none` — the same glyph in both locales, so it is a value, not a

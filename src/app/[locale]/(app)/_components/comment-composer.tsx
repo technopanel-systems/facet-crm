@@ -18,8 +18,8 @@ import { emptyFormState, type FormState } from "@/lib/validation";
  * threading and no emoji bar. A box, the people to tell, and a button.
  *
  * **Tagging is a chip row, not `@` in the text** `[25 §11]`. There is no
- * autocomplete primitive in FACET — `Combobox` is the documented exception for
- * the ~200-item city list `[15 §5]` — and without one a rep typing `@Rawan`
+ * autocomplete primitive in FACET — the `Combobox` that was `[15 §5]`'s city
+ * exception is deleted `D20` — and without one a rep typing `@Rawan`
  * must guess the exact stored spelling, in a company where names are recorded
  * in two scripts and more than one person is called Mohammed. A checkbox is
  * native, needs no JavaScript to submit, and the browser places it correctly in
