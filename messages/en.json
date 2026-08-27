@@ -14,7 +14,6 @@
     "projects": "Projects",
     "quotations": "Quotations",
     "dispatches": "Dispatches",
-    "reports": "Reports",
     "activity": "Activity",
     "targets": "Targets",
     "team": "Team",
@@ -834,14 +833,10 @@
     }
   },
   "reports": {
-    "title": "Reports",
     "new": "Log",
     "newTitle": "Log an interaction",
     "newFieldNoteTitle": "Log a field note",
     "editTitle": "Correct this report",
-    "empty": "Nothing logged yet.",
-    "emptyFiltered": "No reports match this search.",
-    "searchPlaceholder": "Search the text or a company name",
     "fields": {
       "entryType": "What is this",
       "company": "Company",
@@ -863,12 +858,7 @@
       "cityPlaceholder": "Anywhere in particular?",
       "reportDate": "Date",
       "signals": "What the customer told us",
-      "author": "Logged by",
-      "filterAll": "All",
-      "filterInteractions": "Interactions",
-      "filterFieldNotes": "Field notes",
-      "filterOutcome": "Outcome",
-      "filterAnyOutcome": "Any outcome"
+      "author": "Logged by"
     },
     "signalReference": {
       "competitor_cheaper": "Which competitor?",
@@ -879,7 +869,7 @@
     "detail": {
       "title": "Report",
       "interactionHint": "Anchored to a company. The contact and the project are optional.",
-      "fieldNoteHint": "A field note belongs to no customer. It counts as activity and appears on no timeline.",
+      "fieldNoteHint": "A field note belongs to no customer. It counts as activity and reaches the stream, though no company's or project's timeline.",
       "signalsHint": "What the customer said, kept separate from what happened in the funnel. Worth recording whether or not the deal was lost.",
       "onHoldHint": "This company raises no follow-up until the date above.",
       "onHoldFieldHint": "Only used when the outcome is “On hold”.",
@@ -890,12 +880,6 @@
       "authorOnlyHint": "The note is the author's own. Only the person who wrote a report may correct it, on the day they wrote it.",
       "correctionHint": "This corrects the report in place, today only. There is still one entry, and the change is recorded.",
       "standsHint": "This report now stands. A report can be corrected only on the day it was written."
-    },
-    "actions": {
-      "log": "Log it",
-      "save": "Save the correction",
-      "logInteraction": "Log an interaction",
-      "logFieldNote": "Log a field note"
     },
     "errors": {
       "narrativeRequired": "Write what happened, even if it is one line.",
@@ -913,6 +897,10 @@
       "notFound": "That report no longer exists.",
       "authorOnly": "Only the person who wrote this report may correct it.",
       "editWindowClosed": "A report can be corrected only on the day it was written. This one now stands."
+    },
+    "actions": {
+      "log": "Log it",
+      "save": "Save the correction"
     }
   },
   "comments": {
@@ -947,7 +935,30 @@
   },
   "activity": {
     "title": "Activity",
-    "empty": "No activity is visible for this range.",
+    "searchPlaceholder": "A company name, or a word from your own note",
+    "empty": "Nothing has happened yet — log the first thing.",
+    "emptyFiltered": "Nothing matches these filters.",
+    "views": {
+      "stream": "Stream",
+      "byRep": "By rep"
+    },
+    "kinds": {
+      "all": "Everything",
+      "typed": "Typed",
+      "observed": "Observed",
+      "said": "Said"
+    },
+    "filters": {
+      "title": "Narrow this",
+      "who": "Who",
+      "anyone": "Anyone",
+      "justMe": "Just me",
+      "outcome": "Outcome",
+      "anyOutcome": "Any outcome",
+      "signal": "Signal raised",
+      "anySignal": "Any signal",
+      "typedOnly": "An outcome and a signal belong to what somebody typed, so this shows typed entries only."
+    },
     "fields": {
       "from": "From",
       "to": "To",
@@ -959,12 +970,8 @@
       "signalsRaised": "Signals"
     },
     "detail": {
-      "hint": "What people logged, beside what FACET recorded on its own. The two are shown side by side and never added together.",
+      "hint": "Everything that happened, whether somebody typed it, said it to a colleague, or FACET recorded it on its own.",
       "attribution": "Every event counts for whoever performed it, not for whoever was credited. A rep's recorded column looks thin because the coordinator does much of the quotation chain — that is correct, not a fault.",
-      "expand": "Show entries",
-      "collapse": "Hide entries",
-      "entriesFor": "What {name} did",
-      "noEntries": "Nothing in this range.",
       "teamTotal": "Team total",
       "notACombinedScore": "Activity is never combined with target progress into a single score."
     }
@@ -1200,8 +1207,7 @@
     "detail": {
       "hint": "Targets and coverage, side by side.",
       "targets": "Target attainment",
-      "coverage": "Coverage",
-      "viewReports": "View reports"
+      "coverage": "Coverage"
     },
     "origin": {
       "title": "How requests arrived",

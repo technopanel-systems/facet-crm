@@ -7,6 +7,21 @@ visibility or what a record may contain.
 
 Rules are numbered `D1`… and cited by number.
 
+**Markers**, on `SPEC.md`'s definitions and for the same reason: a rule with no
+marker describes the screen as it renders today.
+
+- **[CHANGE]** — the code currently does something different. This is the target.
+- **[BUILD]** — nothing exists yet.
+
+`D48` is the first rule here to carry one, and the legend is written down
+rather than inferred from it (`WORKFLOW §5 AD7`). **A `D` marker is not in the
+progress bar** — `npm run status` counts `SPEC.md`'s and only those, so adding
+one here moves no number. The point is the opposite of a count: `WORKFLOW §7`
+asks that a rule say whether work remains, and 26 rules in this file describe
+things that do not exist while reading as finished. Marking them is a rule
+review's job `§6b`, not a build slice's; what a build slice may not do is
+leave the one rule it just touched still reading as finished.
+
 ---
 
 ## 1. What FACET is for, on screen
@@ -456,6 +471,14 @@ nothing rather than an empty slot.
 **D31.** Build order: table and stream first. Board second. Cards and calendar
 only if someone asks twice.
 
+**It has now decided two views, and neither was declined for being hard.**
+`?view=cards` on `/projects` in session 35, and `?view=calendar` on the stream
+in session 27 — which is cheap, because every event already carries `day` as a
+Riyadh calendar day and `working-days.ts` knows which of them are working days.
+Cheap is not the test this rule sets; **the second ask is.** So a third
+deferral needs no fresh argument, and a rule that has been applied twice is no
+longer one nobody reaches for.
+
 ---
 
 ## 8. The dashboard — one screen of blocks
@@ -848,11 +871,32 @@ see it. Nothing is greyed out or "locked" — it simply is not there.
 
 ## 12. Comments
 
-**D48.** Comments appear on **quotation threads and projects only**, inside the
-timeline as a third event kind, with a plain composer in the card — a box, the
-people to tell, a button. No typing indicator, no read receipt, no reply
-threading, no emoji. Nothing renders a comments card on a company, contact or
-dispatch.
+**D48. [CHANGE]** Comments appear on **quotation threads and projects only**,
+inside the timeline as a third event kind, with a plain composer in the card —
+a box, the people to tell, a button. No typing indicator, no read receipt, no
+reply threading, no emoji. Nothing renders a comments card on a company,
+contact or dispatch.
+
+**The last sentence is the target, not the screen** (`WORKFLOW §5 AD7`).
+`CommentBox` renders on **five** — the company, the contact and the dispatch
+each take one today, and the `comments_record_type` CHECK admits all five. So
+the rule read as finished while describing behaviour nothing had built, which
+is the failure `WORKFLOW §7` exists to stop: a marker says whether work
+remains, and this one had none. `S114` carries the same gap in its own words
+and the same `[CHANGE]`; the two are one piece of work and neither is a second
+opinion about it.
+
+**Session 27 did not close it, deliberately.** The stream `D45` and the
+narrowing are one row in `WORKFLOW §4` and were split: the narrowing is a
+migration with a disclosure decision attached — a comment follows its anchor
+`S131`, so one on a company reaches everyone holding a share of that company,
+which is wider than `S38` gives a report's note — and the rows already written
+have to be decided rather than dropped in passing. **Session `27b`** is that
+work, and this marker comes off with it.
+
+Everything else in this rule ships: the comment IS the timeline's third event
+kind, it is the stream's **said** kind `D45`, and the composer is in the card
+rather than beside it.
 
 ---
 

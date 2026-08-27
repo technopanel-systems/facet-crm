@@ -1,4 +1,4 @@
-import { getFormatter, getTranslations } from "next-intl/server";
+import { getFormatter, getLocale, getTranslations } from "next-intl/server";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
 import { formatSqm } from "@/lib/decimal";
-import type { TimelineEvent, TimelineLink } from "@/lib/timeline";
+import { streamKindOf, type TimelineEvent, type TimelineLink } from "@/lib/timeline";
 
 /**
  * The customer timeline `[20 §6]` — the rep's payoff for logging.
@@ -94,9 +94,29 @@ export async function Timeline({
   );
 }
 
-async function TimelineRow({ event }: { event: TimelineEvent }) {
+/**
+ * One event, wherever it is read.
+ *
+ * **Exported since session 27** `D45`: *a record's timeline is the same
+ * stream, scoped to that record*, so the stream and the two `[id]/timeline`
+ * routes render the same row and there is no second one to keep in step.
+ *
+ * `subject` is the only thing that differs. A timeline is already inside its
+ * record and names it in the page title; the stream is inside nothing, so it
+ * passes what the event is about and this renders it. Absent, the row is
+ * exactly what it was.
+ */
+export async function TimelineRow({
+  event,
+  subject,
+}: {
+  event: TimelineEvent;
+  /** What the event is about — already resolved. Stream only. */
+  subject?: string;
+}) {
   const t = await getTranslations();
   const format = await getFormatter();
+  const locale = await getLocale();
 
   // A `date` column is a calendar day in Riyadh, not an instant.
   const day = format.dateTime(new Date(`${event.day}T00:00:00Z`), {
@@ -105,11 +125,32 @@ async function TimelineRow({ event }: { event: TimelineEvent }) {
   });
 
   if (event.kind === "comment") {
-    return <CommentRow event={event} day={day} t={t} />;
+    return <CommentRow event={event} day={day} subject={subject} t={t} />;
   }
 
   const label = t(`enums.timelineEvent.${event.kind}`);
   const href = hrefFor(event.link);
+
+  /**
+   * A field note names no customer `S33`, so where every other event puts its
+   * company this puts the city the work happened in — the one thing `S33`
+   * gives it besides the category, which is already the `detail` beside the
+   * badge. Without it the row reads *Report · Market research* and says
+   * nothing about where anybody went.
+   */
+  const fieldNoteCity =
+    event.kind === "report" && event.report.entryType === "field_note"
+      ? (locale === "ar" ? event.report.cityNameAr : event.report.cityNameEn)
+      : null;
+  const named = subject ?? fieldNoteCity ?? null;
+
+  /**
+   * `S38` puts signals in the SHARED half — *whoever can see the record*, the
+   * same audience as the outcome beside them — so they render wherever the
+   * event does. They are also what makes `D45`'s *signals raised* filter
+   * legible: filtering to one and seeing which row carries it.
+   */
+  const signals = event.kind === "report" ? event.report.signals : [];
 
   // `RecordRow`'s shape, hand-written: a timeline entry leads with its badge,
   // which the shared row has no slot for. Everything else matches — the same
@@ -125,12 +166,27 @@ async function TimelineRow({ event }: { event: TimelineEvent }) {
       // one name per element everywhere in this codebase, and the comment row
       // below already owns one that two sections assert on exactly.
       data-timeline-event=""
+      // `D45`'s three kinds, and the entry type under `typed`, as markers.
+      // `verify:routes` §25 counts them: a translated badge is unreadable to a
+      // black-box script, and `D3` — *a field note reaches no timeline* — can
+      // only be shown closed by finding one in the stream.
+      data-stream-kind={streamKindOf(event.kind)}
+      data-entry-type={
+        event.kind === "report" ? event.report.entryType : undefined
+      }
       className="border-line flex items-center gap-3 border-b py-2.5 last:border-b-0"
     >
       <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-1 text-start">
         <Badge variant={event.kind === "report" ? "secondary" : "outline"}>
           {label}
         </Badge>
+        {/* `dir="auto"` on the NAME `D62` — never on the row, which also
+            holds a badge, a date and a count. */}
+        {named ? (
+          <span className="text-sm font-medium" dir="auto">
+            {named}
+          </span>
+        ) : null}
         {href ? (
           <Link href={href} className="text-sm hover:underline">
             {detailText(event, t)}
@@ -138,6 +194,11 @@ async function TimelineRow({ event }: { event: TimelineEvent }) {
         ) : (
           <span className="text-sm">{detailText(event, t)}</span>
         )}
+        {signals.map((signal) => (
+          <Badge key={signal.signal} variant="outline">
+            {t(`enums.reportSignal.${signal.signal}`)}
+          </Badge>
+        ))}
       </span>
       <span className="text-faint flex-none text-[11.5px]">
         <span className="num" dir="ltr">
@@ -167,10 +228,12 @@ async function TimelineRow({ event }: { event: TimelineEvent }) {
 async function CommentRow({
   event,
   day,
+  subject,
   t,
 }: {
   event: TimelineEvent & { kind: "comment" };
   day: string;
+  subject?: string;
   t: Translate;
 }) {
   const { comment } = event;
@@ -182,11 +245,17 @@ async function CommentRow({
       // carries the same marker as every other row — and keeps its own
       // `data-slot`, which sections 9 and 14 assert on.
       data-timeline-event=""
+      data-stream-kind="said"
       data-slot="comment"
       className="border-line flex flex-col gap-1 border-b py-2.5 last:border-b-0"
     >
       <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-start">
         <Badge variant="outline">{t("enums.timelineEvent.comment")}</Badge>
+        {subject ? (
+          <span className="text-sm font-medium" dir="auto">
+            {subject}
+          </span>
+        ) : null}
         <span className="text-faint text-[11.5px]">
           <span className="num" dir="ltr">
             {day}

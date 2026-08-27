@@ -5,11 +5,13 @@
  * the customer — visit, call, outcome, signals — and it feeds metrics. A
  * *comment* is what colleagues say to each other about a record `[25 §9]`. It
  * never feeds a metric, never counts as activity toward anything, and never
- * appears where a report belongs: not in `/reports`, not in `reportsInRange`,
- * and never inside a coverage threshold. `25 §14` puts the
- * two counts side by side on `/activity` precisely so they cannot be added —
- * merging them would let a rep raise his activity number by talking to
- * colleagues.
+ * appears where a report belongs: never inside a coverage threshold, and never
+ * inside the logged figure. Since session 27 both live on one screen `D45` —
+ * a comment is the stream's **said** kind and a report its **typed** one, and
+ * `?kind=` tells them apart — so what keeps `25 §14` true is `by-rep`'s two
+ * columns rather than two screens: side by side precisely so they cannot be
+ * added, because merging them would let a rep raise his activity number by
+ * talking to colleagues.
  *
  * What it replaces is WhatsApp `[25 §9]`. And it does not try to become the
  * conversation `[25 §15]`: it is where a decision gets written down, not where

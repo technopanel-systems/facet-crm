@@ -845,9 +845,17 @@ export function visibleRepReportsFilter(
  *    builds their page and does not leave Postgres. A `case … end` in the
  *    SELECT list would read more directly and is wrong here: a Drizzle `sql`
  *    template drops the table qualifier there, silently, under a join.
- *  - the `/reports` search `ilike`s the note, which discloses it by inference —
- *    so the same predicate gates that term. Withholding the column and leaving
- *    the search open looks correct and leaks anyway.
+ *  - the stream's search matches the note, which discloses it by inference —
+ *    a rep who can binary-search a word learns the note says it, without a
+ *    word of it ever rendering. Withholding the column and leaving the search
+ *    open looks correct and leaks anyway.
+ *
+ * **The second bullet moved in session 27 and got stronger.** `/reports` is
+ * gone `D45`, and its `ilike` had to compose this predicate into its own `or`
+ * — a term somebody could drop while the screen still looked right.
+ * `timeline.ts` matches the string `withNotes` has ALREADY set to `null` for a
+ * viewer who may not read it, so the gate is the same one, asked once, and
+ * there is no second term left to forget.
  *
  * `undefined` means every note, and composes with `and()` like the filters
  * above. Never feed it to `or()`.

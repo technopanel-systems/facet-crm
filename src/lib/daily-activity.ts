@@ -30,6 +30,21 @@
  * activity; they simply belong to no customer.
  *
  * Nothing here combines activity with target into a single score `[07 D2]`.
+ *
+ * **Since session 27 this counts the stream and does not re-read anything**
+ * `D45`. It used to run `reportsInRange` beside `eventsInRange` — two readings
+ * of one set, which is how a count and a list start disagreeing, and the very
+ * thing `reportsInRange`'s own docblock said it existed to prevent while being
+ * the second reading. `D30` settles it: `by-rep` is an ARRANGEMENT of the
+ * stream, so it folds `streamEvents` and nothing else, and every column here
+ * counts rows a person can see for themselves under `?view=stream` with the
+ * same filters in the URL.
+ *
+ * **The roster is still its own query, and that is not a second answer.** It
+ * asks who is being measured, not what happened — so a rep who did nothing in
+ * the range gets a row of zeros rather than vanishing. That is the point of
+ * the screen: `S42` makes this what a manager reads as the daily report, and
+ * the first thing they look for is who logged nothing.
  */
 
 import { and, asc, eq } from "drizzle-orm";
@@ -37,11 +52,10 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { visibleMeasuredUsersFilter, type AuthSession } from "@/lib/authz";
-import { reportsInRange } from "@/lib/reports";
 import {
-  eventsInRange,
+  streamEvents,
   type DateRange,
-  type TimelineEvent,
+  type StreamFilters,
 } from "@/lib/timeline";
 
 export type DailyActivityRow = {
@@ -71,95 +85,102 @@ export type DailyActivityRow = {
 };
 
 export type DailyActivity = {
-  range: DateRange;
+  /** `null` is the whole visible history — `D45` gives the stream no default
+   *  range and this is the same set, counted. */
+  range: DateRange | null;
   rows: DailyActivityRow[];
   total: Omit<DailyActivityRow, "userId" | "userName">;
 };
 
-/** Yesterday in Riyadh, as `YYYY-MM-DD` — the view's default range `[20 §8]`. */
-export function yesterday(): string {
-  const now = new Date();
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Riyadh",
-    dateStyle: "short",
-  }).format(new Date(now.getTime() - 24 * 60 * 60 * 1000));
-}
-
-export function defaultRange(): DateRange {
-  const day = yesterday();
-  return { from: day, to: day };
-}
-
 /**
- * One row per rep this identity may read, over the range.
+ * One row per rep this identity may read, counting the stream `D30`.
  *
- * The reports half comes from `reports.ts` rather than being counted in SQL
- * here, so the report tally and the signal tally can never come from two
- * different definitions of the same set — and so both obey
- * `visibleRepReportsFilter` without a second copy of the rule.
+ * Every figure comes from ONE list of events, so the report tally, the comment
+ * tally and the signal tally cannot come from two definitions of the same set —
+ * and every one of them obeys the six sources' own filters without a second
+ * copy of any rule. `filters` is whatever the stream is showing, so switching
+ * `?view=` never changes which events are being counted.
  */
-export async function dailyActivity(
+/**
+ * Who this identity is allowed to read a figure for — the roster, and nothing
+ * about what happened.
+ *
+ * **Exported since session 27** because `by-rep` and the stream's *who* filter
+ * ask the same question and must not answer it twice: a person offered in the
+ * filter who then has no row, or a row for somebody the filter will not offer,
+ * are the same defect from two sides.
+ *
+ * `S111` — an account deactivates rather than being deleted, and this is the
+ * *roster* half of that rule, not the display half. History keeps naming a
+ * departed person on the records they touched; a list of who is being measured
+ * does not. `achievementForPeriod` `[targets.ts]` is the same question and
+ * already asked it, so the two rosters answered it two different ways until
+ * this line existed.
+ */
+export async function measuredPeople(
   session: AuthSession,
-  options: { range?: DateRange; userId?: string } = {},
-): Promise<DailyActivity> {
-  const range = options.range ?? defaultRange();
-
-  const people = await db
+  userId?: string,
+): Promise<{ id: string; name: string }[]> {
+  return db
     .select({ id: users.id, name: users.name })
     .from(users)
     .where(
       and(
-        // `S111` — an account deactivates rather than being deleted, and this
-        // is the *roster* half of that rule, not the display half. History
-        // keeps naming a departed person on the records they touched; a list
-        // of who is being measured does not. `achievementForPeriod`
-        // `[targets.ts]` is the same question and already asked it, so the two
-        // rosters answered it two different ways until this line existed.
         eq(users.isActive, true),
         visibleMeasuredUsersFilter(session),
-        options.userId ? eq(users.id, options.userId) : undefined,
+        userId ? eq(users.id, userId) : undefined,
       ),
     )
     .orderBy(asc(users.name));
+}
+
+export async function dailyActivity(
+  session: AuthSession,
+  options: { range?: DateRange; userId?: string; filters?: StreamFilters } = {},
+): Promise<DailyActivity> {
+  const range = options.range ?? null;
+
+  const people = await measuredPeople(session, options.userId);
 
   if (people.length === 0) {
     return { range, rows: [], total: emptyTotals() };
   }
 
   const ids = people.map((person) => person.id);
-  const [reports, events] = await Promise.all([
-    reportsInRange(session, range, ids),
-    eventsInRange(session, range, ids),
-  ]);
+  const events = await streamEvents(session, {
+    ...options.filters,
+    who: ids,
+    from: range?.from,
+    to: range?.to,
+  });
 
   const rows = people.map((person) => {
-    const mine = reports.filter((report) => report.userId === person.id);
+    const mine = events.filter((event) => event.actorUserId === person.id);
+    const reports = mine.flatMap((event) =>
+      event.kind === "report" ? [event.report] : [],
+    );
     const companies = new Set(
       mine
-        .map((report) => report.companyId)
+        .filter((event) => event.kind === "report")
+        .map((event) => event.companyId)
         .filter((id): id is string => id !== null),
     );
     return {
       userId: person.id,
       userName: person.name,
-      reportsLogged: mine.length,
+      reportsLogged: reports.length,
       companiesTouched: companies.size,
-      commentsLogged: events.filter(
-        (event) => event.actorUserId === person.id && event.kind === "comment",
-      ).length,
+      commentsLogged: mine.filter((event) => event.kind === "comment").length,
       // `report` events are the logged half and are already counted above;
       // counting them here too would double the figure the founder wants
       // shown BESIDE it, not merged into it. `comment` is the same argument a
       // second time `[25 §14]` — it has its own column, so counting it as a
       // system event would put it in two totals and quietly make it worth
       // twice a report.
-      systemEvents: events.filter(
-        (event) =>
-          event.actorUserId === person.id &&
-          event.kind !== "report" &&
-          event.kind !== "comment",
+      systemEvents: mine.filter(
+        (event) => event.kind !== "report" && event.kind !== "comment",
       ).length,
-      signalsRaised: mine.reduce(
+      signalsRaised: reports.reduce(
         (sum, report) => sum + report.signals.length,
         0,
       ),
@@ -194,24 +215,18 @@ function emptyTotals(): Omit<DailyActivityRow, "userId" | "userName"> {
   };
 }
 
-/**
- * The actual entries behind one rep's row — what "expand a rep" shows
- * `[20 §8]`.
+/*
+ * `dailyActivityEntries` is gone, and its going is the slice `D45`.
  *
- * Drawn from the same `timeline.ts` union the counts come from, so the list and
- * the number can never drift apart.
+ * It answered *"what did this rep actually do"* by re-running the union for
+ * one person and rendering the result under the counts table — which is a
+ * second screen inside the first, and `D45` says there is one stream. The act
+ * is now `?view=stream&who=<id>`: the same events, in the arrangement built
+ * for reading them, with a URL that can be sent to somebody. `D30` makes *just
+ * me* a filter chip on the stream for exactly this reason, and a rep's row is
+ * the same chip pointed at somebody else.
+ *
+ * `visibleMeasuredUsersFilter` guarded it and still does — `by-rep` only ever
+ * offers a link for a person whose row it rendered, and the stream's own six
+ * filters scope what that link then returns.
  */
-export async function dailyActivityEntries(
-  session: AuthSession,
-  userId: string,
-  range: DateRange,
-): Promise<TimelineEvent[]> {
-  const [visible] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(and(eq(users.id, userId), visibleMeasuredUsersFilter(session)))
-    .limit(1);
-  if (!visible) return [];
-
-  return eventsInRange(session, range, [userId]);
-}

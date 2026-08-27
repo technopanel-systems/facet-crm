@@ -74,10 +74,13 @@ import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import {
   auditLog,
+  cities,
   commentMentions,
   comments,
   companies,
+  contacts,
   dispatches,
+  projects,
   quotationThreads,
   quotationVersions,
   repReports,
@@ -92,7 +95,19 @@ import {
   type AuthSession,
 } from "@/lib/authz";
 import { approvedDispatches } from "@/lib/dispatches";
-import type { CommentRecordType } from "@/lib/enums";
+import type {
+  CommentRecordType,
+  FieldNoteCategory,
+  ReportEntryType,
+  ReportOutcome,
+  ReportSignal,
+} from "@/lib/enums";
+import { normalizeName } from "@/lib/normalize";
+import {
+  withNotes,
+  withSignals,
+  type ReportSignalRow,
+} from "@/lib/reports";
 
 /**
  * The five system events `20 §6` and `20 §8` name, the rep's own, and the
@@ -155,12 +170,56 @@ export type TimelineComment = {
   editedAt: Date | null;
   canEdit: boolean;
   mentions: { userId: string; name: string }[];
+  /**
+   * What it was written on `S131`.
+   *
+   * A timeline is already inside its record, so nothing needed this until the
+   * stream `D45`: a comment on a quotation thread sets neither `companyId` nor
+   * `projectId` — `commentEvents` refuses to invent one — so this is the only
+   * thing that can say what the row is about.
+   */
+  anchor: { type: CommentRecordType; id: string };
+};
+
+/**
+ * A report's own half, carried on the event rather than fetched a second time
+ * `D45`.
+ *
+ * **`narrative` is here so the stream can be SEARCHED, not so it can be
+ * rendered.** `D47` gives the note a quote block on `/reports/[id]` and that
+ * is where it is read; the stream row shows the outcome and the signals. But
+ * `/reports`' search matched the note, and a stream that dropped that would
+ * lose it — so it is carried, gated by `readableNoteFilter` inside `withNotes`
+ * `S38`, and `null` here means **withheld from this viewer**, never empty.
+ *
+ * That gating is what makes the search safe. The old `ilike` had to compose
+ * `readableNoteFilter` into its own `or` — withholding the column and leaving
+ * the search open looks correct and leaks the note's contents by inference,
+ * because a rep who can binary-search a word learns the note says it. Here the
+ * column has **already** been withheld before anything is matched against it,
+ * so the leak is closed by construction rather than by remembering a term.
+ */
+export type TimelineReport = {
+  entryType: ReportEntryType;
+  outcome: ReportOutcome | null;
+  /** Field note only `S33` — the pair `rep_reports_shape` keeps exclusive. */
+  category: FieldNoteCategory | null;
+  cityNameEn: string | null;
+  cityNameAr: string | null;
+  signals: ReportSignalRow[];
+  /** `null` is WITHHELD `S38`; the column is NOT NULL and never blank. */
+  narrative: string | null;
 };
 
 export type TimelineEvent = TimelineEventBase &
   (
-    | { kind: Exclude<TimelineEventKind, "comment">; comment?: never }
-    | { kind: "comment"; comment: TimelineComment }
+    | { kind: "report"; report: TimelineReport; comment?: never }
+    | {
+        kind: Exclude<TimelineEventKind, "comment" | "report">;
+        report?: never;
+        comment?: never;
+      }
+    | { kind: "comment"; comment: TimelineComment; report?: never }
   );
 
 /**
@@ -201,12 +260,29 @@ function riyadhDay(column: unknown) {
  * The six sources. Each composes its own filter and nothing else.
  * ------------------------------------------------------------------ */
 
+/**
+ * The rep's own entries — and since session 27 the **only** reader of them
+ * that a list uses `D45`.
+ *
+ * `listReports` and `reportsInRange` are gone. This carries the report's own
+ * half now — entry type, outcome or category, the field note's city, the
+ * signals and the note — by composing `withSignals` and `withNotes` from
+ * `reports.ts` rather than re-querying either. Both are `S38`'s gate, and a
+ * second copy of that gate is a disclosure defect, not duplication.
+ *
+ * **A field note falls in here and nowhere else** `D3`. `S33` allows an entry
+ * anchored to nobody, so the company and project terms below are the only
+ * thing that could hold one out — and at range scope neither is set. On a
+ * company's or a project's timeline it is correctly absent; in the stream it
+ * is present, which is what `S42` needs, because a field note is a day's work
+ * and was being logged and then read by nobody.
+ */
 async function reportEvents(
   session: AuthSession,
   scope: TimelineScope,
   range?: DateRange,
 ): Promise<TimelineEvent[]> {
-  const rows = await db
+  const bare = await db
     .select({
       id: repReports.id,
       day: repReports.reportDate,
@@ -215,11 +291,15 @@ async function reportEvents(
       actorName: users.name,
       companyId: repReports.companyId,
       projectId: repReports.projectId,
+      entryType: repReports.entryType,
       outcome: repReports.outcome,
       category: repReports.category,
+      cityNameEn: cities.nameEn,
+      cityNameAr: cities.nameAr,
     })
     .from(repReports)
     .innerJoin(users, eq(users.id, repReports.userId))
+    .leftJoin(cities, eq(cities.id, repReports.cityId))
     .where(
       and(
         visibleRepReportsFilter(session),
@@ -232,6 +312,8 @@ async function reportEvents(
         range ? lte(repReports.reportDate, range.to) : undefined,
       ),
     );
+
+  const rows = await withNotes(session, await withSignals(bare));
 
   return rows.map((row) => ({
     key: `report:${row.id}`,
@@ -246,6 +328,15 @@ async function reportEvents(
     // the two is always set `[rep_reports_shape]`.
     detail: row.outcome ?? row.category,
     link: { type: "report" as const, id: row.id },
+    report: {
+      entryType: row.entryType,
+      outcome: row.outcome,
+      category: row.category,
+      cityNameEn: row.cityNameEn,
+      cityNameAr: row.cityNameAr,
+      signals: row.signals,
+      narrative: row.narrative,
+    },
   }));
 }
 
@@ -569,6 +660,7 @@ async function commentEvents(
       editedAt: row.editedAt,
       canEdit: row.actorUserId === session.user.id,
       mentions: mentions.get(row.id) ?? [],
+      anchor: { type: row.recordType, id: row.recordId },
     },
   }));
 }
@@ -743,6 +835,299 @@ export async function eventsInRange(
   return events.filter(
     (event) => event.actorUserId !== null && wanted.has(event.actorUserId),
   );
+}
+
+/* ------------------------------------------------------------------ *
+ * The stream `D45` `D30`
+ * ------------------------------------------------------------------ */
+
+/**
+ * `D45`'s three event kinds, over `gather`'s six sources.
+ *
+ * The mapping is total and is written here once: **typed** is what a rep wrote
+ * `S33`, **said** is what colleagues wrote to each other `S114`, and
+ * **observed** is everything FACET recorded on its own `S41`. `D36` already
+ * draws the same three as a written mark, an observed one and a spoken one, so
+ * this invents no vocabulary.
+ */
+export const STREAM_KINDS = ["typed", "observed", "said"] as const;
+export type StreamKind = (typeof STREAM_KINDS)[number];
+
+export function streamKindOf(kind: TimelineEventKind): StreamKind {
+  if (kind === "report") return "typed";
+  if (kind === "comment") return "said";
+  return "observed";
+}
+
+/**
+ * `D45`'s filters — *who, what kind, outcome, signals raised* — plus the range
+ * and the search the two screens this replaces each carried.
+ *
+ * **`outcome` and `signal` are properties of a typed event only**, so either
+ * one selects within `typed` and empties the other two kinds. Stated here
+ * rather than discovered: `D45` names all four filters in one breath and does
+ * not say they are uniform over its own three kinds, and a person filtering by
+ * outcome who then wonders where the dispatches went has been misled by the
+ * chip rather than by the data. The screen says so under the chips.
+ */
+export type StreamFilters = {
+  q?: string;
+  kind?: StreamKind;
+  outcome?: ReportOutcome;
+  signal?: ReportSignal;
+  /** `D45`'s *who*. A list because `daily-activity` folds a whole roster. */
+  who?: string[];
+  from?: string;
+  to?: string;
+};
+
+export type Stream = {
+  events: TimelineEvent[];
+  total: number;
+  page: number;
+  /** `event.key` -> the name of the record the event is about. */
+  subjects: Map<string, string>;
+};
+
+/**
+ * What each event is ABOUT, keyed by `event.key`.
+ *
+ * A timeline is already inside its record, so `gather`'s six sources carry ids
+ * and no names — `companyAddedEvents` says exactly that at the line. The
+ * stream is inside nothing, so a row with no subject is twenty-five rows of
+ * *Dispatched — 340 m²* with nothing to tell them apart.
+ *
+ * **Five small queries over the whole gathered set, never one per row.**
+ * `actorNames` below is the same idiom for people. They run BEFORE the filter
+ * because the search matches the subject, and a name resolved after the slice
+ * could not have been searched on.
+ *
+ * **No visibility filter, deliberately, and it is the precedent rather than an
+ * exception.** Every id here arrived on an event that already passed its own
+ * source's filter, and `reportColumns` in `reports.ts` has always left-joined
+ * `companies` with no filter of its own for this reason: seeing an event
+ * entitles you to know what it is about. What it does not entitle you to is
+ * OPENING that record — a separate question `canOpenRecord` answers, and the
+ * one the row asks before it renders a link `S76`.
+ */
+async function subjectsFor(
+  events: TimelineEvent[],
+): Promise<Map<string, string>> {
+  const subjects = new Map<string, string>();
+  if (events.length === 0) return subjects;
+
+  const unique = (ids: (string | null)[]) => [
+    ...new Set(ids.filter((id): id is string => id !== null)),
+  ];
+
+  // A comment on a contact, a quotation thread or a dispatch sets neither
+  // `companyId` nor `projectId`, so its subject is reached through its anchor.
+  const anchored = events.flatMap((event) =>
+    event.kind === "comment" && !event.companyId && !event.projectId
+      ? [{ key: event.key, anchor: event.comment.anchor }]
+      : [],
+  );
+  const anchorsOf = (type: CommentRecordType) =>
+    unique(
+      anchored
+        .filter((row) => row.anchor.type === type)
+        .map((row) => row.anchor.id),
+    );
+
+  const companyIds = unique(events.map((event) => event.companyId));
+  const projectIds = unique(events.map((event) => event.projectId));
+  const threadIds = anchorsOf("quotation_thread");
+  const dispatchIds = anchorsOf("dispatch");
+  const contactIds = anchorsOf("contact");
+
+  const [companyRows, projectRows, threadRows, dispatchRows, contactRows] =
+    await Promise.all([
+      companyIds.length
+        ? db
+            .select({ id: companies.id, name: companies.name })
+            .from(companies)
+            .where(inArray(companies.id, companyIds))
+        : [],
+      projectIds.length
+        ? db
+            .select({ id: projects.id, name: projects.name })
+            .from(projects)
+            .where(inArray(projects.id, projectIds))
+        : [],
+      threadIds.length
+        ? db
+            .select({ id: quotationThreads.id, name: companies.name })
+            .from(quotationThreads)
+            .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
+            .where(inArray(quotationThreads.id, threadIds))
+        : [],
+      dispatchIds.length
+        ? db
+            .select({ id: dispatches.id, name: companies.name })
+            .from(dispatches)
+            .innerJoin(companies, eq(companies.id, dispatches.companyId))
+            .where(inArray(dispatches.id, dispatchIds))
+        : [],
+      contactIds.length
+        ? db
+            .select({ id: contacts.id, name: contacts.name })
+            .from(contacts)
+            .where(inArray(contacts.id, contactIds))
+        : [],
+    ]);
+
+  const byId = new Map<string, string>();
+  for (const row of [
+    ...companyRows,
+    ...projectRows,
+    ...threadRows,
+    ...dispatchRows,
+    ...contactRows,
+  ]) {
+    byId.set(row.id, row.name);
+  }
+
+  for (const event of events) {
+    const name =
+      (event.companyId ? byId.get(event.companyId) : undefined) ??
+      (event.projectId ? byId.get(event.projectId) : undefined);
+    if (name) subjects.set(event.key, name);
+  }
+  for (const row of anchored) {
+    const name = byId.get(row.anchor.id);
+    if (name) subjects.set(row.key, name);
+  }
+  return subjects;
+}
+
+/**
+ * The search: **the subject's name, or your own note.**
+ *
+ * The name half folds through `normalizeName` on BOTH sides, which is what
+ * `/reports` did not do — `WORKFLOW §5` carried the row, and the gap was
+ * measured rather than argued: against the seeded fixture the folded form of
+ * `مؤسسه` found **0 -> 24** reports, `شركه ابراج الشمال` **0 -> 1** and
+ * `انماء` **0 -> 1**, while the already-matching `مؤسسة`,
+ * `شركة أبراج الشمال` and `أنماء` were unchanged at 24, 1 and 1. So the fold
+ * widens without moving anything that worked. Same fold `quotations.ts` and
+ * `dispatches.ts` took, for the same reason: a rep types the name they type.
+ *
+ * The note half stays raw, and it matches a string this viewer has ALREADY
+ * been allowed to hold `S38` — `withNotes` set it to `null` otherwise, before
+ * it left Postgres. **That is stronger than the `ilike` it replaces**, which
+ * had to carry `readableNoteFilter` in its own `or` or hand over the note's
+ * contents by inference: withholding the column and leaving the search open
+ * looks correct and leaks anyway. Here there is no term to forget.
+ *
+ * A note is free text and not a name, so `normalizeName` is not applied to it —
+ * the line `dispatches.ts` draws at its SMAC reference, for the same reason.
+ */
+function matchesQuery(
+  event: TimelineEvent,
+  subject: string | undefined,
+  raw: string,
+  folded: string,
+): boolean {
+  if (subject && normalizeName(subject).includes(folded)) return true;
+  return (
+    event.kind === "report" &&
+    event.report.narrative !== null &&
+    event.report.narrative.toLowerCase().includes(raw)
+  );
+}
+
+/**
+ * `gather`, filtered — the set both arrangements read `D30`.
+ *
+ * **Every filter is resolved before anything is paged**, which is the half of
+ * `CLAUDE.md`'s rule that decides correctness here: the count and the page
+ * come out of one set, so a filtered stream can never report a total its pages
+ * disagree with. The gather itself reads and sorts in TypeScript, which is old
+ * and deliberate — the header of this file argues it — because six sources
+ * each composing their own filter is what stops one misplaced `or` widening
+ * all six. Measured on the seeded database: **474 events all-time** across the
+ * six, for the identity that can see every one of them.
+ */
+async function filteredStream(
+  session: AuthSession,
+  filters: StreamFilters,
+): Promise<{ events: TimelineEvent[]; subjects: Map<string, string> }> {
+  const range =
+    filters.from && filters.to
+      ? { from: filters.from, to: filters.to }
+      : undefined;
+
+  const all = await gather(session, {}, range);
+  const subjects = await subjectsFor(all);
+
+  const who = filters.who ? new Set(filters.who) : null;
+  const raw = filters.q?.trim().toLowerCase();
+  const folded = raw ? normalizeName(raw) : undefined;
+
+  const events = all.filter((event) => {
+    if (who && (event.actorUserId === null || !who.has(event.actorUserId))) {
+      return false;
+    }
+    if (filters.kind && streamKindOf(event.kind) !== filters.kind) return false;
+    if (
+      filters.outcome &&
+      (event.kind !== "report" || event.report.outcome !== filters.outcome)
+    ) {
+      return false;
+    }
+    if (
+      filters.signal &&
+      (event.kind !== "report" ||
+        !event.report.signals.some((row) => row.signal === filters.signal))
+    ) {
+      return false;
+    }
+    if (raw && folded !== undefined) {
+      return matchesQuery(event, subjects.get(event.key), raw, folded);
+    }
+    return true;
+  });
+
+  return { events, subjects };
+}
+
+/**
+ * One stream `D45`, paged `D24`.
+ *
+ * **No default range** `D45`. The two screens this replaces opened on
+ * yesterday, which is one report on the seeded database — a screen called a
+ * stream that opens on two rows reads as broken. `from`/`to` are the
+ * narrowing, and they are native date inputs `D20`.
+ */
+export async function streamFor(
+  session: AuthSession,
+  filters: StreamFilters = {},
+  options: { page?: number } = {},
+): Promise<Stream> {
+  const { events, subjects } = await filteredStream(session, filters);
+  const page = Math.max(1, options.page ?? 1);
+  const start = (page - 1) * TIMELINE_PAGE_SIZE;
+  return {
+    events: events.slice(start, start + TIMELINE_PAGE_SIZE),
+    total: events.length,
+    page,
+    subjects,
+  };
+}
+
+/**
+ * The same filtered set with no page taken off it — what `by-rep` folds `D30`.
+ *
+ * `by-rep` is a **count of the stream**, not a second reading of it: one row
+ * per measured person, each column summing events that are already on the
+ * screen under `?view=stream`. So it takes the events and nothing else, and
+ * `daily-activity.ts` groups them.
+ */
+export async function streamEvents(
+  session: AuthSession,
+  filters: StreamFilters = {},
+): Promise<TimelineEvent[]> {
+  return (await filteredStream(session, filters)).events;
 }
 
 /** Names for a set of actors, for a screen that groups by person. */

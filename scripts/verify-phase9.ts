@@ -86,17 +86,12 @@ import {
 } from "@/lib/authz";
 import { coverage, coverageRepOptions, daysBetween } from "@/lib/coverage";
 import { normalizeName } from "@/lib/normalize";
-import {
-  dailyActivity,
-  dailyActivityEntries,
-  yesterday,
-} from "@/lib/daily-activity";
+import { dailyActivity } from "@/lib/daily-activity";
 import { REPORT_OUTCOMES, SAUDI_CODE } from "@/lib/enums";
 import { listCountries } from "@/lib/lookups";
 import {
   createReport,
   getReport,
-  listReports,
   onHoldByCompany,
   today,
   updateReport,
@@ -111,11 +106,73 @@ import {
   companyTimeline,
   eventsInRange,
   projectTimeline,
+  streamEvents,
+  streamFor,
   TIMELINE_CARD_LIMIT,
+  type StreamFilters,
 } from "@/lib/timeline";
 
 import { addDispatchLine } from "./dispatch-fixture";
 import { addQuotationLineRow } from "./quotation-fixture";
+
+/**
+ * The typed half of the stream, unpaginated — what `listReports` used to be.
+ *
+ * `D45` made *what happened* one stream and session 27 deleted `listReports`
+ * and `reportsInRange` with the screen that called them. The assertions below
+ * are `S38` and `S40`'s disclosure guard and are the last thing that should
+ * have gone with it, so they ask the same questions of the reader that
+ * replaced it. `streamEvents` is unpaginated on purpose here: the stream's own
+ * page holds twenty-five EVENTS of six kinds, where the old list held
+ * twenty-five reports, so paging would make an absent row ambiguous between
+ * *withheld* and *on page two* — which is exactly what these checks exist to
+ * tell apart.
+ */
+type StreamReport = {
+  id: string;
+  companyId: string | null;
+  projectId: string | null;
+  narrative: string | null;
+};
+
+async function reportsIn(
+  session: AuthSession,
+  filters: StreamFilters = {},
+): Promise<StreamReport[]> {
+  const events = await streamEvents(session, { ...filters, kind: "typed" });
+  return events.flatMap((event) =>
+    event.kind === "report" && event.link?.type === "report"
+      ? [
+          {
+            id: event.link.id,
+            companyId: event.companyId,
+            projectId: event.projectId,
+            narrative: event.report.narrative,
+          },
+        ]
+      : [],
+  );
+}
+
+/** The same, scoped to one company — `listReports({ companyId })`'s question. */
+async function reportsOnCompany(
+  session: AuthSession,
+  companyId: string,
+): Promise<StreamReport[]> {
+  const { events } = await companyTimeline(session, companyId);
+  return events.flatMap((event) =>
+    event.kind === "report" && event.link?.type === "report"
+      ? [
+          {
+            id: event.link.id,
+            companyId: event.companyId,
+            projectId: event.projectId,
+            narrative: event.report.narrative,
+          },
+        ]
+      : [],
+  );
+}
 
 let failures = 0;
 
@@ -840,7 +897,7 @@ async function main(): Promise<void> {
   );
   check(
     "the old outcome is GONE — counts cannot read both",
-    !(await listReports(author, { outcome: "discussed_pricing" })).rows.some(
+    !(await reportsIn(author, { outcome: "discussed_pricing" })).some(
       (row) => row.id === reportA.id,
     ),
   );
@@ -1342,17 +1399,30 @@ async function main(): Promise<void> {
     (await dailyActivity(silent, { range })).rows.length === 1 &&
       withNote.rows.length > 1,
   );
-  const expanded = await dailyActivityEntries(manager, authorUser.id, range);
+  // `D30` — expanding a rep IS the stream filtered to them, and `by-rep` is
+  // an arrangement of it rather than a second screen inside it. The old
+  // `dailyActivityEntries` re-ran the union for one person and rendered the
+  // result under the counts table; this is the same events at a URL somebody
+  // can be sent.
+  const expanded = await streamFor(manager, {
+    who: [authorUser.id],
+    from: range.from,
+    to: range.to,
+  });
   check(
-    "expanding a rep returns the same entries the timeline would",
-    expanded.every((event) => event.actorUserId === authorUser.id) &&
-      expanded.some((event) => event.key === `report:${fieldNote.id}`),
+    "*** expanding a rep is the stream filtered to them, and returns the same entries ***",
+    expanded.events.every((event) => event.actorUserId === authorUser.id) &&
+      expanded.events.some((event) => event.key === `report:${fieldNote.id}`),
   );
+  // `D45` gives the stream NO default range, so `defaultRange`/`yesterday`
+  // went with the screen that opened on yesterday. What replaces the check is
+  // that an unranged stream is not silently empty and is a superset of a
+  // ranged one — the property the default was standing in for.
+  const unranged = await streamFor(manager, {}, { page: 1 });
   check(
-    "yesterday is the default range and is a calendar day",
-    /^\d{4}-\d{2}-\d{2}$/.test(yesterday()) &&
-      daysBetween(yesterday(), today()) === 1,
-    `got ${yesterday()}`,
+    "*** the stream has no default range: unranged is a superset of one day ***",
+    unranged.total >= expanded.total && unranged.total > 0,
+    `unranged ${unranged.total}, one day ${expanded.total}`,
   );
 
   /* --- 14. Attribution — whoever performed it [20 §8] -------------- */
@@ -1408,16 +1478,16 @@ async function main(): Promise<void> {
 
   console.log("\n15. Visibility follows the anchor, and the negative half matters most");
 
-  const sharerReports = await listReports(sharer, {});
+  const sharerReports = await reportsIn(sharer, {});
   check(
     "a rep sharing the company sees a company-level report on it",
-    sharerReports.rows.some((row) => row.id === misfiled.id) === false &&
-      sharerReports.rows.some((row) => row.companyId === companyA.id),
+    sharerReports.some((row) => row.id === misfiled.id) === false &&
+      sharerReports.some((row) => row.companyId === companyA.id),
   );
   check(
     "*** but NOT the one naming a project they cannot open [04 Q7], [20 §10] ***",
-    !sharerReports.rows.some((row) => row.id === reportA.id),
-    `saw ${sharerReports.rows.filter((row) => row.id === reportA.id).length}`,
+    !sharerReports.some((row) => row.id === reportA.id),
+    `saw ${sharerReports.filter((row) => row.id === reportA.id).length}`,
   );
   check(
     "and cannot open it directly either",
@@ -1436,7 +1506,7 @@ async function main(): Promise<void> {
   check(
     "an unrelated rep sees nothing of any of it",
     (await getReport(stranger, reportA.id)) === null &&
-      (await listReports(stranger, {})).rows.length === 0,
+      (await reportsIn(stranger, {})).length === 0,
   );
   check(
     "no `rep_report` value was added to ViewableRecordType [20 §13]",
@@ -1482,10 +1552,10 @@ async function main(): Promise<void> {
   );
   check(
     "the list says the same as the detail, for both viewers [S38]",
-    (await listReports(sharer, { companyId: companyA.id })).rows.find(
+    (await reportsOnCompany(sharer, companyA.id)).find(
       (row) => row.id === noted.id,
     )?.narrative === null &&
-      (await listReports(author, { companyId: companyA.id })).rows.find(
+      (await reportsOnCompany(author, companyA.id)).find(
         (row) => row.id === noted.id,
       )?.narrative !== null,
   );
@@ -1495,29 +1565,39 @@ async function main(): Promise<void> {
      withheld: `/reports` `ilike`s the narrative, so an open search hands over
      the note's contents by inference without ever rendering a word of it. */
 
-  const authorSearch = await listReports(author, { q: noteToken });
-  const managerSearch = await listReports(manager, { q: noteToken });
-  const sharerSearch = await listReports(sharer, { q: noteToken });
+  const authorSearch = await reportsIn(author, { q: noteToken });
+  const managerSearch = await reportsIn(manager, { q: noteToken });
+  const sharerSearch = await reportsIn(sharer, { q: noteToken });
 
   check(
     "the author searching a word of their own note finds it [S38]",
-    authorSearch.rows.length === 1 && authorSearch.rows[0].id === noted.id,
-    `got ${authorSearch.rows.length}`,
+    authorSearch.length === 1 && authorSearch[0].id === noted.id,
+    `got ${authorSearch.length}`,
   );
   check(
     "anyone who sees all reps searching the same word finds it [S38]",
-    managerSearch.rows.some((row) => row.id === noted.id),
+    managerSearch.some((row) => row.id === noted.id),
   );
   check(
     "*** and the shared rep searching it gets NOTHING [S38] ***",
-    sharerSearch.rows.length === 0,
-    `got ${sharerSearch.rows.length}`,
+    sharerSearch.length === 0,
+    `got ${sharerSearch.length}`,
   );
   check(
     "*** and that zero is the SEARCH being gated, not the row being hidden — the same rep sees it by company ***",
-    (await listReports(sharer, { companyId: companyA.id })).rows.some(
+    (await reportsOnCompany(sharer, companyA.id)).some(
       (row) => row.id === noted.id,
     ),
+  );
+  // The gate MOVED in session 27 and got stronger, so assert the new shape
+  // rather than trusting the old one: the search no longer composes
+  // `readableNoteFilter` into an `ilike`, it matches a string `withNotes` has
+  // already withheld. There is no term left to forget.
+  check(
+    "*** the shared rep's copy of that row carries no note to have matched [S38] ***",
+    (await reportsOnCompany(sharer, companyA.id)).find(
+      (row) => row.id === noted.id,
+    )?.narrative === null,
   );
 
   // The audit-sourced half, asserted on its own `[20 §8.2]`.
@@ -1553,9 +1633,7 @@ async function main(): Promise<void> {
 
   check(
     "the newly assigned rep already sees company A's reports",
-    (await listReports(silent, {})).rows.some(
-      (row) => row.companyId === companyA.id,
-    ),
+    (await reportsIn(silent, {})).some((row) => row.companyId === companyA.id),
   );
   await db
     .update(companyReps)
@@ -1568,9 +1646,7 @@ async function main(): Promise<void> {
     );
   check(
     "removing the membership takes the reports with it — no bucket needed [20 §10]",
-    !(await listReports(silent, {})).rows.some(
-      (row) => row.companyId === companyA.id,
-    ),
+    !(await reportsIn(silent, {})).some((row) => row.companyId === companyA.id),
   );
   const stillAuthored = await db
     .select({ userId: repReports.userId })
@@ -1587,10 +1663,10 @@ async function main(): Promise<void> {
   // in the read predicate, which used to hang a rep's own interactions off
   // LIVE membership — so a handover took their own words away the moment it
   // stamped `company_reps.removed_at`.
-  const authorHeld = await listReports(author, { companyId: companyA.id });
+  const authorHeld = await reportsOnCompany(author, companyA.id);
   check(
     "before: the author sees their own reports on company A",
-    authorHeld.rows.length > 0,
+    authorHeld.length > 0,
   );
   await db
     .update(companyReps)
@@ -1616,15 +1692,15 @@ async function main(): Promise<void> {
         isNull(companyReps.removedAt),
       ),
     );
-  const authorKept = await listReports(author, { companyId: companyA.id });
+  const authorKept = await reportsOnCompany(author, companyA.id);
   check(
     "*** a rep who leaves the company KEEPS their own reports [S40] ***",
-    authorKept.rows.length === authorHeld.rows.length,
-    `held ${authorHeld.rows.length}, kept ${authorKept.rows.length}`,
+    authorKept.length === authorHeld.length,
+    `held ${authorHeld.length}, kept ${authorKept.length}`,
   );
   check(
     "including the note, which was always theirs [S38]",
-    authorKept.rows.some((row) => row.narrative !== null),
+    authorKept.some((row) => row.narrative !== null),
   );
   check(
     "and a field note, which never had an anchor to lose [S40]",

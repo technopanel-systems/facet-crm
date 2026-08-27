@@ -32,8 +32,9 @@
  *  7. **Two halves, with different visibility `[S38]`.** *What happened* —
  *     channel, outcome, project, signals — goes to whoever can see the record,
  *     including through a share. *The note* goes to its author and to anyone
- *     who sees all reps. `listColumns` therefore does not name `narrative`;
- *     `withNotes` fetches it separately for the rows that may carry it.
+ *     who sees all reps. `reportColumns` therefore does not name `narrative`;
+ *     `withNotes` fetches it separately for the rows that may carry it, and
+ *     both attachment queries are exported for `timeline.ts` `D45`.
  *  8. **No permission flag `[20 §13]`.** Every rep logs; the only identity
  *     question is authorship on edit. Reads compose
  *     `visibleRepReportsFilter` — a report follows its anchor `[20 §10]`,
@@ -48,7 +49,7 @@
  * `20 §9`'s "never double-count" requires it.
  */
 
-import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -119,8 +120,6 @@ export {
 };
 export type { FieldNoteCategory, ReportChannel, ReportEntryType, ReportOutcome, ReportSignal };
 
-const PAGE_SIZE = 25;
-
 /** A signal and, optionally, the thing it points at `[20 §4]`. */
 export type SignalInput = {
   signal: ReportSignal;
@@ -154,7 +153,7 @@ export type ReportSignalRow = {
   reference: string | null;
 };
 
-export type ReportListRow = {
+export type ReportRow = {
   id: string;
   entryType: ReportEntryType;
   reportDate: string;
@@ -178,7 +177,7 @@ export type ReportListRow = {
   createdAt: Date;
 };
 
-export type ReportDetail = ReportListRow & {
+export type ReportDetail = ReportRow & {
   contactId: string | null;
   cityId: string | null;
   /** Whether the viewer may open the anchor's own record `[16 §10]` shape. */
@@ -515,92 +514,19 @@ export async function updateReport(
  * ------------------------------------------------------------------ */
 
 /**
- * Search reaches the note only where the viewer may read it `[S38]`.
- *
- * Without `readableNoteFilter` here, a rep who holds the company through a
- * share could binary-search another rep's private note by content without ever
- * seeing it rendered. Withholding the column from the select and leaving this
- * `ilike` open looks correct and leaks anyway. The company-name half is
- * unrestricted — the row itself was never the secret.
- */
-function searchFilter(session: AuthSession, query: string | undefined) {
-  const trimmed = query?.trim();
-  if (!trimmed) return undefined;
-  const pattern = `%${trimmed}%`;
-  return or(
-    and(readableNoteFilter(session), ilike(repReports.narrative, pattern)),
-    ilike(companies.name, pattern),
-  );
-}
-
-export type ReportListOptions = {
-  q?: string;
-  entryType?: ReportEntryType;
-  outcome?: ReportOutcome;
-  companyId?: string;
-  projectId?: string;
-  userId?: string;
-  from?: string;
-  to?: string;
-  page?: number;
-};
-
-export async function listReports(
-  session: AuthSession,
-  options: ReportListOptions = {},
-): Promise<{ rows: ReportListRow[]; total: number; page: number }> {
-  const page = Math.max(1, options.page ?? 1);
-
-  // The visibility filter is the FIRST term, and the same `where` feeds the
-  // count, so the total can never disagree with the page.
-  const where = and(
-    visibleRepReportsFilter(session),
-    searchFilter(session, options.q),
-    options.entryType ? eq(repReports.entryType, options.entryType) : undefined,
-    options.outcome ? eq(repReports.outcome, options.outcome) : undefined,
-    options.companyId ? eq(repReports.companyId, options.companyId) : undefined,
-    options.projectId ? eq(repReports.projectId, options.projectId) : undefined,
-    options.userId ? eq(repReports.userId, options.userId) : undefined,
-    options.from ? gte(repReports.reportDate, options.from) : undefined,
-    options.to ? lte(repReports.reportDate, options.to) : undefined,
-  );
-
-  const rows = await db
-    .select(listColumns)
-    .from(repReports)
-    .innerJoin(users, eq(users.id, repReports.userId))
-    .leftJoin(companies, eq(companies.id, repReports.companyId))
-    .leftJoin(projects, eq(projects.id, repReports.projectId))
-    .leftJoin(contacts, eq(contacts.id, repReports.contactId))
-    .leftJoin(cities, eq(cities.id, repReports.cityId))
-    .where(where)
-    .orderBy(desc(repReports.reportDate), desc(repReports.createdAt))
-    .limit(PAGE_SIZE)
-    .offset((page - 1) * PAGE_SIZE);
-
-  const [totals] = await db
-    .select({ total: count() })
-    .from(repReports)
-    .innerJoin(users, eq(users.id, repReports.userId))
-    .leftJoin(companies, eq(companies.id, repReports.companyId))
-    .where(where);
-
-  return {
-    rows: await withNotes(session, await withSignals(rows)),
-    total: totals?.total ?? 0,
-    page,
-  };
-}
-
-/**
  * The *what happened* half `[S38]`, and only that.
  *
  * `narrative` is deliberately absent: every reader of this object composes
  * `withNotes`, which fetches the note in a second query narrowed to the rows
  * whose note the viewer may read. A withheld note is never named in the select
  * that builds someone's page, so it does not leave Postgres.
+ *
+ * **One reader, since session 27.** `listReports` and `reportsInRange` are
+ * gone: `D45` makes *what happened* ONE stream, and `timeline.ts` is the one
+ * that reads it. What is left here is the single-row read behind
+ * `/reports/[id]`, which is `D47`'s screen and not a list.
  */
-const listColumns = {
+const reportColumns = {
   id: repReports.id,
   entryType: repReports.entryType,
   reportDate: repReports.reportDate,
@@ -620,11 +546,21 @@ const listColumns = {
   createdAt: repReports.createdAt,
 } as const;
 
-type BareRow = Omit<ReportListRow, "signals" | "narrative">;
-type SignalledRow = BareRow & { signals: ReportSignalRow[] };
+/**
+ * The two attachment queries below are **generic over the row**, and that is
+ * `D45` in the type system: since session 27 they serve two callers with
+ * different row shapes — `getReport` here, and `reportEvents` in
+ * `timeline.ts`, which is the stream's one report reader. Copying either into
+ * `timeline.ts` would have put `S38`'s note gate in two places, which is the
+ * one place in this codebase a second copy is a disclosure defect rather than
+ * duplication.
+ */
+type Identified = { id: string };
 
 /** One extra query for the whole page, rather than one per row. */
-async function withSignals(rows: BareRow[]): Promise<SignalledRow[]> {
+export async function withSignals<T extends Identified>(
+  rows: T[],
+): Promise<(T & { signals: ReportSignalRow[] })[]> {
   if (rows.length === 0) return [];
 
   const found = await db
@@ -657,17 +593,17 @@ async function withSignals(rows: BareRow[]): Promise<SignalledRow[]> {
  *
  * One extra query for the whole page, the same shape as `withSignals` — and
  * the reason the split is not a `case … end` in the SELECT list: a Drizzle
- * `sql` template drops the table qualifier there, silently, and `listColumns`
+ * `sql` template drops the table qualifier there, silently, and `reportColumns`
  * is used under five joins. Selecting the column in a separate single-table
  * statement narrowed by `readableNoteFilter` is both safe and literal: the
  * note a viewer may not read is never named in a select they run.
  *
  * A row with no match gets `null` — withheld, not empty.
  */
-async function withNotes(
+export async function withNotes<T extends Identified>(
   session: AuthSession,
-  rows: SignalledRow[],
-): Promise<ReportListRow[]> {
+  rows: T[],
+): Promise<(T & { narrative: string | null })[]> {
   if (rows.length === 0) return [];
 
   const readable = await db
@@ -690,49 +626,13 @@ async function withNotes(
   }));
 }
 
-/**
- * Every visible report in a date range, unpaginated.
- *
- * The daily view counts them and has no page to show, and running it through
- * `listReports` would mean reassembling pages to reach a total — two readings
- * of the same set, which is how a count and a list start disagreeing. Same
- * filter, same `authz` predicate, no second copy of the rule.
- */
-export async function reportsInRange(
-  session: AuthSession,
-  range: { from: string; to: string },
-  userIds?: string[],
-): Promise<ReportListRow[]> {
-  if (userIds && userIds.length === 0) return [];
-
-  const rows = await db
-    .select(listColumns)
-    .from(repReports)
-    .innerJoin(users, eq(users.id, repReports.userId))
-    .leftJoin(companies, eq(companies.id, repReports.companyId))
-    .leftJoin(projects, eq(projects.id, repReports.projectId))
-    .leftJoin(contacts, eq(contacts.id, repReports.contactId))
-    .leftJoin(cities, eq(cities.id, repReports.cityId))
-    .where(
-      and(
-        visibleRepReportsFilter(session),
-        gte(repReports.reportDate, range.from),
-        lte(repReports.reportDate, range.to),
-        userIds ? inArray(repReports.userId, userIds) : undefined,
-      ),
-    )
-    .orderBy(desc(repReports.reportDate), desc(repReports.createdAt));
-
-  return withNotes(session, await withSignals(rows));
-}
-
 export async function getReport(
   session: AuthSession,
   id: string,
 ): Promise<ReportDetail | null> {
   const [row] = await db
     .select({
-      ...listColumns,
+      ...reportColumns,
       contactId: repReports.contactId,
       cityId: repReports.cityId,
     })

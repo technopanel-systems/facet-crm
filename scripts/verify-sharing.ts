@@ -100,12 +100,52 @@ import {
   issueVersion,
   listQuotationThreads,
 } from "@/lib/quotations";
-import { createReport, getReport, listReports, today } from "@/lib/reports";
+import { createReport, getReport, today } from "@/lib/reports";
+import { streamEvents, type StreamFilters } from "@/lib/timeline";
 import { addComment } from "@/lib/comments";
 import { grantShare, listShares, revokeShare, shareableUsers } from "@/lib/sharing";
 
 import { addDispatchLine } from "./dispatch-fixture";
 import { ROLE_SEED } from "./seed/roles";
+
+/**
+ * The typed half of the stream, unpaginated — what `listReports` used to be.
+ *
+ * `D45` made *what happened* one stream and session 27 deleted `listReports`
+ * and `reportsInRange` with the screen that called them. The assertions below
+ * are `S38` and `S40`'s disclosure guard and are the last thing that should
+ * have gone with it, so they ask the same questions of the reader that
+ * replaced it. `streamEvents` is unpaginated on purpose here: the stream's own
+ * page holds twenty-five EVENTS of six kinds, where the old list held
+ * twenty-five reports, so paging would make an absent row ambiguous between
+ * *withheld* and *on page two* — which is exactly what these checks exist to
+ * tell apart.
+ */
+type StreamReport = {
+  id: string;
+  companyId: string | null;
+  projectId: string | null;
+  narrative: string | null;
+};
+
+async function reportsIn(
+  session: AuthSession,
+  filters: StreamFilters = {},
+): Promise<StreamReport[]> {
+  const events = await streamEvents(session, { ...filters, kind: "typed" });
+  return events.flatMap((event) =>
+    event.kind === "report" && event.link?.type === "report"
+      ? [
+          {
+            id: event.link.id,
+            companyId: event.companyId,
+            projectId: event.projectId,
+            narrative: event.report.narrative,
+          },
+        ]
+      : [],
+  );
+}
 
 let failures = 0;
 
@@ -702,7 +742,7 @@ async function main(): Promise<void> {
   );
   check(
     "visibleRepReportsFilter, company-level half [20 §10]",
-    (await listReports(repB, { q: stamp })).rows.some(
+    (await reportsIn(repB, { q: stamp })).some(
       (row) => row.id === companyReport.id,
     ),
   );
@@ -727,7 +767,7 @@ async function main(): Promise<void> {
   );
   check(
     "*** and NOT the project-level report, which needs the project too [04 Q7] ***",
-    !(await listReports(repB, { q: stamp })).rows.some(
+    !(await reportsIn(repB, { q: stamp })).some(
       (row) => row.id === projectReport.id,
     ),
   );
@@ -763,7 +803,7 @@ async function main(): Promise<void> {
   );
   check(
     "visibleRepReportsFilter, project-level half — now BOTH terms pass [20 §10]",
-    (await listReports(repB, { q: stamp })).rows.some(
+    (await reportsIn(repB, { q: stamp })).some(
       (row) => row.id === projectReport.id,
     ),
   );

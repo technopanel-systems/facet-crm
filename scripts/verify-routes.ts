@@ -112,6 +112,12 @@
  *      unapproved request `S73`, the rep column blank on the reader's own rows
  *      `D2`, and in Arabic the DOM order is identical to English `D57`.
  *
+ *  25. **The stream** `D45` `D30` `D3` — `/activity` with no parameter is
+ *      the stream; `?view=by-rep` is the same events counted. The three kinds
+ *      partition it exactly, which is the one assertion that can tell *one
+ *      query, three arrangements* from three screens that agree by accident.
+ *      A field note is found IN it, which is what closes `D3`.
+ *
  *  23. **Operability** `D20` — for every form this walk reaches, in either
  *      locale, as any of the three identities: each field the screen says its
  *      action requires is present as a **native, focusable control carrying
@@ -531,7 +537,9 @@ const STATIC_ROUTES = [
   "/quotations/new",
   "/dispatches",
   "/dispatches/new",
-  "/reports",
+  // `/reports` went with `D45` in session 27 — *"what happened" is one
+  // stream*, and `/activity` is it. `/reports/new` and `/reports/[id]` stay:
+  // they are `S32`'s log form and `D47`'s note, not a list.
   "/reports/new",
   "/activity",
   "/follow-ups",
@@ -648,6 +656,9 @@ const MARKERS: Record<string, readonly string[]> = {
     'name="countryId"',
   ],
   "/reports/new": ['data-slot="form-shell"'],
+  // `D45` — the filter column, and `D24`'s day groups. Section 25 does the
+  // arithmetic; these are the frame.
+  "/activity": ['data-slot="stream-filters"', 'data-slot="stream-day"'],
   // `/coverage` carried this marker until feature slice 6 moved the table
   // it comes from onto `/performance` and deleted the route `[26 §2]`.
   //
@@ -710,6 +721,15 @@ const COMMENTABLE = new Set([
   "dispatches",
 ]);
 
+/**
+ * Where a section's ids are found, when that is not `/<section>`.
+ *
+ * `reports` has no list of its own since session 27 `D45`. The stream carries
+ * `/reports/<id>` on every typed row — `timeline.tsx`'s `hrefFor` — so it is
+ * where a report id comes from now, and `firstId`'s pattern is unchanged.
+ */
+const LIST_ROUTE: Record<string, string> = { reports: "activity" };
+
 async function walkRecords(jar: Jar, email: string): Promise<void> {
   // `/users/[id]/handover` is deliberately absent: `19 §3` opens it only AFTER
   // deactivation, and `team.ts:141` returns null for a user who is still
@@ -726,7 +746,7 @@ async function walkRecords(jar: Jar, email: string): Promise<void> {
   ];
 
   for (const [section, suffixes] of sections) {
-    const list = await get(jar, `/en/${section}`);
+    const list = await get(jar, `/en/${LIST_ROUTE[section] ?? section}`);
     if (list.status !== 200) continue;
     const id = firstId(list.body, section);
     if (id === null) {
@@ -5753,6 +5773,247 @@ async function main(): Promise<void> {
         );
       }
     }
+  }
+
+  /* ── 25 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n25. The stream — one query, three arrangements, and a field note that is finally read [D45], [D30], [D3]",
+  );
+  {
+    const jar = jars["manager@example.test"];
+
+    // `D70`'s *states its total*, made assertable: `ListCard` carries it, so a
+    // filtered stream can be compared against an unfiltered one without
+    // counting rows that a page may have cut off. `attrOf` reads the attribute
+    // off the tag carrying the slot — never `after()`, which takes the slot
+    // NAME and builds `data-slot="…"` itself, so handing it the whole
+    // attribute searches for a nested one, finds nothing and answers -1 for
+    // every page alike. That failure is silent in the direction that matters:
+    // -1 <= -1 is true, so a comparison between two of them PASSES.
+    const totalOf = (body: string) =>
+      Number(attrOf(body, "list-card", "data-total") ?? "-1");
+    const count = (body: string, marker: string) =>
+      body.split(marker).length - 1;
+
+    for (const locale of ["en", "ar"]) {
+      const base = await get(jar, `/${locale}/activity`);
+      check(
+        `${locale}: /activity is the stream with no parameter [D30]`,
+        base.status === 200 &&
+          base.body.includes('data-slot="stream-day"') &&
+          base.body.includes('data-slot="stream-filters"'),
+        `status ${base.status}`,
+      );
+      check(
+        `${locale}: the old /reports list is gone [D45]`,
+        (await get(jar, `/${locale}/reports`)).status === 404,
+      );
+      check(
+        `${locale}: but the log form and a report's own page are not`,
+        (await get(jar, `/${locale}/reports/new`)).status === 200,
+      );
+
+      const all = totalOf(base.body);
+      check(`${locale}: the stream has rows to reason about`, all > 0, `${all}`);
+
+      /*
+       * **The one assertion that separates one query from three that agree.**
+       * `D45` gives the stream three kinds and `D30` three arrangements of ONE
+       * query; if typed + observed + said does not equal the unfiltered total,
+       * either a kind is being dropped or an event is being counted twice, and
+       * no amount of the screen looking right would show it.
+       */
+      const kinds = ["typed", "observed", "said"] as const;
+      const perKind: number[] = [];
+      for (const kind of kinds) {
+        const body = (await get(jar, `/${locale}/activity?kind=${kind}`)).body;
+        const total = totalOf(body);
+        perKind.push(total);
+        check(
+          `  ${locale}: ?kind=${kind} renders only that kind`,
+          total === 0 ||
+            count(body, 'data-stream-kind="') ===
+              count(body, `data-stream-kind="${kind}"`),
+          `${count(body, 'data-stream-kind="')} rows, ${count(body, `data-stream-kind="${kind}"`)} of them ${kind}`,
+        );
+      }
+      check(
+        `*** ${locale}: the three kinds PARTITION the stream — one query, not three [D45] ***`,
+        perKind.reduce((sum, n) => sum + n, 0) === all,
+        `${perKind.join(" + ")} against ${all}`,
+      );
+
+      /*
+       * `D3` — *a field note reaches no timeline*. `S33` allows an entry
+       * anchored to nobody and `timeline.ts` scoped reports by company or
+       * project, so the work was logged and read by nobody. The stream is
+       * unscoped, so it is the one place a field note lands.
+       */
+      const typed = (await get(jar, `/${locale}/activity?kind=typed`)).body;
+      check(
+        `  ${locale}: an interaction is on the first page of typed entries`,
+        typed.includes('data-entry-type="interaction"'),
+      );
+      check(
+        `  ${locale}: a typed row links to the report it came from`,
+        new RegExp(`href="/${locale}/reports/[0-9a-f-]{36}"`).test(typed),
+      );
+
+      /*
+       * **Paged, with a stated cap, and it is not caution.** Every verify
+       * script writes reports dated TODAY and the stream is newest-first, so
+       * page one of typed entries is residue on any database this suite has
+       * run against more than once — the wall `§17` already hit from the other
+       * end and `§5` counts. `seed:demo`'s field notes are dated in the past,
+       * so a one-page check would go green on a fresh seed and red for ever
+       * after, which is a check nobody would trust the second time. Six pages
+       * is 150 typed entries against the seed's 129 reports; if it is not
+       * found in those, the count is REPORTED rather than the check quietly
+       * passing on the last page it managed to read.
+       */
+      const FIELD_NOTE_PAGES = 6;
+      let foundOn = 0;
+      for (let page = 1; page <= FIELD_NOTE_PAGES && foundOn === 0; page++) {
+        const body = (
+          await get(jar, `/${locale}/activity?kind=typed&page=${page}`)
+        ).body;
+        if (body.includes('data-entry-type="field_note"')) foundOn = page;
+        if (!body.includes('data-entry-type="')) break;
+      }
+      check(
+        `*** ${locale}: a field note is IN the stream — D3 closes here [D3], [S33] ***`,
+        foundOn > 0,
+        `not found in the first ${FIELD_NOTE_PAGES} pages of typed entries — re-run \`npm run seed:demo\``,
+      );
+
+      /*
+       * An outcome and a signal belong to a typed event, so each narrows
+       * WITHIN typed and never past it. The screen says so in its own line;
+       * this asserts the line is telling the truth.
+       */
+      const outcomeBody = (
+        await get(jar, `/${locale}/activity?outcome=catalogue_sent`)
+      ).body;
+      check(
+        `  ${locale}: ?outcome narrows within typed and says so`,
+        totalOf(outcomeBody) >= 0 &&
+          totalOf(outcomeBody) <= perKind[0] &&
+          outcomeBody.includes('data-slot="stream-typed-only"') &&
+          count(outcomeBody, 'data-stream-kind="observed"') === 0,
+        `${totalOf(outcomeBody)} against typed ${perKind[0]}`,
+      );
+
+      /*
+       * `D59` — a chip that drops the rest of the narrowing sends the reader
+       * to a list that silently holds other rows. Every control here is a link
+       * or a GET form and all of them must carry what is already set.
+       */
+      const narrowed = await get(
+        jar,
+        `/${locale}/activity?kind=typed&outcome=catalogue_sent`,
+      );
+      check(
+        `  ${locale}: the view chips carry the current filters [D59]`,
+        narrowed.body.includes("kind=typed") &&
+          narrowed.body.includes("outcome=catalogue_sent") &&
+          narrowed.body.includes("view=by-rep"),
+      );
+
+      /*
+       * `D30` — *by-rep* is an ARRANGEMENT of the same query. It renders the
+       * counts table and no stream rows, and its per-person link is the
+       * stream's own `who` filter rather than a second screen underneath it.
+       */
+      const byRep = await get(jar, `/${locale}/activity?view=by-rep`);
+      check(
+        `${locale}: ?view=by-rep is the counts table and not the stream [D30]`,
+        byRep.status === 200 &&
+          !byRep.body.includes('data-slot="stream-day"') &&
+          byRep.body.includes('data-slot="list-card"'),
+        `status ${byRep.status}`,
+      );
+      check(
+        `*** ${locale}: a rep's row leads back INTO the stream, not to a second screen [D45] ***`,
+        /href="[^"]*activity\?[^"]*who=[0-9a-f-]{36}/.test(byRep.body),
+      );
+      check(
+        `  ${locale}: a person who did nothing still has a row [S42]`,
+        totalOf(byRep.body) > 1,
+        `${totalOf(byRep.body)} rows`,
+      );
+
+      /*
+       * `D52` and `D60` — an empty list says what would make it non-empty and
+       * offers the action, and it sits OUTSIDE the card, where a pagination
+       * footer would make it read as a broken page rather than an empty one.
+       * A search nothing can match is the only way to reach that state on a
+       * seeded database, and a state nothing drives is a state nobody has
+       * seen.
+       */
+      const empty = await get(
+        jar,
+        `/${locale}/activity?q=zzzz-nothing-matches-this`,
+      );
+      check(
+        `  ${locale}: a search that matches nothing renders the empty state [D52]`,
+        empty.status === 200 &&
+          !empty.body.includes('data-slot="list-card"') &&
+          !empty.body.includes('data-slot="stream-day"'),
+        `status ${empty.status}`,
+      );
+      check(
+        `  ${locale}: …outside the card, and it offers the way out [D52], [D60]`,
+        empty.body.includes(`href="/${locale}/reports/new"`) &&
+          empty.body.includes('data-slot="stream-filters"'),
+      );
+
+      /*
+       * `?view=calendar` is `D31`'s *only if someone asks twice* and is not
+       * built. It must fall back to the stream rather than 404 or render an
+       * empty frame — an unknown `?view=` is a typo, not a missing screen.
+       */
+      const calendar = await get(jar, `/${locale}/activity?view=calendar`);
+      check(
+        `  ${locale}: an unbuilt ?view falls back to the stream [D31]`,
+        calendar.status === 200 &&
+          calendar.body.includes('data-slot="stream-day"'),
+        `status ${calendar.status}`,
+      );
+    }
+
+    /*
+     * **Scoped, never gated** — and the shape is not the obvious one. The
+     * coordinator is not `sees_all_reps`, so `visibleRepReportsFilter` gives
+     * her only her own reports and those on the four companies `S9` gave her;
+     * but `can_approve_quotation` and `can_dispatch` widen the quotation and
+     * dispatch sources to every row. So her stream is nearly all OBSERVED and
+     * almost no TYPED, which is `S76` behaving correctly and reads as a bug to
+     * anyone who has not been told.
+     */
+    const rep = jars["rep-a@example.test"];
+    const coordinator = jars["coordinator@example.test"];
+    const totalFor = async (target: Jar, query: string) =>
+      totalOf((await get(target, `/en/activity${query}`)).body);
+
+    const managerAll = await totalFor(jar, "");
+    const repAll = await totalFor(rep, "");
+    check(
+      "*** a rep's stream is a subset of the manager's — scoped, not gated [D53] ***",
+      repAll > 0 && repAll < managerAll,
+      `rep ${repAll} of manager ${managerAll}`,
+    );
+    check(
+      "the rep's own filter narrows their stream further [D30]",
+      (await totalFor(rep, "?kind=said")) <= repAll,
+    );
+    const coordinatorTyped = await totalFor(coordinator, "?kind=typed");
+    const coordinatorObserved = await totalFor(coordinator, "?kind=observed");
+    check(
+      "*** the coordinator reads the records and not what the reps wrote — observed >> typed [S76] ***",
+      coordinatorObserved > coordinatorTyped,
+      `observed ${coordinatorObserved}, typed ${coordinatorTyped}`,
+    );
   }
 
   /* ── 23 ──────────────────────────────────────────────────────────────── */

@@ -251,11 +251,10 @@ export default async function PerformancePage({
         <p className="text-muted-foreground text-start text-sm">
           {t("targets.detail.activityElsewhere")}
         </p>
+        {/* One link, since session 27: `/reports` and `/activity` were two
+            screens answering one question and `D45` made them one. */}
         <Button asChild size="xs" variant="outline">
           <Link href="/activity">{t("targets.detail.viewActivity")}</Link>
-        </Button>
-        <Button asChild size="xs" variant="outline">
-          <Link href="/reports">{t("performance.detail.viewReports")}</Link>
         </Button>
       </div>
     </div>
