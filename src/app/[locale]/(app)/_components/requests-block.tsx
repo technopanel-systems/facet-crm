@@ -9,6 +9,8 @@ import { listDispatches } from "@/lib/dispatches";
 import { listQuotationThreads } from "@/lib/quotations";
 import { riyadhDayOf } from "@/lib/working-days";
 
+import { refreshProps } from "./refresh";
+import { RefreshNotice } from "./refresh-notice";
 import { toneClass, turnTone } from "./turn";
 
 /**
@@ -49,16 +51,44 @@ import { toneClass, turnTone } from "./turn";
 export async function RequestsBlock({
   session,
   limit,
+  locale,
 }: {
   session: AuthSession;
   /** How much of each queue the dashboard shows before deferring. */
   limit: number;
+  /** For the refresh line's href — the dashboard's own URL `D72`. */
+  locale: string;
 }) {
   const t = await getTranslations();
   const format = await getFormatter();
 
   const mayIssue = session.user.role.canApproveQuotation;
   const mayDecide = session.user.role.canDispatch;
+
+  /**
+   * `D72` — **one line per column**, because the two are different work and
+   * arrive independently: *in the header of the block it belongs to*, and a
+   * column is the block here.
+   *
+   * **Each carries the narrowing its own column ran**, so the count route
+   * answers about the rows this column shows and no others — the issuing
+   * queue's `awaitingIssue`, the deciding queue's `status=submitted`. Both
+   * hrefs are the dashboard, because that is the screen an F5 would redraw.
+   */
+  const refreshQuotations = refreshProps({
+    scope: "quotations",
+    locale,
+    basePath: "/",
+    search: {},
+    query: { awaitingIssue: true },
+  });
+  const refreshDispatches = refreshProps({
+    scope: "dispatches",
+    locale,
+    basePath: "/",
+    search: {},
+    query: { status: "submitted" },
+  });
 
   const [quotations, dispatches] = await Promise.all([
     mayIssue
@@ -98,6 +128,7 @@ export async function RequestsBlock({
               href="/quotations"
               seeAll={t("today.requests.seeAll")}
               empty={t("today.requests.quotationsEmpty")}
+              refresh={<RefreshNotice {...refreshQuotations} />}
             >
               {quotations.rows.slice(0, limit).map((thread) => (
                 <RecordRow
@@ -139,6 +170,7 @@ export async function RequestsBlock({
               href="/dispatches"
               seeAll={t("today.requests.seeAll")}
               empty={t("today.requests.dispatchesEmpty")}
+              refresh={<RefreshNotice {...refreshDispatches} />}
             >
               {dispatches.rows.slice(0, limit).map((row) => (
                 <RecordRow
@@ -178,6 +210,7 @@ function Column({
   href,
   seeAll,
   empty,
+  refresh,
   children,
 }: {
   slot: string;
@@ -187,17 +220,29 @@ function Column({
   href: string;
   seeAll: string;
   empty: string;
+  /** `D72`'s line, in this column's heading row. */
+  refresh: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section data-slot={slot} className="min-w-0">
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-faint text-[10.5px] font-semibold tracking-[.09em] uppercase">
-          {label}
-          <span className="num ms-1.5" dir="ltr">
-            {total}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        {/* **A flex row with a gap, never `ms-*` on the count** `D57`: the
+            count carries `dir="ltr"` and `margin-inline-start` resolves
+            against the element's OWN direction, so `ms-1.5` compiled to
+            `margin-left` and in Arabic the gap landed on the count's outer
+            edge while the number ran into the label. English worked by
+            accident. This is the site session 28 recorded in `WORKFLOW §5`
+            and left for its own screen's session. */}
+        <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="text-faint flex items-baseline gap-1.5 text-[10.5px] font-semibold tracking-[.09em] uppercase">
+            <span>{label}</span>
+            <span className="num" dir="ltr">
+              {total}
+            </span>
           </span>
-        </p>
+          {refresh}
+        </span>
         {total > shown ? (
           <Button asChild size="xs" variant="ghost">
             <Link href={href}>{seeAll}</Link>

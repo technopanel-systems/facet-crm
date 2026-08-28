@@ -30,6 +30,8 @@ import {
   ScopeChip,
   SearchForm,
 } from "../_components/list-controls";
+import { refreshProps } from "../_components/refresh";
+import { RefreshNotice } from "../_components/refresh-notice";
 import { daysSince } from "../_components/turn";
 
 export const dynamic = "force-dynamic";
@@ -69,8 +71,8 @@ export default async function DispatchesPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const { q, page, direct, archive, userId, companyId, threadId } =
-    await searchParams;
+  const search = await searchParams;
+  const { q, page, direct, archive, userId, companyId, threadId } = search;
 
   const session = await requireSession();
   const t = await getTranslations();
@@ -88,6 +90,27 @@ export default async function DispatchesPage({
   // different arrangement of them.
   const archived = archive === "1";
   const currentPage = Number(page) || 1;
+  const basePath = "/dispatches";
+
+  // **Stamped before the query runs** `D72` — see `refresh.ts`. The narrowing
+  // sent to the count route is the one the data module is given below, minus
+  // `grouped` and `page`: those arrange and cut, and a count is over the whole
+  // scope `CLAUDE.md`.
+  const refresh = refreshProps({
+    scope: "dispatches",
+    locale,
+    basePath,
+    search,
+    query: {
+      q,
+      userId,
+      companyId,
+      threadId,
+      direct: direct === "1",
+      status: archived ? "refused" : undefined,
+    },
+  });
+
   const { rows, total, groupCounts, foreignRepCount } = await listDispatches(session, {
     q,
     page: currentPage,
@@ -104,8 +127,6 @@ export default async function DispatchesPage({
     // number he wants to move.
     direct: direct === "1" ? true : undefined,
   });
-
-  const basePath = "/dispatches";
 
   // **The scope is named or it is not applied** `D59`. A company detail card
   // links here for the sixth dispatch onward `D70`, and a list that silently
@@ -228,6 +249,10 @@ export default async function DispatchesPage({
           total={total}
           query={q}
           extra={{ direct, archive, userId, companyId, threadId }}
+          // `D72` — *in the header of the block it belongs to*. This is the
+          // list the rule's own example is about: a rep submits at 9:15 and
+          // the coordinator's open screen still says 9:00.
+          header={<RefreshNotice {...refresh} variant="bar" />}
         >
           {/* **`table-fixed`, and it is not cosmetic** — the lesson
               `/quotations` paid for in session 26. `TableCell` carries
@@ -407,7 +432,11 @@ function DispatchRow({
           submitted and names no lateness at all. A tone invented here would
           become the number everyone believes in. */}
       <TableCell className="text-start">
-        <span className="num text-faint text-xs font-semibold" dir="ltr">
+        {/* `D73` — the run holds a translated word, so it resolves off its own
+              word. `dir="ltr"` here rendered *5 يوم* as *يوم 5* for an Arabic
+              reader: digits are weak, the word is strong, and forcing LTR puts
+              them the wrong way round. */}
+        <span className="num text-faint text-xs font-semibold" dir="auto">
           {t("followUps.fields.days", { count: daysSince(row.lastMovedAt) })}
         </span>
       </TableCell>

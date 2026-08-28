@@ -197,7 +197,7 @@ export default async function TodayPage({
           neither flag — which today is every rep *and* the manager, whose own
           blocks `D39`-`D41` are not built. */}
       {mayIssue || mayDecide ? (
-        <RequestsBlock session={session} limit={REQUEST_ROWS} />
+        <RequestsBlock session={session} limit={REQUEST_ROWS} locale={locale} />
       ) : null}
 
       <CountsStrip counts={follow.counts} />
@@ -394,7 +394,11 @@ async function TargetPanel({
             data-sqm={formatSqm(target)}
             className="num text-muted-foreground text-end text-sm"
           >
-            <span dir="ltr">
+            {/* `D73` — *of 800 m²* / *من ٨٠٠ م²*: a translated word and a
+                figure in one run, so it resolves off the word. Under
+                `dir="ltr"` the Arabic read with its parts the wrong way
+                round, which is the `28b` defect the rule was written from. */}
+            <span dir="auto">
               {t("today.target.of", { target: formatSqm(target) })}
             </span>
           </p>

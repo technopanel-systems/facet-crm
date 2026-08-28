@@ -24,6 +24,8 @@ import {
 } from "@/lib/quotations";
 
 import { ListCard, ScopeChip, SearchForm } from "../_components/list-controls";
+import { refreshProps } from "../_components/refresh";
+import { RefreshNotice } from "../_components/refresh-notice";
 import { daysSince, initials } from "../_components/turn";
 
 export const dynamic = "force-dynamic";
@@ -68,7 +70,18 @@ export default async function QuotationsPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const { q, page, companyId, projectId } = await searchParams;
+  const search = await searchParams;
+  const { q, page, companyId, projectId } = search;
+
+  // **Stamped before the query runs** `D72`, so the count can over-report by a
+  // query's duration and never miss a row. See `refresh.ts`.
+  const refresh = refreshProps({
+    scope: "quotations",
+    locale,
+    basePath: "/quotations",
+    search,
+    query: { q, companyId, projectId },
+  });
 
   const session = await requireSession();
   const t = await getTranslations();
@@ -173,6 +186,9 @@ export default async function QuotationsPage({
           total={total}
           query={q}
           extra={extra}
+          // `D72` — *in the header of the block it belongs to*. It draws no box
+          // until something has arrived, so this card is unchanged until then.
+          header={<RefreshNotice {...refresh} variant="bar" />}
         >
           {/* **`table-fixed`, and it is not cosmetic.** Every cell carries
               `whitespace-nowrap`, so under auto layout the table's min-content
@@ -383,7 +399,11 @@ function QuotationRow({
               single threshold that exists `07 D5` covers one position of six
               and lives in `follow-ups.ts`. A tone invented here would become
               the number everyone believes in. */}
-          <span className="num text-faint text-xs font-semibold" dir="ltr">
+          {/* `D73` — the run holds a translated word, so it resolves off its own
+              word. `dir="ltr"` here rendered *5 يوم* as *يوم 5* for an Arabic
+              reader: digits are weak, the word is strong, and forcing LTR puts
+              them the wrong way round. */}
+          <span className="num text-faint text-xs font-semibold" dir="auto">
             {t("followUps.fields.days", { count: daysSince(row.createdAt) })}
           </span>
         </span>

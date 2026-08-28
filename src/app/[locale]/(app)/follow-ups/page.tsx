@@ -211,6 +211,13 @@ export default async function FollowUpsPage({
                       here: this reads the age the data layer computed. */}
                   <TableCell
                     numeric
+                    // **`data-column`, not `data-slot`** — `TableCell` sets its
+                    // own `data-slot` and then spreads props over it, so one
+                    // passed here would silently replace the component's marker
+                    // (`WORKFLOW §5`). The cell beside this one is a bare date
+                    // and correctly keeps `dir="ltr"`, so `D73` needs a handle
+                    // for THIS cell rather than for every numeric cell.
+                    data-column="age"
                     className={cn(
                       "font-semibold",
                       toneClass(
@@ -220,7 +227,10 @@ export default async function FollowUpsPage({
                         }),
                       ),
                     )}
-                    dir="ltr"
+                    // `D73` — both branches below are translated phrases
+                    // carrying a figure, so the cell resolves off its own
+                    // word. `numeric` still ends-aligns it `D11`.
+                    dir="auto"
                   >
                     {/* **One unit for the whole list** `D34` — calendar days
                         for every kind, so two rows can be ranked against each

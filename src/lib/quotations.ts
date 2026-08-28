@@ -34,6 +34,7 @@
 import {
   and,
   asc,
+  count,
   desc,
   eq,
   exists,
@@ -359,43 +360,20 @@ function threadHasSubmittedDispatch(): SQL<boolean> {
   )}`;
 }
 
-export async function listQuotationThreads(
+/**
+ * Which threads a reader may see under a given narrowing — the **one** `where`
+ * `listQuotationThreads` and `countQuotationThreadsSince` both run `D72`.
+ *
+ * Extracted rather than repeated: `D72` asks the count route for *the same
+ * query the screen ran*, and a second copy of these five terms would drift the
+ * first time one of them changed. Sharing the builder makes that structural
+ * instead of remembered.
+ */
+function threadScopeWhere(
   session: AuthSession,
-  options: {
-    q?: string;
-    projectId?: string;
-    companyId?: string;
-    /**
-     * `D65`'s first column — the requests **needing issuing**, oldest first.
-     *
-     * **The predicate is `chain.ts`'s, not a second one.** A thread whose live
-     * version is still `requested` sits at chain position `requested`, and
-     * `chainOwner` says that position is owed by the **coordinator** `[07 C2]`
-     * — she builds the real quotation in SMAC. `D27` makes that file the only
-     * ladder, so this composes its answer in SQL rather than restating it.
-     *
-     * **A returned-for-edit version is deliberately still here.** `S72`'s
-     * queue and `quotationReturned` in `follow-ups.ts` disagree about those:
-     * the follow-up chases the rep until they touch the lines, while the chain
-     * says a `requested` version is hers. Following the chain is the founder's
-     * call for this slice — a second ladder in this module is exactly the trap
-     * `chain.ts` exists to prevent — and the tension is a row in `WORKFLOW §5`.
-     *
-     * **A queue is oldest first** `S87`, so this orders ascending, the same
-     * way `listDispatches` orders its submitted scope.
-     */
-    awaitingIssue?: boolean;
-    page?: number;
-  } = {},
-): Promise<{
-  rows: QuotationThreadListRow[];
-  total: number;
-  page: number;
-  groupCounts: QuotationGroupCounts;
-  foreignRaiserCount: number;
-}> {
-  const page = Math.max(1, options.page ?? 1);
-  const where = and(
+  options: QuotationScope,
+): SQL | undefined {
+  return and(
     visibleQuotationThreadsFilter(session),
     liveVersionFilter(),
     searchFilter(options.q),
@@ -412,6 +390,108 @@ export async function listQuotationThreads(
       ? eq(quotationThreads.companyId, options.companyId)
       : undefined,
   );
+}
+
+/**
+ * When a thread last **arrived** — `D72`'s stamp for this list.
+ *
+ * The thread's own creation, or its live version's where that is later: raising
+ * a thread writes the first, and a revision `S66` writes a new version row and
+ * so the second. Both columns are already joined by every caller, so this adds
+ * no join.
+ *
+ * **Both tables named outright** `CLAUDE.md`. What it cannot see is a status
+ * write — a version ISSUED or a thread ACCEPTED — because `quotation_versions`
+ * carries no `issued_at` and `quotation_threads` no `accepted_at`. Those two
+ * moves reorder `D25`'s piles and this count is blind to them; the row is in
+ * `WORKFLOW §5`, and the fix is a column, not a second definition of *new*
+ * read off the audit log.
+ */
+const threadArrivedAt = sql`greatest(
+  "quotation_threads"."created_at",
+  "quotation_versions"."created_at"
+)`;
+
+/** The narrowing `/quotations` and `D65`'s issuing column pass. */
+export type QuotationScope = {
+  q?: string;
+  projectId?: string;
+  companyId?: string;
+  /**
+   * `D65`'s first column — the requests **needing issuing**, oldest first.
+   *
+   * **The predicate is `chain.ts`'s, not a second one.** A thread whose live
+   * version is still `requested` sits at chain position `requested`, and
+   * `chainOwner` says that position is owed by the **coordinator** `[07 C2]`
+   * — she builds the real quotation in SMAC. `D27` makes that file the only
+   * ladder, so this composes its answer in SQL rather than restating it.
+   *
+   * **A returned-for-edit version is deliberately still here.** `S72`'s queue
+   * and `quotationReturned` in `follow-ups.ts` disagree about those: the
+   * follow-up chases the rep until they touch the lines, while the chain says
+   * a `requested` version is hers. Following the chain is the founder's call —
+   * a second ladder in this module is exactly the trap `chain.ts` exists to
+   * prevent — and the tension is a row in `WORKFLOW §5`.
+   *
+   * **A queue is oldest first** `S87`, so `listQuotationThreads` orders
+   * ascending, the same way `listDispatches` orders its submitted scope.
+   */
+  awaitingIssue?: boolean;
+};
+
+/**
+ * How many threads in this scope arrived after `since` — `D72`'s count.
+ *
+ * One aggregate over `threadScopeWhere`, resolved in SQL `CLAUDE.md`: the whole
+ * scope, never a page, so the number cannot depend on where the reader happens
+ * to be paged to. It does **not** fold `D25`'s groups — arriving is not a
+ * question about which pile a row lands in — so it costs one statement where
+ * the list costs a full read.
+ */
+export async function countQuotationThreadsSince(
+  session: AuthSession,
+  options: QuotationScope,
+  since: Date,
+): Promise<number> {
+  const [row] = await db
+    .select({ total: count() })
+    .from(quotationThreads)
+    .innerJoin(
+      quotationVersions,
+      eq(quotationVersions.threadId, quotationThreads.id),
+    )
+    .innerJoin(projects, eq(quotationThreads.projectId, projects.id))
+    .innerJoin(companies, eq(quotationThreads.companyId, companies.id))
+  // **The bound parameter is cast outright**, and that is load-bearing: a
+  // `Date` interpolated into a `sql` template reaches postgres.js untyped and
+  // the driver refuses it, while a bare ISO string would be typed `text` and
+  // compared against a `timestamptz` — the untyped-parameter half of the trap
+  // `CLAUDE.md` records, which `coverage.ts` and `dispatches.ts` both name.
+    .where(
+      and(
+        threadScopeWhere(session, options),
+        sql`${threadArrivedAt} > ${since.toISOString()}::timestamptz`,
+      ),
+    );
+  return row?.total ?? 0;
+}
+
+export async function listQuotationThreads(
+  session: AuthSession,
+  options: QuotationScope & {
+    page?: number;
+  } = {},
+): Promise<{
+  rows: QuotationThreadListRow[];
+  total: number;
+  page: number;
+  groupCounts: QuotationGroupCounts;
+  foreignRaiserCount: number;
+}> {
+  const page = Math.max(1, options.page ?? 1);
+  // The one `where`, shared with `countQuotationThreadsSince` so the count
+  // route cannot answer about a different set of rows `D72`.
+  const where = threadScopeWhere(session, options);
 
   const base = () =>
     db

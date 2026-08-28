@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { PageHeader } from "@/components/page-header";
@@ -14,15 +15,11 @@ import {
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
 import { dailyActivity, measuredPeople } from "@/lib/daily-activity";
-import {
-  REPORT_OUTCOMES,
-  REPORT_SIGNALS,
-  type ReportOutcome,
-  type ReportSignal,
-} from "@/lib/enums";
-import { STREAM_KINDS, streamFor, type StreamKind } from "@/lib/timeline";
+import { STREAM_KINDS, parseStreamFilters, streamFor } from "@/lib/timeline";
 
 import { FilterNav, ListCard } from "../_components/list-controls";
+import { refreshProps } from "../_components/refresh";
+import { RefreshNotice } from "../_components/refresh-notice";
 import {
   StreamFilters,
   StreamList,
@@ -32,7 +29,6 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const VIEWS = ["stream", "by-rep"] as const;
 type View = (typeof VIEWS)[number];
 
@@ -88,37 +84,37 @@ export default async function ActivityPage({
   const people = await measuredPeople(session);
 
   /**
-   * Every parameter is validated against the enum it belongs to before it
-   * reaches the data layer, so a hand-typed `?outcome=nonsense` narrows to
-   * nothing silently instead of being passed through. `who` is checked against
-   * the roster this identity may read for the same reason — an id that is not
-   * on it would otherwise be a probe that returns an empty page for a real
-   * person and an empty page for an invented one, which is the same answer and
-   * therefore no answer at all.
+   * Every parameter validated against the enum it belongs to before it reaches
+   * the data layer, so a hand-typed `?outcome=nonsense` narrows to nothing
+   * silently instead of being passed through.
+   *
+   * **The four enum checks moved to `parseStreamFilters` in `timeline.ts`**
+   * when `D72` gave this same query a second reader: the count route must run
+   * *the same query the screen ran*, and two copies of this reasoning would be
+   * the second definition of the scope that rule forbids.
+   *
+   * **`who` stays here**, because checking it means reading the roster and this
+   * screen already holds one for its filter panel. An id that is not on it
+   * would otherwise be a probe returning an empty page for a real person and an
+   * empty page for an invented one — the same answer, and therefore no answer.
    */
-  const kind = (STREAM_KINDS as readonly string[]).includes(search.kind ?? "")
-    ? (search.kind as StreamKind)
+  const { filters, who: whoAsked } = parseStreamFilters(search);
+  const who = people.some((person) => person.id === whoAsked)
+    ? whoAsked
     : undefined;
-  const outcome = (REPORT_OUTCOMES as readonly string[]).includes(
-    search.outcome ?? "",
-  )
-    ? (search.outcome as ReportOutcome)
-    : undefined;
-  const signal = (REPORT_SIGNALS as readonly string[]).includes(
-    search.signal ?? "",
-  )
-    ? (search.signal as ReportSignal)
-    : undefined;
-  const who = people.some((person) => person.id === search.who)
-    ? search.who
-    : undefined;
-  // Both or neither: a half-given range is no range, so a stray `?from=`
-  // cannot silently drop everything before it.
-  const ranged = DATE.test(search.from ?? "") && DATE.test(search.to ?? "");
-  const from = ranged ? search.from : undefined;
-  const to = ranged ? search.to : undefined;
+  const { kind, outcome, signal, from, to } = filters;
 
-  const filters = { q: search.q, kind, outcome, signal, from, to };
+  // **Stamped before the query runs** `D72` — see `refresh.ts`. The narrowing
+  // is the normalised one above, never `search`: an unknown `?kind=` reaches
+  // the count route as nothing at all, exactly as it reaches the stream.
+  const refresh = refreshProps({
+    scope: "stream",
+    locale,
+    basePath: "/activity",
+    search,
+    query: { q: search.q, kind, who, outcome, signal, from, to },
+  });
+
   const query: StreamQuery = {
     view: search.view === "by-rep" ? "by-rep" : undefined,
     kind,
@@ -229,6 +225,7 @@ export default async function ActivityPage({
                 total={stream.total}
                 query={search.q}
                 extra={withoutKey(query)}
+                header={<RefreshNotice {...refresh} variant="bar" />}
               >
                 <StreamList
                   events={stream.events}
@@ -238,7 +235,13 @@ export default async function ActivityPage({
             )
           ) : null}
 
-          {byRep ? <ByRep data={byRep} query={query} /> : null}
+          {byRep ? (
+            <ByRep
+              data={byRep}
+              query={query}
+              refresh={<RefreshNotice {...refresh} variant="bar" />}
+            />
+          ) : null}
         </div>
       </div>
 
@@ -280,9 +283,16 @@ export default async function ActivityPage({
 async function ByRep({
   data,
   query,
+  /**
+   * `D72`'s line. **This arrangement polls too**, and on the same scope: it is
+   * a count of the very events `?view=stream` lists, so a screen that went
+   * stale in one goes stale in both.
+   */
+  refresh,
 }: {
   data: Awaited<ReturnType<typeof dailyActivity>>;
   query: StreamQuery;
+  refresh: ReactNode;
 }) {
   const t = await getTranslations();
 
@@ -311,7 +321,12 @@ async function ByRep({
       </p>
       {/* No pager: the roster is every person this identity may read, so the
           footer is a count and nothing else. */}
-      <ListCard basePath="/activity" page={1} total={data.rows.length}>
+      <ListCard
+        basePath="/activity"
+        page={1}
+        total={data.rows.length}
+        header={refresh}
+      >
         <Table>
           <TableHeader>
             <TableRow>

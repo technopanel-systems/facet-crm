@@ -983,6 +983,26 @@ sheet. The board scrolls horizontally with the current column snapped in view.
 The mini-chain, the silence meter and the pace line are flex rows and need no
 `rtl:` override. Every screen is driven in both locales before it is done.
 
+**D73. Direction follows the run, and the test is one question: is there a word
+in it?** A run holding a **translated word** takes `dir="auto"`. A run holding a
+**bare figure** — a reference, a decimal, a date, a percentage, a count standing
+alone — takes `dir="ltr"`. Nothing takes `dir="ltr"` merely because it contains
+digits.
+
+**The failure is silent and it changes a number.** European digits are *weak* in
+the bidi algorithm, not strong, so `auto` resolves a mixed run off its word and
+gets Arabic right. Forcing `dir="ltr"` over *figure · word · figure* reverses
+the two figures for an RTL reader: *4 of 13* renders as *13 of 4*. Nothing
+throws, nothing fails a check, and the page looks composed. Session `28b`
+shipped it.
+
+**`D62` is the same instinct about a stored value** that may hold either script;
+this is the rule for a run FACET **composes** out of a translated string and a
+figure — `"{count} days"` / `"{count} يوم"`, `"of {target} m²"` /
+`"من {target} م²"`. The tell is a `dir` on the container rather than on the
+value: a cell, a paragraph or a table column carrying `dir="ltr"` is almost
+always covering a word it did not mean to.
+
 ---
 
 ## 17. What is not built, deliberately

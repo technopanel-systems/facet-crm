@@ -68,7 +68,8 @@
     "filter": "Filter",
     "apply": "Apply",
     "whoseMove": "Whose move",
-    "ofTotal": "{shown} of {total}"
+    "ofTotal": "{shown} of {total}",
+    "newSinceLoad": "{count, plural, one {# new — refresh} other {# new — refresh}}"
   },
   "enums": {
     "region": {

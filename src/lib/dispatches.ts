@@ -1866,33 +1866,114 @@ function searchFilter(query: string | undefined) {
   );
 }
 
+/**
+ * The narrowing `/dispatches` and `D65`'s deciding column pass — everything
+ * that decides WHICH rows, and nothing that decides how they are arranged.
+ *
+ * `grouped` and `page` are not here on purpose: they order and cut, and
+ * `countDispatchesSince` asks about the whole scope `CLAUDE.md`.
+ */
+export type DispatchScope = {
+  q?: string;
+  userId?: string;
+  companyId?: string;
+  threadId?: string;
+  /** `07 C6` — the direct route, made countable. */
+  direct?: boolean;
+  /**
+   * `S72` — one of the five states, or absent for the **working list**:
+   * everything but `refused`, because *a refused dispatch request is archived
+   * and kept out of the working lists* `S122`. Absent is not "everything"; the
+   * archive is reached by asking for it.
+   *
+   * **`cancelled` stays in the default scope, and that is a decision.** `S122`
+   * archives a refusal and no rule archives a cancellation; `S31` says the
+   * opposite — *visible as history, counted nowhere*. Counted nowhere is
+   * already true by construction, because every figure composes
+   * `approvedDispatches()`, so excluding it here would only hide it from the
+   * one screen that shows history.
+   *
+   * A caller wanting the figure rather than the screen passes `"approved"` —
+   * which is what the two `hasDispatch` callers do, so an unapproved request
+   * cannot advance a chain.
+   */
+  status?: DispatchStatus;
+  from?: string;
+  to?: string;
+};
+
+/**
+ * Which dispatches a reader may see under a given narrowing — the **one**
+ * `where` `listDispatches` and `countDispatchesSince` both run `D72`.
+ *
+ * Extracted rather than repeated: `D72` asks the count route for *the same
+ * query the screen ran*, and a second copy of these nine terms would drift the
+ * first time one of them changed.
+ */
+function dispatchScopeWhere(
+  session: AuthSession,
+  options: DispatchScope,
+): SQL | undefined {
+  return and(
+    visibleDispatchesFilter(session),
+    searchFilter(options.q),
+    options.status
+      ? eq(dispatches.status, options.status)
+      : ne(dispatches.status, "refused"),
+    options.userId ? eq(dispatches.userId, options.userId) : undefined,
+    options.companyId ? eq(dispatches.companyId, options.companyId) : undefined,
+    options.threadId
+      ? eq(dispatches.quotationThreadId, options.threadId)
+      : undefined,
+    options.direct === true ? isNull(dispatches.quotationThreadId) : undefined,
+    options.direct === false
+      ? isNotNull(dispatches.quotationThreadId)
+      : undefined,
+    options.from ? gte(dispatches.dispatchDate, options.from) : undefined,
+    options.to ? lte(dispatches.dispatchDate, options.to) : undefined,
+  );
+}
+
+/**
+ * How many dispatches in this scope moved after `since` — `D72`'s count.
+ *
+ * **The stamp is `lastMovedAt`**, which this list already orders its two live
+ * piles by: `coalesce(approved_at, submitted_at, created_at)`. So *new* here is
+ * exactly the event `D72`'s opening sentence describes — a rep submits at 9:15
+ * and the coordinator's open screen still says 9:00 — and it is the list's own
+ * order key rather than a second definition.
+ *
+ * One aggregate over `dispatchScopeWhere`, resolved in SQL over the whole
+ * scope and never a page `CLAUDE.md`. The two joins are the ones the search
+ * term needs, not decoration.
+ */
+export async function countDispatchesSince(
+  session: AuthSession,
+  options: DispatchScope,
+  since: Date,
+): Promise<number> {
+  const [row] = await db
+    .select({ total: count() })
+    .from(dispatches)
+    .innerJoin(companies, eq(companies.id, dispatches.companyId))
+    .innerJoin(users, eq(users.id, dispatches.userId))
+  // **The bound parameter is cast outright**, and that is load-bearing: a
+  // `Date` interpolated into a `sql` template reaches postgres.js untyped and
+  // the driver refuses it, while a bare ISO string would be typed `text` and
+  // compared against a `timestamptz` — the untyped-parameter half of the trap
+  // `CLAUDE.md` records, which `coverage.ts` and `dispatches.ts` both name.
+    .where(
+      and(
+        dispatchScopeWhere(session, options),
+        sql`${lastMovedAt} > ${since.toISOString()}::timestamptz`,
+      ),
+    );
+  return row?.total ?? 0;
+}
+
 export async function listDispatches(
   session: AuthSession,
-  options: {
-    q?: string;
-    userId?: string;
-    companyId?: string;
-    threadId?: string;
-    /** `07 C6` — the direct route, made countable. */
-    direct?: boolean;
-    /**
-     * `S72` — one of the five states, or absent for the **working list**:
-     * everything but `refused`, because *a refused dispatch request is
-     * archived and kept out of the working lists* `S122`. Absent is not
-     * "everything"; the archive is reached by asking for it.
-     *
-     * **`cancelled` stays in the default scope, and that is a decision.** `S122`
-     * archives a refusal and no rule archives a cancellation; `S31` says the
-     * opposite — *visible as history, counted nowhere*. Counted nowhere is
-     * already true by construction, because every figure composes
-     * `approvedDispatches()`, so excluding it here would only hide it from the
-     * one screen that shows history.
-     *
-     * A caller wanting the figure rather than the screen passes `"approved"` —
-     * which is what the two `hasDispatch` callers do, so an unapproved request
-     * cannot advance a chain.
-     */
-    status?: DispatchStatus;
+  options: DispatchScope & {
     /**
      * **Order by `D25`'s piles** rather than by date — `/dispatches` and
      * nothing else.
@@ -1904,8 +1985,6 @@ export async function listDispatches(
      * to compute and nothing to ignore.
      */
     grouped?: boolean;
-    from?: string;
-    to?: string;
     page?: number;
   } = {},
 ): Promise<{
@@ -1935,24 +2014,9 @@ export async function listDispatches(
   const recordedBy = alias(users, "recorded_by");
   const approvedBy = alias(users, "approved_by");
 
-  const where = and(
-    visibleDispatchesFilter(session),
-    searchFilter(options.q),
-    options.status
-      ? eq(dispatches.status, options.status)
-      : ne(dispatches.status, "refused"),
-    options.userId ? eq(dispatches.userId, options.userId) : undefined,
-    options.companyId ? eq(dispatches.companyId, options.companyId) : undefined,
-    options.threadId
-      ? eq(dispatches.quotationThreadId, options.threadId)
-      : undefined,
-    options.direct === true ? isNull(dispatches.quotationThreadId) : undefined,
-    options.direct === false
-      ? isNotNull(dispatches.quotationThreadId)
-      : undefined,
-    options.from ? gte(dispatches.dispatchDate, options.from) : undefined,
-    options.to ? lte(dispatches.dispatchDate, options.to) : undefined,
-  );
+  // The one `where`, shared with `countDispatchesSince` so the count route
+  // cannot answer about a different set of rows `D72`.
+  const where = dispatchScopeWhere(session, options);
 
   const rows = await db
     .select({

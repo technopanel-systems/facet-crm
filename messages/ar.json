@@ -68,7 +68,8 @@
     "filter": "تصفية",
     "apply": "تطبيق",
     "whoseMove": "بانتظار من",
-    "ofTotal": "{shown} من أصل {total}"
+    "ofTotal": "{shown} من أصل {total}",
+    "newSinceLoad": "{count, plural, one {أمر جديد واحد — تحديث} two {أمران جديدان — تحديث} few {# أمور جديدة — تحديث} many {# أمراً جديداً — تحديث} other {# أمر جديد — تحديث}}"
   },
   "enums": {
     "region": {

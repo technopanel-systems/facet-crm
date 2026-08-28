@@ -95,12 +95,14 @@ import {
   type AuthSession,
 } from "@/lib/authz";
 import { approvedDispatches } from "@/lib/dispatches";
-import type {
-  CommentRecordType,
-  FieldNoteCategory,
-  ReportEntryType,
-  ReportOutcome,
-  ReportSignal,
+import {
+  REPORT_OUTCOMES,
+  REPORT_SIGNALS,
+  type CommentRecordType,
+  type FieldNoteCategory,
+  type ReportEntryType,
+  type ReportOutcome,
+  type ReportSignal,
 } from "@/lib/enums";
 import { normalizeName } from "@/lib/normalize";
 import {
@@ -888,6 +890,87 @@ export type Stream = {
   /** `event.key` -> the name of the record the event is about. */
   subjects: Map<string, string>;
 };
+
+/** The raw strings `/activity` and the count route each arrive holding. */
+export type StreamQueryParams = {
+  q?: string;
+  kind?: string;
+  outcome?: string;
+  signal?: string;
+  who?: string;
+  from?: string;
+  to?: string;
+};
+
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Every stream parameter checked against the enum it belongs to, **once**.
+ *
+ * This lived in `/activity/page.tsx` until `D72` gave the same query a second
+ * reader. A hand-typed `?outcome=nonsense` narrows to nothing silently instead
+ * of being passed through, and an invented `?who=` reads as no filter rather
+ * than as an empty page — the same answer twice is no answer at all. Two copies
+ * of that reasoning would be a second definition of the screen's scope, which
+ * is exactly what `D72` forbids of the count route.
+ *
+ * **`who` comes back raw and unchecked**, because checking it means reading the
+ * roster and only the caller knows whether it already has one. `/activity`
+ * holds `measuredPeople` for its own filter panel; the count route asks for the
+ * single row.
+ *
+ * **Both or neither** on the range: a half-given range is no range, so a stray
+ * `?from=` cannot silently drop everything before it.
+ */
+export function parseStreamFilters(params: StreamQueryParams): {
+  filters: StreamFilters;
+  who: string | undefined;
+} {
+  const ranged = DATE.test(params.from ?? "") && DATE.test(params.to ?? "");
+  return {
+    filters: {
+      q: params.q,
+      kind: (STREAM_KINDS as readonly string[]).includes(params.kind ?? "")
+        ? (params.kind as StreamKind)
+        : undefined,
+      outcome: (REPORT_OUTCOMES as readonly string[]).includes(
+        params.outcome ?? "",
+      )
+        ? (params.outcome as ReportOutcome)
+        : undefined,
+      signal: (REPORT_SIGNALS as readonly string[]).includes(params.signal ?? "")
+        ? (params.signal as ReportSignal)
+        : undefined,
+      from: ranged ? params.from : undefined,
+      to: ranged ? params.to : undefined,
+    },
+    who: params.who,
+  };
+}
+
+/**
+ * How many events in this scope happened after `since` — `D72`'s count.
+ *
+ * **The stamp is `event.at`**, and it is exact for all six sources: each one
+ * selects a real `created_at` — including `quotation_issued`, which reads the
+ * audit row `S112`. So this is the one scope where the count sees every kind of
+ * arrival the screen shows.
+ *
+ * **It runs the screen's own query and counts after the whole set is built**,
+ * never over a page `CLAUDE.md` — `streamEvents` is the unpaginated half
+ * `by-rep` already folds. That is the cost of one definition, and it is the
+ * dearest poll in the application: `filteredStream` is `gather`'s six sources
+ * plus `subjectsFor`, because reducing it to one aggregate would mean a second
+ * definition of the stream. Stated in `WORKFLOW §5` rather than hidden.
+ */
+export async function countStreamSince(
+  session: AuthSession,
+  filters: StreamFilters,
+  since: Date,
+): Promise<number> {
+  const events = await streamEvents(session, filters);
+  return events.filter((event) => event.at > since).length;
+}
 
 /**
  * What each event is ABOUT, keyed by `event.key`.

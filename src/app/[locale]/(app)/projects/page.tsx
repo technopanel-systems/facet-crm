@@ -20,6 +20,8 @@ import { listProjectBoard, listProjects } from "@/lib/projects";
 
 import { FilterNav, ListCard, SearchForm } from "../_components/list-controls";
 import { ProjectStateBadge } from "../_components/project-state";
+import { refreshProps } from "../_components/refresh";
+import { RefreshNotice } from "../_components/refresh-notice";
 import { Turn, chainTurnKey, turnTone } from "../_components/turn";
 import { ProjectBoardView } from "./project-board";
 
@@ -48,7 +50,8 @@ export default async function ProjectsPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const { q, page, view } = await searchParams;
+  const search = await searchParams;
+  const { q, page, view } = search;
 
   const session = await requireSession();
   const t = await getTranslations();
@@ -63,6 +66,18 @@ export default async function ProjectsPage({
   // the coordinator is the one FACET can name exactly — the same split
   // `/quotations` makes.
   const viewerIsCoordinator = can(session, "canApproveQuotation");
+
+  // **Stamped before the query runs** `D72` — see `refresh.ts`. `onBoard` is
+  // the board's own term `D29`: a lost project is off the board and on the
+  // table, so the two views genuinely hold different row sets and the count
+  // must be told which one it is answering about.
+  const refresh = refreshProps({
+    scope: "projects",
+    locale,
+    basePath: "/projects",
+    search,
+    query: { q, onBoard: !asTable },
+  });
 
   // A project needs a company `S27`, so an identity with none may read this
   // list and start nothing from it — the `S76` reader exactly. `D51`: the
@@ -139,6 +154,7 @@ export default async function ProjectsPage({
             board={board}
             tableHref={tableHref}
             viewerUserId={session.user.id}
+            refresh={<RefreshNotice {...refresh} />}
           />
         )
       ) : null}
@@ -170,6 +186,7 @@ export default async function ProjectsPage({
             total={list.total}
             query={q}
             extra={extra}
+            header={<RefreshNotice {...refresh} variant="bar" />}
           >
             <Table>
               <TableHeader>

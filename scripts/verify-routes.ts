@@ -118,6 +118,20 @@
  *      query, three arrangements* from three screens that agree by accident.
  *      A field note is found IN it, which is what closes `D3`.
  *
+ *  26. **Auto-refresh** `D72` `D20` `D73` — the notice's transport is on the
+ *      five screens that carry one, in both locales, and **no line is drawn**,
+ *      because this walk executes no script. The count route is then driven
+ *      directly and bracketed: a `since` in the future answers 0, and a `since`
+ *      at the epoch answers **the screen's own stated total** — which is what
+ *      proves the route's `where` is the list's `where`, and the one assertion
+ *      that fires on a stamp resolving against the wrong table (`CLAUDE.md`:
+ *      returns zero, raises nothing). The coordinator's two columns carry two
+ *      different narrowings and each narrows the count. Then one real arrival,
+ *      end to end, because neither bracket can tell a correct stamp from a
+ *      wrong column that happens to be non-null. `D73`'s five corrected runs
+ *      are asserted on the `dir` attribute, which is the same marker in both
+ *      locales where the words are not.
+ *
  *  23. **Operability** `D20` — for every form this walk reaches, in either
  *      locale, as any of the three identities: each field the screen says its
  *      action requires is present as a **native, focusable control carrying
@@ -6101,6 +6115,388 @@ async function main(): Promise<void> {
       coordinatorObserved > coordinatorTyped,
       `observed ${coordinatorObserved}, typed ${coordinatorTyped}`,
     );
+  }
+
+  /* ── 26 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n26. Auto-refresh — the line is absent with scripts off, and the count route runs the screen's own query [D72], [D20], [D73]",
+  );
+  {
+    /**
+     * **This walk executes no script, so every check below is a scripts-off
+     * check** — which makes it the whole of `D20`'s half of `D72`. What it can
+     * see is the markup the server sent: the transport the notice needs, and
+     * the fact that no line was drawn.
+     *
+     * **The count route is then driven directly**, which is the only way a
+     * black-box script can reach it at all. Two `since` values bracket it:
+     *
+     * - `since` **in the future** must answer `0`. That proves the comparison
+     *   runs in the direction the rule needs.
+     * - `since` at the **epoch** must answer the screen's own total, because
+     *   every row has moved after 1970. That is the assertion this slice needs:
+     *   it proves the route's `where` is the list's `where` — the drift the
+     *   shared builders exist to prevent — and it fires on the exact failure
+     *   `CLAUDE.md` records twice, a stamp resolving against the wrong table
+     *   and returning zero with no error.
+     *
+     * Then one real arrival, end to end, because neither bracket can tell a
+     * correct stamp from a wrong column that happens to be non-null.
+     */
+    const manager = jars["manager@example.test"];
+    const rep = jars["rep-a@example.test"];
+
+    const EPOCH = "1970-01-01T00:00:00.000Z";
+    const FUTURE = "2999-01-01T00:00:00.000Z";
+
+    type Notice = {
+      scope: string;
+      since: string;
+      query: string;
+      count: string;
+    };
+
+    /** Every notice on a page, in document order. */
+    const noticesIn = (body: string): Notice[] =>
+      [
+        ...body.matchAll(
+          /<[a-z]+[^>]*data-slot="refresh-notice"[^>]*>/g,
+        ),
+      ].map((tag) => ({
+        scope: attrIn(tag[0], "data-scope") ?? "",
+        since: attrIn(tag[0], "data-since") ?? "",
+        // React escapes `&` in an attribute, and a two-filter query has one.
+        query: unescapeHtml(attrIn(tag[0], "data-query") ?? ""),
+        count: attrIn(tag[0], "data-count") ?? "",
+      }));
+
+    const ask = async (
+      jar: Jar | null,
+      notice: Notice,
+      since: string,
+    ): Promise<{ status: number; count: number }> => {
+      const params = new URLSearchParams(notice.query);
+      params.set("scope", notice.scope);
+      params.set("since", since);
+      const response = await fetch(`${BASE}/api/updates?${params}`, {
+        headers: jar ? { cookie: header(jar) } : {},
+        redirect: "manual",
+      });
+      if (response.status !== 200) {
+        return { status: response.status, count: -1 };
+      }
+      const body = (await response.json()) as { count?: unknown };
+      return {
+        status: response.status,
+        count: typeof body.count === "number" ? body.count : -1,
+      };
+    };
+
+    /* — The five screens `D72` names and this slice builds — */
+
+    const screens: {
+      path: string;
+      scope: string;
+      /** Where the screen states its own whole-scope total. */
+      totalSlot: string;
+    }[] = [
+      { path: "/quotations", scope: "quotations", totalSlot: "list-card" },
+      { path: "/dispatches", scope: "dispatches", totalSlot: "list-card" },
+      { path: "/projects", scope: "projects", totalSlot: "project-board" },
+      {
+        path: "/projects?view=table",
+        scope: "projects",
+        totalSlot: "list-card",
+      },
+      { path: "/activity", scope: "stream", totalSlot: "list-card" },
+    ];
+
+    for (const locale of ["en", "ar"] as const) {
+      for (const screen of screens) {
+        const page = await get(manager, `/${locale}${screen.path}`);
+        const [notice] = noticesIn(page.body);
+
+        check(
+          `${locale}: ${screen.path} carries the notice's transport [D72]`,
+          Boolean(notice) && notice.scope === screen.scope,
+          `scope ${notice?.scope ?? "ABSENT"}`,
+        );
+        if (!notice) continue;
+
+        // **The whole of `D20` for this feature.** No script ran, so no poll
+        // answered, so there is no line — and the page above it is the page it
+        // always was.
+        check(
+          `${locale}: ${screen.path} draws NO line with scripts off [D20], [D72]`,
+          notice.count === "0" &&
+            !page.body.includes('data-slot="refresh-line"'),
+          `data-count="${notice.count}"`,
+        );
+        check(
+          `${locale}: ${screen.path}'s render moment is an instant, and its query carries no page [D72]`,
+          !Number.isNaN(Date.parse(notice.since)) &&
+            !new URLSearchParams(notice.query).has("page"),
+          `since="${notice.since}" query="${notice.query}"`,
+        );
+
+        const total = Number(
+          attrOf(page.body, screen.totalSlot, "data-total") ?? "-1",
+        );
+        const fresh = await ask(manager, notice, notice.since);
+        const everything = await ask(manager, notice, EPOCH);
+        const ahead = await ask(manager, notice, FUTURE);
+
+        check(
+          `${locale}: ${screen.path} — nothing has arrived since it rendered [D72]`,
+          fresh.count === 0,
+          `answered ${fresh.count}`,
+        );
+        check(
+          `${locale}: ${screen.path} — a future moment answers nothing [D72]`,
+          ahead.count === 0,
+          `answered ${ahead.count}`,
+        );
+        // The one that would have caught a stamp resolving against the wrong
+        // table: that returns zero and raises nothing `CLAUDE.md`.
+        check(
+          `*** ${locale}: ${screen.path} — since the epoch, the count IS the screen's own total *** [D72]`,
+          total > 0 && everything.count === total,
+          `route ${everything.count}, screen ${total}`,
+        );
+      }
+    }
+
+    /* — The narrowing travels, and the scope is the reader's — */
+
+    const dashboard = await get(manager, "/en");
+    check(
+      "a rep-and-manager dashboard has no Requests block, so it polls nothing [D64], [D72]",
+      noticesIn(dashboard.body).length === 0,
+      `${noticesIn(dashboard.body).length} notice(s)`,
+    );
+
+    const coordinator = jars["coordinator@example.test"];
+    const coordinatorHome = await get(coordinator, "/en");
+    const columns = noticesIn(coordinatorHome.body);
+    check(
+      "*** the coordinator's Requests block polls its two columns separately, each with its own narrowing *** [D65], [D72]",
+      columns.length === 2 &&
+        columns[0].query === "awaitingIssue=1" &&
+        columns[1].query === "status=submitted",
+      columns.map((one) => `${one.scope}?${one.query}`).join(" · ") || "none",
+    );
+    check(
+      "…and both are silent with scripts off [D20]",
+      columns.every((one) => one.count === "0") &&
+        !coordinatorHome.body.includes('data-slot="refresh-line"'),
+    );
+
+    if (columns.length === 2) {
+      // Each column states its own total; the epoch count must be that total
+      // and not the unnarrowed list's, or the narrowing did not travel.
+      const issuing = Number(
+        attrOf(
+          between(
+            coordinatorHome.body,
+            "today-requests-quotations",
+            "today-requests-dispatches",
+          ),
+          "refresh-notice",
+          "data-count",
+        ) ?? "-1",
+      );
+      check(
+        "the issuing column's notice is inside the issuing column [D72]",
+        issuing === 0,
+        `read ${issuing}`,
+      );
+
+      const wide = await ask(coordinator, { ...columns[0], query: "" }, EPOCH);
+      const narrow = await ask(coordinator, columns[0], EPOCH);
+      check(
+        "*** `awaitingIssue` narrows the count route exactly as it narrows the block *** [D65], [D72]",
+        narrow.count > 0 && narrow.count < wide.count,
+        `narrowed ${narrow.count} of ${wide.count}`,
+      );
+    }
+
+    // Scoped, not global — the same question, two identities, two answers.
+    const asDispatches = { scope: "dispatches", since: "", query: "", count: "" };
+    const repSees = await ask(rep, asDispatches, EPOCH);
+    const coordinatorSees = await ask(coordinator, asDispatches, EPOCH);
+    check(
+      "*** the count route is scoped by the reader, never global *** [S109], [D72]",
+      repSees.count > 0 && repSees.count < coordinatorSees.count,
+      `rep ${repSees.count} of coordinator ${coordinatorSees.count}`,
+    );
+
+    /* — What it refuses — */
+
+    check(
+      "an anonymous poll is refused, and not with a login page to parse as JSON [D72]",
+      (await ask(null, asDispatches, EPOCH)).status === 401,
+    );
+    check(
+      "an unknown scope is refused",
+      (await ask(manager, { ...asDispatches, scope: "companies" }, EPOCH))
+        .status === 400,
+    );
+    check(
+      "a `since` that is not an instant is refused",
+      (await ask(manager, asDispatches, "yesterday")).status === 400,
+    );
+    check(
+      "…and so is no `since` at all",
+      (
+        await fetch(`${BASE}/api/updates?scope=dispatches`, {
+          headers: { cookie: header(manager) },
+        })
+      ).status === 400,
+    );
+
+    /* — One real arrival, end to end — */
+
+    {
+      /**
+       * **Neither bracket above can tell a correct stamp from a wrong column
+       * that happens to be non-null**, so one row is made to arrive for real:
+       * `/activity` is read, a company is registered over HTTP, and the same
+       * notice is polled again with the `since` the page carried.
+       *
+       * A registration is `companyAddedEvents`, whose `at` is
+       * `companies.created_at` — a `typed`-adjacent arrival on the stream the
+       * manager is watching. The company carries a run stamp, for §9's reason:
+       * an unremovable fixture row must land somewhere nobody reads as data.
+       */
+      const stamp = `${Date.now()}`.slice(-7);
+      // **A ranged stream, and the range is not decoration.**
+      // `companyAddedEvents` is the one of `gather`'s six sources that returns
+      // nothing at all without a range — *"a project timeline never shows this
+      // event; the range form is the daily view"* — so an unranged stream would
+      // never see the arrival below however correct the count route was. It
+      // also puts a two-parameter narrowing through `data-query`, which is the
+      // shape a hand-built query string is most likely to get wrong.
+      const today = new Date().toLocaleDateString("en-CA", {
+        timeZone: "Asia/Riyadh",
+      });
+      const before = await get(
+        manager,
+        `/en/activity?from=${today}&to=${today}`,
+      );
+      const [notice] = noticesIn(before.body);
+      check(
+        "the range travels into the notice's own query [D72]",
+        notice?.query.includes(`from=${today}`) === true &&
+          notice.query.includes(`to=${today}`),
+        notice?.query ?? "no notice",
+      );
+      const quiet = notice ? await ask(manager, notice, notice.since) : null;
+      check(
+        "the stream is quiet at the moment it renders [D72]",
+        quiet?.count === 0,
+        `answered ${quiet?.count ?? "no notice"}`,
+      );
+
+      const blank = await get(rep, "/en/companies/new");
+      const countrySelect =
+        blank.body.match(
+          /<select[^>]*name="countryId"[\s\S]*?<\/select>/,
+        )?.[0] ?? "";
+      // Abroad, for §9's and §13's reason: the city is a `Combobox` in a
+      // portal, so this script has no city id, and `S15` refuses a Saudi
+      // company without one. `"SA"` is `SAUDI_CODE`, repeated rather than
+      // imported — this file imports nothing from `src/`.
+      const foreignId = [
+        ...countrySelect.matchAll(
+          /<option value="([0-9a-f-]{36})"[^>]*data-code="([A-Z]{2})"/g,
+        ),
+      ].find((option) => option[2] !== "SA")?.[1];
+
+      const registration = envelopeOf(blank.body);
+      registration.set("name", `refresh-${stamp}`);
+      registration.set("phone", `+9665${stamp}1`);
+      registration.set("countryId", foreignId ?? "");
+      for (const empty of ["cityId", "categoryId", "leadSourceId", "notes"]) {
+        registration.set(empty, "");
+      }
+      const registered = await fetch(`${BASE}/en/companies/new`, {
+        method: "POST",
+        headers: { cookie: header(rep), origin: BASE },
+        body: registration,
+        redirect: "manual",
+      });
+      store(rep, registered);
+      check(
+        "this section registers the company it watches arrive [S13]",
+        registered.status === 303,
+        `got ${registered.status}`,
+      );
+
+      const after = notice ? await ask(manager, notice, notice.since) : null;
+      check(
+        "*** a row that arrived AFTER the render is counted, and the page was never reloaded *** [D72]",
+        after?.count === 1,
+        `answered ${after?.count ?? "no notice"}`,
+      );
+      // `D72`: *what it may update is the number in that line, and whether the
+      // line is there at all. Nothing beneath it.* The screen is still the one
+      // the server sent, which is what makes that true by construction.
+      check(
+        "…and the rendered page still holds exactly what it held [D72]",
+        !before.body.includes('data-slot="refresh-line"'),
+      );
+    }
+
+    /* — `D73`, on the five runs this slice corrected — */
+
+    {
+      /**
+       * A run of *figure · translated word* must resolve off its own word.
+       * Asserted as markup rather than as rendered text: the words differ by
+       * locale and `CLAUDE.md` forbids asserting on a translated string, but
+       * the `dir` attribute is the same marker in both.
+       */
+      const holds = (region: string) =>
+        region.includes('dir="auto"') && !region.includes('dir="ltr"');
+
+      for (const locale of ["en", "ar"] as const) {
+        const quotations = await get(manager, `/${locale}/quotations`);
+        check(
+          `${locale}: /quotations' elapsed figure resolves off its own word [D73]`,
+          holds(between(quotations.body, "turn", "quotation-row").slice(0, 400)),
+        );
+
+        const dispatches = await get(manager, `/${locale}/dispatches`);
+        check(
+          `${locale}: /dispatches' elapsed figure does too [D73]`,
+          dispatches.body.includes(
+            '<span class="num text-faint text-xs font-semibold" dir="auto">',
+          ),
+        );
+
+        // Scoped to the age cell by its own handle: the cell beside it holds a
+        // bare date and correctly keeps `dir="ltr"`, so asserting over the
+        // whole table would be asserting the wrong thing about both.
+        const followUps = await get(manager, `/${locale}/follow-ups`);
+        const ageCells = [
+          ...followUps.body.matchAll(/<td[^>]*data-column="age"[^>]*>/g),
+        ].map((cell) => cell[0]);
+        check(
+          `${locale}: /follow-ups' age cell does too [D73]`,
+          ageCells.length > 0 && ageCells.every(holds),
+          `${ageCells.length} age cell(s)`,
+        );
+
+        const home = await get(rep, `/${locale}`);
+        const target = between(home.body, "today-target-sqm", "today-pace");
+        check(
+          `${locale}: the target's *of N m²* resolves off its own word [D73]`,
+          target === "" || holds(target),
+          target === "" ? "no target panel for this identity" : "",
+        );
+      }
+    }
   }
 
   /* ── 23 ──────────────────────────────────────────────────────────────── */

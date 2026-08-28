@@ -65,7 +65,11 @@ export function Turn({
     <span data-slot="turn" className="flex flex-col gap-0.5 text-start">
       <span className="text-[13px] font-medium">{line}</span>
       {elapsed ? (
-        <span className={cn("num text-xs font-semibold", TONE[tone])} dir="ltr">
+        // `D73` — `elapsed` is `D34`'s calendar-day figure, which is a
+        // number and a translated word, so the run resolves off the word. A
+        // bare figure would land on LTR through `auto` anyway: with no strong
+        // character the algorithm falls back to it.
+        <span className={cn("num text-xs font-semibold", TONE[tone])} dir="auto">
           {elapsed}
         </span>
       ) : null}

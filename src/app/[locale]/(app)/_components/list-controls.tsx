@@ -157,6 +157,7 @@ export async function ListCard({
   total,
   query,
   extra,
+  header,
   children,
 }: {
   basePath: string;
@@ -165,6 +166,17 @@ export async function ListCard({
   query?: string;
   /** Filters the pager must carry, so page 2 of a filtered list still is. */
   extra?: Record<string, string | undefined>;
+  /**
+   * **The card's own header** — `D72`'s *where it renders*, and the only thing
+   * that goes here.
+   *
+   * This card had a footer and no header until session 42, because nothing had
+   * ever needed one. It is rendered bare rather than inside a bar of its own:
+   * `RefreshNotice` draws no box when there is nothing new, so an unconditional
+   * wrapper here would paint an empty rule across every list in the product —
+   * the `D61` mistake in a different shape.
+   */
+  header?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -177,6 +189,7 @@ export async function ListCard({
       data-total={String(total)}
       className="card-face glass"
     >
+      {header}
       {children}
       <ListPagination
         basePath={basePath}

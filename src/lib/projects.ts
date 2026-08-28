@@ -318,6 +318,10 @@ export function projectMovement() {
       at: sql<string | null>`max(
         (${quotationThreads.createdAt} at time zone 'Asia/Riyadh')::date
       )`.as("thread_event_at"),
+      /** The same event as an **instant** — see `movedAt` below. */
+      movedAt: sql<Date | null>`max(${quotationThreads.createdAt})`.as(
+        "thread_moved_at",
+      ),
     })
     .from(quotationThreads)
     .groupBy(quotationThreads.projectId)
@@ -328,6 +332,18 @@ export function projectMovement() {
       projectId: dispatches.projectId,
       at: sql<string | null>`max(${dispatches.dispatchDate})`.as(
         "dispatch_event_at",
+      ),
+      /**
+       * The same event as an instant — `approved_at`, not `dispatch_date`.
+       *
+       * `dispatch_date` is the day the panels left, typed by a person and
+       * freely backdated; `approved_at` is when the row actually moved, which
+       * is the only one of the two that can be compared against *the moment
+       * this screen was rendered* `D72`. `approvedDispatches()` reads the
+       * status, so this stamp is never null on a row that reaches here.
+       */
+      movedAt: sql<Date | null>`max(${dispatches.approvedAt})`.as(
+        "dispatch_moved_at",
       ),
     })
     .from(dispatches)
@@ -340,7 +356,109 @@ export function projectMovement() {
     ("projects"."created_at" at time zone 'Asia/Riyadh')::date
   )`;
 
-  return { threadEvents, dispatchEvents, at };
+  /**
+   * `at`, at the granularity a clock has — `D72`'s stamp for both project
+   * views.
+   *
+   * **The same two events, read finer.** `at` is a Riyadh calendar day because
+   * that is the unit a list ranks by, and a count over a day reads zero all
+   * day and then jumps at midnight, which is useless to somebody watching a
+   * board. This is the identical `greatest`/`coalesce` over the identical
+   * subqueries, taking the instant each one already holds — a finer reading of
+   * the list's own order key rather than a second definition of movement.
+   *
+   * The fallback is the project's own creation, so a project a colleague has
+   * just created counts as having arrived.
+   */
+  const movedAt = sql<Date>`coalesce(
+    greatest(${threadEvents.movedAt}, ${dispatchEvents.movedAt}),
+    "projects"."created_at"
+  )`;
+
+  return { threadEvents, dispatchEvents, at, movedAt };
+}
+
+/**
+ * The narrowing both project views pass — everything that decides WHICH rows.
+ *
+ * `onBoard` is the board's own term `D29`: a lost project leaves the board and
+ * is counted beside it, so the two views genuinely hold different row sets and
+ * one scope may not pretend otherwise.
+ */
+export type ProjectScope = {
+  q?: string;
+  companyId?: string;
+  /** `D29` — cards only, lost projects excluded. */
+  onBoard?: boolean;
+};
+
+/**
+ * Which projects a reader may see under a given narrowing — the **one** `where`
+ * `listProjects`, `listProjectBoard` and `countProjectsSince` all run `D72`.
+ *
+ * Extracted rather than repeated: `D72` asks the count route for *the same
+ * query the screen ran*, and a second copy of these four terms would drift the
+ * first time one of them changed.
+ */
+function projectScopeWhere(
+  session: AuthSession,
+  options: ProjectScope,
+): SQL | undefined {
+  return and(
+    visibleProjectsFilter(session),
+    searchFilter(options.q),
+    options.companyId
+      ? inArray(
+          projects.id,
+          db
+            .select({ id: projectCompanies.projectId })
+            .from(projectCompanies)
+            .where(
+              and(
+                eq(projectCompanies.companyId, options.companyId),
+                isNull(projectCompanies.removedAt),
+              ),
+            ),
+        )
+      : undefined,
+    // `end_state` carries only `lost` since `S31`, so this reads "not lost".
+    options.onBoard ? isNull(projects.endState) : undefined,
+  );
+}
+
+/**
+ * How many projects in this scope moved after `since` — `D72`'s count.
+ *
+ * One aggregate over `projectScopeWhere` and `projectMovement().movedAt`,
+ * resolved in SQL over the whole scope and never a page `CLAUDE.md`. The two
+ * left joins are the ones the stamp needs; nothing else is read.
+ */
+export async function countProjectsSince(
+  session: AuthSession,
+  options: ProjectScope,
+  since: Date,
+): Promise<number> {
+  const moved = projectMovement();
+  const [row] = await db
+    .select({ total: count() })
+    .from(projects)
+    .leftJoin(moved.threadEvents, eq(moved.threadEvents.projectId, projects.id))
+    .leftJoin(
+      moved.dispatchEvents,
+      eq(moved.dispatchEvents.projectId, projects.id),
+    )
+  // **The bound parameter is cast outright**, and that is load-bearing: a
+  // `Date` interpolated into a `sql` template reaches postgres.js untyped and
+  // the driver refuses it, while a bare ISO string would be typed `text` and
+  // compared against a `timestamptz` — the untyped-parameter half of the trap
+  // `CLAUDE.md` records, which `coverage.ts` and `dispatches.ts` both name.
+    .where(
+      and(
+        projectScopeWhere(session, options),
+        sql`${moved.movedAt} > ${since.toISOString()}::timestamptz`,
+      ),
+    );
+  return row?.total ?? 0;
 }
 
 /**
@@ -604,9 +722,7 @@ function searchFilter(query: string | undefined): SQL | undefined {
  */
 export async function listProjects(
   session: AuthSession,
-  options: {
-    companyId?: string;
-    q?: string;
+  options: ProjectScope & {
     page?: number;
     withChain?: boolean;
   } = {},
@@ -618,26 +734,9 @@ export async function listProjects(
 }> {
   const page = Math.max(1, options.page ?? 1);
 
-  const linkedToCompany = options.companyId
-    ? inArray(
-        projects.id,
-        db
-          .select({ id: projectCompanies.projectId })
-          .from(projectCompanies)
-          .where(
-            and(
-              eq(projectCompanies.companyId, options.companyId),
-              isNull(projectCompanies.removedAt),
-            ),
-          ),
-      )
-    : undefined;
-
-  const where = and(
-    visibleProjectsFilter(session),
-    searchFilter(options.q),
-    linkedToCompany,
-  );
+  // The one `where`, shared with `countProjectsSince` so the count route
+  // cannot answer about a different set of rows `D72`.
+  const where = projectScopeWhere(session, options);
 
   const moved = projectMovement();
 
@@ -776,11 +875,13 @@ export type ProjectBoard = {
  */
 export async function listProjectBoard(
   session: AuthSession,
-  options: { q?: string } = {},
+  options: ProjectScope = {},
 ): Promise<ProjectBoard> {
-  const visible = and(visibleProjectsFilter(session), searchFilter(options.q));
-  // `end_state` carries only `lost` since `S31`, so this reads "not lost".
-  const onBoard = and(visible, isNull(projects.endState));
+  const visible = projectScopeWhere(session, { ...options, onBoard: false });
+  // `end_state` carries only `lost` since `S31`, so this reads "not lost" —
+  // and it is the same `onBoard` term `countProjectsSince` takes, so the
+  // board's count and the board's cards cannot disagree about the row set.
+  const onBoard = projectScopeWhere(session, { ...options, onBoard: true });
 
   const moved = projectMovement();
 

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { getTranslations } from "next-intl/server";
 
 import { Badge } from "@/components/ui/badge";
@@ -59,10 +60,17 @@ export async function ProjectBoardView({
    * the page already asked.
    */
   viewerUserId,
+  /**
+   * `D72`'s line, already built by the page — *in the header of the block it
+   * belongs to*. Passed as a node rather than as props for the same reason
+   * `viewerUserId` is: this component asks the server for nothing of its own.
+   */
+  refresh,
 }: {
   board: ProjectBoard;
   tableHref: string;
   viewerUserId: string;
+  refresh?: ReactNode;
 }) {
   const t = await getTranslations();
   // The owner's name earns its place only where the reader sees somebody
@@ -76,6 +84,9 @@ export async function ProjectBoardView({
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Above the strip, in the block's own flow `D72`. It draws no box until
+          something has arrived, so the board is unchanged until then. */}
+      {refresh}
       <div
         data-slot="project-board"
         data-total={String(board.total)}
