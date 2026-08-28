@@ -2,13 +2,11 @@ import { Bell } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { AppRail } from "@/components/app-rail";
-import { Button } from "@/components/ui/button";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { Link } from "@/i18n/navigation";
 import { can } from "@/lib/authz";
 import { lookupName } from "@/lib/lookups";
 
-import { logoutAction } from "./actions";
 import { shellCounts } from "./_components/shell-counts";
 import { ThemeToggle } from "./_components/theme-toggle";
 
@@ -81,7 +79,10 @@ export default async function AppLayout({
               href="/notifications"
               aria-label={t("nav.notifications")}
               title={t("nav.notifications")}
-              className="text-muted-foreground hover:bg-surface hover:border-line hover:text-foreground relative grid size-8 place-items-center rounded-lg border border-transparent transition-colors"
+              // `D74` — a floor below `md`, and `D22`'s 32px above it. `38a`
+              // put the same pair on `Button`'s base and this is not a
+              // `Button`, which is why it was missed.
+              className="text-muted-foreground hover:bg-surface hover:border-line hover:text-foreground relative grid size-8 place-items-center rounded-lg border border-transparent transition-colors max-md:size-11"
             >
               <Bell className="size-4" aria-hidden />
               {unresolved > 0 ? (
@@ -97,11 +98,6 @@ export default async function AppLayout({
             </Link>
             <LocaleSwitcher />
             <ThemeToggle />
-            <form action={logoutAction}>
-              <Button type="submit" size="sm" variant="ghost">
-                {t("auth.signOut")}
-              </Button>
-            </form>
           </div>
         </header>
 

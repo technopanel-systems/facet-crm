@@ -115,13 +115,19 @@ export async function ProjectBoardView({
               data-slot="board-column"
               data-column={column}
               data-count={String(cards.length)}
-              // `min-w-72` below `md` is what makes *snapped in view* mean
-              // something: at 375 one column fills the measure and the next
-              // shows about 23px of itself, which is what says there is more
-              // to the side. 168px is the laptop's width `D22`, and it lets
-              // two and a bit columns share a phone — which snaps to nothing
-              // a reader chose.
-              className="card-face glass flex min-w-72 flex-1 snap-start flex-col md:min-w-42"
+              // **`min-w-60` below `md`, and the number moved in `38c`.** It
+              // was `min-w-72` — 288px into the 323px `<main>` leaves at 375,
+              // so the next column showed **23px**: 14px of its own padding
+              // and 9px of a letter, which reads as a clipping bug rather than
+              // as *more to the side*. At 240 the peek is **71px at 375 and
+              // 89px at 393** — the padding plus enough text to read the next
+              // pile's name starting. The column is no longer the whole
+              // measure, which is why `D56`'s clause was rewritten with it.
+              //
+              // It costs the primary column nothing: `240 − 28` of padding is
+              // **212px** of card, still half again the **168px** the laptop
+              // gives a column `D22`, and that width already works.
+              className="card-face glass flex min-w-60 flex-1 snap-start flex-col md:min-w-42"
             >
               <header className="border-line flex-none border-b px-3.5 py-2.5 text-start">
                 <p className="text-faint flex items-baseline gap-1.5 text-[10.5px] font-semibold tracking-[.09em] uppercase">

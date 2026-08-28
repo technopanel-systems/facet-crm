@@ -134,10 +134,17 @@ export default async function TodayPage({
         <form
           method="get"
           action={getPathname({ href: "/companies", locale: locale as Locale })}
-          // The measure is on the FORM, not the input: `flex-1` here would
-          // stretch to the content column and leave the button at the far
-          // edge, and `D69` puts it beside the field.
-          className="flex w-full max-w-sm min-w-0 items-center"
+          // The measure is on the FORM, not the input — `flex-1` on a wide
+          // screen would stretch to the whole content column and leave the
+          // button at the far edge, and the two belong beside each other.
+          //
+          // **Below `sm` the measure is what broke it** `38c`: `w-full` claims
+          // the entire 323px line at 375, so the ~46px Log button wrapped and
+          // sat alone on a row of its own — which reads as a control somebody
+          // forgot rather than the second half of `D69`'s pair. Below `sm` the
+          // form takes the space the button leaves; at `sm` and up the 384px
+          // measure is exactly as it was.
+          className="flex min-w-0 flex-1 items-center sm:w-full sm:max-w-sm sm:flex-none"
         >
           <Input
             type="search"

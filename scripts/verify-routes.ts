@@ -6709,6 +6709,228 @@ async function main(): Promise<void> {
     }
   }
 
+  /* ── 28 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n28. The phone three — the log form's order, the strip's axis, the shell [D46], [D56], [D74], [D20]",
+  );
+  {
+    // **What this can and cannot see**, the same admission `§27` makes: the
+    // harness fetches HTML and executes nothing, so a breakpoint, a grid track
+    // and a 375px viewport are the founder's eye check. What it CAN see is
+    // every part of `38c` that is markup rather than arrangement — and one of
+    // those, the `D20` hole below, was shipping on every device.
+    const rep = jars["rep-a@example.test"];
+
+    // **Written out rather than imported.** This script is black-box and may
+    // not reach into `src/` — the same reason `Fact` carries a `data-fact`
+    // handle. So the two lists are restated here, and a value added to
+    // `enums.ts` without one added here fails the count rather than passing
+    // silently over a shorter list. `S43` is the rule behind both.
+    const SIGNALS = [
+      "price_too_high",
+      "competitor_cheaper",
+      "colour_unavailable",
+      "lead_time_too_long",
+      "quality_concern",
+      "payment_terms",
+      "specification_unavailable",
+      "project_delayed",
+      "other",
+    ] as const;
+    const WITH_REFERENCE = [
+      "competitor_cheaper",
+      "colour_unavailable",
+      "specification_unavailable",
+      "other",
+    ] as const;
+
+    // ── the log form's order `S32` `D46` ────────────────────────────────
+    //
+    // *"Three taps and a text box."* The claim is an ORDER, so it is read as
+    // one: `data-field` in DOM order, which `FormField` already emits for
+    // `§23` and which no translated string is involved in.
+    for (const locale of ["en", "ar"] as const) {
+      const form = await get(rep, `/${locale}/reports/new`);
+      const fields = [...form.body.matchAll(/data-field="([A-Za-z]+)"/g)].map(
+        (one) => one[1],
+      );
+
+      check(
+        `${locale}: the log form's three taps come first [S32], [D46]`,
+        fields.slice(0, 3).join(",") === "companyId,channel,outcome",
+        `read ${fields.slice(0, 3).join(",") || "nothing"}`,
+      );
+      check(
+        `${locale}: …and the text box is next, above everything optional [S32]`,
+        fields[3] === "narrative",
+        `read ${fields[3] ?? "nothing"}`,
+      );
+      // The regression this guards is the shape the form shipped in: the note
+      // sixth, under the optional context, so at 375 it started below the
+      // fold. Asserting *narrative is present* would have been green then.
+      check(
+        `${locale}: …and both dates come after it, not before [D46], [S37]`,
+        fields.indexOf("reportDate") > fields.indexOf("narrative") &&
+          fields.indexOf("onHoldUntil") === fields.indexOf("reportDate") + 1,
+        `read ${fields.join(",")}`,
+      );
+
+      // ── the signals, and the `D20` hole `38c` closed ──────────────────
+      //
+      // **This is the assertion that matters most in the section.** The four
+      // reference inputs rendered on client state, so with scripts off a rep
+      // could not record a competitor's name at all — and `§23` could not see
+      // it, because a field gated on `useState` is not in the HTML for a scan
+      // of the HTML to fail on. `WORKFLOW §5` carries the shape. What closes
+      // it is that the fields are HERE, in a response that ran no script.
+      check(
+        `${locale}: the signals are a native <details> [D46], [D20]`,
+        /<details[^>]*data-slot="report-signals"/.test(form.body),
+      );
+      const shut = !/<details[^>]*data-slot="report-signals"[^>]*\sopen/.test(
+        form.body,
+      );
+      check(
+        `${locale}: …shut on a form with no signals raised [D46]`,
+        shut,
+        "it rendered open with nothing in it",
+      );
+      const boxes = SIGNALS.filter((signal) =>
+        new RegExp(`name="signals"[^>]*value="${signal}"`).test(form.body),
+      );
+      check(
+        `${locale}: …with all nine checkboxes in the markup while it is shut [D20]`,
+        boxes.length === SIGNALS.length,
+        `${boxes.length} of ${SIGNALS.length}`,
+      );
+      const references = WITH_REFERENCE.filter((signal) =>
+        form.body.includes(`name="signalReference.${signal}"`),
+      );
+      check(
+        `${locale}: …and all four reference inputs too — the D20 hole [D20]`,
+        references.length === WITH_REFERENCE.length,
+        `${references.length} of ${WITH_REFERENCE.length} — ` +
+          "a reference behind client state cannot be typed with scripts off",
+      );
+      // A field that is in the DOM but permanently invisible is the same
+      // defect wearing a different hat, so the reveal is asserted as the
+      // sibling selector it is rather than trusted.
+      check(
+        `${locale}: …revealed by the checkbox itself, not by script [D20]`,
+        // Read off the whole tag, not forward from `name=`: `Input` spreads
+        // its caller's props AFTER `className`, so the class attribute is
+        // emitted first and a forward-only match sees nothing. That is the
+        // check failing for a reason unrelated to the claim, which is the
+        // shape this section exists to avoid.
+        [...form.body.matchAll(/<input[^>]*>/g)]
+          .filter((tag) => /name="signalReference\./.test(tag[0]))
+          .every((tag) => tag[0].includes("peer-checked:block")),
+      );
+
+      // ── `D74` — the label IS the target, not a 44px box around it ──────
+      const labels = [
+        ...form.body.matchAll(/<label[^>]*for="signal-[a-z_]+"[^>]*>/g),
+      ].map((one) => one[0]);
+      check(
+        `${locale}: every signal label carries the 44px floor itself [D74]`,
+        labels.length === SIGNALS.length &&
+          labels.every((label) => label.includes("max-md:min-h-11")),
+        `${labels.filter((one) => one.includes("max-md:min-h-11")).length} of ` +
+          `${labels.length} labels`,
+      );
+      // `D74` as amended: a component's own floor is the floor, and a caller
+      // may not pin it. `h-11` is a HEIGHT and the rule says never — it is the
+      // class the deleted `touch` constant put on both dates, at every width.
+      // `min-h-11` is deliberately not matched.
+      check(
+        `${locale}: …and no caller pins a height over it [D74]`,
+        !/[\s"](?:max-md:|md:)?h-11[\s"]/.test(form.body),
+        "a control carries h-11 — a height where the rule says a floor",
+      );
+    }
+
+    // ── the chain strip's axis `D56` ────────────────────────────────────
+    //
+    // The arrangement is CSS and invisible here; what is markup is that all
+    // six steps still carry both lines. The defect was that they carried them
+    // and truncated them to five characters, which no fetch can see — so the
+    // thing worth asserting is that `truncate` is scoped to `md`, because an
+    // unscoped one is the defect returning.
+    for (const locale of ["en", "ar"] as const) {
+      const quotations = await get(rep, `/${locale}/quotations`);
+      const threadId = firstId(quotations.body, "quotations");
+      if (!threadId) {
+        console.log(`  skip  ${locale}: no quotation thread to open`);
+        continue;
+      }
+      const thread = await get(rep, `/${locale}/quotations/${threadId}`);
+      const strip = between(thread.body, "chain-strip", "facts");
+      const steps = [...strip.matchAll(/<li[^>]*data-state="[a-z]+"/g)];
+      check(
+        `${locale}: the strip draws six steps [D27], [S132]`,
+        steps.length === 6,
+        `${steps.length} steps`,
+      );
+      check(
+        `${locale}: …and truncates only at md, so a phone reads the labels [D56]`,
+        strip.length > 0 && !/[\s"]truncate[\s"]/.test(strip),
+        "an unscoped truncate is back — six labels at 40px is five characters",
+      );
+    }
+
+    // ── the shell `D74`, and Sign out's new home ────────────────────────
+    for (const locale of ["en", "ar"] as const) {
+      const home = await get(rep, `/${locale}`);
+      // Three controls, counted rather than trusted: the whole of the header
+      // change is a NUMBER, and `D49`'s seven rail items went unchecked for
+      // exactly this reason until `28b` counted them.
+      const head = home.body.slice(
+        home.body.indexOf("<header"),
+        home.body.indexOf("</header>"),
+      );
+      const controls = [...head.matchAll(/<(?:a|button)\s/g)].length;
+      check(
+        `${locale}: the header carries three controls, not five [D74]`,
+        controls === 3,
+        `${controls} control(s) — the row needs ~324px EN / ~346px AR at five`,
+      );
+      check(
+        `${locale}: …and Sign out is in the rail footer instead`,
+        home.body.includes('data-slot="rail-sign-out"'),
+      );
+      // Neither is a `Button`, so `38a`'s floor on the base could not reach
+      // either of them — which is why both were still 32px.
+      check(
+        `${locale}: the bell and the theme toggle carry D74's floor [D74]`,
+        (head.match(/max-md:size-11/g) ?? []).length === 2,
+        `${(head.match(/max-md:size-11/g) ?? []).length} of 2`,
+      );
+    }
+
+    // ── the board's column measure `D56` ────────────────────────────────
+    //
+    // A utility class is a coarser handle than a `data-` marker, and is used
+    // here only because the rule's content IS the number: `D56` now says 240
+    // and says why, and a clause carrying a figure nothing reads is how the
+    // *current column* clause survived with no referent. If the measure ever
+    // moves to a custom property this goes red and gets updated, which is the
+    // right outcome — it is not asserting a style, it is asserting the rule.
+    for (const locale of ["en", "ar"] as const) {
+      const board = await get(rep, `/${locale}/projects?view=board`);
+      const columns = [
+        ...board.body.matchAll(/<section[^>]*data-slot="board-column"[^>]*>/g),
+      ].map((one) => one[0]);
+      check(
+        `${locale}: every board column takes the phone measure [D56]`,
+        columns.length === 6 &&
+          columns.every((column) => column.includes("min-w-60")),
+        `${columns.filter((one) => one.includes("min-w-60")).length} of ` +
+          `${columns.length} columns at 240px`,
+      );
+    }
+  }
+
   /* ── 23 ──────────────────────────────────────────────────────────────── */
 
   console.log(

@@ -4,7 +4,7 @@
     "tagline": "Technopanel operations platform"
   },
   "locale": {
-    "label": "Language",
+    "switchTo": "Switch to {language}",
     "en": "English",
     "ar": "العربية"
   },
@@ -880,6 +880,8 @@
       "interactionHint": "Anchored to a company. The contact and the project are optional.",
       "fieldNoteHint": "A field note belongs to no customer. It counts as activity and reaches the stream, though no company's or project's timeline.",
       "signalsHint": "What the customer said, kept separate from what happened in the funnel. Worth recording whether or not the deal was lost.",
+      "signalsSummary": "Signals ({count})",
+      "signalsSummaryNone": "Signals",
       "onHoldHint": "This company raises no follow-up until the date above.",
       "onHoldFieldHint": "Only used when the outcome is “On hold”.",
       "noSignals": "No signals.",

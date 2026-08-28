@@ -13,8 +13,11 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import { Button } from "@/components/ui/button";
 import { Link, usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
+
+import { logoutAction } from "@/app/[locale]/(app)/actions";
 
 /**
  * The rail `D49` — **seven items** in two groups, plus Today.
@@ -73,6 +76,24 @@ import { cn } from "@/lib/utils";
  *
  * **No chevron rotation and no slide** `D17`. The motion list is closed and a
  * disclosure is not on it — the same reading `disclosure.tsx` already applies.
+ *
+ * ## Sign out lives in the footer, since `38c`
+ *
+ * It was the largest control in the header, in a row that needed ~324px English
+ * and ~346px Arabic against the 323px `<main>` leaves at 375 — so the shell
+ * wrapped to two sticky rows on every screen in the product. It is the thing
+ * pressed least and it was the loudest, at **every** width and not only on a
+ * phone, so it moved rather than being hidden below `md`.
+ *
+ * **`PROPOSED — not required by any rule.`** No `D` rule governs the header
+ * cluster or this footer; `D49` numbers the rail's seven links and Sign out is
+ * not one of them, which is why it sits **below** the identity rather than in
+ * the `<nav>`. What the footer already says is *who you are*; this is *how you
+ * stop being them*, and the two belong to one another.
+ *
+ * A `"use client"` component may import a server action — `actions.ts` carries
+ * `"use server"`, so what crosses the boundary is a reference, not the module.
+ * This file still imports nothing from `@/lib/authz`, not even a type `D50`.
  */
 
 const GROUPS = [
@@ -143,6 +164,7 @@ export function AppRail({
   roleLabel,
 }: RailFlags) {
   const t = useTranslations("nav");
+  const tAuth = useTranslations("auth");
   const pathname = usePathname();
 
   // Prefix match so a detail page keeps its section lit. Today is the one
@@ -314,7 +336,7 @@ export function AppRail({
         >
           {initials(userName)}
         </div>
-        <div className="min-w-0 text-start">
+        <div className="min-w-0 flex-1 text-start">
           <span className="text-rail-strong block truncate text-[13px] font-semibold">
             {userName}
           </span>
@@ -322,6 +344,21 @@ export function AppRail({
             {roleLabel}
           </span>
         </div>
+        {/* A form, not a link: signing out deletes the session row, which is a
+            write and may not be a GET. `Button`'s base carries `D74`'s floor,
+            so `xs` is 24px on a laptop and 44 on a phone with no size variant
+            having to remember it. */}
+        <form action={logoutAction} className="flex-none">
+          <Button
+            data-slot="rail-sign-out"
+            type="submit"
+            size="xs"
+            variant="ghost"
+            className="text-rail-text hover:bg-rail-active hover:text-rail-strong"
+          >
+            {tAuth("signOut")}
+          </Button>
+        </form>
       </div>
     </aside>
   );

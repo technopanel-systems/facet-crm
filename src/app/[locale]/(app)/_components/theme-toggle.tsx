@@ -13,7 +13,12 @@ import { setThemeAction } from "../actions";
  * job is to POST the *other* theme and let the layout re-render.
  *
  * The label names the theme being switched TO, which is what a screen reader
- * user needs to hear before pressing it.
+ * user needs to hear before pressing it. `LocaleSwitcher` beside it is now the
+ * same shape for the same reason `38c`.
+ *
+ * `max-md:size-11` is `D74`'s floor. `38a` put it on `Button`'s base and this
+ * is a bare `<button>`, so it was missed — as was the bell in the layout, for
+ * the same reason.
  */
 export async function ThemeToggle() {
   const theme = await getTheme();
@@ -27,7 +32,7 @@ export async function ThemeToggle() {
         type="submit"
         aria-label={t(next)}
         title={t(next)}
-        className="text-muted-foreground hover:bg-surface hover:border-line hover:text-foreground grid size-8 place-items-center rounded-lg border border-transparent transition-colors"
+        className="text-muted-foreground hover:bg-surface hover:border-line hover:text-foreground grid size-8 place-items-center rounded-lg border border-transparent transition-colors max-md:size-11"
       >
         {theme === "dark" ? (
           <Sun className="size-4" aria-hidden />

@@ -863,6 +863,30 @@ timeline is the same stream, scoped to that record.
 text box. Channel, outcome, optional project and contact, optional signals, the
 note. Built for a phone.
 
+**The order that ships is the sentence's, and the note comes third** — company,
+channel · outcome, **the note**, then project, contact, the two dates, then the
+signals. The list above reads as a field order and never was one: the code has
+put the note before the signals since the form was built, and until `38c` it
+also put it sixth, under everything optional. At 375 that meant the box *"three
+taps and a text box"* names started **below the fold**, which is the one thing
+this rule exists to prevent. Optional context follows the note; it does not
+precede it.
+
+**The signals are behind a disclosure, at every width.** Nine checkboxes were
+~530px of a ~1500px form — a third of the screen for the block most reports
+leave empty — and the summary carries the count, so a rep who has raised one
+sees it without opening. **Not below `md` only**: a closed native `<details>`
+hides its children through a slot or `::details-content` and author CSS cannot
+reliably re-show them `D56`, so closed-on-a-phone-open-on-a-laptop is not a
+shape a disclosure can take. `D24` builds this form phone-first and the laptop
+reader is the same rep, so it collapses for both.
+
+**Every field is in the markup whether it is open or shut** `D20`. That is the
+point of a `<details>` rather than a toggle, and it is what a signal's reference
+input did not manage: it rendered on client state, so with scripts off a rep
+could not record a competitor's name at all, on any device. It is revealed by
+the checkbox itself now — a sibling selector, no bundle.
+
 **D47.** A report's shared half and its private note render differently: the
 note is visually a quote block, and is absent entirely for a reader who may not
 see it. Nothing is greyed out or "locked" — it simply is not there.
@@ -1027,10 +1051,42 @@ width, and no script is involved `D20`.
 **The board snaps, and there is no *current* column.** The clause named one and
 had no referent: six piles `S132`, no selection, and no act may move a card
 `D29` `S134`. So every column snaps to the inline start and the board opens on
-the first, which is `S132`'s own order; below `md` a column takes the measure so
-one is in view with the next showing its edge. A reader who wants rows has
+the first, which is `S132`'s own order. A reader who wants rows has
 `?view=table` `D28` — the same query, already built, carrying the search `D59`.
 No third arrangement was invented for a narrow screen.
+
+**A column is 240px below `md`, and it is deliberately narrower than the
+measure.** `38b` gave it 288 — the whole 323px `<main>` leaves at 375 — so the
+next column showed **23px**, which is 14px of its own padding and 9px of a
+letter. The peek was reading as a clipping bug rather than as *there is more to
+the side*, which is the one job it has. At 240 it is **71px at 375 and 89px at
+393**: the padding, plus enough of the next pile's name to start reading it.
+**The number is a legibility floor on the peek, not a fraction of the screen** —
+a column that takes the whole measure can only ever show a sliver of the next
+one, whatever the screen is. It costs the near column nothing: 212px of card
+against the **168px** a laptop column gets `D22`, and that width already works.
+
+**A horizontal strip of steps turns vertical below `md`.** The chain strip
+`D27` is six `flex-1` steps; in the 291px a `Card` leaves at 375 that is 48.5px
+each, and every label and owner name truncated to about five characters — *No
+pr… Reque… Quot… With … Read… Won*. **That is not a narrow arrangement of the
+strip, it is the strip's absence**, on the two screens `D70` says a rep opens
+standing outside a customer's office. Turned down the page each step takes the
+full measure and nothing truncates, so `truncate` is scoped to `md` where it is
+a real necessity. Same one-DOM-in-CSS shape as the phone row above: the `<li>`
+is a two-column grid below `md` with the rail run spanning both rows, a flex
+column above it, and the rail halves swap axis — no prop, no branch, no second
+component, no script `D20`.
+
+**This is a fourth clause, and `D55` does not name the screens it lands on.**
+Its phone-first list is the waiting list, the log form, the company lookup and
+the quotation *request* — not the quotation thread or the project detail, which
+are where the strip lives. The strip is fixed anyway: five characters is not
+laptop-first, it is broken, and a rule that only reaches screens on a list would
+leave it that way. The disagreement between `D55`'s list and this clause's reach
+is recorded rather than resolved here.
+
+---
 
 **D74. A control a thumb has to hit is at least 44px on a phone.** Every
 button, input, select and native date field; below `md` only — `D22`'s laptop
@@ -1049,6 +1105,22 @@ That is what lets it sit on `Button`'s base rather than on its seven size
 variants: 44 simply outranks the `h-6` an `xs` chip already carries, and every
 `FilterNav` chip and both pager buttons were `xs` — 24px, the smallest thing a
 thumb was asked to hit anywhere in the product.
+
+**A component's own floor IS the floor, and a caller may not pin it.** The ban
+above reaches the **call site**, which is the half that went unsaid and was
+therefore breached in the one file this rule's number came from: `report-form`
+carried a local `touch = "h-11 …"` and applied it to both its dates, overriding
+`Input`'s `h-8 max-md:min-h-11` in both directions — 44px on a laptop, where
+`D22`'s density is deliberate, and a height where the rule says a minimum. A
+component that already carries the floor needs nothing from its caller; a caller
+that adds one is either duplicating it or breaking it, and there is no third
+case. The same reading covers the `text-base md:text-sm` step below — repeating
+its first half locally pins 16px above `md`.
+
+**Two controls in the shell are not `Button`s and were missed by that**, which
+is the cost of putting the floor on a base: the bell in `(app)/layout.tsx` and
+`ThemeToggle` are bare elements at `size-8`, and both carried 32px until `38c`
+found them. Anything hand-rolled has to say the floor itself.
 
 **A checkbox is the exception and needs no growth**, because `checkbox.tsx`
 already pairs every one of its call sites with a `<label htmlFor>` and the
