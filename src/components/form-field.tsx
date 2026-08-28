@@ -170,8 +170,20 @@ export function SelectField({
       aria-invalid={invalid || undefined}
       aria-describedby={invalid ? `${name}-error` : undefined}
       className={cn(
-        "border-input bg-background text-foreground h-8 w-full rounded-lg border",
-        "ps-3 pe-8 text-start text-sm shadow-xs outline-none",
+        "border-input bg-background text-foreground w-full rounded-lg border",
+        // **`text-base` below `md`, and it is not a taste decision.** iOS
+        // Safari zooms the page whenever a focused form control renders under
+        // 16px, and this was `text-sm` — 14px — with no step, while `Input`
+        // and `Textarea` beside it have carried `text-base md:text-sm` all
+        // along. Every `<select>` in FACET zoomed the page on focus, eight of
+        // them on the quotation form alone. Nobody reports that as a bug; they
+        // assume phones do that.
+        "text-base md:text-sm",
+        // `D74` — 44px on a phone, and a **floor**, never a height: the rule
+        // says `min-height` so `D22`'s 32px laptop control is untouched, and
+        // so this reads the same way as `Button` and `Input`.
+        "h-8 max-md:min-h-11",
+        "ps-3 pe-8 text-start shadow-xs outline-none",
         "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3",
         "aria-invalid:border-destructive aria-invalid:ring-destructive/20",
         "disabled:cursor-not-allowed disabled:opacity-50",

@@ -106,8 +106,17 @@ export default async function AppLayout({
         </header>
 
         {/* `D23`'s column: max-width 1320, start-aligned, no auto margin.
-            `max-w-330` is 330 × 4px. Padding is `D22`. */}
-        <main className="w-full max-w-330 flex-1 px-6.5 pt-5.5 pb-10">
+            `max-w-330` is 330 × 4px. Padding is `D22`.
+
+            `max-md:pb-20` is the sheet's clearance `D56`: below `md` the rail
+            is a bar fixed to the bottom edge, so the last row of every screen
+            would sit under it. **No `env(safe-area-inset-bottom)` and no
+            `viewport-fit=cover`** — nothing exports `viewport`, so Next emits
+            its default `width=device-width, initial-scale=1` with no
+            `viewport-fit`, and iOS therefore insets the viewport itself and the
+            bar already clears the home indicator. Opting into `cover` would
+            create the problem `env()` then solves. */}
+        <main className="w-full max-w-330 flex-1 px-6.5 pt-5.5 pb-10 max-md:pb-20">
           {children}
         </main>
       </div>

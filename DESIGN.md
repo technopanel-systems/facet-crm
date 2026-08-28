@@ -970,9 +970,66 @@ a thing exists that they may not see.
 request — are **built phone-first**. Manager and coordinator screens are
 laptop-first. Nothing is designed for tablet specifically.
 
-**D56.** On a phone, a table row collapses to its lead cell, name and elapsed
+**D56. [CHANGE]** On a phone, a table row collapses to its lead cell, name and elapsed
 time; secondary columns are hidden, not scrolled. The rail becomes a bottom
 sheet. The board scrolls horizontally with the current column snapped in view.
+
+**The rail clause ships** — session `38a`. It is a native `<details>`: the
+`<summary>` is a bar fixed to the bottom edge, and the panel is its **peer**,
+revealed by CSS. Not a child, because every engine hides a closed `<details>`'
+non-summary children through a slot or `::details-content` and author CSS
+cannot reliably re-show them — nested, `D49`'s seven links would be
+unreachable at `md` and up, where there is no disclosure to open. No client
+state, so `D20` holds; it closes itself on navigation, because every link is a
+full page load. It replaced a horizontally scrollable **top** strip, which was
+the wrong half of `AD8` in both directions: the wrong edge, and scrolled where
+this rule says a sheet.
+
+**The other two clauses are still `[CHANGE]`, and the first one is also wrong.**
+`Table` is `overflow-x-auto` and no page hides a column at any breakpoint, so
+columns are scrolled — but *lead cell, name and elapsed time* is not the right
+kept set either, because `D26` and `D2` moved after this rule was written. On
+`/quotations` the lead cell **is** the elapsed and the column this would hide,
+*position*, is which of the coordinator's three moves is owed; on `/dispatches`
+the lead cell is square metres and *status* is the only thing separating
+approved, refused and cancelled inside one pile; on `/companies` the meter
+already holds the elapsed and *Log* is what makes the list a work queue `28b`;
+on `/contacts` the lead cell **is** the name `D26` and there is no elapsed at
+all. So a phone row keeps **its lead cell, its name, and the one column its own
+anatomy needs** — the same widening `D26` took at `AD33`, for the same reason.
+Session `38b` builds it and writes that set per list.
+
+The board's clause names *the current column*, which has no referent: six piles,
+no selection. `38b` settles the wording with the snap.
+
+**D74. A control a thumb has to hit is at least 44px on a phone.** Every
+button, input, select and native date field; below `md` only — `D22`'s laptop
+density is deliberate and stays.
+
+**The number has a source, so it is not argued about later.** It is the
+platform minimum on **iOS** (44pt, Human Interface Guidelines) and the nearest
+thing on **Android** (48dp, Material) — 44 is the floor both agree is not
+enough to go below, and it is taken as a floor rather than a target, so a
+control with room takes more. It is also **already FACET's own answer**, in the
+one screen a rep uses one-handed: the log form has carried `h-11` on both its
+dates and `min-h-11` on its project chips since it was built `D46`.
+
+**It is a floor, not a size** — `min-height` and `min-width`, never `height`.
+That is what lets it sit on `Button`'s base rather than on its seven size
+variants: 44 simply outranks the `h-6` an `xs` chip already carries, and every
+`FilterNav` chip and both pager buttons were `xs` — 24px, the smallest thing a
+thumb was asked to hit anywhere in the product.
+
+**A checkbox is the exception and needs no growth**, because `checkbox.tsx`
+already pairs every one of its call sites with a `<label htmlFor>` and the
+label is the target a thumb lands on. Growing the box would break the tick,
+which is a background image sized to it.
+
+**Sixteen pixels is the other half and is not this rule.** iOS Safari zooms the
+page whenever a focused control renders under 16px, so `Input` and `Textarea`
+have carried `text-base md:text-sm` all along; `SelectField` was the one that
+did not, and every `<select>` in FACET zoomed on focus until `38a`. That is a
+legibility failure with a browser behaviour attached, not a target size.
 
 ---
 

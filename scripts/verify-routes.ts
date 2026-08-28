@@ -999,6 +999,34 @@ async function main(): Promise<void> {
         `  ${email} ${locale} rail has no /performance [D49]`,
         !rail.body.includes(`href="/${locale}/performance"`),
       );
+      // **`D56`'s bottom sheet, and the ONE thing a scripts-off walk can prove
+      // about it** `38a`. This fetches HTML and executes nothing, so it cannot
+      // see a breakpoint, a fixed position or a 44px target — those are the
+      // founder's eye check at 375. What it CAN prove is the half that would
+      // silently regress: the sheet is a native `<details>` with a `<summary>`,
+      // so there is no client state behind it `D20`, and the nav is its
+      // SIBLING rather than its child — which is what keeps `D49`'s seven
+      // links in the markup at every width. The count above is off the `<nav>`
+      // alone and would fall to zero if the nav were ever nested inside a
+      // closed `<details>` and dropped, so the two assertions hold each other
+      // up.
+      const sheet = rail.body.indexOf('data-slot="rail-sheet"');
+      check(
+        `  ${email} ${locale} the rail is a native <details> sheet [D56], [D20]`,
+        sheet !== -1 && rail.body.includes('data-slot="rail-sheet-bar"'),
+      );
+      check(
+        `  ${email} ${locale} the sheet's bar is a <summary> [D20]`,
+        /<details[^>]*data-slot="rail-sheet"[^>]*>\s*<summary/.test(rail.body),
+      );
+      // The nav opens AFTER the details closes — a peer, never a child. If it
+      // were nested this index comparison would still pass, so the closing tag
+      // is what is asserted: `</details>` must come before `<nav`.
+      check(
+        `  ${email} ${locale} the nav is the sheet's peer, not its child [D56]`,
+        sheet !== -1 &&
+          rail.body.indexOf("</details>", sheet) < rail.body.indexOf("<nav"),
+      );
       await walk(jar, email, locale);
     }
   }

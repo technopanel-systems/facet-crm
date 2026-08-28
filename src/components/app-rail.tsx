@@ -3,6 +3,7 @@
 import {
   Activity,
   Building2,
+  ChevronUp,
   FileText,
   FolderOpen,
   House,
@@ -40,6 +41,38 @@ import { cn } from "@/lib/utils";
  *
  * Hiding a link is cosmetic `D50`. `/users` returns `notFound()` on its own
  * `D53`.
+ *
+ * ## Below `md` it is `D56`'s bottom sheet
+ *
+ * It was a horizontally scrollable strip across the top, and the strip was the
+ * wrong half of `AD8`: `D56` says the rail **becomes a bottom sheet**, and the
+ * comment defending the strip — "no Sheet component, no new dependency, no
+ * JavaScript" — named a Radix `Sheet`, which `D20` as rewritten no longer needs
+ * anyone to avoid. Eight `flex-none` links ran ~891px inside 351px, so Targets
+ * and Team were two swipes off the screen on every page in the product.
+ *
+ * **It is a native `<details>` and there is no client state** `D20`. The
+ * `<summary>` is the closed bar; the panel is its `peer`, revealed by CSS.
+ *
+ * **The nav is a SIBLING of the `<details>`, never a child.** Every engine
+ * hides a closed `<details>`' non-summary children through a slot or
+ * `::details-content`, and author CSS cannot reliably re-show them — so nesting
+ * would leave `D49`'s seven links unreachable at `md` and up, where there is no
+ * disclosure to open. As a peer it is one selector, the links are in the markup
+ * in both states, and that is what `verify:routes` reads and what `useState`
+ * could never give it.
+ *
+ * **It closes itself on navigation**, free: every link is a full page load, so
+ * the next document renders the `<details>` shut.
+ *
+ * `flex-col-reverse` below `md` pins the bar to the bottom edge and grows the
+ * panel upward out of it. Opening must not move the thing that was tapped.
+ *
+ * **`glass` stays.** `D8`, `D14` and `D21` make the rail one of exactly two
+ * surfaces that may carry `--blur`, and the sheet IS the rail.
+ *
+ * **No chevron rotation and no slide** `D17`. The motion list is closed and a
+ * disclosure is not on it — the same reading `disclosure.tsx` already applies.
  */
 
 const GROUPS = [
@@ -79,6 +112,30 @@ function initials(name: string): string {
     .join("");
 }
 
+/**
+ * `D49`'s count — on a rail link, and on the sheet's closed bar.
+ *
+ * **The auto margin is on the LABEL beside it, never on this.**
+ * `margin-inline-start` resolves against the element's OWN direction, and this
+ * run carries `dir="ltr"` because it is a bare figure `D73`. So `ms-auto` here
+ * compiled to `margin-left: auto`, which in an RTL row sits on the badge's
+ * main-END side: it pushes the badge back against the label and leaves the
+ * slack on its outer edge. English worked by accident. That is the defect
+ * `companies/page.tsx` records in the same words, and the fix is the same one —
+ * put the margin on a run that inherits the page's direction, so it has no side
+ * to get wrong `D57`.
+ */
+function Count({ count }: { count: number }) {
+  return (
+    <span
+      className="bg-(--red-600) inline-flex min-w-5 flex-none items-center justify-center rounded-full px-1.5 py-0.5 text-xs font-semibold text-white"
+      dir="ltr"
+    >
+      {count}
+    </span>
+  );
+}
+
 export function AppRail({
   canManageUsers,
   todayCount,
@@ -108,7 +165,9 @@ export function AppRail({
         href={href}
         aria-current={active ? "page" : undefined}
         className={cn(
-          "flex flex-none items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
+          "flex flex-none items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium transition-colors",
+          // `D74` — 44px on a phone, the laptop's own density above it `D22`.
+          "min-h-11 py-2.5 md:min-h-0 md:py-2",
           active
             ? "bg-rail-active text-rail-strong"
             : "text-rail-text hover:bg-rail-active hover:text-rail-strong",
@@ -121,21 +180,36 @@ export function AppRail({
           )}
           aria-hidden
         />
-        <span className="whitespace-nowrap">{label}</span>
-        {count !== undefined && count > 0 ? (
-          <span
-            className="bg-(--red-600) ms-auto inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-xs font-semibold text-white"
-            dir="ltr"
-          >
-            {count}
-          </span>
-        ) : null}
+        <span className="me-auto whitespace-nowrap">{label}</span>
+        {count !== undefined && count > 0 ? <Count count={count} /> : null}
       </Link>
     );
   };
 
+  // What the closed bar names. Nothing matches on `/reports/new`,
+  // `/follow-ups` or `/notifications` — none of them is a rail item `D49` — so
+  // the bar says *Menu* rather than naming a section the reader is not in.
+  const items = [
+    { href: "/", key: "today" },
+    ...GROUPS.flatMap((group) =>
+      group.items.filter((item) => !("requires" in item) || canManageUsers),
+    ),
+  ];
+  const current = items.find((item) => isActive(item.href));
+
   return (
-    <aside className="bg-rail glass flex flex-col gap-0.5 px-3 py-3 md:sticky md:top-0 md:h-svh md:w-59 md:flex-none md:py-4">
+    <aside
+      data-slot="app-rail"
+      className={cn(
+        // `D56` — below `md` a bar fixed to the bottom edge, with the panel
+        // growing upward out of it. `inset-x-0` compiles to `inset-inline` in
+        // Tailwind v4, so it is logical `D57`.
+        "bg-rail glass fixed inset-x-0 bottom-0 z-30 flex flex-col-reverse",
+        "border-t border-white/10",
+        // `md` and up: `D49`'s rail, unchanged.
+        "md:sticky md:inset-auto md:top-0 md:h-svh md:w-59 md:flex-none md:flex-col md:gap-0.5 md:border-t-0 md:px-3 md:py-4",
+      )}
+    >
       <div className="hidden items-center gap-2.5 px-2 pt-1 pb-4 md:flex">
         <div
           className="grid size-8 flex-none place-items-center rounded-lg bg-[linear-gradient(140deg,var(--red-500),#7A1020)] text-sm font-bold text-white"
@@ -153,25 +227,61 @@ export function AppRail({
         </div>
       </div>
 
-      {/* Below md the rail is a horizontally scrollable strip: no Sheet
-          component, no new dependency, no JavaScript. */}
-      <nav className="flex flex-row gap-1 overflow-x-auto md:flex-col md:gap-0.5 md:overflow-visible">
+      {/* The bar. FIRST in the DOM because the two blocks below are its
+          `peer`s — a peer selector reaches forward only — and LAST on screen,
+          because `flex-col-reverse` pins it to the bottom edge. */}
+      <details data-slot="rail-sheet" className="peer md:hidden">
+        <summary
+          data-slot="rail-sheet-bar"
+          className={cn(
+            "text-rail-strong flex min-h-11 cursor-pointer list-none items-center gap-2.5 px-3 py-2.5",
+            "[&::-webkit-details-marker]:hidden",
+          )}
+        >
+          <span
+            className="grid size-8 flex-none place-items-center rounded-lg bg-[linear-gradient(140deg,var(--red-500),#7A1020)] text-sm font-bold text-white"
+            aria-hidden
+          >
+            {t("brandMark")}
+          </span>
+          <span className="me-auto truncate text-sm font-semibold">
+            {current ? t(current.key) : t("menu")}
+          </span>
+          {/* `D49`'s count survives the collapse. It is the one thing on the
+              rail that says work has arrived, and a sheet that hid it until
+              somebody opened the sheet would be a count nobody sees. */}
+          {todayCount > 0 ? <Count count={todayCount} /> : null}
+          <ChevronUp className="size-4 flex-none opacity-60" aria-hidden />
+        </summary>
+      </details>
+
+      {/* `md:min-h-0` and the scroll are `WORKFLOW §5`'s own row: the `<nav>`
+          could not shrink — `md:overflow-visible` won, so `min-height: auto`
+          held it at content height — free space went negative on a short
+          viewport, `mt-auto` below resolved to 0, and the footer landed
+          outside the aside: 166px below its own box at 305px. It needs `md`
+          width AND a short window, which an iPhone in landscape (852×393) is,
+          so the sheet does not make it moot. */}
+      <nav
+        className={cn(
+          "flex flex-col gap-1 px-3 pb-2 md:gap-0.5 md:px-0 md:pb-0",
+          "hidden peer-open:max-md:flex md:flex",
+          "max-md:max-h-[60svh] max-md:overflow-y-auto md:min-h-0 md:overflow-y-auto",
+        )}
+      >
         {link("/", t("today"), House, todayCount)}
 
         {GROUPS.map((group) => {
-          const items = group.items.filter(
+          const groupItems = group.items.filter(
             (item) => !("requires" in item) || canManageUsers,
           );
-          if (items.length === 0) return null;
+          if (groupItems.length === 0) return null;
           return (
-            <div
-              key={group.key}
-              className="contents md:block md:space-y-0.5 md:pt-2"
-            >
-              <p className="text-rail-text hidden px-2.5 pt-2 pb-1.5 text-[10.5px] font-semibold tracking-widest uppercase opacity-45 md:block">
+            <div key={group.key} className="space-y-0.5 pt-2">
+              <p className="text-rail-text px-2.5 pt-2 pb-1.5 text-[10.5px] font-semibold tracking-widest uppercase opacity-45">
                 {t(group.key)}
               </p>
-              {items.map((item) => link(item.href, t(item.key), item.Icon))}
+              {groupItems.map((item) => link(item.href, t(item.key), item.Icon))}
             </div>
           );
         })}
@@ -185,8 +295,19 @@ export function AppRail({
           composites that layer on the GPU where headless Chrome does it in
           software. A footer with its own stacking context is not painted by
           the aside's promoted layer. **`glass` stays** — `D8`, `D14` and `D21`
-          make the rail one of exactly two surfaces that may carry `--blur`. */}
-      <div className="relative isolate mt-auto hidden items-center gap-2.5 border-t border-white/10 pt-3.5 md:flex">
+          make the rail one of exactly two surfaces that may carry `--blur`.
+
+          On a phone it is the TOP of the opened sheet — identity above the
+          links, which is where a phone menu puts it — so the rule it draws
+          moves to the side the links are on. */}
+      <div
+        data-slot="rail-footer"
+        className={cn(
+          "relative isolate items-center gap-2.5 border-white/10 px-3 pt-3 pb-2",
+          "hidden peer-open:max-md:flex md:flex",
+          "max-md:border-b md:mt-auto md:border-t md:px-0 md:pt-3.5 md:pb-0",
+        )}
+      >
         <div
           className="grid size-8 flex-none place-items-center rounded-full bg-[linear-gradient(140deg,#8A3244,#4A1622)] text-xs font-semibold text-white"
           aria-hidden

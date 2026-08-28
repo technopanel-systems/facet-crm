@@ -24,7 +24,8 @@
     "track": "Track",
     "brand": "Technopanel",
     "brandSub": "Operations",
-    "brandMark": "T"
+    "brandMark": "T",
+    "menu": "Menu"
   },
   "common": {
     "create": "Create",
