@@ -4,14 +4,42 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+/**
+ * `D56` — **a phone row keeps its lead cell, the name, and the one column the
+ * list's own anatomy needs.** `phoneRows` is what opts a table into that
+ * arrangement below `md`; `globals.css` carries the layout.
+ *
+ * **One DOM, two arrangements.** The markup is identical at every width, so
+ * `verify:routes` reads the same markers on a phone as on a laptop, the two
+ * views cannot drift apart, and no script is involved `D20`.
+ *
+ * It also takes the scroll container off below `md`: *hidden, not scrolled*,
+ * and a container that scrolls sideways is how a phone hides a defect instead
+ * of showing it (`WORKFLOW §5 AD8`). Without it, `/companies` looked
+ * survivable at 375 with Category, City and Actions off-screen entirely.
+ *
+ * **It is opt-in, and the tables that decline it declare why at the call site.**
+ * `/users`, `/targets` and `/activity?view=by-rep` are laptop-first `D55`, and
+ * the three detail line tables are genuinely wide. Those keep the scroller.
+ */
+function Table({
+  className,
+  phoneRows,
+  ...props
+}: React.ComponentProps<"table"> & { phoneRows?: boolean }) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      className={cn(
+        "relative w-full",
+        // `D56` — below `md` a phone-row table has nothing to scroll, because
+        // it is no longer laid out as columns.
+        phoneRows ? "md:overflow-x-auto" : "overflow-x-auto",
+      )}
     >
       <table
         data-slot="table"
+        data-phone-rows={phoneRows ? "" : undefined}
         className={cn("w-full caption-bottom text-sm", className)}
         {...props}
       />
@@ -93,14 +121,38 @@ function TableHead({
   )
 }
 
+/**
+ * `D56`'s kept set, declared per cell rather than remembered per screen — the
+ * same one-prop shape `numeric` above already has.
+ *
+ * | Value | Below `md` |
+ * |---|---|
+ * | `lead` | `D26`'s first column, at the inline start, spanning both lines |
+ * | `name` | the record's name, first line, free to wrap |
+ * | `keep` | **the one column** the list's anatomy needs, second line |
+ * | `action` | the one column where it is a control — same slot, inline end |
+ * | `group` | a group header's cell `D24`, full width |
+ * | *(absent)* | **hidden** `D56` — not scrolled |
+ *
+ * **`keep` and `action` occupy the same grid slot**, so *the one column* is
+ * enforced by the layout rather than by a person remembering it: a row that
+ * annotates two of them collides visibly, and `verify:routes §27` fails it.
+ *
+ * Where the lead cell IS the name — a contact `D26` — a row fills two slots,
+ * not three, and `D56` says so outright rather than leaving it per list.
+ */
+type PhoneSlot = "lead" | "name" | "keep" | "action" | "group"
+
 function TableCell({
   className,
   numeric,
+  phone,
   ...props
-}: React.ComponentProps<"td"> & NumericProps) {
+}: React.ComponentProps<"td"> & NumericProps & { phone?: PhoneSlot }) {
   return (
     <td
       data-slot="table-cell"
+      data-phone={phone}
       className={cn(
         "px-4 py-3 align-middle whitespace-nowrap [&:has([role=checkbox])]:pe-0",
         numeric && "num text-end",

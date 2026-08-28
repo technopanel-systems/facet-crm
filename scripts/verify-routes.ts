@@ -6527,6 +6527,188 @@ async function main(): Promise<void> {
     }
   }
 
+  /* ── 27 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n27. The phone row — the kept set, per list [D56], [D26], [D55]",
+  );
+  {
+    // **What this can and cannot see.** The harness fetches HTML and executes
+    // nothing, so it cannot see a breakpoint, a grid track or a 375px
+    // viewport — those are the founder's eye check, exactly as the bottom
+    // sheet's own note in section 2 records for `38a`.
+    //
+    // What it CAN see is the whole of `D56`'s contract, because `38b` is one
+    // DOM at every width: the arrangement is CSS and the *kept set* is markup.
+    // A cell says which slot it fills, so this reads the same annotations the
+    // stylesheet reads, and a list that quietly grew a second kept column
+    // fails here rather than colliding on somebody's phone.
+    const tbodyOf = (body: string) =>
+      body.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/)?.[1] ?? "";
+    const slotsOf = (row: string) =>
+      [...row.matchAll(/data-phone="([a-z]+)"/g)].map((slot) => slot[1]);
+    const count = (slots: string[], slot: string) =>
+      slots.filter((one) => one === slot).length;
+
+    // **The section proves itself before it is believed** — `§23`'s
+    // precedent. A check that has only ever been green has not been shown to
+    // fail, and the whole value of this one is catching a list that quietly
+    // grew a second kept column, which is the shape that would collide on a
+    // phone and read as a rendering bug rather than as a rule breach.
+    const twoKept = slotsOf(
+      '<td data-phone="lead"></td><td data-phone="name"></td>' +
+        '<td data-phone="keep"></td><td data-phone="action"></td>',
+    );
+    check(
+      "the slot scan catches a row with TWO kept columns [D56]",
+      count(twoKept, "keep") + count(twoKept, "action") === 2,
+      `read ${twoKept.join(" ")}`,
+    );
+    const noName = slotsOf(
+      '<td data-phone="lead"></td><td data-phone="keep"></td>',
+    );
+    check(
+      "…and a row that lost its name [D56]",
+      count(noName, "name") === 0 &&
+        count(noName, "keep") + count(noName, "action") === 1,
+      `read ${noName.join(" ")}`,
+    );
+    // The table's own opt-in attribute sits one hyphen away from a slot name.
+    // If the scan read it as one, every table would report a phantom slot and
+    // the counts above would be measuring the wrong thing.
+    check(
+      "…and it does not read `data-phone-rows` as a slot",
+      slotsOf('<table data-slot="table" data-phone-rows="">').length === 0,
+    );
+
+    // `sees_all_reps` — the one identity with rows on every list, the same
+    // reason `MARKER_IDENTITY` picks it.
+    const manager = jars["manager@example.test"];
+
+    // `lead: false` is `/contacts`, where the lead cell IS the name `D26` — a
+    // row fills two slots, not three, and `D56` says so outright rather than
+    // leaving it to be re-argued here.
+    const LISTS = [
+      { path: "/companies", lead: true, groups: true },
+      { path: "/projects?view=table", lead: true, groups: false },
+      { path: "/quotations", lead: true, groups: true },
+      { path: "/dispatches", lead: true, groups: true },
+      { path: "/contacts", lead: false, groups: false },
+      { path: "/follow-ups", lead: true, groups: false },
+    ] as const;
+
+    for (const locale of ["en", "ar"] as const) {
+      for (const list of LISTS) {
+        const page = await get(manager, `/${locale}${list.path}`);
+        if (page.status !== 200) {
+          console.log(`  skip  ${locale}: ${list.path} returned ${page.status}`);
+          continue;
+        }
+
+        check(
+          `${locale}: ${list.path} opts into the phone row [D56]`,
+          page.body.includes("data-phone-rows"),
+          "the table is not annotated at all",
+        );
+
+        const rows = tbodyOf(page.body)
+          .split(/<tr\b/)
+          .slice(1)
+          .map(slotsOf);
+        // `every()` over an empty array is `true`, so an empty list — or a
+        // 500 — would take every assertion below green without reading a row.
+        const bodyRows = rows.filter((slots) => !slots.includes("group"));
+        const groupRows = rows.filter((slots) => slots.includes("group"));
+
+        check(
+          `${locale}: ${list.path} returned rows to measure`,
+          bodyRows.length > 0,
+          `${rows.length} row(s) in the tbody`,
+        );
+
+        check(
+          `${locale}: ${list.path} — every row keeps its name [D56]`,
+          bodyRows.length > 0 &&
+            bodyRows.every((slots) => count(slots, "name") === 1),
+          `${bodyRows.filter((slots) => count(slots, "name") !== 1).length} row(s) wrong`,
+        );
+
+        check(
+          `${locale}: ${list.path} — every row keeps ${
+            list.lead ? "its lead cell" : "NO lead cell, the name IS it"
+          } [D26]`,
+          bodyRows.length > 0 &&
+            bodyRows.every(
+              (slots) => count(slots, "lead") === (list.lead ? 1 : 0),
+            ),
+          `${
+            bodyRows.filter(
+              (slots) => count(slots, "lead") !== (list.lead ? 1 : 0),
+            ).length
+          } row(s) wrong`,
+        );
+
+        // **The one column, counted.** `keep` and `action` are one grid slot,
+        // so two of them would overlap on a phone and neither would be
+        // readable. This is the assertion that catches it before a person does.
+        check(
+          `${locale}: ${list.path} — *** exactly ONE column beside them *** [D56]`,
+          bodyRows.length > 0 &&
+            bodyRows.every(
+              (slots) => count(slots, "keep") + count(slots, "action") === 1,
+            ),
+          `${
+            bodyRows.filter(
+              (slots) => count(slots, "keep") + count(slots, "action") !== 1,
+            ).length
+          } row(s) wrong`,
+        );
+
+        if (list.groups) {
+          check(
+            `${locale}: ${list.path} — every group header survives the collapse [D24]`,
+            groupRows.length > 0 &&
+              groupRows.every((slots) => slots.length === 1),
+            `${groupRows.length} group header(s)`,
+          );
+        }
+      }
+
+      // **The three that decline it, asserted as declining rather than as
+      // missed.** `D55` makes them laptop-first, and an unannotated table and
+      // a deliberately unannotated one are identical in the markup — so the
+      // claim this makes is the negative one, and `WORKFLOW §5` carries why.
+      for (const path of ["/users", "/targets", "/activity?view=by-rep"]) {
+        const page = await get(manager, `/${locale}${path}`);
+        if (page.status !== 200) {
+          console.log(`  skip  ${locale}: ${path} returned ${page.status}`);
+          continue;
+        }
+        check(
+          `${locale}: ${path} keeps its columns, laptop-first [D55]`,
+          page.body.includes("data-slot=\"table\"") &&
+            !page.body.includes("data-phone-rows"),
+          "a laptop-first list opted into the phone row",
+        );
+      }
+
+      // A detail line table is genuinely wide and carries its own scroller;
+      // it is not a list of records and `D56` does not reach it.
+      const dispatches = await get(manager, `/${locale}/dispatches`);
+      const dispatchId = firstId(dispatches.body, "dispatches");
+      if (dispatchId) {
+        const detail = await get(manager, `/${locale}/dispatches/${dispatchId}`);
+        check(
+          `${locale}: a dispatch's line table is untouched by D56`,
+          detail.status === 200 && !detail.body.includes("data-phone-rows"),
+          `status ${detail.status}`,
+        );
+      } else {
+        console.log(`  skip  ${locale}: no dispatch to open`);
+      }
+    }
+  }
+
   /* ── 23 ──────────────────────────────────────────────────────────────── */
 
   console.log(

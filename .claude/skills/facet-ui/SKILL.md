@@ -73,8 +73,10 @@ else is a **defect**, not a flourish `D8`.
 Motion is the closed list in `D17`, `prefers-reduced-motion` is the tested path, radius is
 `D9` — which records the code at 10/14 and deliberately did not move it — and `D21` names
 the forbidden tells. **JavaScript stays near zero** `D20`: depth is CSS, filters are GET
-forms in the URL, the theme is a server-read cookie, and the only exceptions are the city
-combobox, the view-mode switch and the board's scroll.
+forms in the URL, the theme is a server-read cookie. **`D20` names a test, not a waiver
+list** — turn scripts off and ask whether the person can still do the thing; if yes it is
+an enhancement and needs no permission. Two things stay forbidden outright: optimistic
+rendering `D58`, and dragging a card to change a position `S134` `D29`.
 
 ## Page and permission shape
 
@@ -95,9 +97,8 @@ combobox, the view-mode switch and the board's scroll.
   *Sell* and *Track*, with Reports, Coverage, Follow-ups, Notifications and Performance
   **not** top-level, so **a new screen usually belongs inside an existing section** `D49`,
   and nothing renders until something is behind it `D51`. **Performance and Targets are one
-  item, Targets** `D49`. (`GROUPS` now carries Activity and Targets and holds **eight** —
-  Performance stays last in `track` until session `28b` merges the two screens, which is
-  what takes it to seven. Deliberate, temporary, and recorded in `WORKFLOW §5`.)
+  item, Targets** `D49` — `28b` merged them, deleted `/performance`, and `GROUPS` holds
+  the seven.)
 
 ## Archetypes and building blocks
 
@@ -141,8 +142,16 @@ already dropped a clause `D26` gained — do not put it back.
 
 The mini-chain draws from `chainState()` in `src/lib/chain.ts` and nothing else, and
 **derives nothing** `D27`; that file is the one definition of the six chain positions the
-board's columns use `D29`. On a phone a row collapses to lead cell, name and elapsed
-time `D56`.
+board's columns use `D29`.
+
+**On a phone a row keeps its lead cell, the name, and the one column the list's own
+anatomy needs** `D56` — read the per-list table there; a copy here would go stale the
+way the one above it did. Where the lead cell IS the name, that is two, not three. It is
+**one DOM re-laid out in CSS**: `<Table phoneRows>` opts a list in, `TableCell`'s
+`phone` prop names each slot, and an unannotated cell is hidden below `md` — hidden,
+never scrolled. The kept column and a row action share one slot, so *the one column* is
+structural. Six rep-facing lists take it; `/users`, `/targets` and `/activity?view=by-rep`
+are laptop-first `D55` and declare the scroller they keep.
 
 **One query parameter, no second screen** `D28` — `?view=` over the same filters, URL and
 data: quotations default `table`, projects `board`, plus `cards`; Activity is `stream`
@@ -190,7 +199,9 @@ only `D48` `S114` · responsive `D55` `D56` · deliberately not built `D58` `D21
 6. Does it look right with blur off `D19`, and did you test `prefers-reduced-motion`? `D17`
 7. Is the physical-utility grep still zero `D57` `S113` —
    `ml-|mr-|pl-|pr-|text-left|text-right|border-l-|border-r-`?
-8. Driven in **both locales** `D57`, at **1366 and 1440 first** `D23`?
+8. Driven in **both locales** `D57`, at **1366 and 1440 first** `D23`, then **375**
+   `D55` `D56` — a wide viewport hides exactly the wrapping a laptop shows, and a laptop
+   hides what a phone does?
 9. `npm run typecheck` · `lint` · `build` · `check:messages`, then `npm run build && npm run
    start` and `npm run verify:routes`, never `next dev`. **`build` is not optional**: it
    alone catches a client component importing a data module (`CLAUDE.md`).

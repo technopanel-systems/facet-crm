@@ -263,7 +263,11 @@ export default async function DispatchesPage({
               rep, against the 1078 a 1366 laptop has after the rail and `D22`'s
               padding — `/quotations` sits at 912/1040, so this one has room the
               other does not. */}
-          <Table className="table-fixed">
+          {/* `D56` — below `md` this becomes rows: the square metres, the
+              company, and **status**. `D26`'s five states have three answers,
+              so approved, refused and cancelled all sit in the same pile and
+              the badge is the only thing separating them. */}
+          <Table phoneRows className="table-fixed">
             <TableHeader>
               <TableRow>
                 {/* `D26`'s lead cell — **the square metres, mono, large**, and
@@ -355,7 +359,7 @@ function renderGrouped(
         data-count={String(counts[group])}
         className="hover:bg-transparent"
       >
-        <TableCell colSpan={columns} className="text-start">
+        <TableCell colSpan={columns} phone="group" className="text-start">
           {/* No `dir="auto"` anywhere on this header: it holds a translated
               label and a number, never a name `D62`.
 
@@ -414,7 +418,7 @@ function DispatchRow({
           link on `/quotations`' idiom — the row's identity going to its own
           record — but a dispatch's identity is a quantity, which is what `D26`
           says answers its question. The company keeps its own link below. */}
-      <TableCell numeric className="font-medium" data-lead="sqm">
+      <TableCell numeric phone="lead" className="font-medium" data-lead="sqm">
         <Link
           href={`/dispatches/${row.id}`}
           className="num text-[15px] hover:underline"
@@ -442,18 +446,25 @@ function DispatchRow({
       </TableCell>
       {/* `18 §2` — the name always; the link only for someone who may open the
           record. `dir="auto"` on the NAME, never the cell `D62`. */}
-      <TableCell className="text-start">
+      <TableCell phone="name" className="text-start">
         {row.companyViewable ? (
           <Link
             href={`/companies/${row.companyId}`}
             className="block hover:underline"
           >
-            <span className="block truncate" dir="auto" title={row.companyName}>
+            {/* Truncation is the fixed layout's answer to a narrow column and
+                belongs to it: below `md` there is no column and the name wraps
+                `D56`. */}
+            <span
+              className="block md:truncate"
+              dir="auto"
+              title={row.companyName}
+            >
               {row.companyName}
             </span>
           </Link>
         ) : (
-          <span className="block truncate" dir="auto" title={row.companyName}>
+          <span className="block md:truncate" dir="auto" title={row.companyName}>
             {row.companyName}
           </span>
         )}
@@ -488,12 +499,14 @@ function DispatchRow({
       </TableCell>
       {/* No tone `D6` — a cancellation is a state of a record rather than an
           elapsed time, and `S77` refuses to read the gap as a verdict. */}
-      <TableCell className="text-start">
+      <TableCell phone="keep" className="text-start">
         <Badge
           variant={row.status === "approved" ? "default" : "outline"}
           data-status={row.status}
         >
-          <span className="truncate">{t(`dispatches.status.${row.status}`)}</span>
+          <span className="md:truncate">
+            {t(`dispatches.status.${row.status}`)}
+          </span>
         </Badge>
       </TableCell>
       {namesRep ? (

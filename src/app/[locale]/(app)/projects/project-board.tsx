@@ -95,7 +95,18 @@ export async function ProjectBoardView({
         // scrolls inside it and its header carries the true count, so nothing
         // hides its own size. `D70`'s cap-and-state pattern is the other answer
         // and is deliberately not taken here — see `WORKFLOW §5`.
-        className="flex h-128 items-stretch gap-3 overflow-x-auto pb-1"
+        //
+        // **`D56`'s snap, and there is no *current* column.** The rule named
+        // one and had no referent for it: six piles `S132`, no selection, and
+        // nothing here may be picked `D29` `S134`. So every column snaps to the
+        // inline start and the board opens on the first, which is `S132`'s own
+        // order. Snapping is CSS and needs no script `D20`; it is inert above
+        // `md`, where all six already fit.
+        //
+        // A reader who wants rows on a phone has `?view=table` `D28` — the
+        // same query, already built, carrying the search `D59`. No third
+        // arrangement is invented for a narrow screen.
+        className="flex h-128 snap-x snap-mandatory items-stretch gap-3 overflow-x-auto pb-1"
       >
         {board.columns.map(({ column, cards }) => {
           return (
@@ -104,12 +115,30 @@ export async function ProjectBoardView({
               data-slot="board-column"
               data-column={column}
               data-count={String(cards.length)}
-              className="card-face glass flex min-w-42 flex-1 flex-col"
+              // `min-w-72` below `md` is what makes *snapped in view* mean
+              // something: at 375 one column fills the measure and the next
+              // shows about 23px of itself, which is what says there is more
+              // to the side. 168px is the laptop's width `D22`, and it lets
+              // two and a bit columns share a phone — which snaps to nothing
+              // a reader chose.
+              className="card-face glass flex min-w-72 flex-1 snap-start flex-col md:min-w-42"
             >
               <header className="border-line flex-none border-b px-3.5 py-2.5 text-start">
                 <p className="text-faint flex items-baseline gap-1.5 text-[10.5px] font-semibold tracking-[.09em] uppercase">
-                  <span className="min-w-0">{t(`chain.step.${column}`)}</span>
-                  <span className="num ms-auto flex-none" dir="ltr">
+                  {/* **The auto margin is on the LABEL, never on the count.**
+                      `margin-inline-start` resolves against the element's OWN
+                      direction, and the count carries `dir="ltr"` because it is
+                      a bare figure `D73` — so `ms-auto` there compiled to
+                      `margin-left`, which in an RTL row sits on the badge's
+                      main-END side and pushes it back against the label with
+                      the slack on its outer edge. English worked by accident.
+                      The label carries no `dir` and inherits the page's, so it
+                      has no side to get wrong `D57`. Third sighting: the rail
+                      and `/companies` both record it in the same words. */}
+                  <span className="me-auto min-w-0">
+                    {t(`chain.step.${column}`)}
+                  </span>
+                  <span className="num flex-none" dir="ltr">
                     {cards.length}
                   </span>
                 </p>

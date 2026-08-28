@@ -95,6 +95,11 @@ export default async function UsersPage({
           total={total}
           query={q}
         >
+          {/* **No `phoneRows`, deliberately** `D55` — managing people is
+              laptop-first work, so this keeps `Table`'s horizontal scroller
+              below `md` rather than becoming `D56`'s phone rows. Declared
+              here rather than inherited, with the row in `WORKFLOW §5`, so
+              the next reader does not read it as a list that was missed. */}
           <Table>
             <TableHeader>
               <TableRow>

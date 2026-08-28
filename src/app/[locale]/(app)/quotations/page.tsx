@@ -198,7 +198,12 @@ export default async function QuotationsPage({
               the declared widths bind and lets the two name columns truncate.
               The whole row is 912px, or 1040 with the raiser, against the
               1078 a 1366 laptop has after the rail and `D22`'s padding. */}
-          <Table className="table-fixed">
+          {/* `D56` — below `md` this becomes rows: the days it has waited,
+              the project name, and **position**. The lead cell IS the elapsed
+              here `D26`, and position is which of the coordinator's three
+              moves is owed — the thing a pile header cannot say. The company
+              name goes with the other secondary columns. */}
+          <Table phoneRows className="table-fixed">
             <TableHeader>
               <TableRow>
                 {/* **The order is what a rep scans for**: how long, where it
@@ -313,7 +318,7 @@ function renderGrouped(
         data-count={String(counts[group])}
         className="hover:bg-transparent"
       >
-        <TableCell colSpan={columns} className="text-start">
+        <TableCell colSpan={columns} phone="group" className="text-start">
           {/* No `dir="auto"` anywhere on this header: it holds a translated
               label and a number, never a name `D62`.
 
@@ -383,7 +388,7 @@ function QuotationRow({
           settled this shape for the board — the pile's name answers `D2` once,
           and the row says what the pile cannot. What is left here is the one
           figure a header can never carry. */}
-      <TableCell className="text-start">
+      <TableCell phone="lead" className="text-start">
         <span data-slot="turn" className="flex items-center gap-2">
           {named ? (
             <span
@@ -414,9 +419,12 @@ function QuotationRow({
           end state is the label, because *why* is the only fact left — the
           group already said it is over. The version number survives `S66`: a
           revision is a fact nothing else on the row carries. */}
-      <TableCell className="text-start">
+      <TableCell phone="keep" className="text-start">
         <Badge variant={closed ? endStateVariant(row.endState!) : "outline"}>
-          <span className="truncate">
+          {/* Truncation is the fixed layout's answer to a narrow column and
+              belongs to it: below `md` there is no column and the label wraps
+              `D56`. */}
+          <span className="md:truncate">
             {closed
               ? t(`enums.quotationThreadEndState.${row.endState}`)
               : t(`chain.step.${row.position}`)}
@@ -428,11 +436,11 @@ function QuotationRow({
           is null on a requested thread — so a rep clicked a dash. The name is
           the row's identity, which is where `/companies` and `/projects` both
           put it. */}
-      <TableCell className="text-start font-medium">
+      <TableCell phone="name" className="text-start font-medium">
         <Link href={`/quotations/${row.id}`} className="block hover:underline">
           {/* `S50` — always there, and it may hold either script `D62`. On the
               NAME, never the cell. */}
-          <span className="block truncate" dir="auto" title={row.projectName}>
+          <span className="block md:truncate" dir="auto" title={row.projectName}>
             {row.projectName}
           </span>
         </Link>

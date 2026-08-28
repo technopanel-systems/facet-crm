@@ -327,6 +327,12 @@ async function ByRep({
         total={data.rows.length}
         header={refresh}
       >
+        {/* **No `phoneRows`, deliberately** `D55` — five figures per rep is
+            a manager's arrangement, and this is the one table in the product
+            with a `<TableFooter>` of totals that has to stay beside them. It
+            keeps `Table`'s horizontal scroller below `md` rather than
+            becoming `D56`'s phone rows; declared rather than inherited, with
+            the row in `WORKFLOW §5`. */}
         <Table>
           <TableHeader>
             <TableRow>

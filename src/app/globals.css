@@ -350,6 +350,103 @@
   }
 }
 
+/* `D56` — **a phone row keeps its lead cell, the name, and the one column the
+   list's own anatomy needs.** Below `md` the table stops being columns and
+   becomes rows; `Table`'s `phoneRows` prop is what opts a list in, and
+   `TableCell`'s `phone` prop is what names each slot.
+
+   **The arrangement changes and the content does not.** `D26`'s anatomies are
+   the content — a silence meter, a mini-chain, an avatar, the square metres —
+   and the table was only ever the arrangement. So the markup is identical at
+   every width: `verify:routes` reads the same markers on a phone as on a
+   laptop, the two views cannot drift apart, and no script is involved `D20`.
+
+   **Hidden, not scrolled.** A cell with no slot does not render below `md`.
+   `Table`'s scroll container comes off with it — a container that scrolls
+   sideways is how a phone hides a defect instead of showing it, and it is why
+   `/companies` looked survivable at 375 with Category, City and Actions
+   off-screen entirely (`WORKFLOW §5 AD8`).
+
+   Logical properties throughout `D57`: grid tracks resolve against the writing
+   direction, so column 1 is the inline start in both locales with no `rtl:`
+   override, and `justify-self: end` is the inline end rather than the right.
+
+   Unlayered on purpose — it must outrank the utility classes on the cells it
+   re-lays out (`whitespace-nowrap`, `px-4`, `text-end`). */
+@media (width < 48rem) {
+  [data-phone-rows] thead {
+    display: none;
+  }
+
+  [data-phone-rows],
+  [data-phone-rows] tbody,
+  [data-phone-rows] tfoot {
+    display: block;
+  }
+
+  /* `D22`'s row padding, on the row rather than on each cell now that the
+     cells are slots in a grid: 12px vertical, 16px horizontal. */
+  [data-phone-rows] tr {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    column-gap: 0.75rem;
+    row-gap: 0.125rem;
+    padding: 0.75rem 1rem;
+  }
+
+  [data-phone-rows] td {
+    display: none;
+    min-width: 0;
+    padding: 0;
+    text-align: start;
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
+
+  [data-phone-rows] td[data-phone] {
+    display: block;
+  }
+
+  [data-phone-rows] td[data-phone="lead"] {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  [data-phone-rows] td[data-phone="name"] {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  /* **The one column** `D56`. `keep` and `action` share one slot, so a list
+     that annotated two of them would collide visibly rather than quietly
+     widening the rule back to the table it just left. */
+  [data-phone-rows] td[data-phone="keep"],
+  [data-phone-rows] td[data-phone="action"] {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  /* A control goes where a thumb is, at the inline end. `D74`'s 44px floor is
+     already on `Button` and needs nothing here. */
+  [data-phone-rows] td[data-phone="action"] {
+    justify-self: end;
+  }
+
+  /* Where the lead cell IS the name — a contact `D26` — the row fills two
+     slots, not three, so the empty first track collapses rather than leaving
+     every row indented by a gap that answers nothing. */
+  [data-phone-rows] tr:not(:has(td[data-phone="lead"])) td[data-phone] {
+    grid-column: 1 / -1;
+  }
+
+  /* `D24`'s group header — the name and the scope's count, full width. */
+  [data-phone-rows] td[data-phone="group"] {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

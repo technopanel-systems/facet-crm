@@ -61,6 +61,12 @@ export async function AttainmentTable({
     );
   }
 
+  // **No `phoneRows`, deliberately** `D55` — and `D49` is the second reason:
+  // it asks this screen for the goal and the attainment TOGETHER, while
+  // `D56`'s one kept column carries one of them. The rule does not fit a
+  // laptop screen, which is why this table is excluded rather than bent. It
+  // keeps `Table`'s horizontal scroller below `md`; declared rather than
+  // inherited, with the row in `WORKFLOW §5`.
   return (
     <Table>
       <TableHeader>

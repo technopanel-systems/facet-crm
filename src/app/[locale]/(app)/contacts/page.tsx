@@ -68,7 +68,12 @@ export default async function ContactsPage({
           total={total}
           query={q}
         >
-          <Table>
+          {/* `D56` — below `md` this becomes rows, and it is the list where
+              **the lead cell IS the name** `D26`, so a row fills two slots
+              rather than three. The one column is the **phone**, on `D70`'s
+              argument: a rep reads it standing outside the customer's office.
+              Position goes with company and email. */}
+          <Table phoneRows>
             <TableHeader>
               <TableRow>
                 <TableHead className="text-start">
@@ -91,12 +96,16 @@ export default async function ContactsPage({
             <TableBody>
               {rows.map((row) => (
                 <TableRow key={row.id}>
-                  <TableCell className="text-start font-medium">
+                  <TableCell phone="name" className="text-start font-medium">
                     <Link
                       href={`/contacts/${row.id}`}
                       className="hover:underline"
                     >
-                      {row.name}
+                      {/* `dir="auto"` on the NAME, never on the cell `D62`.
+                          Since `S19` a contact has one name field written in
+                          either script; this was the one list-name cell in the
+                          product without it. */}
+                      <span dir="auto">{row.name}</span>
                     </Link>
                   </TableCell>
                   {/* Not viewable means no link `S76`: a reader who holds
@@ -117,7 +126,7 @@ export default async function ContactsPage({
                   <TableCell className="text-start">
                     {row.position ?? t("common.none")}
                   </TableCell>
-                  <TableCell className="num text-start" dir="ltr">
+                  <TableCell phone="keep" className="num text-start" dir="ltr">
                     {row.phone ?? t("common.none")}
                   </TableCell>
                   <TableCell className="num text-start" dir="ltr">

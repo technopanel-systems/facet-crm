@@ -188,7 +188,11 @@ export default async function ProjectsPage({
             extra={extra}
             header={<RefreshNotice {...refresh} variant="bar" />}
           >
-            <Table>
+            {/* `D56` — below `md` this becomes rows: the days since it
+                moved, the name, and **whose move it is**. This view is flat,
+                so unlike the board no group header answers `D2` and the
+                column is the only place the row says it. */}
+            <Table phoneRows>
               <TableHeader>
                 <TableRow>
                   {/* `D25` — the list is ordered by attention, and this is the
@@ -235,7 +239,7 @@ export default async function ProjectsPage({
               <TableBody>
                 {list.rows.map((row) => (
                   <TableRow key={row.id}>
-                    <TableCell className="text-start">
+                    <TableCell phone="lead" className="text-start">
                       {row.chain ? (
                         <span
                           data-slot="project-moved"
@@ -251,7 +255,7 @@ export default async function ProjectsPage({
                         </span>
                       ) : null}
                     </TableCell>
-                    <TableCell className="text-start font-medium">
+                    <TableCell phone="name" className="text-start font-medium">
                       <Link
                         href={`/projects/${row.id}`}
                         className="hover:underline"
@@ -260,7 +264,7 @@ export default async function ProjectsPage({
                         <span dir="auto">{row.name}</span>
                       </Link>
                     </TableCell>
-                    <TableCell className="text-start">
+                    <TableCell phone="keep" className="text-start">
                       {row.chain ? (
                         <Turn
                           line={t(

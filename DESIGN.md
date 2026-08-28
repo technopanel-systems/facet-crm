@@ -228,7 +228,7 @@ never JavaScript at all: `?view=` ships as `FilterNav` links carrying the search
 **The reasons the ban existed still hold, which is why this is a boundary and
 not a loosening:**
 
-- **The quality system is server-rendered HTML.** `verify:routes` drives 1,051
+- **The quality system is server-rendered HTML.** `verify:routes` drives 1,556
   checks by fetching HTML and reading it. It executes no script and this project
   has no browser. A screen that needs script to render is a screen nothing can
   test.
@@ -246,7 +246,7 @@ not a loosening:**
 
 **Enforcement.** `verify:routes` is already the check for half of this, and
 nothing has to be built for that half: it fetches over HTTP and **executes no
-script**, so all 1,051 checks are already scripts-off checks — every DOM marker
+script**, so all 1,556 checks are already scripts-off checks — every DOM marker
 it asserts is proof that screen rendered without a bundle. What it cannot see is
 **operability**: a control can render and do nothing. So one section joins the
 same walk — for every form it reaches, each field the action requires is present
@@ -970,9 +970,10 @@ a thing exists that they may not see.
 request — are **built phone-first**. Manager and coordinator screens are
 laptop-first. Nothing is designed for tablet specifically.
 
-**D56. [CHANGE]** On a phone, a table row collapses to its lead cell, name and elapsed
-time; secondary columns are hidden, not scrolled. The rail becomes a bottom
-sheet. The board scrolls horizontally with the current column snapped in view.
+**D56.** On a phone, a table row **collapses to a row**: its lead cell, the
+name, and the one column the list's own anatomy needs. Secondary columns are
+hidden, not scrolled. The rail becomes a bottom sheet. The board scrolls
+horizontally, each column snapped to the inline start.
 
 **The rail clause ships** — session `38a`. It is a native `<details>`: the
 `<summary>` is a bar fixed to the bottom edge, and the panel is its **peer**,
@@ -985,22 +986,51 @@ full page load. It replaced a horizontally scrollable **top** strip, which was
 the wrong half of `AD8` in both directions: the wrong edge, and scrolled where
 this rule says a sheet.
 
-**The other two clauses are still `[CHANGE]`, and the first one is also wrong.**
-`Table` is `overflow-x-auto` and no page hides a column at any breakpoint, so
-columns are scrolled — but *lead cell, name and elapsed time* is not the right
-kept set either, because `D26` and `D2` moved after this rule was written. On
-`/quotations` the lead cell **is** the elapsed and the column this would hide,
-*position*, is which of the coordinator's three moves is owed; on `/dispatches`
-the lead cell is square metres and *status* is the only thing separating
-approved, refused and cancelled inside one pile; on `/companies` the meter
-already holds the elapsed and *Log* is what makes the list a work queue `28b`;
-on `/contacts` the lead cell **is** the name `D26` and there is no elapsed at
-all. So a phone row keeps **its lead cell, its name, and the one column its own
-anatomy needs** — the same widening `D26` took at `AD33`, for the same reason.
-Session `38b` builds it and writes that set per list.
+**The kept set is a widening, taken in `38b`** — the same shape `D26` took at
+`AD33`, and for the same reason: the anatomies moved after this rule was
+written. It used to say *lead cell, name and elapsed time*, and three columns
+literally would take **Log** off `/companies` and **position** off
+`/quotations`, which are the two things those screens exist to answer.
 
-The board's clause names *the current column*, which has no referent: six piles,
-no selection. `38b` settles the wording with the snap.
+| List | Lead cell `D26` | The one column, and why |
+|---|---|---|
+| `/companies` | the silence meter | **Log** — the meter already holds the elapsed, and Log is what made this list a work queue `28b` |
+| `/quotations` | avatar and days | **position** — which of the coordinator's three moves is owed; the pile's name answers `D2` once and cannot say this |
+| `/dispatches` | the square metres | **status** — five states have three answers, so approved, refused and cancelled share a pile and only the badge separates them |
+| `/projects?view=table` | days since it moved | **whose move** — this view is flat, so no group header answers `D2` |
+| `/contacts` | *is* the name | **the phone** — `D70`'s argument: a rep reads it standing outside the customer's office |
+| `/follow-ups` | the kind badge | **the age** — the kind IS the *why*, so the one column is the figure the list is worked down by `D34` |
+
+**Where the lead cell IS the name, that is two, not three.** `D26` gives a
+contact *name and position*; the row fills two slots and fills them honestly.
+Written down rather than left to be re-argued on each list, which is the waiver
+shape `§6b` exists to catch.
+
+**It applies to the six rep-facing lists** `D55`. `/users`, `/targets` and
+`/activity?view=by-rep` are laptop-first: they keep `Table`'s horizontal
+scroller below `md` and **declare it at the call site**, so it is a decision
+rather than an omission. `D49` is the second reason `/targets` is out — it asks
+that screen for the goal and the attainment **together**, and one kept column
+carries one of them. That is evidence this rule does not fit a laptop screen,
+not a puzzle to solve inside it.
+
+**The arrangement changes and the content does not.** `D26`'s anatomies are the
+content; the table was only ever the arrangement. So it is **one DOM at every
+width**, re-laid out in CSS: below `md` a phone-row table hides its header and
+each row becomes a two-line grid — the lead cell at the inline start spanning
+both lines, the name on the first, the one column on the second, a control at
+the inline end. The kept column and a row action are **the same slot**, so *the
+one column* is enforced by the layout rather than remembered by a person. The
+two views cannot drift apart, `verify:routes` reads the same markers at every
+width, and no script is involved `D20`.
+
+**The board snaps, and there is no *current* column.** The clause named one and
+had no referent: six piles `S132`, no selection, and no act may move a card
+`D29` `S134`. So every column snaps to the inline start and the board opens on
+the first, which is `S132`'s own order; below `md` a column takes the measure so
+one is in view with the next showing its edge. A reader who wants rows has
+`?view=table` `D28` — the same query, already built, carrying the search `D59`.
+No third arrangement was invented for a narrow screen.
 
 **D74. A control a thumb has to hit is at least 44px on a phone.** Every
 button, input, select and native date field; below `md` only — `D22`'s laptop

@@ -119,7 +119,11 @@ export default async function CompaniesPage({
           query={q}
           extra={extra}
         >
-          <Table>
+          {/* `D56` — below `md` this becomes rows: the meter, the name, and
+              **Log**. The meter already holds the elapsed time `D26`, and Log
+              is what `28b` made this list a work queue with, so phone,
+              category and city are the secondary columns that go. */}
+          <Table phoneRows>
             <TableHeader>
               <TableRow>
                 {/* `D26`'s lead cell. The header names what the meter measures
@@ -215,7 +219,7 @@ function renderGrouped(
         data-count={String(count)}
         className="hover:bg-transparent"
       >
-        <TableCell colSpan={6} className="text-start">
+        <TableCell colSpan={6} phone="group" className="text-start">
           {/* No `dir="auto"` anywhere on this header: it holds a translated
               label and a number, never a company name, and putting it on the
               block is precisely the defect the dashboard's planned-group
@@ -256,7 +260,7 @@ function CompanyRow({
 }) {
   return (
     <TableRow>
-      <TableCell className="text-start">
+      <TableCell phone="lead" className="text-start">
         <SilenceMeter
           daysSince={row.daysSince}
           silentDays={row.silentDays}
@@ -265,7 +269,7 @@ function CompanyRow({
           onHoldUntil={row.onHoldUntil}
         />
       </TableCell>
-      <TableCell className="text-start font-medium">
+      <TableCell phone="name" className="text-start font-medium">
         <Link href={`/companies/${row.id}`} className="hover:underline">
           {/* **`dir="auto"` on the NAME, never on the cell** `D62`. Since `S12`
               a company has one name field written in English or Arabic, so an
@@ -308,7 +312,7 @@ function CompanyRow({
       <TableCell className="text-start">
         {pickName(locale, row.cityNameEn, row.cityNameAr) ?? t("common.none")}
       </TableCell>
-      <TableCell className="text-start">
+      <TableCell phone="action" className="text-start">
         <Button asChild size="xs" variant="outline">
           <Link href={`/reports/new?companyId=${row.id}`}>
             {t("reports.new")}

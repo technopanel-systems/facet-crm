@@ -141,7 +141,13 @@ export default async function FollowUpsPage({
           total={total}
           query={q}
         >
-          <Table>
+          {/* `D56` — below `md` this becomes rows: the kind, the record, and
+              **the age**. The kind badge IS the *why* this row is on the list,
+              so it is the lead cell and the one column is the figure the list
+              is worked down by `D34`. **The Log button goes**, and the exit
+              door survives without it: the record cell is already a link to
+              the anchor. */}
+          <Table phoneRows>
             <TableHeader>
               <TableRow>
                 <TableHead className="text-start">
@@ -166,12 +172,12 @@ export default async function FollowUpsPage({
             <TableBody>
               {rows.map((row) => (
                 <TableRow key={`${row.kind}:${row.anchorId}`}>
-                  <TableCell className="text-start">
+                  <TableCell phone="lead" className="text-start">
                     <Badge variant="outline">
                       {t(`enums.followUpKind.${row.kind}`)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-start font-medium">
+                  <TableCell phone="name" className="text-start font-medium">
                     <Link href={anchorHref(row.anchorType, row.anchorId)} className="hover:underline">
                       <span dir="auto">{row.anchorName}</span>
                     </Link>
@@ -211,6 +217,7 @@ export default async function FollowUpsPage({
                       here: this reads the age the data layer computed. */}
                   <TableCell
                     numeric
+                    phone="keep"
                     // **`data-column`, not `data-slot`** — `TableCell` sets its
                     // own `data-slot` and then spreads props over it, so one
                     // passed here would silently replace the component's marker
