@@ -235,8 +235,20 @@ export default async function DispatchPage({
                 {formatSqm(dispatch.sqm)} {t("common.sqm")}
               </span>
             </Fact>
-            <Fact label={t("dispatches.fields.dispatchDate")}>
-              <span dir="ltr">{day(dispatch.dispatchDate)}</span>
+            {/* **No `dir` here, and that is the fix rather than the omission.**
+                `D62` groups dates with references and decimals as LTR content
+                inside Arabic, and for a raw reference like `Q-9280` that is
+                right. A date is not raw: `Intl` formats `ar` as
+                `29<U+200F>/08<U+200F>/2026`, embedding RIGHT-TO-LEFT MARKs so
+                the segments land correctly in an RTL run. `dir="ltr"` fights
+                those marks — the digits resolve to three different embedding
+                levels and the day jumps to the front, which rendered
+                `292026/08/` on this cell where the header two elements up,
+                carrying no `dir` at all, rendered `2026/08/29` from the same
+                formatter. Bare is what the header and the submitted banner do,
+                and this now matches them. */}
+            <Fact label={t("dispatches.fields.dispatchDate")} name="dispatchDate">
+              {day(dispatch.dispatchDate)}
             </Fact>
             {/* `S74` — the dispatch's own project, taken from the quotation
                 or chosen when it had none. A direct sale still has none at all

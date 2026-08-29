@@ -5868,6 +5868,37 @@ async function main(): Promise<void> {
       if (linkedId) {
         const detail = await get(jar, `/${locale}/dispatches/${linkedId}`);
         check(`${locale}: a dispatch detail answers 200`, detail.status === 200);
+
+        /*
+         * **The dispatch date carries NO `dir`, and the absence is the
+         * assertion** `D62`.
+         *
+         * `Intl` formats an `ar` date as `29<U+200F>/08<U+200F>/2026` — it
+         * embeds RIGHT-TO-LEFT MARKs so the segments land correctly inside an
+         * RTL run. `dir="ltr"` fights them: the digits resolve to three
+         * different embedding levels and the day jumps to the front. This cell
+         * shipped `292026/08/` in Arabic while the header two elements up, with
+         * no `dir` at all, rendered `2026/08/29` from the same formatter.
+         *
+         * **No script can see the defect** — bidi reordering happens at render
+         * and this file executes none — so what is asserted is the MARKUP that
+         * causes it, which is the attribute's absence.
+         *
+         * **Guarded on a non-empty read**, and it prints what it saw. A bare
+         * `!includes('dir="ltr"')` would pass just as well on a cell that never
+         * rendered, which is the shape `WORKFLOW §5` carries four rows about.
+         */
+        const dateCell = factHtmlOf(detail.body, "dispatchDate");
+        check(
+          `${locale}: the dispatch date cell rendered at all [D62]`,
+          /[0-9]{4}/.test(dateCell),
+          `saw ${JSON.stringify(factOf(detail.body, "dispatchDate"))}`,
+        );
+        check(
+          `${locale}: *** …and carries no dir="ltr", which would scramble it *** [D62]`,
+          Boolean(dateCell) && !dateCell.includes('dir="ltr"'),
+          `saw ${JSON.stringify(dateCell.slice(0, 160))}`,
+        );
         check(
           `${locale}: *** S77's comparison card renders on a linked dispatch *** [S77]`,
           detail.body.includes('data-slot="against-quotation"'),
