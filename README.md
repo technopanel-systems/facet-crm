@@ -7,7 +7,7 @@ It does **not** cover finance, invoicing or tax — those stay in SMAC, the
 existing ERP.
 
 Project rules are in [CLAUDE.md](CLAUDE.md); the decisions behind them are in
-[docs/](docs/). `docs/03-stack.md` is the settled technical record.
+[docs/](docs/). `docs/archive/03-stack.md` is the settled technical record.
 
 ---
 
@@ -35,7 +35,7 @@ month. `/ar` shows the same screen mirrored right-to-left.
 
 The interface is **dark by default**; the toggle in the header persists your
 choice in a cookie and is read on the server, so there is no flash of the wrong
-palette. `docs/22-design-language.md` is the reference for the palette and type.
+palette. `DESIGN.md` is the authority for the palette and type; `docs/archive/22-design-language.md` records how it was reached.
 
 Check it from the command line:
 
@@ -112,7 +112,7 @@ npm run build        # production build
 ## Database
 
 The schema lives in `src/db/schema.ts`; the phase it belongs to is in
-`docs/05-roadmap.md`.
+`WORKFLOW.md` §4.
 
 ```bash
 npm run db:generate   # write a migration from schema.ts changes
@@ -144,7 +144,7 @@ Migration `0024` is the worked example.
 
 ### Getting a clean database
 
-**Nothing in FACET deletes** (`docs/12-closing-open-items.md` §7), and the
+**Nothing in FACET deletes** (`docs/archive/12-closing-open-items.md` §7), and the
 verify scripts are held to the same rule. `verify:slice2`, `verify:slice3`,
 `verify:phase9`, `verify:phase11` and `verify:phase10a` all **leave their rows
 behind by design** — they are not fixtures that tear themselves down, and they
@@ -199,7 +199,7 @@ container's own healthcheck, then `db:migrate`, `db:seed` and
 `bootstrap:admin`.
 
 - **Development only.** It refuses unless `NODE_ENV` is exactly `development`,
-  the same guard as `dev:fixtures` (`docs/15-lookup-decisions.md` §7).
+  the same guard as `dev:fixtures` (`docs/archive/15-lookup-decisions.md` §7).
 - **It also confirms**, because that guard cannot tell a laptop from the office
   PC — both copy the same `.env.example`. Type the database name back, or pass
   `--yes` (required when there is no terminal).
@@ -215,7 +215,7 @@ container's own healthcheck, then `db:migrate`, `db:seed` and
 ## Bilingual and RTL
 
 Every user-facing string goes through the translation layer from the first
-screen (`docs/07-phase4-answers.md` E3). Retrofitting this means touching every
+screen (`docs/archive/07-phase4-answers.md` E3). Retrofitting this means touching every
 file, so there is no "add it later".
 
 - Strings live in [messages/en.json](messages/en.json) and
@@ -249,7 +249,8 @@ which handles keyboard and popover behaviour that CSS alone does not.
 
 ## Deployment notes
 
-Runs on a company Windows PC behind a Cloudflare Tunnel. Per `docs/03-stack.md`:
+Runs on a company Windows PC behind a Cloudflare Tunnel. Per
+`docs/archive/03-stack.md`:
 
 - **PostgreSQL is bound to `127.0.0.1`** in `docker-compose.yml`. Only the app
   container and local tools reach it. Never publish it as `5432:5432`.

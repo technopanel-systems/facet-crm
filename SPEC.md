@@ -10,6 +10,11 @@ were reached, and are never cited as authority.
 - **[CHANGE]** — the code currently does something different. This is the target.
 - **[BUILD]** — nothing exists yet.
 
+**A marker is one bit and a rule can be three quarters done** (`WORKFLOW §7`).
+It says *whether* work remains, never how much; where only part of a rule is
+built, **the rule's own text says which half**. So a marked rule may already
+ship most of itself, and a marker is never a claim that nothing works.
+
 Rules are numbered `S1`… and are cited by number, never by paraphrase.
 
 ---
@@ -344,8 +349,10 @@ merging what reps wrote with what the system observed — company added, quotati
 issued, payment confirmed, dispatched. Nothing is stored, so every record has a
 full history with no backfill.
 
-**S42. [CHANGE]** The timeline is also **what a manager reads as the daily
-report**. There is no separate daily report to write or submit.
+**S42.** The timeline is also **what a manager reads as the daily report**.
+There is no separate daily report to write or submit. `/activity` is that
+stream (S41, D45): a manager reads it by rep, and a person who did nothing
+still has a row, which is the first thing the day is opened to find out.
 
 ---
 
@@ -818,10 +825,10 @@ record as a company going quiet. The only difference is what raises it — the
 clock, or the rep's judgement. One table, one screen, one manager decision, two
 ways in. The review, the three outcomes and the one record all exist. Only the second way in — the rep's request — is missing.
 
-**S107.** **Nothing is ever deleted.** "Removed" means archived: if that customer
+**S107. [CHANGE]** **Nothing is ever deleted.** "Removed" means archived: if that customer
 resurfaces in two years, the record says they were already known and why someone
 gave up on them. Archiving is gated by the delete-approval flag (S8). That gate
-is not built. `canApproveDeletion` has no reader anywhere today (S8), and
+is not built. `canApproveDelete` has no reader anywhere today (S8), and
 archiving is gated by `canAssign` instead.
 
 **S128.** **A decision that ends someone's work reaches them.** A
@@ -900,9 +907,10 @@ introduced being counted as the rep's — this rule counts every edit she had to
 make, lines or not.
 
 **Both figures exist, over dispatch requests, and nothing else is counted.**
-`/performance` carries them per rep for a month, beside target attainment:
-requests raised, of those the ones somebody else raised, and requests a
-`can_dispatch` holder other than the raiser edited. The month bounds the **act**
+`/users/[id]` carries them per rep for a month: requests raised, of those the
+ones somebody else raised, and requests a `can_dispatch` holder other than the
+raiser edited. They sat on `/performance` until that route was merged into
+`/targets` and deleted; the figures moved rather than went. The month bounds the **act**
 rather than the dispatch date the tables around them use, because that is what
 this rule measures and because an edit has no other date; the screen says so,
 and says the three figures do not add or subtract.

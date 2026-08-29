@@ -13,14 +13,21 @@ marker describes the screen as it renders today.
 - **[CHANGE]** — the code currently does something different. This is the target.
 - **[BUILD]** — nothing exists yet.
 
-`D48` is the first rule here to carry one, and the legend is written down
+`D48` was the first rule here to carry one, and the legend is written down
 rather than inferred from it (`WORKFLOW §5 AD7`). **A `D` marker is not in the
 progress bar** — `npm run status` counts `SPEC.md`'s and only those, so adding
 one here moves no number. The point is the opposite of a count: `WORKFLOW §7`
-asks that a rule say whether work remains, and 26 rules in this file describe
-things that do not exist while reading as finished. Marking them is a rule
-review's job `§6b`, not a build slice's; what a build slice may not do is
-leave the one rule it just touched still reading as finished.
+asks that a rule say whether work remains, and a number of rules in this file
+describe things that do not exist while reading as finished.
+
+**How many is not stated here, deliberately.** `AUDIT DESIGN` counted them on
+24 Aug 2026 and `WORKFLOW §5` carries that tally with its own instruction —
+*re-take the count; do not patch it*. Phase 2 has since made a good part of it
+true, so a number repeated here would be the stale one people trust. Re-taking
+it belongs to the rule review `§6b`, beside `AUDIT 2`, and so does marking the
+rules it finds. What a build slice may not do is leave the one rule it just
+touched still reading as finished — which is why `D71` and `D72` carry markers
+and the older set does not yet.
 
 ---
 
@@ -257,7 +264,7 @@ note. `§17` already replays the POST, but it writes the body itself, so it
 proves the action answers and never that a person could have produced the body.
 This is that second half.
 
-**D72. A screen refreshes itself visibly, or not at all.** Nothing in FACET
+**D72. [BUILD]** **A screen refreshes itself visibly, or not at all.** Nothing in FACET
 updates without a reload: a rep submits a request at 9:15 and the coordinator's
 open screen still says 9:00 until she presses F5. So a screen where somebody
 else's work arrives polls for **how much** has arrived and renders one line —
@@ -293,6 +300,16 @@ dashboard's blocks and the waiting list `D64` `D34`, the coordinator's queues
 `D65`, `/quotations`, `/dispatches`, `/projects` in both views, the stream
 `D45`, and the rail's Today count `D49`. A screen showing only your own typing
 polls nothing.
+
+**Two of those are not built, and the marker is for them.** Polling ships on
+`/quotations`, `/dispatches`, `/projects`, the stream and the coordinator's
+requests block. **The waiting list and the rail's Today count poll nothing**,
+and neither is a matter of getting round to it: no follow-up row records *when
+it joined the list* — every `S89` condition is a day-threshold crossing, so the
+earliest a new row can appear is Riyadh midnight — and `followUpScope` is about
+fifteen queries, which would run on every open screen every minute. Nothing
+that ships contradicts this rule; those two screens are absent from it. The
+cost of building them is recorded in `WORKFLOW §5` rather than half-paid.
 
 **D21. Still forbidden, and these are the actual tells.** Purple, violet or cyan
 accents. Rainbow or multi-hue gradients. Large gradient blobs. Glassmorphism on
@@ -460,13 +477,18 @@ carries what that costs.
 `?view=calendar`. All three read one query. "Just me" is a filter chip on the
 stream, not a separate screen.
 
-**D71.** **A mark is a small label on a card, never a column and never a
-colour.** `S135`'s four — catalogue sent, samples sent, documents sent,
+**D71. [BUILD]** **A mark is a small label on a card, never a column and never
+a colour.** `S135`'s four — catalogue sent, samples sent, documents sent,
 technical submitting — say *what is out with this customer*, and several may sit
 on one card at once. They are not a position, so they never become a column
 `D29`; and they are not a duration, so they take no colour — `D6` gives colour
 to how long something has waited and nothing else. A card with no mark shows
 nothing rather than an empty slot.
+
+**Nothing draws one yet.** `S135` is itself unbuilt, so no card carries a mark
+on any screen and this rule describes the shape one takes when it does. It was
+written beside `S132`–`S135` in the board-rules slice and landed unmarked; the
+marker is the correction, not a change of mind.
 
 **D31.** Build order: table and stream first. Board second. Cards and calendar
 only if someone asks twice.

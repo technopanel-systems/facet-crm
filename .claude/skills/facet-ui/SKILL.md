@@ -144,6 +144,16 @@ The mini-chain draws from `chainState()` in `src/lib/chain.ts` and nothing else,
 **derives nothing** `D27`; that file is the one definition of the six chain positions the
 board's columns use `D29`.
 
+**A control a thumb has to hit is at least 44px below `md`** `D74` — every button, input,
+select and native date field. It is a **floor, not a size**: `min-height`/`min-width` on the
+component's base, never `height`, which is what lets it outrank the `h-6` an `xs` chip
+carries. **A component's own floor IS the floor and a caller may not pin it** — a local
+`h-11` on a call site overrides it in both directions, 44px on a laptop where `D22`'s
+density is deliberate. Anything hand-rolled rather than a `Button` has to say the floor
+itself. A checkbox is the exception: its `<label htmlFor>` is the target. **Sixteen pixels
+is a separate thing** — iOS Safari zooms on focus under 16px, so a text control carries
+`text-base md:text-sm`, and repeating that locally pins 16px above `md`.
+
 **On a phone a row keeps its lead cell, the name, and the one column the list's own
 anatomy needs** `D56` — read the per-list table there; a copy here would go stale the
 way the one above it did. Where the lead cell IS the name, that is two, not three. It is
@@ -161,8 +171,10 @@ do not drag** `D29`. Build order `D31`.
 ## Forms, actions and values
 
 - **A native `<select>`, deliberately** `D20` — no hidden-input bridge, no client state, no
-  JavaScript to submit, and the browser places the RTL popup. **`Combobox` is the one
-  documented exception** `D20`, for the ~200-item city list.
+  JavaScript to submit, and the browser places the RTL popup. **There is no exception list
+  to join** `D20`: `Combobox` was deleted in session 40 and the rewritten rule names a test,
+  not waivers. A long list is grouped instead — `city-field.tsx` puts 171 cities into five
+  `<optgroup>`s keyed on the region `S15` already derives from the city.
 - **Filters and search are GET forms in the URL** `D20` `D45`, never client state: shareable,
   survives reload, needs no JavaScript.
 - The form is `"use client"` with `useActionState(action, emptyFormState)`; submit shows
@@ -173,9 +185,15 @@ do not drag** `D29`. Build order `D31`.
   errors; invariants come back from the data layer as `RuleError` → `ruleErrorState()`, also
   a key; then `revalidatePath()` and `redirect()` from `@/i18n/navigation`. The audit row is
   the data layer's `S112`.
-- Wrap LTR content in Arabic with `dir="ltr"` — references, decimals, dates, percentages, m².
-  And the converse `D62`: a value that may hold **either** script takes `dir="auto"` wherever
-  it is entered or displayed, because direction belongs to the value, not the page.
+- **Direction follows the run, and the test is one question: is there a word in it?** `D73`
+  A run holding a **translated word** takes `dir="auto"`; only a **bare figure** — a
+  reference, a decimal, a date, a percentage, a count standing alone — takes `dir="ltr"`.
+  **Nothing takes `dir="ltr"` merely because it contains digits**: forcing it over
+  *figure · word · figure* reverses the two figures for an RTL reader, so `4 of 13` renders
+  as `13 of 4`, silently. The tell is a `dir` on a **container** rather than on a value.
+  And `D62` is the same instinct about a **stored** value: one that may hold either script
+  takes `dir="auto"` wherever it is entered or displayed, because direction belongs to the
+  value, not the page.
   Decimals stay **strings** end to end; square metres are computed, never typed `S55`.
 - Dates: `format.dateTime(new Date(value + "T00:00:00Z"), { dateStyle: "medium", timeZone:
   "UTC" })` from `getFormatter()` — a calendar day in Riyadh, not an instant. **One name
@@ -187,7 +205,12 @@ Screen contents when you need them: the dashboard's block model `D64` · its no-
 `D32`–`D37` · what a flag adds `D38`–`D41` · the coordinator `D65` · Marketing and the
 Executive `D67` `D68` · where a dispatch's difference is seen `D66` · rollup `D42`–`D44` ·
 stream, Log button, private note `D45`–`D47` · comments on quotation threads and projects
-only `D48` `S114` · responsive `D55` `D56` · deliberately not built `D58` `D21`.
+only `D48` `S114` · responsive `D55` `D56` `D74` · deliberately not built `D58` `D21`.
+
+**Two rules here carry markers and describe something unbuilt** — read them before citing
+them. `D71`, a mark on a card, waits on `S135`; `D72`, the visible refresh line, ships on
+the lists, the stream and the coordinator's requests block, and **not** on the waiting list
+or the rail's Today count.
 
 ## Before calling a screen done
 
@@ -198,7 +221,8 @@ only `D48` `S114` · responsive `D55` `D56` · deliberately not built `D58` `D21
 5. Is every effect one of its token's named uses? `D13`–`D17` `D21`
 6. Does it look right with blur off `D19`, and did you test `prefers-reduced-motion`? `D17`
 7. Is the physical-utility grep still zero `D57` `S113` —
-   `ml-|mr-|pl-|pr-|text-left|text-right|border-l-|border-r-`?
+   `ml-|mr-|pl-|pr-|text-left|text-right|border-l-|border-r-|left-|right-`?
+   (`left-*` and `right-*` are in the Use/Never table above and were missing here.)
 8. Driven in **both locales** `D57`, at **1366 and 1440 first** `D23`, then **375**
    `D55` `D56` — a wide viewport hides exactly the wrapping a laptop shows, and a laptop
    hides what a phone does?

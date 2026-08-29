@@ -86,6 +86,20 @@ build task. `SPEC.md` supersedes all of them.
   No hardcoded text.
 - **RTL: logical Tailwind utilities only** — `ms-*` not `ml-*`, `text-start`
   not `text-left`. The convention that rots fastest if unenforced.
+  **But a logical margin resolves against the element's OWN direction**, so
+  `ms-auto` on a run carrying `dir="ltr"` compiles to `margin-left` and lands
+  on the wrong side in Arabic. Three sightings — the rail, `/companies`, the
+  board — each fixed by moving the margin onto a neighbour that carries no
+  `dir`, or by using a `gap`, which has no side to get wrong. A logical
+  utility is not protection when something nearby sets a direction.
+- **A Tailwind class that compiles to nothing fails no check.** Tailwind scans
+  the SOURCE TEXT, so a bare `/` inside an arbitrary value reads as the opacity
+  modifier and an escaped quote reaches the stylesheet as a literal backslash —
+  either way the declaration is dropped or malformed, in silence. The checkbox
+  shipped **tickless** through a green `build`, and only reading the emitted CSS
+  caught it. Same family: what `md:w-59` actually emits, and whether a closed
+  `<details>` can have its children re-shown. **Read the compiled stylesheet
+  when a visual change does not appear** — `build` cannot tell you.
 - Square metres are always **generated**, never hand-entered:
   `quantity_pcs × width_m × length_m`.
 - **Derived conditions are resolved in SQL, before pagination.** Filtering a
@@ -98,6 +112,20 @@ build task. `SPEC.md` supersedes all of them.
   times: sessions 5, 6 and 1b-3, the last shipping wrong numbers until a verify
   assertion caught it. Name both tables outright in any correlated subquery, and
   assert a derived figure at every reader, not one.
+- **The other half of that trap is the untyped `sql` parameter**, in three
+  variants, all silent in a different way. `coverage.ts` cites this file for it,
+  so it is written down here rather than in one module's comment.
+  - **A value interpolated into a `sql` template becomes a bound parameter, and
+    Postgres types it `text`.** The comparison then reads `integer > text` and
+    the query dies with `42883`. Cast it — `::int`, `::date` — at every site.
+  - **`sql<T>` is a type ASSERTION, not a decoder.** Drizzle applies a column's
+    decoder only to that column; a raw expression comes back as the driver left
+    it. `sql<Date>` returned a string, `typecheck` · `lint` · `build` all
+    passed, and every `/dispatches` request 500'd on `a.getTime is not a
+    function`. Borrow the column's own mapper with `.mapWith(table.column)`.
+  - **An untyped join column drops rows rather than failing.** `audit_log`'s
+    `entity_id` is text; INNER JOINed against a uuid it silently returns
+    nothing, and the queue reading it is empty for ever with no error.
 
 The screen and form conventions live in the **`facet-ui`** skill. Load it for
 any work under `src/app` or `src/components`. The verify-script shape is the
@@ -125,6 +153,28 @@ shaped like `<namespace>.<key>` — that asserts no lookup silently failed.
 
 **Check laptop width first — 1366 and 1440 — then wide.** A wide viewport hides
 exactly the wrapping defects a laptop shows.
+
+**A check can pass for the wrong reason, and this has happened eight times.**
+Two shapes. **A wrong assertion:** `§17` once asserted the *inverse* of `D20` on
+its own markers, so it went green over the thing the rule forbids. **An
+assertion that reads nothing:** four page-one reads with no total guard, three
+of them negatives, all correct only because the fixture rows happened to be
+newest. So — **an assertion prints what it read** (`saw N of TOTAL`), and **a
+negative guards on a non-empty read** first. A check nobody has seen fail has
+not been shown to work: feed it the defect and watch it go red, the way `§23`
+was fed the two shapes its own slice removed.
+
+**A database tool that reports success may have changed nothing.** Three
+sightings, one class. `drizzle-kit migrate` exits 1 with no message at all on
+a connection error. A trailing carriage return in an inline `DATABASE_URL`
+connects to a database that does not exist and prints only a spinner. And **a
+hand-written journal entry whose `when` predates the last applied migration is
+skipped in silence while `migrations applied successfully!` still prints** —
+`0030` was recorded as applied with its columns untouched. drizzle runs only
+entries newer than the last `created_at` in `drizzle.__drizzle_migrations`,
+and `0028`–`0031` all carry hand-picked `when` values, so this is live rather
+than historical. **Confirm from `information_schema` or
+`drizzle.__drizzle_migrations`, never from the success line.**
 
 **Auth bridge:** re-run the session checks after any upgrade of `next-auth`,
 `@auth/core`, `@auth/drizzle-adapter` or `next` — failure is **silent**, login
