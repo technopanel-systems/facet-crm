@@ -870,19 +870,29 @@ joining back to the real record and applying its visibility.
 **S113.** **Every user-facing string goes through the translation layer** (EN +
 AR), and layout uses logical utilities so RTL works.
 
-**S114. [CHANGE]** **Comments exist on quotation threads and projects only.**
-Not on companies, contacts or dispatches — the timeline already carries those.
-An unread comment appears on the waiting list, so it cannot be missed.
+**S114.** **Comments exist on quotation threads and projects only.**
+Not on companies, contacts or dispatches. An unread comment appears on the
+waiting list, so it cannot be missed.
 
-**The rule is the target; the code admits five kinds.** A company, a contact and
-a dispatch each take a comment today, at every layer — the record-type check in
-the database, the record-type list, the visibility filter and the comment card
-on all five screens — and comments sit on all three this rule forbids.
-Narrowing to two removes three branches and the rows behind them. It is a
-disclosure question rather than tidying: a comment follows its anchor (S131), so
-a comment on a company reaches everyone holding a share of that company, and
-S38 gives a report's note a narrower audience than that. Comments ship. The
-unread-comment surfacing does not — it needs the waiting list (S87).
+**Each of the three is excluded for its own reason, and they are not the same
+reason.** A **company** already has a timeline carrying what happened with that
+customer, so the conversation would sit beside a record of it. A **contact** and
+a **dispatch** have no timeline at all — nothing else anchors to either, so
+comments were the whole of what their screens could ever show, and both cards
+came off rather than being emptied (D48, D70). The sentence that used to say
+*the timeline already carries those* was true of the company alone.
+
+**Narrowed in session 27b.** Five kinds were admitted at every layer — the
+record-type check in the database, the record-type list, the visibility filter
+and the comment card on five screens. It was a disclosure question rather than
+tidying: a comment follows its anchor (S131), so a comment on a company reached
+everyone holding a share of that company, and S38 gives a report's note a
+narrower audience than that with no equivalent half here to withhold. Three
+rows existed on the forbidden kinds and all three were verify residue; the
+migration cleared them (WORKFLOW §7).
+
+Comments ship. The unread-comment surfacing does not — it needs the waiting
+list (S87).
 
 **S115.** **File attachments are Super Admin only** — a logo or general image.
 Rep file uploads are a possible later addition. There is no attachment feature
@@ -932,11 +942,16 @@ comment is not a record with a visibility of its own — it follows its anchor,
 the way a report's shared half does (S38).
 
 **S76 is the one exception, and it does not carry the conversation.** The
-coordinator sees a project and a contact because a dispatch names both; she does
-not see what the reps say to each other on them. On those two records her sight
-stops at the record. Everywhere else she reads the comments of records she
-already holds in her own right — every quotation thread (S62) and every dispatch
-(S72) — and a company's conversation was never hers and is not now.
+coordinator sees a project because a dispatch names one; she does not see what
+the reps say to each other on it. On a project her sight stops at the record.
+The one thread she reads is the quotation thread, which she holds in her own
+right (S62).
+
+**S76 opened a contact on the same terms and that half is now empty rather than
+excepted.** Since S114 a contact carries no conversation for anybody, so there
+is nothing on one for this rule to withhold from her — the exception is
+enforced in exactly one place, the project. A company's conversation was never
+hers, and a company has none either.
 
 ---
 

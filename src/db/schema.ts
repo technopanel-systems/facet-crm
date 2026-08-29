@@ -2237,9 +2237,13 @@ export const repReportSignals = pgTable(
  * ------------------------------------------------------------------ */
 
 /**
- * `25 §9` — comments belong on **every** record: projects, companies,
- * quotations, contacts, dispatches, for all roles. The founder called it
- * structural rather than a feature, and it is.
+ * `S114` — comments belong on a **project and a quotation thread**, for all
+ * roles. The founder called it structural rather than a feature, and it is.
+ *
+ * `25 §9` put them on every record and the CHECK below admitted five until
+ * session `27b`. `S114` supersedes it: the timeline already carries a company,
+ * and a comment follows its anchor `S131`, so one on a company reached every
+ * holder of a share of it.
  *
  * **The distinction that makes it work** `[25 §9]`: a *report* is what happened
  * with the customer — visit, call, outcome, signals — and it feeds metrics. A
@@ -2290,20 +2294,28 @@ export const comments = pgTable(
      * row-local `!==` on a comment already fetched by id. */
     index("comments_record_idx").on(t.recordType, t.recordId, t.createdAt),
     /**
-     * `13 §1`, `25 §9` — the five kinds §9 names, stated **positively**.
+     * `13 §1`, `S114` — the **two** kinds that rule names, stated
+     * **positively**.
      *
      * `record_type` is shared with `record_shares`, `delete_requests`,
      * `duplicate_flags` and `attachments` (`tasks` and `activities` shared it
      * too, until feature slice 6 dropped both `[26 §2, §6]`; so did
      * `pipeline_snapshots`, until `SPEC §15` did), so it will grow for reasons
      * that have nothing to do with comments. A negative CHECK would silently
-     * admit every value added later; this one refuses until somebody decides. Today that excludes
-     * `quotation_version` — a comment belongs to the thread, which is the
-     * conversation, not to one superseded version of it.
+     * admit every value added later; this one refuses until somebody decides.
+     * That excludes `company`, `contact` and `dispatch`, which `S114` forbids
+     * and `0032` narrowed this to; and `quotation_version`, which `0027`
+     * removed from `record_type` altogether.
+     *
+     * **The type is untouched by that narrowing** — the four tables above still
+     * need all five values, so `0032` rebuilt this CHECK and nothing else. That
+     * is also why `0024`'s enum-rebuild trap does not apply to it: nothing
+     * casts this column to `text`, so the literals below never have to be
+     * re-resolved.
      */
     check(
       "comments_record_type",
-      sql`record_type in ('company', 'contact', 'project', 'quotation_thread', 'dispatch')`,
+      sql`record_type in ('project', 'quotation_thread')`,
     ),
   ],
 );

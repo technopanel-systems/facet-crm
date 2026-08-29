@@ -272,24 +272,33 @@ export function signalTakesReference(signal: ReportSignal): boolean {
 export const SIGNAL_REFERENCE_MAX = 200;
 
 /**
- * `[25 §9]` — the five kinds of record a comment may hang on.
+ * `S114` — the **two** kinds of record a comment may hang on.
  *
  * The database says the same thing in the `comments_record_type` CHECK, stated
- * positively there because `record_type` is shared with seven other tables and
+ * positively there because `record_type` is shared with four other tables and
  * will grow for reasons that have nothing to do with comments. This list is
  * that CHECK in TypeScript: keep the two in step, and `scripts/verify-comments`
- * asserts the database refuses a sixth by constraint name.
+ * §1 asserts the database refuses a company, a contact and a dispatch by
+ * constraint name.
  *
- * `quotation_version` is excluded on purpose — a comment belongs to the thread,
- * which is the conversation, not to one superseded version of it.
+ * **It admitted five until session `27b`.** A company, a contact and a dispatch
+ * each took one, which `S114` forbids in its own words. The reason is
+ * disclosure rather than tidiness: a comment follows its anchor `S131`, so one
+ * on a company reached everyone holding a share of that company — wider than
+ * `S38` gives a report's private note, which has no equivalent here to
+ * withhold.
+ *
+ * `quotation_version` was never admitted, and for a different reason: a comment
+ * belongs to the thread, which is the conversation, not to one superseded
+ * version of it. `0027` dropped the value from `record_type` entirely.
+ *
+ * **This union is narrower than `record_type`**, which still carries all five
+ * for `record_shares`, `delete_requests`, `duplicate_flags` and `attachments`.
+ * A raw `comments.record_type` column therefore no longer assigns to
+ * `CommentRecordType` — narrow it at the read site, as `listComments` and
+ * `timeline.ts` do.
  */
-export const COMMENT_RECORD_TYPES = [
-  "company",
-  "contact",
-  "project",
-  "quotation_thread",
-  "dispatch",
-] as const;
+export const COMMENT_RECORD_TYPES = ["project", "quotation_thread"] as const;
 export type CommentRecordType = (typeof COMMENT_RECORD_TYPES)[number];
 
 /**
@@ -298,8 +307,8 @@ export type CommentRecordType = (typeof COMMENT_RECORD_TYPES)[number];
  * A comment is what colleagues say to each other about a record; there is no
  * reason a colleague note needs to run longer than the account of the visit it
  * is about. The cap is also what keeps the timeline legible: an uncapped body
- * breaks the layout on every screen that renders one, and comments render on
- * six of them.
+ * breaks the layout on every screen that renders one, and since `27b` comments
+ * render on two of them `S114`.
  *
  * `25 §13`'s return-for-edit reason is a comment, so it takes this number
  * rather than a second one.

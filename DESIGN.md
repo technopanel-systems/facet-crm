@@ -917,28 +917,21 @@ see it. Nothing is greyed out or "locked" — it simply is not there.
 
 ## 12. Comments
 
-**D48. [CHANGE]** Comments appear on **quotation threads and projects only**,
+**D48.** Comments appear on **quotation threads and projects only**,
 inside the timeline as a third event kind, with a plain composer in the card —
 a box, the people to tell, a button. No typing indicator, no read receipt, no
 reply threading, no emoji. Nothing renders a comments card on a company,
 contact or dispatch.
 
-**The last sentence is the target, not the screen** (`WORKFLOW §5 AD7`).
-`CommentBox` renders on **five** — the company, the contact and the dispatch
-each take one today, and the `comments_record_type` CHECK admits all five. So
-the rule read as finished while describing behaviour nothing had built, which
-is the failure `WORKFLOW §7` exists to stop: a marker says whether work
-remains, and this one had none. `S114` carries the same gap in its own words
-and the same `[CHANGE]`; the two are one piece of work and neither is a second
-opinion about it.
-
-**Session 27 did not close it, deliberately.** The stream `D45` and the
-narrowing are one row in `WORKFLOW §4` and were split: the narrowing is a
-migration with a disclosure decision attached — a comment follows its anchor
-`S131`, so one on a company reaches everyone holding a share of that company,
-which is wider than `S38` gives a report's note — and the rows already written
-have to be decided rather than dropped in passing. **Session `27b`** is that
-work, and this marker comes off with it.
+**A screen whose only timeline events were comments carries no timeline card at
+all** — which is the contact and the dispatch. Neither has a derived event of
+its own: nothing anchors to a contact, and a dispatch is an event rather than a
+thing that accumulates them. So on those two the composer was not the card's
+contents alongside other things, it was the whole of them, and removing it left
+a heading over nothing. `D70` says an empty block is absent rather than an empty
+shell, so both cards came off entire. **The company keeps its card** and loses
+only the composer, because Dispatched, Quotation issued and Quotation raised are
+still on it.
 
 Everything else in this rule ships: the comment IS the timeline's third event
 kind, it is the stream's **said** kind `D45`, and the composer is in the card

@@ -39,16 +39,14 @@ function readComment(formData: FormData) {
 }
 
 /** The paths a comment can change. A comment shows on its record's thread and,
- *  through `/activity`, in the day's counts `[25 §14]`. */
+ *  through `/activity`, in the day's counts `[25 §14]`. Two records since
+ *  `27b`, not five `S114`. */
 function revalidateFor(recordType: string, recordId: string): void {
   revalidatePath("/activity");
-  if (recordType === "company") revalidatePath(`/companies/${recordId}`);
-  if (recordType === "contact") revalidatePath(`/contacts/${recordId}`);
   if (recordType === "project") revalidatePath(`/projects/${recordId}`);
   if (recordType === "quotation_thread") {
     revalidatePath(`/quotations/${recordId}`);
   }
-  if (recordType === "dispatch") revalidatePath(`/dispatches/${recordId}`);
 }
 
 export async function addCommentAction(
@@ -105,11 +103,16 @@ export async function updateCommentAction(
   throw new Error("unreachable"); // redirect() never returns
 }
 
-/** Back to the thread the comment lives on. There is no comment page `[25 §9]`. */
+/**
+ * Back to the thread the comment lives on. There is no comment page `[25 §9]`.
+ *
+ * **The fallback is the project, and that is the safe half of the pair.**
+ * `recordType` arrives as a bound `string`, so this cannot be exhaustive over
+ * the union; it used to fall through to `/companies/`, which after `S114` would
+ * send a reader to a record that can hold no comment at all. Both live values
+ * are named, and the one that is reached by falling through is a real anchor.
+ */
 function recordHref(recordType: string, recordId: string): string {
   if (recordType === "quotation_thread") return `/quotations/${recordId}`;
-  if (recordType === "project") return `/projects/${recordId}`;
-  if (recordType === "contact") return `/contacts/${recordId}`;
-  if (recordType === "dispatch") return `/dispatches/${recordId}`;
-  return `/companies/${recordId}`;
+  return `/projects/${recordId}`;
 }

@@ -78,7 +78,6 @@ import {
   commentMentions,
   comments,
   companies,
-  contacts,
   dispatches,
   projects,
   quotationThreads,
@@ -228,13 +227,15 @@ export type TimelineEvent = TimelineEventBase &
  * Which timeline is being asked for.
  *
  * A report naming a project appears on both its company's and its project's.
- * `record` is the third form, for the records that have a thread but no derived
- * events of their own — a contact, a quotation thread, a dispatch `[25 §9]`.
+ * `record` is the third form, for the one record that has a thread but no
+ * derived events of its own — a quotation thread `S114`. It served a contact
+ * and a dispatch too until `27b`; neither takes a comment now, so neither has
+ * anything for this scope to return and both screens dropped the card.
  * **No key at all** means "everything in the range", which is what the daily
  * view asks for.
  *
- * A company scope and a project scope are also record anchors; `commentAnchor`
- * derives that rather than making a caller pass the same id twice.
+ * A project scope is also a record anchor; `commentAnchor` derives that rather
+ * than making a caller pass the same id twice.
  */
 export type TimelineScope = {
   companyId?: string;
@@ -242,13 +243,31 @@ export type TimelineScope = {
   record?: { type: CommentRecordType; id: string };
 };
 
-/** The record whose comments this scope is asking for, if any. */
+/**
+ * The record whose comments this scope is asking for, if any.
+ *
+ * **Three answers, and the third is the one that matters.** `null` means *no
+ * anchor term* — every comment in the range, which is what the stream and the
+ * daily view ask for. `"none"` means *this scope can carry no conversation at
+ * all*, which since `S114` is the company scope.
+ *
+ * They are not the same, and collapsing them is a disclosure defect rather than
+ * a tidy-up. A company used to return `{type:"company"}`, which after the
+ * narrowing no longer typechecks — and the obvious repair, falling through to
+ * `null`, would drop the anchor term and put **every comment the viewer can
+ * see** on one company's timeline. `visibleCommentsFilter` would still be
+ * applied, so it would leak nothing the viewer may not read; it would put a
+ * rep's whole conversation on an unrelated customer's page. Hence the third
+ * value and `commentEvents`' early return.
+ */
 function commentAnchor(
   scope: TimelineScope,
-): { type: CommentRecordType; id: string } | null {
+): { type: CommentRecordType; id: string } | "none" | null {
   if (scope.record) return scope.record;
-  if (scope.companyId) return { type: "company", id: scope.companyId };
   if (scope.projectId) return { type: "project", id: scope.projectId };
+  // `S114` — a company carries no conversation. Checked AFTER the project term,
+  // because a project scope sets neither key the other way round.
+  if (scope.companyId) return "none";
   return null;
 }
 
@@ -581,8 +600,8 @@ async function dispatchedEvents(
  * the function it was simply false.
  *
  * The cost is one correlated `exists` over a single anchor row: the record type
- * is pinned by equality, so four of the filter's five branches are contradicted
- * and dropped before execution. That is not a price worth trading a leak for,
+ * is pinned by equality, so the other of the filter's two branches is
+ * contradicted and dropped before execution. That is not a price worth trading a leak for,
  * in the one module where a leak is silent `[03]` — FACET has no RLS, so a
  * missing filter is not a weakened defence, it is none `[00 §1.13]`.
  *
@@ -600,6 +619,8 @@ async function commentEvents(
   range?: DateRange,
 ): Promise<TimelineEvent[]> {
   const anchor = commentAnchor(scope);
+  // `S114` — a company scope. Not a missing anchor: see `commentAnchor`.
+  if (anchor === "none") return [];
 
   const rows = await db
     .select({
@@ -648,10 +669,12 @@ async function commentEvents(
     at: row.at,
     actorUserId: row.actorUserId,
     actorName: row.actorName,
-    // Only where the anchor IS the company or the project. A comment on a
-    // contact is not a company event, and inventing one here would put it on a
-    // timeline `25 §9` does not put it on.
-    companyId: row.recordType === "company" ? row.recordId : null,
+    // Only where the anchor IS the project. A comment on a quotation thread is
+    // not a project event, and inventing one here would put it on a timeline
+    // `S114` does not put it on. `companyId` is unconditionally null: since
+    // `27b` no comment hangs on a company, so the term that used to set it
+    // could never be true again.
+    companyId: null,
     projectId: row.recordType === "project" ? row.recordId : null,
     detail: null,
     // The comment's own edit route, rendered only when `canEdit` `[25 §12]`.
@@ -662,7 +685,10 @@ async function commentEvents(
       editedAt: row.editedAt,
       canEdit: row.actorUserId === session.user.id,
       mentions: mentions.get(row.id) ?? [],
-      anchor: { type: row.recordType, id: row.recordId },
+      // `comments.record_type` is the whole `record_type` enum in the schema;
+      // the CHECK is what narrows it to two, so the narrowing is asserted here
+      // the way `listComments` asserts it `[comments.ts:228]`.
+      anchor: { type: row.recordType as CommentRecordType, id: row.recordId },
     },
   }));
 }
@@ -720,11 +746,13 @@ async function gather(
    * falls to `undefined` when neither key is set. That is correct for the daily
    * view, which asks for everything in a range.
    *
-   * It is NOT correct for `25 §9`'s third scope. A contact, a quotation thread
-   * and a dispatch have a thread of their own and no derived events, so running
-   * the six for one of them would answer "every event this viewer can see"
-   * instead of "this record's". Silently, and as over-disclosure rather than a
-   * crash. So they are not run at all.
+   * It is NOT correct for the record scope. A quotation thread has a thread of
+   * its own and no derived events, so running the six for one would answer
+   * "every event this viewer can see" instead of "this record's". Silently, and
+   * as over-disclosure rather than a crash. So they are not run at all.
+   *
+   * `commentAnchor`'s `"none"` is the same trap at the other end of the same
+   * function, for the company scope this slice left with no conversation.
    */
   const derived = scope.record
     ? []
@@ -791,13 +819,18 @@ export function companyTimeline(
 }
 
 /**
- * The thread of a record that has no derived events of its own — a contact, a
- * quotation thread, a dispatch `[25 §9]`.
+ * The thread of a record that has no derived events of its own — since `27b`,
+ * the quotation thread and nothing else `S114`.
+ *
+ * It served the contact and the dispatch too. Both lost their whole timeline
+ * card in that slice rather than only their composer: comments were the only
+ * events either card could ever hold, so what was left was an empty shell,
+ * which `D70` says is absent rather than empty.
  *
  * Callers pass **no `limit`**, so it pages rather than capping: `<Timeline>`
- * only offers a "view all" link when it is given one, and these three records
- * have no full-history route. A cap with no route behind it is what
- * `timelineFor` above exists not to do.
+ * only offers a "view all" link when it is given one, and a thread has no
+ * full-history route. A cap with no route behind it is what `timelineFor` above
+ * exists not to do.
  */
 export function recordTimeline(
   session: AuthSession,
@@ -1003,70 +1036,49 @@ async function subjectsFor(
     ...new Set(ids.filter((id): id is string => id !== null)),
   ];
 
-  // A comment on a contact, a quotation thread or a dispatch sets neither
-  // `companyId` nor `projectId`, so its subject is reached through its anchor.
+  // A comment on a quotation thread sets neither `companyId` nor `projectId`,
+  // so its subject is reached through its anchor. Since `27b` it is the ONLY
+  // anchor that lands here: a project comment sets `projectId` and is picked up
+  // below, and the contact and dispatch anchors that used to need their own
+  // lookups can no longer exist `S114`.
   const anchored = events.flatMap((event) =>
     event.kind === "comment" && !event.companyId && !event.projectId
       ? [{ key: event.key, anchor: event.comment.anchor }]
       : [],
   );
-  const anchorsOf = (type: CommentRecordType) =>
-    unique(
-      anchored
-        .filter((row) => row.anchor.type === type)
-        .map((row) => row.anchor.id),
-    );
 
   const companyIds = unique(events.map((event) => event.companyId));
   const projectIds = unique(events.map((event) => event.projectId));
-  const threadIds = anchorsOf("quotation_thread");
-  const dispatchIds = anchorsOf("dispatch");
-  const contactIds = anchorsOf("contact");
+  const threadIds = unique(
+    anchored
+      .filter((row) => row.anchor.type === "quotation_thread")
+      .map((row) => row.anchor.id),
+  );
 
-  const [companyRows, projectRows, threadRows, dispatchRows, contactRows] =
-    await Promise.all([
-      companyIds.length
-        ? db
-            .select({ id: companies.id, name: companies.name })
-            .from(companies)
-            .where(inArray(companies.id, companyIds))
-        : [],
-      projectIds.length
-        ? db
-            .select({ id: projects.id, name: projects.name })
-            .from(projects)
-            .where(inArray(projects.id, projectIds))
-        : [],
-      threadIds.length
-        ? db
-            .select({ id: quotationThreads.id, name: companies.name })
-            .from(quotationThreads)
-            .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
-            .where(inArray(quotationThreads.id, threadIds))
-        : [],
-      dispatchIds.length
-        ? db
-            .select({ id: dispatches.id, name: companies.name })
-            .from(dispatches)
-            .innerJoin(companies, eq(companies.id, dispatches.companyId))
-            .where(inArray(dispatches.id, dispatchIds))
-        : [],
-      contactIds.length
-        ? db
-            .select({ id: contacts.id, name: contacts.name })
-            .from(contacts)
-            .where(inArray(contacts.id, contactIds))
-        : [],
-    ]);
+  const [companyRows, projectRows, threadRows] = await Promise.all([
+    companyIds.length
+      ? db
+          .select({ id: companies.id, name: companies.name })
+          .from(companies)
+          .where(inArray(companies.id, companyIds))
+      : [],
+    projectIds.length
+      ? db
+          .select({ id: projects.id, name: projects.name })
+          .from(projects)
+          .where(inArray(projects.id, projectIds))
+      : [],
+    threadIds.length
+      ? db
+          .select({ id: quotationThreads.id, name: companies.name })
+          .from(quotationThreads)
+          .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
+          .where(inArray(quotationThreads.id, threadIds))
+      : [],
+  ]);
 
   const byId = new Map<string, string>();
-  for (const row of [
-    ...companyRows,
-    ...projectRows,
-    ...threadRows,
-    ...dispatchRows,
-    ...contactRows,
-  ]) {
+  for (const row of [...companyRows, ...projectRows, ...threadRows]) {
     byId.set(row.id, row.name);
   }
 

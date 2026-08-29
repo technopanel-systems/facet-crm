@@ -18,9 +18,12 @@
  *      which nothing else drives.
  *   8. The chain strip `D27` `D29` renders on a quotation thread AND on the
  *      project behind it, in both locales.
- *   9. The comment box `S114` `D48` posts for real, and its cap refuses rather
- *      than 500s — the one assertion of `readFields`' shape validation
- *      anywhere, because no in-process script crosses the action boundary.
+ *   9. The comment box `S114` `D48` posts for real, on a project this section
+ *      registers, and its cap refuses rather than 500s — the one assertion of
+ *      `readFields`' shape validation anywhere, because no in-process script
+ *      crosses the action boundary. `walkRecords` asserts the other half: the
+ *      two screens that take a comment offer the box and the three that no
+ *      longer do render none.
  *  10. The sharing panel `S96` `S99` `S100` grants and revokes for real, and
  *      the rep who may not share is not offered the form.
  *  11. The next follow-up date `D34` `25 §18` is set and cleared for real, over
@@ -717,24 +720,25 @@ async function walk(jar: Jar, email: string, locale: string): Promise<void> {
 
 /** The id-bearing routes, discovered from the lists rather than hard-coded. */
 /**
- * The five kinds `comments_record_type` admits, by list section.
+ * The two kinds `comments_record_type` admits, by list section — and the three
+ * it refuses.
  *
- * **This is five and `S114` says two.** `S114` and `D48` put comments on
- * quotation threads and projects ONLY — never a company, contact or dispatch.
- * The CHECK, the screens and this walk all predate them and none has caught
- * up. Recorded in `WORKFLOW.md` §5; session 14 narrows it and deletes what is
- * below. Cited here so the gap is legible rather than silent.
+ * **This was five until `27b`.** `S114` and `D48` put comments on quotation
+ * threads and projects ONLY; the CHECK, the screens and this walk all admitted
+ * five, and all three narrowed in that slice.
  *
- * `reports` and `users` are absent because they are not commentable — a report
- * is already somebody's words, and a colleague is not a record.
+ * **`NOT_COMMENTABLE` is not decoration.** Deleting the three from
+ * `COMMENTABLE` and stopping there would leave the narrowing untested: putting
+ * `CommentBox` back on the company screen would go green. Every detail screen
+ * is now asserted either way, so the rule is enforced from both sides.
+ *
+ * `reports` and `users` are absent from both because they are not records a
+ * comment could ever hang on — a report is already somebody's words, and a
+ * colleague is not a record. Asserting their absence would be asserting the
+ * `record_type` enum, which `verify:schema25` §13 already owns.
  */
-const COMMENTABLE = new Set([
-  "companies",
-  "contacts",
-  "projects",
-  "quotations",
-  "dispatches",
-]);
+const COMMENTABLE = new Set(["projects", "quotations"]);
+const NOT_COMMENTABLE = new Set(["companies", "contacts", "dispatches"]);
 
 /**
  * Where a section's ids are found, when that is not `/<section>`.
@@ -791,19 +795,26 @@ async function walkRecords(jar: Jar, email: string): Promise<void> {
             body.includes('data-slot="chain-strip"'),
           );
         }
-        // Every one of the five detail screens offers the box. This is the
-        // assertion that would have caught the three screens that had no
-        // timeline to hang it on — and, since `S114` and `D48` allow only two
-        // of the five, the assertion session 14 has to invert.
+        // The two screens that take a comment offer the box; the three that
+        // no longer do must not render one `S114` `D48`. The fact-grid
+        // assertion above is this negative's guard: it proves the page
+        // rendered at all, so an absent composer is an absent composer and
+        // not an absent page.
+        const offered =
+          body.includes('data-slot="comment-composer"') &&
+          body.includes('name="body"');
         if (COMMENTABLE.has(section)) {
-          const offered =
-            body.includes('data-slot="comment-composer"') &&
-            body.includes('name="body"');
           check(
             readOnly
               ? `  ${path} offers NO comment box — read, not write [S76] [D51]`
               : `  ${path} offers the comment box [S114] [D48]`,
             readOnly ? !offered : offered,
+          );
+        }
+        if (NOT_COMMENTABLE.has(section)) {
+          check(
+            `  ${path} renders NO comments card — S114 forbids one here [S114] [D48]`,
+            !offered,
           );
         }
       }
@@ -1716,8 +1727,8 @@ async function main(): Promise<void> {
     }
   }
 
-  // `S114` and `D48` govern; the screens this drives are wider than either
-  // allows — see the note above COMMENTABLE.
+  // `S114` and `D48` govern, and since `27b` the screens agree with them —
+  // see the note above COMMENTABLE.
   console.log("\n9. The comment box, posted for real [S114] [D48]");
   {
     // **`verify:comments` drives `addComment`; this drives the FORM.** The two
@@ -1727,12 +1738,29 @@ async function main(): Promise<void> {
     // lives. That boundary is where slices 2 and 3 replayed a POST by hand and
     // threw the replay away `[23]`; this one is kept.
     //
-    // **The company is this section's own, registered here over HTTP.** It
+    // **It posted on a COMPANY until `27b`.** `S114` takes the comment off a
+    // company, so this registers a run-stamped company AND a project on it, and
+    // posts there. Every assertion below is the one that stood before; only the
+    // anchor moved.
+    //
+    // **The scratch records are this section's own, registered over HTTP.** It
     // used to comment on whichever company rep-a held first, which on a seeded
     // database is a real demo record — and `S107` means nothing can ever take
     // a comment off again, so eighteen of them had settled onto two of them.
-    // The company below carries a run stamp, so the unremovable row lands on a
-    // record nobody reads as data.
+    // Both records below carry a run stamp, so the unremovable row lands on
+    // records nobody reads as data.
+    //
+    // **New residue, recorded here rather than discovered later: this section
+    // now leaves ONE PROJECT per run behind where it left none.** That is a
+    // real cost and it is the cheaper of the two options — the alternative is
+    // commenting on a seeded project, which `S107` then marks for ever.
+    //
+    // **The project is created through `/projects/new` WITH its participant**,
+    // never by a direct insert. `WORKFLOW §5` records 11 projects carrying no
+    // live participant and names the verify scripts that inserted into
+    // `projects` directly as how they got there; `S27` says a project keeps at
+    // least one. Posting the form is also what `createProject` gates on, so a
+    // project this script leaves behind is one the product could have made.
     //
     // Abroad, for §13's old reason: the city was a `Combobox` in a portal, so
     // this script has no city id to post, and `S15` refuses a Saudi company
@@ -1779,20 +1807,57 @@ async function main(): Promise<void> {
       redirect: "manual",
     });
     store(jar, registered);
-    const location = registered.headers.get("location") ?? "";
-    const id = location.match(/\/companies\/([0-9a-f-]{36})/)?.[1];
+    const companyLocation = registered.headers.get("location") ?? "";
+    const companyId = companyLocation.match(/\/companies\/([0-9a-f-]{36})/)?.[1];
     check(
-      "*** this section registers the company it comments on *** [S13], [S18]",
-      registered.status === 303 && Boolean(id),
-      `got ${registered.status} ${location}`,
+      "*** this section registers the company the project hangs on *** [S13], [S18]",
+      registered.status === 303 && Boolean(companyId),
+      `got ${registered.status} ${companyLocation}`,
     );
+
+    /* --- the project, and the participant `S27` will not let it lose ---- */
+
+    let id: string | undefined;
+    if (companyId) {
+      const projectForm = await get(jar, "/en/projects/new");
+      const creation = envelopeOf(projectForm.body);
+      creation.set("name", `comments-${stamp}`);
+      // The participant rows arrive as repeated `companyId` inputs `S27`.
+      creation.set("companyId", companyId);
+      // The rest as an untouched form sends them. An empty `endState` is an
+      // OPEN project, which is what `S29` calls one that has not closed.
+      for (const empty of [
+        "sqmExpected",
+        "cityId",
+        "region",
+        "endState",
+        "lostReasonId",
+        "lossReason",
+      ]) {
+        creation.set(empty, "");
+      }
+      const created = await fetch(`${BASE}/en/projects/new`, {
+        method: "POST",
+        headers: { cookie: header(jar), origin: BASE },
+        body: creation,
+        redirect: "manual",
+      });
+      store(jar, created);
+      const location = created.headers.get("location") ?? "";
+      id = location.match(/\/projects\/([0-9a-f-]{36})/)?.[1];
+      check(
+        "*** …and the project it comments on, carrying that participant *** [S27], [S50]",
+        created.status === 303 && Boolean(id),
+        `got ${created.status} ${location}`,
+      );
+    }
 
     for (const locale of ["en", "ar"] as const) {
       if (!id) break;
 
-      const page = await get(jar, `/${locale}/companies/${id}`);
+      const page = await get(jar, `/${locale}/projects/${id}`);
       check(
-        `${locale}: the company screen carries the composer [S114] [D48]`,
+        `${locale}: the project screen carries the composer [S114] [D48]`,
         page.body.includes('data-slot="comment-composer"'),
       );
 
@@ -1811,7 +1876,7 @@ async function main(): Promise<void> {
       );
 
       const post = async (body: FormData): Promise<number> => {
-        const response = await fetch(`${BASE}/${locale}/companies/${id}`, {
+        const response = await fetch(`${BASE}/${locale}/projects/${id}`, {
           method: "POST",
           headers: { cookie: header(jar), origin: BASE },
           body,
@@ -1830,7 +1895,7 @@ async function main(): Promise<void> {
         `got ${posted}`,
       );
 
-      const landed = await get(jar, `/${locale}/companies/${id}`);
+      const landed = await get(jar, `/${locale}/projects/${id}`);
       check(
         `${locale}: the comment is on the record's thread [S114]`,
         landed.body.includes('data-slot="comment"'),
@@ -5023,23 +5088,43 @@ async function main(): Promise<void> {
   );
   {
     /*
-     * **The first assertion is the reason this section exists.**
+     * **The probe this section was built around is GONE, and what it proved is
+     * no longer provable here.** Recording that plainly, because a check that
+     * quietly stops existing is worse than one that fails.
      *
-     * The turn panel took its elapsed figure from the newest TIMELINE event —
-     * the most recent of seven kinds, a comment and a dispatch among them —
-     * while the red band beside it came from the interaction clock. `20 §2`
-     * says why those differ: a field note is anchored to nobody and cannot be
-     * evidence a customer was contacted, and neither can a comment. So posting
-     * a comment reset the number to zero and left the colour alone, and the
-     * page printed "Nothing recorded for 0 days" inside a red band next to a
-     * Gone quiet badge. On this database it understated 20 of one rep's 59
-     * logged companies, by 36 days on average and 118 at worst.
+     * What it caught: the turn panel took its elapsed figure from the newest
+     * TIMELINE event — the most recent of seven kinds, a comment and a dispatch
+     * among them — while the red band beside it came from the interaction
+     * clock. `20 §2` says why those differ: a field note is anchored to nobody
+     * and cannot be evidence a customer was contacted, and neither can a
+     * comment. So posting a comment reset the number to zero and left the
+     * colour alone, and the page printed "Nothing recorded for 0 days" inside a
+     * red band next to a Gone quiet badge. On this database it understated 20
+     * of one rep's 59 logged companies, by 36 days on average and 118 at worst.
      *
-     * A screen cannot be asked whether it read the right column. It CAN be
-     * asked whether its number moves when something that is not an interaction
-     * happens, and that is a black-box question this file is allowed to ask.
-     * Section 9 already posts a comment on this same company; this brackets one
-     * with a before and an after.
+     * How it was proved: a screen cannot be asked whether it read the right
+     * column, but it CAN be asked whether its number moves when something that
+     * is not an interaction happens. This section posted a comment on the
+     * company and bracketed the meter with a before and an after.
+     *
+     * **`S114` removed the instrument in `27b`.** A comment can no longer land
+     * on a company, and the company screen is the only one carrying a
+     * `silence-meter` — so there is no longer a non-interaction event a rep can
+     * add to a company timeline over HTTP from inside this section.
+     *
+     * **What is therefore NOT proven any more, stated rather than left
+     * implied:** that the panel's figure is unmoved by a DERIVED company event
+     * — a quotation raised, a version issued, a dispatch. Those are still on
+     * the timeline and the panel could still, in principle, read one. What has
+     * changed is that the specific defect this section caught is structurally
+     * unreachable rather than merely untested: the event kind that caused it
+     * cannot exist on a company any more.
+     *
+     * Re-pointing this at raising a quotation was considered and declined by
+     * founder decision — it drags §14's machinery into a section that does not
+     * own it, to guard a case no rule says is at risk. `coverage.ts` states in
+     * place that the figure comes from `companySilence` and nothing else, which
+     * is the claim, and `verify:phase9` §11 is where that function is measured.
      */
     const jar = jars["rep-a@example.test"];
     const list = await get(jar, "/en/companies");
@@ -5068,49 +5153,16 @@ async function main(): Promise<void> {
         `data-days ${figureBefore}`,
       );
 
-      const form = before.body.match(
-        /<form[^>]*data-slot="comment-composer"[\s\S]*?<\/form>/,
-      )?.[0];
-      if (!form) {
-        check("the composer is on the company screen [S114]", false);
-      } else {
-        const fields = envelopeOf(form);
-        fields.set("body", "verify-routes turn-panel probe");
-        const posted = await fetch(`${BASE}${path}`, {
-          method: "POST",
-          headers: { cookie: header(jar), origin: BASE },
-          body: fields,
-          redirect: "manual",
-        });
-        store(jar, posted);
-        check(
-          "the probe comment posted",
-          posted.status === 200,
-          `got ${posted.status}`,
-        );
-
-        const afterPost = await get(jar, path);
-        // **The card's stated TOTAL, not its rendered rows.** `D70` caps the
-        // card at eight, so on a full one a ninth entry pushes one off the
-        // bottom and the row count cannot move — which is what this assertion
-        // measured first time out, and it read 8 then 8. The total is the
-        // number that is allowed to change, and stating it is `D70`'s own
-        // second clause.
-        const totalOf = (body: string) =>
-          Number(attrOf(body, "timeline-card", "data-total") ?? "-1");
-        const commentsBefore = totalOf(before.body);
-        const commentsAfter = totalOf(afterPost.body);
-        check(
-          "*** a comment does NOT move the turn panel's figure *** [D24], [20 §2]",
-          daysOf(afterPost.body) === figureBefore,
-          `${figureBefore} became ${daysOf(afterPost.body)}`,
-        );
-        check(
-          "…and the comment did land, so the negative above means something [S114]",
-          commentsAfter === commentsBefore + 1,
-          `timeline total ${commentsBefore} then ${commentsAfter}`,
-        );
-      }
+      // **The composer's ABSENCE is what this screen now asserts** `S114`
+      // `D48`. It is the same read the probe opened with, inverted: the page
+      // rendered — the meter above proves that — and it carries no composer.
+      // `walkRecords` asserts the same thing over every company id it finds;
+      // this one stands because §21 already has the page in hand and the claim
+      // belongs beside the paragraph explaining what left with it.
+      check(
+        "no comment composer on the company screen [S114], [D48]",
+        !before.body.includes('data-slot="comment-composer"'),
+      );
 
       const detail = await get(jar, path);
 

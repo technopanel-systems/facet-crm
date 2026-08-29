@@ -576,9 +576,12 @@ async function main(): Promise<void> {
     signals: [],
   });
 
-  // One comment on each of the three shareable anchors `[25 §10]`.
+  // One comment on each anchor a comment may hang on `S114`. **It was three
+  // until `27b`** — the company came off with `visibleCommentsFilter`'s company
+  // branch, and these are the two `SHARED_RECORD_TYPES` and
+  // `COMMENT_RECORD_TYPES` still have in common. A company share remains fully
+  // asserted here; what it no longer carries is a conversation.
   for (const anchor of [
-    { type: "company" as const, id: company.id },
     { type: "project" as const, id: project.id },
     { type: "quotation_thread" as const, id: thread.id },
   ]) {
@@ -754,10 +757,10 @@ async function main(): Promise<void> {
     "…while its author still reads their own words [S38]",
     typeof (await getReport(repA, companyReport.id))?.narrative === "string",
   );
-  check(
-    "visibleCommentsFilter, through the company branch [25 §10]",
-    (await listComments(repB, "company", company.id)).length === 1,
-  );
+  // **`visibleCommentsFilter`'s company branch was asserted here and is gone**
+  // `S114` `27b`. A company share no longer opens a conversation because a
+  // company no longer has one; the project and thread branches below are the
+  // whole of what this script now follows a real share through.
   // **The coverage assertion came out in `28b` rather than being rewritten.**
   // It read `coverage()`, a SECOND reader composing `visibleCompaniesFilter`,
   // so it proved something the `visibleCompaniesFilter` check above could not.

@@ -31,7 +31,6 @@ import {
   reassignCompanyAction,
   reincludeCompanyAction,
 } from "../actions";
-import { CommentBox } from "../../_components/comment-box";
 import { NextFollowUpPanel } from "../../_components/next-follow-up-panel";
 import { projectStateKey } from "../../_components/project-state";
 import { SharingPanel } from "../../_components/sharing-panel";
@@ -325,24 +324,19 @@ export default async function CompanyDetailPage({
           opens to answer where do we stand with this customer. */}
       <div className="grid items-start gap-4 lg:grid-cols-[1.25fr_1fr]">
         <div className="flex flex-col gap-4">
+          {/* No Log button here any more `S32` — it is in the page header,
+              where an entry point can be reached without scrolling.
+
+              **And no composer since `27b`** `S114` `D48`. A company takes no
+              comment: the timeline already carries what happened with this
+              customer, and a comment follows its anchor `S131`, so one here
+              reached every holder of a share of the company — wider than `S38`
+              gives a report's private note. The CARD stays, because it still
+              holds Dispatched, Quotation issued and Quotation raised. */}
           <Timeline
             events={timeline.events}
             total={timeline.total}
             fullHistoryHref={`/companies/${company.id}/timeline`}
-            // No Log button here any more `S32` — it is in the page header,
-            // where an entry point can be reached without scrolling.
-            //
-            // One thread per record `[25 §9]`: the conversation sits inside the
-            // timeline card, not beside it. A report is what happened with the
-            // customer and a comment is what colleagues say about it, and the
-            // two are not the same act.
-            composer={
-              <CommentBox
-                session={session}
-                recordType="company"
-                recordId={company.id}
-              />
-            }
           />
         </div>
 

@@ -9,12 +9,13 @@
  * `src/lib/daily-activity.ts` and `src/lib/quotations.ts` in process — no
  * browser, no HTTP — and checks the things that are otherwise only claimed:
  *
- *   1. All five record types take a comment, and the database refuses a sixth
- *      `[25 §9]` — asserted by CONSTRAINT NAME, not by "it threw".
+ *   1. Both record types take a comment, and the database refuses a company, a
+ *      contact and a dispatch `S114` — asserted by CONSTRAINT NAME, not by "it
+ *      threw".
  *   2. Visibility follows the record `S131`, in both directions. The negative
  *      half matters most — including `S76`'s exception, which gives the
- *      coordinator the project and the contact and none of the conversation on
- *      either, at all three readers of that rule.
+ *      coordinator the project and none of the conversation on it, at all three
+ *      readers of that rule.
  *   3. Editable by the author, never deleted `[25 §12]`.
  *   4. A mention raises `mention.received`, act-now and NOT persistent
  *      `[25 §11]`, `[21 §4]` — and TWO mentions of the same person on the same
@@ -55,7 +56,6 @@ import {
   commentMentions,
   companies,
   companyReps,
-  contacts,
   dispatches as dispatchesTable,
   notificationTypes,
   notifications,
@@ -76,6 +76,7 @@ import {
   getComment,
   listComments,
   updateComment,
+  type Comment,
 } from "@/lib/comments";
 import { dailyActivity } from "@/lib/daily-activity";
 import { NOTIFICATION_TYPES, SAUDI_CODE } from "@/lib/enums";
@@ -87,7 +88,13 @@ import {
   returnForEdit,
 } from "@/lib/quotations";
 import { createReport, today } from "@/lib/reports";
-import { recordTimeline, companyTimeline, eventsInRange } from "@/lib/timeline";
+import {
+  recordTimeline,
+  projectTimeline,
+  companyTimeline,
+  eventsInRange,
+  type TimelineEvent,
+} from "@/lib/timeline";
 
 import { addDispatchLine } from "./dispatch-fixture";
 
@@ -125,13 +132,58 @@ async function refuses(
   }
 }
 
-/* `databaseRefuses` and its `causeChain` helper stood here until `0027`. Their
- * one caller asserted that `comments_record_type` refuses a comment on a
- * quotation VERSION; the sweep dropped `quotation_version` from the
- * `record_type` enum, so there is no such value left to offer and no refusal
- * to test. `verify:schema25` §13 compares the enum's live values to
- * `schema.ts`, which covers all seven tables carrying the type rather than
- * comments alone. */
+/**
+ * Assert that the DATABASE refuses, by constraint name `[13 §1]`.
+ *
+ * **This stood here until `0027` and is back for `27b`.** Its old caller
+ * offered `record_type = 'quotation_version'`; the sweep dropped that value
+ * from the enum, so there was nothing left to refuse and the helper went with
+ * it. `S114` gives it three callers again — a company, a contact and a dispatch
+ * are values the enum still carries and the CHECK now rejects, which is exactly
+ * the shape a constraint-name assertion is for.
+ *
+ * **By NAME, never by "it threw".** A typo in the insert throws too, and would
+ * pass an assertion that only caught an exception. Drizzle wraps a driver error
+ * in one whose message is just "Failed query: …" and postgres.js puts the
+ * constraint on the `cause`, so reading `error.message` alone passes on nothing
+ * and fails on everything — hence `causeChain`. Same helper as
+ * `verify-schema25.ts`, which is where it survived the sweep.
+ */
+async function databaseRefuses(
+  label: string,
+  constraintName: string,
+  statement: string,
+): Promise<void> {
+  try {
+    await db.execute(sql.raw(statement));
+    failures += 1;
+    console.error(`  FAIL  ${label} — the database allowed it`);
+  } catch (error) {
+    check(
+      `${label} (${constraintName})`,
+      causeChain(error).includes(constraintName),
+      `threw ${causeChain(error).slice(0, 160)}`,
+    );
+  }
+}
+
+/** Every message in the `cause` chain, plus a driver's `constraint_name`. */
+function causeChain(error: unknown): string {
+  const parts: string[] = [];
+  let current: unknown = error;
+  for (let depth = 0; current && depth < 5; depth += 1) {
+    if (current instanceof Error) {
+      parts.push(current.message);
+      const named = (current as { constraint_name?: string }).constraint_name;
+      if (named) parts.push(named);
+      current = current.cause;
+    } else {
+      parts.push(String(current));
+      break;
+    }
+  }
+  return parts.join(" | ");
+}
 
 /** A session for a user, assembled the way `getSession` would. */
 async function sessionFor(email: string): Promise<AuthSession> {
@@ -318,15 +370,15 @@ async function main(): Promise<void> {
     .insert(projectCompanies)
     .values({ projectId: project.id, companyId: company.id });
 
-  const [contact] = await db
-    .insert(contacts)
-    .values({
-      companyId: company.id,
-      name: `${stamp} Contact`,
-      nameNormalized: normalizeName(`${stamp} Contact`),
-      createdBy: repA.user.id,
-    })
-    .returning();
+  /* **The contact fixture went in `27b`.** It existed only to take a comment
+   * and to prove `S76`'s exception withheld the conversation on one; `S114`
+   * removed both, so a row nothing reads is unused structure `CLAUDE.md`.
+   *
+   * **The dispatch below stays**, and not out of caution: nothing asserts on it
+   * directly any more either, but it is a SOURCE of the derived events §6 and
+   * §7 count — a dispatched event on the company and project timelines. §6's
+   * new company-scope negative is guarded on that timeline being non-empty, so
+   * deleting the dispatch would weaken the guard rather than tidy the file. */
 
   const thread = await createQuotationThread(
     repA,
@@ -380,20 +432,17 @@ async function main(): Promise<void> {
   // sum, so a hand-written row needs one or it reads as 0 m².
   await addDispatchLine(dispatch.id, "86.3040");
 
-  /* --- 1. All five record types, and the database refuses a sixth -- */
+  /* --- 1. Both record types, and the database refuses the other three -- */
 
-  console.log("\n1. Comments land on all five record types [25 §9]");
+  console.log("\n1. Comments land on both record types [S114]");
 
   const anchors = [
-    { type: "company" as const, id: company.id },
-    { type: "contact" as const, id: contact.id },
     { type: "project" as const, id: project.id },
     { type: "quotation_thread" as const, id: thread.id },
-    { type: "dispatch" as const, id: dispatch.id },
   ];
 
-  // Kept by anchor: §2 reads two of them back through `getComment`, which is a
-  // second reader of the same rule and had to be narrowed with the filter.
+  // Kept by anchor: §2 reads them back through `getComment`, which is a second
+  // reader of the same rule and had to be narrowed with the filter.
   const commentIds = new Map<string, string>();
   for (const anchor of anchors) {
     const created = await addComment(repA, {
@@ -404,27 +453,40 @@ async function main(): Promise<void> {
     });
     commentIds.set(anchor.type, created.id);
     check(
-      `a ${anchor.type} takes a comment [25 §9]`,
+      `a ${anchor.type} takes a comment [S114]`,
       created.recordType === anchor.type && created.recordId === anchor.id,
     );
   }
 
   check(
-    "all five are held, one thread per record [25 §9]",
+    "both are held, one thread per record [S114]",
     (await Promise.all(anchors.map((a) => listComments(repA, a.type, a.id)))).every(
       (list) => list.length === 1,
     ),
   );
 
-  // The refusal that stood here inserted `record_type = 'quotation_version'`
-  // and asserted `comments_record_type` rejected it. `0027` dropped the value
-  // from the enum itself — 0 rows carried it across all seven columns of the
-  // type, and no rule ever named it — so the insert no longer type-checks and
-  // there is nothing left to refuse. The CHECK stays, still stated positively,
-  // for the reason it always was: `record_type` is shared with six other
-  // tables and will grow for reasons that have nothing to do with comments.
-  // `verify:schema25` §13 compares the enum's live value list to `schema.ts`,
-  // which is what now catches a sixth kind appearing.
+  /* **The other three, refused by the database itself** `S114`, `0032`.
+   *
+   * The positive loop above cannot prove this. `addComment` would refuse a
+   * company on the TYPE before a statement was ever built, which proves that
+   * TypeScript narrowed and nothing at all about the database — and
+   * `COMMENT_RECORD_TYPES` and the CHECK are two statements of one rule that
+   * can drift apart. So these go in as raw SQL, past the type, and the
+   * constraint NAME is what is asserted rather than "it threw": a typo in the
+   * insert throws too.
+   *
+   * **The positive half above is what stops this passing for the wrong
+   * reason.** A CHECK refusing everything would go green on all three of these
+   * and red on both of those, which is the shape `CLAUDE.md` records eight
+   * sightings of. */
+  for (const kind of ["company", "contact", "dispatch"] as const) {
+    await databaseRefuses(
+      `the database refuses a comment on a ${kind} [S114]`,
+      "comments_record_type",
+      `insert into comments (record_type, record_id, author_user_id, body)
+       values ('${kind}', '${company.id}', '${repA.user.id}', '${stamp} refused')`,
+    );
+  }
 
   // All roles comment `[25 §9]` — no flag gate, the way logging has none.
   const coordinatorComment = await addComment(coordinator, {
@@ -437,84 +499,77 @@ async function main(): Promise<void> {
     "the coordinator comments without a flag — all roles do [25 §9]",
     coordinatorComment.authorUserId === coordinator.user.id,
   );
-
   /* --- 2. Visibility follows the record, both directions ----------- */
 
-  console.log("\n2. Visibility follows the record [25 §10]");
+  console.log("\n2. Visibility follows the record [S131]");
 
   check(
-    "the owning rep reads the company's comments",
-    (await listComments(repA, "company", company.id)).length === 1,
+    "the owning rep reads the project's comments",
+    (await listComments(repA, "project", project.id)).length === 1,
   );
 
   // The negative half, which matters most: an outsider composing the SAME
   // filters must see none of it.
-  const outsiderCompanyThread = await recordTimeline(
-    outsider,
-    "company",
-    company.id,
-  );
+  const outsiderProjectThread = await projectTimeline(outsider, project.id);
   check(
-    "an outsider sees NO comment on a company they do not hold [25 §10]",
-    outsiderCompanyThread.total === 0,
-    `saw ${outsiderCompanyThread.total}`,
+    "an outsider sees NO comment on a project they do not hold [S131]",
+    outsiderProjectThread.total === 0,
+    `saw ${outsiderProjectThread.total}`,
   );
 
   await refuses(
-    "an outsider cannot comment on a record they cannot see [25 §10]",
+    "an outsider cannot comment on a record they cannot see [S131]",
     "comments.errors.recordNotFound",
     () =>
       addComment(outsider, {
-        recordType: "company",
-        recordId: company.id,
+        recordType: "project",
+        recordId: project.id,
         body: `${stamp} should be refused`,
         mentions: [],
       }),
   );
 
-  // A share is what changes the answer — the rule reports already follow.
-  //
-  // **Still a hand-written row, deliberately.** `grantShare` in
-  // `src/lib/sharing.ts` is the real path as of feature slice 3, and this
-  // fixture is not converted to it: this script asserts nothing about sharing,
-  // so the coupling would buy no assertion and would make a comments run fail
-  // when sharing changed. What the two paths agree is asserted once, in
-  // `verify-sharing.ts` §5, which follows a REAL share through every filter —
-  // including `visibleCommentsFilter`, the one this line exists to exercise.
+  /* A share is what changes the answer — the rule reports already follow.
+   *
+   * **It is a PROJECT share, and that is not a detail of the port.** This was a
+   * company share until `27b`, reaching the company branch of
+   * `visibleCommentsFilter`. That branch is gone, and a company share does not
+   * cascade to the company's projects `S30` `[04 Q7]` — so pointing the old row
+   * at the same project would assert a grant the rules do not make, and would
+   * have gone RED, correctly. The share that opens a project's conversation is
+   * a share on the project.
+   *
+   * **Still a hand-written row, deliberately.** `grantShare` in
+   * `src/lib/sharing.ts` is the real path as of feature slice 3, and this
+   * fixture is not converted to it: this script asserts nothing about sharing,
+   * so the coupling would buy no assertion and would make a comments run fail
+   * when sharing changed. What the two paths agree is asserted once, in
+   * `verify-sharing.ts` §5, which follows a REAL share through every filter —
+   * including `visibleCommentsFilter`, the one this line exists to exercise. */
   await db.insert(recordShares).values({
-    recordType: "company",
-    recordId: company.id,
+    recordType: "project",
+    recordId: project.id,
     sharedWithUserId: repB.user.id,
     sharedByUserId: manager.user.id,
   });
   check(
-    "a SHARED rep reads the same company's comments [25 §10]",
-    (await recordTimeline(repB, "company", company.id)).total === 1,
+    "a SHARED rep reads the same project's comments [S131]",
+    (await projectTimeline(repB, project.id)).events.filter(
+      (event: TimelineEvent) => event.kind === "comment",
+    ).length === 1,
   );
 
-  // `16 §10` reaching through: the coordinator sees every thread, so they see
-  // every thread conversation — and still no company conversation.
+  // `16 §10` reaching through: the coordinator sees every thread, so she sees
+  // every thread conversation — and still none of the project's.
   const coordinatorThreadView = await recordTimeline(
     coordinator,
     "quotation_thread",
     thread.id,
   );
   check(
-    "the coordinator reads every quotation conversation [16 §10], [25 §10]",
+    "the coordinator reads every quotation conversation [16 §10], [S131]",
     coordinatorThreadView.total === 2,
     `saw ${coordinatorThreadView.total}`,
-  );
-  const coordinatorCompanyView = await eventsInRange(
-    coordinator,
-    { from: today(), to: today() },
-    [repA.user.id],
-  );
-  check(
-    "…and NOT the company conversation behind it [16 §8], [25 §10]",
-    !coordinatorCompanyView.some(
-      (event) =>
-        event.kind === "comment" && event.companyId === company.id,
-    ),
   );
 
   /* `S131` — her sight of the record stops at the record.
@@ -522,16 +577,20 @@ async function main(): Promise<void> {
    * The finding `AUDIT 1 F2` raised: `visibleCommentsFilter` composed each
    * anchor's READ filter, and `S76` had widened two of those to `undefined` for
    * `can_dispatch`, so both branches degraded to *"the record exists"* and the
-   * coordinator read every rep's project and contact conversation. Company
-   * comments stayed shut — `visibleCompaniesFilter` carries no role exception —
-   * which is how the asymmetry showed rather than reading as one uniform grant.
+   * coordinator read every rep's project and contact conversation.
+   *
+   * **Since `27b` the project is the whole of that exception.** `S114` took the
+   * conversation off a contact entirely, so the contact half is trivially true
+   * — there is nothing on a contact for anybody to read — and asserting it here
+   * would be a check that passes by reading nothing, which is the shape
+   * `WORKFLOW §5` already carries four rows about. `S131` was amended in the
+   * same slice to say so.
    *
    * Both halves, on what the DATA LAYER returns. A narrowing asserted only on
    * the closed side proves nothing about who is left holding the record. */
   check(
-    "the coordinator can still OPEN the project and the contact [S76]",
-    (await canOpenRecord(coordinator, "project", project.id)) &&
-      (await canOpenRecord(coordinator, "contact", contact.id)),
+    "the coordinator can still OPEN the project [S76]",
+    await canOpenRecord(coordinator, "project", project.id),
   );
   check(
     "*** …and reads NONE of the project's conversation *** [S131]",
@@ -539,36 +598,31 @@ async function main(): Promise<void> {
     `saw ${(await listComments(coordinator, "project", project.id)).length}`,
   );
   check(
-    "*** …nor the contact's *** [S131]",
-    (await listComments(coordinator, "contact", contact.id)).length === 0,
-    `saw ${(await listComments(coordinator, "contact", contact.id)).length}`,
+    "the rep who could read it still can — one role moved, not the rule [S131]",
+    (await listComments(repA, "project", project.id)).length === 1,
   );
   check(
-    "the rep who could read them still can — one role moved, not the rule [S131]",
-    (await listComments(repA, "project", project.id)).length === 1 &&
-      (await listComments(repA, "contact", contact.id)).length === 1,
-  );
-  check(
-    "the records she holds in her own right are untouched [S62], [S72], [S131]",
-    (await listComments(coordinator, "quotation_thread", thread.id)).length ===
-      2 && (await listComments(coordinator, "dispatch", dispatch.id)).length === 1,
+    "the record she holds in her own right is untouched [S62], [S131]",
+    (await listComments(coordinator, "quotation_thread", thread.id)).length === 2,
+    `saw ${(await listComments(coordinator, "quotation_thread", thread.id)).length}`,
   );
 
   // `/activity` and `dailyActivity` read `commentEvents`, which composes the
   // same filter — so they inherit rather than restating it. Asserted on the
-  // comment ids themselves: a comment event carries no contact id to test.
+  // comment id itself: a comment event carries no project id when the reader
+  // may not have it.
   const coordinatorGlobal = await eventsInRange(
     coordinator,
     { from: today(), to: today() },
     [repA.user.id],
   );
   check(
-    "…and the global read inherits it, both anchors [S131]",
-    !coordinatorGlobal.some(
-      (event) =>
-        event.key === `comment:${commentIds.get("project")}` ||
-        event.key === `comment:${commentIds.get("contact")}`,
-    ),
+    "…and the global read inherits it [S131]",
+    coordinatorGlobal.length > 0 &&
+      !coordinatorGlobal.some(
+        (event) => event.key === `comment:${commentIds.get("project")}`,
+      ),
+    `read ${coordinatorGlobal.length} event(s) in range`,
   );
 
   // The second reader. It asked `canOpenRecord`, which since `S76` answers a
@@ -618,7 +672,9 @@ async function main(): Promise<void> {
 
   console.log("\n3. Editable by the author, never deleted [25 §12]");
 
-  const [own] = await listComments(repA, "company", company.id);
+  // `listComments` is oldest-first, so `[0]` is §1's own note on the project —
+  // stable whatever §2 appended after it.
+  const [own] = await listComments(repA, "project", project.id);
   await updateComment(repA, own.id, {
     body: `${stamp} corrected`,
     mentions: [],
@@ -640,7 +696,9 @@ async function main(): Promise<void> {
 
   check(
     "the comment survives every refusal — nothing is deleted [12 §7]",
-    (await listComments(repA, "company", company.id)).length === 1,
+    (await listComments(repA, "project", project.id)).some(
+      (row: Comment) => row.id === own.id,
+    ),
   );
 
   // A no-op save writes nothing, the way `updateReport` and `updateUser` behave.
@@ -679,8 +737,8 @@ async function main(): Promise<void> {
 
   const before = await mentionsFor(repB.user.id);
   await addComment(repA, {
-    recordType: "company",
-    recordId: company.id,
+    recordType: "project",
+    recordId: project.id,
     body: `${stamp} first tag`,
     mentions: [repB.user.id],
   });
@@ -699,8 +757,8 @@ async function main(): Promise<void> {
    * `on conflict do nothing` and vanish — permanently, and silently.
    */
   await addComment(repA, {
-    recordType: "company",
-    recordId: company.id,
+    recordType: "project",
+    recordId: project.id,
     body: `${stamp} second tag, same person, same record`,
     mentions: [repB.user.id],
   });
@@ -727,13 +785,13 @@ async function main(): Promise<void> {
   );
   check(
     "…and the record travels in the payload instead [21 §10]",
-    (raised[0]?.payload as { recordType?: string })?.recordType === "company",
+    (raised[0]?.payload as { recordType?: string })?.recordType === "project",
   );
 
   const selfBefore = await mentionsFor(repA.user.id);
   await addComment(repA, {
-    recordType: "company",
-    recordId: company.id,
+    recordType: "project",
+    recordId: project.id,
     body: `${stamp} tagging myself`,
     mentions: [repA.user.id],
   });
@@ -743,8 +801,8 @@ async function main(): Promise<void> {
   );
 
   // The set is REWRITTEN by an edit, and only a NEW name is notified.
-  const rewriteTarget = (await listComments(repA, "company", company.id)).find(
-    (row) => row.body === `${stamp} first tag`,
+  const rewriteTarget = (await listComments(repA, "project", project.id)).find(
+    (row: Comment) => row.body === `${stamp} first tag`,
   )!;
   const beforeRewrite = await mentionsFor(repB.user.id);
   await updateComment(repA, rewriteTarget.id, {
@@ -769,8 +827,8 @@ async function main(): Promise<void> {
 
   const outsiderBefore = await mentionsFor(outsider.user.id);
   await addComment(repA, {
-    recordType: "company",
-    recordId: company.id,
+    recordType: "project",
+    recordId: project.id,
     body: `${stamp} tagging an outsider`,
     mentions: [outsider.user.id],
   });
@@ -798,44 +856,74 @@ async function main(): Promise<void> {
 
   /* --- 6. Comments join the timeline, and only their own record --- */
 
-  console.log("\n6. Comments join the record's timeline [25 §9]");
+  console.log("\n6. Comments join the record's timeline [S114]");
 
-  const companyThread = await companyTimeline(repA, company.id);
+  const projectThread = await projectTimeline(repA, project.id);
   check(
-    "a company comment appears on the company timeline [25 §9]",
-    companyThread.events.some((event) => event.kind === "comment"),
+    "a project comment appears on the project timeline [S114]",
+    projectThread.events.some((event: TimelineEvent) => event.kind === "comment"),
+    `total ${projectThread.total}`,
   );
   check(
     "…attributed to whoever wrote it [20 §8]",
-    companyThread.events
-      .filter((event) => event.kind === "comment")
-      .every((event) => event.actorUserId !== null),
+    projectThread.events
+      .filter((event: TimelineEvent) => event.kind === "comment")
+      .every((event: TimelineEvent) => event.actorUserId !== null),
   );
   check(
-    "…and the reports and system events are still there [25 §9]",
-    companyThread.events.some((event) => event.kind !== "comment"),
+    "…and the system events are still there [S41]",
+    projectThread.events.some((event: TimelineEvent) => event.kind !== "comment"),
+    `kinds ${[...new Set(projectThread.events.map((e: TimelineEvent) => e.kind))].join(",")}`,
   );
 
   /**
    * **The second trap.** The six derived sources are anchored to a company or a
    * project, and every one of their anchor terms falls to `undefined` when
-   * neither is set. Without the guard in `gather`, a contact scope would answer
+   * neither is set. Without the guard in `gather`, a record scope would answer
    * "every event this viewer can see" instead of "this record's" — silently,
    * and as over-disclosure rather than a crash.
+   *
+   * It was asserted on a contact and a dispatch until `27b`. Neither takes a
+   * comment now `S114`, so neither has a thread to ask for; the quotation
+   * thread is the one record scope left and it carries the whole assertion.
    */
-  const contactThread = await recordTimeline(repA, "contact", contact.id);
+  const threadOnly = await recordTimeline(repA, "quotation_thread", thread.id);
   check(
-    "*** a contact's thread carries its OWN comment and nothing else *** [25 §9]",
-    contactThread.total === 1 &&
-      contactThread.events.every((event) => event.kind === "comment"),
-    `total ${contactThread.total}, kinds ${[...new Set(contactThread.events.map((e) => e.kind))].join(",")}`,
+    "*** a thread's scope carries its OWN comments and nothing else *** [S114]",
+    threadOnly.total === 2 &&
+      threadOnly.events.every((event: TimelineEvent) => event.kind === "comment"),
+    `total ${threadOnly.total}, kinds ${[...new Set(threadOnly.events.map((e: TimelineEvent) => e.kind))].join(",")}`,
   );
-  const dispatchThread = await recordTimeline(repA, "dispatch", dispatch.id);
+
+  /**
+   * **The third trap, and it is `27b`'s own.** `commentAnchor` used to map a
+   * company scope to `{type:"company"}`. `S114` makes that literal illegal, and
+   * the obvious repair — falling through to `null`, which every other
+   * unanchored caller uses — means *no anchor term*, which would put EVERY
+   * comment this viewer can see onto one company's timeline. Hence `"none"` and
+   * the early return in `commentEvents`.
+   *
+   * **Both halves, or this passes by reading nothing.** The negative is guarded
+   * on the company timeline being non-empty: it still carries its derived
+   * events `S41`, and it is only the conversation that is gone. A company scope
+   * that returned nothing at all would satisfy a bare `some(...) === false` and
+   * tell us nothing.
+   */
+  const companyThread = await companyTimeline(repA, company.id);
   check(
-    "a dispatch's thread likewise — no reports, no company events [25 §9]",
-    dispatchThread.total === 1 &&
-      dispatchThread.events.every((event) => event.kind === "comment"),
-    `total ${dispatchThread.total}`,
+    "the company timeline still carries its derived events [S41]",
+    companyThread.total > 0,
+    `saw ${companyThread.total}`,
+  );
+  check(
+    "*** …and NO comment, on a scope that can no longer anchor one *** [S114]",
+    companyThread.events.every((event: TimelineEvent) => event.kind !== "comment"),
+    `saw ${companyThread.events.filter((e: TimelineEvent) => e.kind === "comment").length} of ${companyThread.total}`,
+  );
+  check(
+    "*** …and it is the ANCHOR that is empty, not the range *** [S114]",
+    (await eventsInRange(repA, { from: today(), to: today() }, [repA.user.id]))
+      .some((event: TimelineEvent) => event.kind === "comment"),
   );
 
   /* --- 7. Counted, never summed. The central claim ---------------- */

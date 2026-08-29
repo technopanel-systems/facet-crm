@@ -266,10 +266,14 @@ export const SHARES: readonly ShareEntry[] = [
  * ------------------------------------------------------------------ */
 
 /**
- * `S114` allows exactly two anchors; the code still admits five and
- * `WORKFLOW §5` holds the row for the session that narrows it. Nothing here
- * comments on a company, a contact or a dispatch, so this dataset is already
- * on the rule's side of that gap and the narrowing slice deletes no rows.
+ * `S114` allows exactly two anchors, and since `27b` the code allows two as
+ * well — the `comments_record_type` CHECK, `COMMENT_RECORD_TYPES` and
+ * `visibleCommentsFilter` all narrowed with it.
+ *
+ * **This dataset was already on the rule's side of that gap**, which the
+ * narrowing slice confirmed by measurement rather than by reading this comment:
+ * the three company comments it deleted were all `verify:routes` residue, and
+ * `seed:demo` had written none. The type below is what kept it honest.
  */
 export type CommentEntry = {
   on: "project" | "quotation_thread";

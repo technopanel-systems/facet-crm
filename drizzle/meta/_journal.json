@@ -225,6 +225,13 @@
       "when": 1788048000000,
       "tag": "0031_a_quotation_always_names_a_project",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1788134400000,
+      "tag": "0032_a_comment_hangs_on_two_kinds",
+      "breakpoints": true
     }
   ]
 }

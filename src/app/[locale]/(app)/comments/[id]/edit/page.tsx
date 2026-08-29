@@ -67,10 +67,10 @@ export default async function EditCommentPage({
   );
 }
 
+/** `S114`'s two anchors. The same shape, and the same reason for its fallback,
+ *  as `actions.ts`' own — the cancel link and the post-save redirect are one
+ *  destination asked twice. */
 function recordHref(recordType: string, recordId: string): string {
   if (recordType === "quotation_thread") return `/quotations/${recordId}`;
-  if (recordType === "project") return `/projects/${recordId}`;
-  if (recordType === "contact") return `/contacts/${recordId}`;
-  if (recordType === "dispatch") return `/dispatches/${recordId}`;
-  return `/companies/${recordId}`;
+  return `/projects/${recordId}`;
 }

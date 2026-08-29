@@ -988,6 +988,12 @@ async function main(): Promise<void> {
   // report the wrong constraint name. §13's enum-value comparison is what
   // holds the claim now, and it holds it for all seven tables at once rather
   // than for comments alone.
+  //
+  // **`27b` gave `comments_record_type` three refusals it CAN be fed** — a
+  // company, a contact and a dispatch are values `record_type` still carries
+  // and this CHECK now rejects. They live in `verify-comments.ts` §1, beside
+  // the positive half that stops them passing for the wrong reason, rather
+  // than here where there is nothing to pair them with.
   // The invariant that stood here — a `reference` only on an interaction —
   // went with the column it guarded. `SPEC §15` dropped
   // `rep_reports.reference`; section 2 asserts the column and its CHECK are
@@ -1130,17 +1136,23 @@ async function main(): Promise<void> {
    *
    * `25 §9`–`§15` is that path, and it is built, so the assertion inverts. What
    * it guards now is the structure, not the emptiness: every comment hangs on
-   * one of the five kinds the CHECK admits, and every mention hangs on a
-   * comment. `scripts/verify-comments.ts` owns the behaviour.
+   * one of the kinds the CHECK admits, and every mention hangs on a comment.
+   * `scripts/verify-comments.ts` owns the behaviour.
+   *
+   * **Two kinds since `27b`, not five** `S114`. Left at five this would still
+   * have gone green — no row sits outside the wider list either — which is a
+   * check passing for the wrong reason, the shape `CLAUDE.md` records eight
+   * sightings of. The list has to be the one the CHECK actually carries or the
+   * assertion is about nothing.
    */
   const [strayAnchor] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(comments)
     .where(
-      sql`record_type not in ('company', 'contact', 'project', 'quotation_thread', 'dispatch')`,
+      sql`record_type not in ('project', 'quotation_thread')`,
     );
   check(
-    "every comment hangs on one of 25 §9's five record kinds",
+    "every comment hangs on one of S114's two record kinds",
     strayAnchor?.n === 0,
     `got ${strayAnchor?.n} on another kind`,
   );

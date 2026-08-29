@@ -8,26 +8,27 @@ import {
 } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Timeline } from "@/components/timeline";
 import { Link } from "@/i18n/navigation";
 import { canViewRecord, requireSession } from "@/lib/authz";
 import { getContact } from "@/lib/contacts";
-import { recordTimeline } from "@/lib/timeline";
-
-import { CommentBox } from "../../_components/comment-box";
-import { ListPagination } from "../../_components/list-controls";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * **Details and Edit, and nothing else since `27b`.**
+ *
+ * It carried a timeline card whose only content was the conversation, and
+ * `S114` took the conversation off a contact. Nothing else anchors to one — a
+ * report anchors to a company `[20 §2]`, a quotation to a thread — so the card
+ * could hold nothing ever again and it is gone rather than empty `D70`. Its
+ * pagination went with it, and so did the `page` search param that drove it.
+ */
 export default async function ContactDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ locale: string; id: string }>;
-  searchParams: Promise<{ page?: string }>;
 }) {
   const { locale, id } = await params;
-  const { page } = await searchParams;
   setRequestLocale(locale);
 
   const session = await requireSession();
@@ -39,16 +40,9 @@ export default async function ContactDetailPage({
   const dash = t("common.none");
 
   // Read or act — the project detail page's note `S76`. False only for the
-  // reader `S76` admits, and presentation only: `updateContact` and
-  // `addComment` refuse on their own `S109`.
+  // reader `S76` admits, and presentation only: `updateContact` refuses on its
+  // own `S109`.
   const mayEdit = await canViewRecord(session, "contact", contact.id);
-
-  // `25 §9` — one thread per record. A contact has no derived events of its
-  // own, so its thread is the conversation and nothing else; it pages rather
-  // than capping, because there is no full-history route to send anyone to.
-  const timeline = await recordTimeline(session, "contact", contact.id, {
-    page: Number(page) || 1,
-  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -109,25 +103,6 @@ export default async function ContactDetailPage({
           </Facts>
         </CardContent>
       </Card>
-
-      <Timeline
-        events={timeline.events}
-        total={timeline.total}
-        composer={
-          mayEdit ? (
-            <CommentBox
-              session={session}
-              recordType="contact"
-              recordId={contact.id}
-            />
-          ) : undefined
-        }
-      />
-      <ListPagination
-        basePath={`/contacts/${contact.id}`}
-        page={timeline.page}
-        total={timeline.total}
-      />
     </div>
   );
 }

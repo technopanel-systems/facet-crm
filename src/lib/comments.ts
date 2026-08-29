@@ -62,8 +62,6 @@ import {
   commentMentions,
   comments,
   companies,
-  contacts,
-  dispatches,
   projects,
   quotationThreads,
   users,
@@ -503,22 +501,6 @@ export async function commentRecordName(
   recordType: CommentRecordType,
   recordId: string,
 ): Promise<string | null> {
-  if (recordType === "company") {
-    const [row] = await db
-      .select({ name: companies.name })
-      .from(companies)
-      .where(eq(companies.id, recordId))
-      .limit(1);
-    return row?.name ?? null;
-  }
-  if (recordType === "contact") {
-    const [row] = await db
-      .select({ name: contacts.name })
-      .from(contacts)
-      .where(eq(contacts.id, recordId))
-      .limit(1);
-    return row?.name ?? null;
-  }
   if (recordType === "project") {
     const [row] = await db
       .select({ name: projects.name })
@@ -527,23 +509,16 @@ export async function commentRecordName(
       .limit(1);
     return row?.name ?? null;
   }
-  if (recordType === "quotation_thread") {
-    const [row] = await db
-      .select({ name: companies.name })
-      .from(quotationThreads)
-      .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
-      .where(eq(quotationThreads.id, recordId))
-      .limit(1);
-    return row?.name ?? null;
-  }
-  // A dispatch has no name of its own — it is an event, not a thing — so it
-  // reads as the company it went to, which is how `anchorName` already names a
-  // quotation thread.
+  // A quotation thread has no name of its own — it is a conversation, not a
+  // thing — so it reads as the company it is with, which is how `anchorName`
+  // already names one. It was five branches until `27b`; the company and the
+  // contact each had their own, and the dispatch fell through to this shape
+  // for this reason `S114`.
   const [row] = await db
     .select({ name: companies.name })
-    .from(dispatches)
-    .innerJoin(companies, eq(companies.id, dispatches.companyId))
-    .where(eq(dispatches.id, recordId))
+    .from(quotationThreads)
+    .innerJoin(companies, eq(companies.id, quotationThreads.companyId))
+    .where(eq(quotationThreads.id, recordId))
     .limit(1);
   return row?.name ?? null;
 }

@@ -23,16 +23,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Timeline } from "@/components/timeline";
 import { Link } from "@/i18n/navigation";
 import { formatSqm } from "@/lib/decimal";
 import { can, requireSession } from "@/lib/authz";
 import { getDispatch } from "@/lib/dispatches";
-import { recordTimeline } from "@/lib/timeline";
 
 import { lineParts } from "../../quotations/line-display";
-import { CommentBox } from "../../_components/comment-box";
-import { ListPagination } from "../../_components/list-controls";
 import { TurnPanel } from "../../_components/turn";
 import { RequestActions } from "./request-actions";
 
@@ -40,13 +36,10 @@ export const dynamic = "force-dynamic";
 
 export default async function DispatchPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ locale: string; id: string }>;
-  searchParams: Promise<{ page?: string }>;
 }) {
   const { locale, id } = await params;
-  const { page } = await searchParams;
   setRequestLocale(locale);
 
   const session = await requireSession();
@@ -60,9 +53,7 @@ export default async function DispatchPage({
   const isRaiser = dispatch.recordedByUserId === session.user.id;
   const isCoordinator = can(session, "canDispatch");
 
-  // `25 §9` — a dispatch takes a comment like any other record.
-  //
-  // **It now takes a turn too, and only sometimes** `[22 §4]`. `D26` says a
+  // **A dispatch takes a turn, and only sometimes** `[22 §4]`. `D26` says a
   // dispatch owes nobody, and for an APPROVED one that is still exactly right:
   // it is an event that already happened. A REQUEST is different — `S86` puts
   // it in one of three states and `S88` says a submitted one *waits on the
@@ -70,9 +61,12 @@ export default async function DispatchPage({
   // submitted request, and for nothing else: approved, refused and cancelled
   // are all finished, and a panel on any of them would claim somebody owed
   // something. A cancellation especially — *never revived* `S73`.
-  const timeline = await recordTimeline(session, "dispatch", dispatch.id, {
-    page: Number(page) || 1,
-  });
+  //
+  // **The timeline card went in `27b`** `S114` `D48`. A dispatch has no derived
+  // events of its own, so comments were the whole of what that card could hold;
+  // with the conversation off a dispatch it could hold nothing ever again, and
+  // an empty block is absent rather than an empty shell `D70`. Its pagination
+  // and the `page` search param behind it went with it.
 
   const dash = t("common.none");
 
@@ -625,23 +619,6 @@ export default async function DispatchPage({
           </CardContent>
         </Card>
       ) : null}
-
-      <Timeline
-        events={timeline.events}
-        total={timeline.total}
-        composer={
-          <CommentBox
-            session={session}
-            recordType="dispatch"
-            recordId={dispatch.id}
-          />
-        }
-      />
-      <ListPagination
-        basePath={`/dispatches/${dispatch.id}`}
-        page={timeline.page}
-        total={timeline.total}
-      />
     </div>
   );
 }
