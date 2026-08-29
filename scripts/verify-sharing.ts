@@ -91,7 +91,7 @@ import {
 } from "@/lib/enums";
 import { listCountries } from "@/lib/lookups";
 import { normalizeName } from "@/lib/normalize";
-import { sweepNotifications, unresolvedCount } from "@/lib/notifications";
+import { unreadCount } from "@/lib/notifications";
 import { getProject, listProjects, updateProject } from "@/lib/projects";
 import {
   createQuotationThread,
@@ -1060,9 +1060,38 @@ async function main(): Promise<void> {
     (await canViewRecord(repB, "company", company.id)) === true,
   );
 
-  /* --- 9. share.granted fires [21 §3], [21 §4] --------------------- */
+  /* --- 9. share.granted fires, and it is news [21 §3], [S92] ------- */
 
-  console.log("\n9. share.granted fires, and a revoke withdraws it [21 §3], [21 §4]");
+  console.log("\n9. share.granted fires, and it stays as news [21 §3], [S92]");
+
+  /**
+   * **What this section asserted before session 24, and where each claim went.**
+   *
+   * It had a second half, headed *a revoke withdraws it*, built entirely on
+   * `sweepNotifications` and `notifications.resolved_at`. `S91` deletes the
+   * per-anchor resolution conditions and the sweep that re-derived them, and
+   * `0033` drops the column, so those five claims have no mechanism left to be
+   * true or false about. They are DROPPED, not moved:
+   *
+   *  - *an interaction against the company resolves the company anchor* — the
+   *    condition `21 §3` named. Gone with `RESOLUTION_RULES`.
+   *  - *…and the project anchor too* — the same statement's second limb.
+   *  - *the badge fell* / *the badge fell with it* — the badge falls on READ
+   *    now, and that IS still asserted: `verify-comments` §9 drives `markRead`
+   *    against `unreadCount` and prints what it read.
+   *  - *a second sweep changes nothing — the resolver is idempotent* — there is
+   *    no resolver.
+   *  - *a `share.granted` with NO share row behind it is left alone* — this
+   *    existed to stop `verify-phase10a` §11's planted rows being cleared by a
+   *    resolver keyed on *holds no live share*. Both the resolver and those
+   *    planted rows are gone.
+   *
+   * **What replaces them is one claim, and it is a real one:** a revoked share
+   * leaves its news standing. `S92` makes this news, not work — being told a
+   * share was granted is a thing that happened, and it did happen — so nothing
+   * takes the row away and `12 §7` keeps it. The badge clears when the person
+   * reads it, like every other item.
+   */
 
   const sharesOf = async (userId: string) =>
     db
@@ -1080,10 +1109,10 @@ async function main(): Promise<void> {
     "the grantee was told — the producer 21 §11 was waiting for [25 §30]",
     repBNotifications.length > 0,
   );
-  check(
-    "it is act-now and persistent, as seeded [21 §2]",
-    shareType.tier === "act_now" && shareType.isPersistent === true,
-  );
+  // *it is act-now and persistent, as seeded* stood here and is dropped with
+  // its two columns `S91`, `0033`. Persistence meant *stays until the condition
+  // clears*; there are no conditions, and `21 §4`'s exception — a type with
+  // none can be dismissed by reading — is now the rule for all six types.
   check(
     "one per grant, anchored to the record [21 §3]",
     repBNotifications.some(
@@ -1105,98 +1134,50 @@ async function main(): Promise<void> {
     (await sharesOf(outsider.user.id)).length === 0,
   );
 
-  console.log("\n    resolution: the recipient works it [21 §3]");
-  const waitingBefore = await unresolvedCount(repB);
-  await createReport(repB, {
-    entryType: "interaction",
-    companyId: company.id,
-    contactId: null,
-    projectId: null,
-    channel: "visit",
-    outcome: "introduced",
-    category: null,
-    cityId: null,
-    onHoldUntil: null,
-    narrative: `${stamp} the shared rep worked it`,
-    reportDate: today(),
-    signals: [],
-  });
-  await sweepNotifications();
-  const afterInteraction = await sharesOf(repB.user.id);
-  check(
-    "an interaction against the company resolves the company anchor [21 §3]",
-    afterInteraction
-      .filter((row) => row.recordType === "company" && row.recordId === company.id)
-      .every((row) => row.resolvedAt !== null),
-  );
-  check(
-    "…and the project anchor too — its live linked company is the same one",
-    afterInteraction
-      .filter((row) => row.recordType === "project")
-      .every((row) => row.resolvedAt !== null),
-  );
-  check(
-    "the badge fell",
-    (await unresolvedCount(repB)) < waitingBefore,
-    `${waitingBefore} → ${await unresolvedCount(repB)}`,
-  );
+  console.log("\n    *** a revoke does not un-say the telling [S92], [12 §7] ***");
 
-  console.log("\n    *** withdrawal: a revoked share cannot leave a badge [21 §4] ***");
-  const repCWaitingBefore = await unresolvedCount(repC);
+  const repCWaitingBefore = await unreadCount(repC);
   check(
-    "repC is holding an unresolved share.granted to begin with",
+    "repC is holding an unread share.granted to begin with",
     repCWaitingBefore > 0,
     `got ${repCWaitingBefore}`,
   );
-  const [threadShare] = await listShares("quotation_thread", narrowThread.id);
-  await revokeShare(manager, threadShare.id);
-  await sweepNotifications();
-  check(
-    "revoking withdrew it — 21 §3's own condition is now unreachable [21 §4]",
-    (await sharesOf(repC.user.id))
-      .filter((row) => row.recordId === narrowThread.id)
-      .every((row) => row.resolvedAt !== null),
+  const threadNewsBefore = (await sharesOf(repC.user.id)).filter(
+    (row) => row.recordId === narrowThread.id,
   );
   check(
-    "the badge fell with it",
-    (await unresolvedCount(repC)) < repCWaitingBefore,
-    `${repCWaitingBefore} → ${await unresolvedCount(repC)}`,
-  );
-  const settled = await unresolvedCount(repC);
-  await sweepNotifications();
-  check(
-    "and a second sweep changes nothing — the resolver is idempotent [16 §3]",
-    (await unresolvedCount(repC)) === settled,
-    `${settled} → ${await unresolvedCount(repC)}`,
+    "and one of them is the thread grant",
+    threadNewsBefore.length > 0,
+    `got ${threadNewsBefore.length}`,
   );
 
-  /**
-   * The trap this resolver had to be narrowed around, asserted so it stays
-   * narrow: `verify-phase10a.ts` §11 plants `share.granted` rows with no
-   * `record_shares` row behind them, deliberately, to test `21 §3`'s rule
-   * without a producer. A resolver keyed on "holds no live share" would clear
-   * those on the first sweep and that script's *"an interaction resolves the
-   * project anchor"* would pass whether or not `resolveOnInteraction` worked.
-   */
-  const [planted] = await db
-    .insert(notifications)
-    .values({
-      recipientUserId: outsider.user.id,
-      notificationTypeId: shareType.id,
-      recordType: "company" as const,
-      recordId: lonely.id,
-    })
-    .returning();
-  await sweepNotifications();
-  const [plantedAfter] = await db
-    .select()
-    .from(notifications)
-    .where(eq(notifications.id, planted.id));
+  const [threadShare] = await listShares("quotation_thread", narrowThread.id);
+  await revokeShare(manager, threadShare.id);
+
+  // The access goes; the news does not. `12 §7` — FACET deletes nothing — and
+  // `S92` — the bell records what happened, and this happened.
   check(
-    "*** a share.granted with NO share row behind it is left alone [21 §3] ***",
-    plantedAfter.resolvedAt === null,
-    `got ${plantedAfter.resolvedAt}`,
+    "revoking removed the access",
+    (await canViewRecord(repC, "quotation_thread", narrowThread.id)) === false,
   );
+  const threadNewsAfter = (await sharesOf(repC.user.id)).filter(
+    (row) => row.recordId === narrowThread.id,
+  );
+  check(
+    `*** and the telling stands — saw ${threadNewsAfter.length} of ${threadNewsBefore.length} *** [12 §7], [S92]`,
+    threadNewsAfter.length === threadNewsBefore.length,
+    `${threadNewsBefore.length} then ${threadNewsAfter.length}`,
+  );
+  check(
+    "the badge did not move either — reading is what clears it [S91]",
+    (await unreadCount(repC)) === repCWaitingBefore,
+    `${repCWaitingBefore} then ${await unreadCount(repC)}`,
+  );
+
+  // **The anchor is still not a promise of access** `[20 §8.2]`. The row above
+  // names a thread repC can no longer open; `decorate` re-checks
+  // `canOpenRecord` on read and renders the entry without a link. That is the
+  // claim `listNotifications` carries and `verify:routes` walks.
 
   /* --- 10. Three record types, and only three [21 §3] --------------- */
 

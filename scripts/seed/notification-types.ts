@@ -1,6 +1,5 @@
 /**
- * The seeded notification types — `21 §2`'s five, `25 §11`'s sixth, and
- * `S92`'s seventh and eighth.
+ * The seeded notification types — **`S92`'s six, and no seventh**.
  *
  * `10 §10` makes the type a **lookup, not an enum in code**: the trigger list
  * stays open and adding a type must be data, not a migration. That is why this
@@ -20,11 +19,23 @@
  * change is what `21 §11` describes for `share.granted`. `25` is the later
  * user-truth document besides.
  *
- * **`is_persistent` is not a synonym for act-now** `[21 §4]`. A type is
- * persistent only where its resolution condition can actually become true;
- * otherwise the rep gets a badge they can never clear, which is the failure that
- * makes the whole act-now tier get ignored — the opposite of what `07 G1`
- * wanted from persistence.
+ * **`tier` and `is_persistent` are gone** `S91`, with `0033`. Every row used to
+ * carry both: a tier deciding whether it interrupted, and a flag deciding
+ * whether reading it was enough to make it go away. There is one kind of
+ * delivery now — a bell carrying news `S92` — so neither has a value to hold.
+ * `21 §4`'s rule that persistence belongs only to a type whose condition can
+ * clear is not overturned; it is universal, because no type has a condition any
+ * more.
+ *
+ * **`followup.digest` is gone with them.** It was `07 E5`'s *"one summary
+ * daily: what went stale, what is dormant"* — the only seeded type that ever
+ * carried WORK rather than news, and `S91` answers it in one line: *the list is
+ * the notification*. A digest is `S87`'s list said a second time and a day
+ * late.
+ *
+ * **The comments below still explain why each surviving type is news and why
+ * four of them carry no anchor**, because both facts still decide behaviour.
+ * What they no longer explain is a column.
  */
 
 import { NOTIFICATION_TYPES } from "@/lib/enums";
@@ -33,35 +44,31 @@ export type NotificationTypeSeed = {
   key: string;
   nameEn: string;
   nameAr: string;
-  tier: "act_now" | "digest";
-  isPersistent: boolean;
 };
 
 export const NOTIFICATION_TYPE_SEED: NotificationTypeSeed[] = [
   {
     // `07 E5`, `07 G1` — "a lead assigned to you", "a manager assignment".
-    // Clears when the recipient logs an interaction against the company
-    // `[21 §3]`: a first view is a click by another name, which `07 G1`
-    // refuses.
+    //
+    // It used to CLEAR, when the recipient logged an interaction against the
+    // company `[21 §3]`. `S91` deletes the per-anchor resolution conditions
+    // and the sweep that re-derived them, so it is read like every other item
+    // now. The work is on the list `S87`; this says it arrived.
     key: NOTIFICATION_TYPES.recordAssigned,
     nameEn: "Assigned to you",
     nameAr: "أُسند إليك",
-    tier: "act_now",
-    isPersistent: true,
   },
   {
     // `21 §5` — a handover raises ONE of these, naming the departing rep and
     // the counts, rather than one `record.assigned` per record.
     //
-    // NOT persistent `[21 §4]`: it has no anchor and no completion condition,
-    // so persistence would make it permanent. A handover summary is news; the
-    // work items are the individual records, which reach the rep through their
-    // own lists and follow-ups.
+    // A handover summary is news: the work items are the individual records,
+    // which reach the rep through their own list `S87`. It was the first type
+    // `21 §4` refused persistence to, for having no anchor and no completion
+    // condition; since `S91` that is true of all six.
     key: NOTIFICATION_TYPES.recordHandedOver,
     nameEn: "Work handed over to you",
     nameAr: "تم تسليم عمل إليك",
-    tier: "act_now",
-    isPersistent: false,
   },
   {
     // `07 E5` — "a share approved". Raised for company, project and quotation
@@ -71,50 +78,35 @@ export const NOTIFICATION_TYPE_SEED: NotificationTypeSeed[] = [
     //
     // **The one seeded type with no live producer.** `07 B1`'s
     // manager-initiated sharing screen has never been built and no document
-    // schedules it; the tier, persistence and resolution rules are settled so
-    // the raise call is one line the day it exists `[21 §11]`.
+    // schedules it. `21 §11` kept the row so the raise call would be one line
+    // the day it exists, and that is still true — there is now less to settle,
+    // not more, since `S91` took the tier, the flag and the resolution rule.
     key: NOTIFICATION_TYPES.shareGranted,
     nameEn: "Shared with you",
     nameAr: "تمت مشاركته معك",
-    tier: "act_now",
-    isPersistent: true,
-  },
-  {
-    // `07 E5`, `07 G1` — "one summary daily or weekly: what went stale, what is
-    // dormant". Follows `21 §1`: a follow-up is a condition computed on read,
-    // and this row is the only thing it ever writes.
-    key: NOTIFICATION_TYPES.followUpDigest,
-    nameEn: "Daily follow-ups",
-    nameAr: "المتابعات اليومية",
-    tier: "digest",
-    isPersistent: false,
   },
   {
     // `25 §11` — "Tagging a person raises a notification. That is the difference
     // between a comment box people ignore and one that replaces WhatsApp."
     // Raised per mention by `addComment` and `updateComment`.
     //
-    // Act-now rather than digest: it is directed at one person about one thing,
-    // and the point is that it interrupts. A daily summary would reproduce
-    // exactly the latency `25 §9` exists to remove.
+    // It is directed at one person about one thing and the point is that it
+    // interrupts — which is why it was act-now and never the digest, back when
+    // there were two of those. Being mentioned is news: a reply is not owed,
+    // and where it implies work, that work raises its own notification through
+    // the normal path.
     //
-    // NOT persistent `[21 §4]`, for `record.handed_over`'s reason. Being
-    // mentioned has no condition that can clear: opening the record is a click
-    // by another name, which `07 G1` refuses, and a reply is not owed. Being
-    // mentioned is news — and where it implies work, that work raises its own
-    // notification through the normal path.
-    //
-    // It is also raised with NO ANCHOR, which is not cosmetic: the partial
-    // unique index `notifications_live_key` covers every unresolved row that
-    // carries a `record_id`, and nothing ever resolves a non-persistent type.
-    // Anchored, the second mention of the same person on the same record would
-    // be swallowed by `on conflict do nothing`, permanently. The record travels
-    // in `payload` instead, as `record.handed_over`'s counts do `[21 §10]`.
+    // It is also raised with NO ANCHOR. That was load-bearing until `0033`:
+    // the partial unique index `notifications_live_key` covered every
+    // unresolved row carrying a `record_id`, so an anchored second mention of
+    // the same person on the same record was swallowed by `on conflict do
+    // nothing`, permanently. The index is gone and the reason is now the plain
+    // one — a mention is about a comment, and a comment is not one of the four
+    // anchors `ANCHOR_TYPES` names. The record travels in `payload` instead, as
+    // `record.handed_over`'s counts do `[21 §10]`.
     key: NOTIFICATION_TYPES.mentionReceived,
     nameEn: "Mentioned you",
     nameAr: "أشار إليك",
-    tier: "act_now",
-    isPersistent: false,
   },
   {
     // `S128` — *a decision that ends someone's work reaches them*, and `S92`
@@ -122,25 +114,21 @@ export const NOTIFICATION_TYPE_SEED: NotificationTypeSeed[] = [
     // for all four acts, because `S92` names one item and the four differ only
     // in which record ended — which travels in `payload`, as the kind does.
     //
-    // Act-now: it is directed at one person about one thing, and a daily
-    // summary of "your dispatch was cancelled last Tuesday" is the latency the
-    // rule exists to remove. NOT persistent `[21 §4]`, for `mention.received`'s
-    // reason — the decision has already happened, there is no condition left to
-    // clear, and a badge the rep can never clear is what makes the tier get
-    // ignored.
+    // A daily summary of "your dispatch was cancelled last Tuesday" is exactly
+    // the latency `S128` exists to remove, which is why this was never the
+    // digest — and `S91` has since deleted the digest for the same reason at
+    // scale. The decision has already happened, so there is nothing to clear
+    // and nothing to do but read it.
     //
-    // Raised with **no anchor**, and that is `mention.received`'s reason plus
-    // one of its own: `notifications_live_key` covers every unresolved row
-    // carrying a `record_id` and nothing resolves a non-persistent type, so a
-    // second decision against the same record would be swallowed for good. The
-    // one of its own is `S128`'s — *where the person told cannot see the
-    // record, the message carries the reason and stands alone*. An anchor is a
-    // link into something a co-credited rep cannot open.
+    // Raised with **no anchor**, and the reason is `S128`'s own — *where the
+    // person told cannot see the record, the message carries the reason and
+    // stands alone*. An anchor is a link into something a co-credited rep
+    // cannot open. (It also dodged `notifications_live_key`, which would have
+    // swallowed a second decision against the same record for good; that index
+    // is gone with `0033` and this reason no longer needs it.)
     key: NOTIFICATION_TYPES.decisionEndedWork,
     nameEn: "A decision ended your work",
     nameAr: "قرار أنهى عملك",
-    tier: "act_now",
-    isPersistent: false,
   },
   {
     // `S129` — *a rep is told when they are given a share of someone else's
@@ -154,13 +142,11 @@ export const NOTIFICATION_TYPE_SEED: NotificationTypeSeed[] = [
     // and says which half is true (`WORKFLOW §7`). When that prompt lands it
     // calls this same writer and the telling comes free.
     //
-    // Act-now and NOT persistent, for the type above's reasons. No anchor
-    // either: a rep given a share need not hold the project `S30`, so the
-    // record travels in `payload` and is re-checked on read.
+    // News, for the type above's reasons — the share has already been given.
+    // No anchor either: a rep given a share need not hold the project `S30`, so
+    // the record travels in `payload` and is re-checked on read.
     key: NOTIFICATION_TYPES.creditGranted,
     nameEn: "Credit shared with you",
     nameAr: "تمت مشاركة رصيد معك",
-    tier: "act_now",
-    isPersistent: false,
   },
 ];

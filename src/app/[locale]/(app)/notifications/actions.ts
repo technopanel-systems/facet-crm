@@ -7,11 +7,12 @@ import { markAllRead, markRead } from "@/lib/notifications";
 import { readFields, type FormState } from "@/lib/validation";
 
 /**
- * `07 G1` — **reading is not resolving.** These actions set `read_at` and never
- * `resolved_at`, so a persistent act-now entry stays in the badge until the
- * condition it points at actually clears. There is deliberately no "dismiss"
- * action to write: a notification that can be swiped away is one that gets
- * swiped away.
+ * **Reading is the whole disposal** `S91`. `07 G1` set `read_at` and never
+ * `resolved_at`, so a persistent act-now entry stayed in the badge until its
+ * condition cleared; there are no persistent entries and no conditions, so this
+ * is what takes a row out of the count. There is still no "dismiss" action and
+ * there is nothing for one to do — `07 G1` refused the swipe to protect work,
+ * and a bell carries none `S92`.
  *
  * No layout wraps a server action, so each one calls `requireSession()` itself;
  * the recipient term is then applied inside `markRead` / `markAllRead`, in the

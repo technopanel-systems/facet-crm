@@ -23,8 +23,11 @@
  *    `gather` does; a second resolution would name one company while another
  *    did the suppressing, which is the trap `21 §7` names.
  *  - **§11: none of it stores anything.** No `notifications` row — `21 §1`,
- *    restated with six kinds. (`tasks` itself is gone since feature slice 6
- *    `[26 §6]`; there is no table left to prove writes nothing to.)
+ *    restated with six kinds. **Stronger since `S91`**: a follow-up used to
+ *    write exactly one row, the daily `followup.digest`, and that type no
+ *    longer exists, so *nothing* is now literally true. (`tasks` itself is gone
+ *    since feature slice 6 `[26 §6]`; there is no table left to prove writes
+ *    nothing to.)
  *
  * Usage: `npm run verify:followups`.
  *
@@ -87,7 +90,7 @@ import { FOLLOW_UP_KINDS, SAUDI_CODE, type FollowUpKind } from "@/lib/enums";
 import { normalizeName } from "@/lib/normalize";
 import {
   followUps,
-  followUpsForRecipient,
+  followUpScope,
   nextFollowUpContext,
   setNextFollowUp,
 } from "@/lib/follow-ups";
@@ -825,7 +828,7 @@ async function main(): Promise<void> {
     .select({ n: sql<number>`count(*)::int` })
     .from(notifications);
   await followUps(owner);
-  await followUpsForRecipient(owner);
+  await followUpScope(owner);
   const notificationsAfter = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(notifications);
@@ -1062,33 +1065,44 @@ async function main(): Promise<void> {
     `got ${[...new Set(ownerRows.map((row) => row.kind))].join(", ")}`,
   );
 
-  /* --- 16. The digest reads the same six kinds [07 E5] --------------- */
+  /* --- 16. Asked AS somebody else, the scope is theirs [00 §1.13] ---- */
 
-  console.log("\n16. The digest reads them in the recipient's own scope");
+  console.log("\n16. Asked in another person's scope, the rows are theirs");
 
+  // **This section was headed *the digest reads the same six kinds*, and the
+  // digest is gone** `S91` — with it `followUpsForRecipient`, whose only
+  // production caller was `generateDigests`. What it proved was never really
+  // about the digest: it is that the derivation can be asked in a scope built
+  // from somebody else's identity, and that the answer is then THEIRS. `00
+  // §1.13` is v1's bug — both notification pages selected every row and left
+  // filtering to RLS, which FACET does not have — and this is the assertion
+  // that the bug stays fixed. It is kept, re-headed, and asked through
+  // `followUpScope`, which takes the same `AuthSession` and runs the same
+  // `gather`.
+  //
   // §4 cleared the one returned fixture and §5 and §6 disposed of the rest, so
-  // the digest needs a live one of its own rather than an assertion that
-  // passes on whatever happens to be left.
-  const digestCompany = await makeCompany("digest-co", 5);
-  const digestProject = await makeProject("digest-pr", digestCompany.id, 5);
-  const digestThread = await makeThread(digestProject, digestCompany.id);
-  await returnedWorkingDaysAgo(digestThread.id, thresholds.quotationReturned);
+  // this needs a live one of its own rather than an assertion that passes on
+  // whatever happens to be left.
+  const otherCompany = await makeCompany("scope-co", 5);
+  const otherProject = await makeProject("scope-pr", otherCompany.id, 5);
+  const otherThread = await makeThread(otherProject, otherCompany.id);
+  await returnedWorkingDaysAgo(otherThread.id, thresholds.quotationReturned);
 
   const scope = await scopeForUser(ownerUser.id);
   check("the owner has a scope to compute in", scope !== null);
   if (scope) {
-    const digestRows = await followUpsForRecipient(scope);
-    const kinds = new Set(digestRows.map((row) => row.kind));
+    const scopeRows = (await followUpScope(scope)).rows;
+    const kinds = new Set(scopeRows.map((row) => row.kind));
     check(
-      "date_due reaches the digest [07 E5]",
+      `date_due is in the owner's own scope — saw ${scopeRows.length} rows [25 §18]`,
       kinds.has("date_due"),
       `got ${[...kinds].join(", ")}`,
     );
     check(
       "and so does quotation_returned [22 §6.11]",
-      digestRows.some(
+      scopeRows.some(
         (row) =>
-          row.kind === "quotation_returned" && row.anchorId === digestThread.id,
+          row.kind === "quotation_returned" && row.anchorId === otherThread.id,
       ),
       `got ${[...kinds].join(", ")}`,
     );
@@ -1096,14 +1110,26 @@ async function main(): Promise<void> {
 
   const strangerScope = await scopeForUser(strangerUser.id);
   check("a stranger's scope exists", strangerScope !== null);
-  if (strangerScope) {
-    const leaked = (await followUpsForRecipient(strangerScope)).filter((row) =>
+  if (strangerScope && scope) {
+    /**
+     * **The non-vacuity guard is on the OWNER, not the stranger** `CLAUDE.md`.
+     *
+     * The obvious guard — *the stranger's scope is not empty* — is wrong here
+     * and was written that way first: this stranger is a rep who holds nothing,
+     * deliberately, so an empty scope is the correct answer and asserting
+     * otherwise fails a working system. What must be non-empty is the set of
+     * rows there is something to leak: the owner's stamped rows, counted below
+     * and printed beside the zero.
+     */
+    const ownerStamped = (await followUpScope(scope)).rows.filter((row) =>
       row.anchorName.startsWith(stamp),
     );
+    const strangerAll = (await followUpScope(strangerScope)).rows;
+    const leaked = strangerAll.filter((row) => row.anchorName.startsWith(stamp));
     check(
-      "and holds none of this run's follow-ups — 00 §1.13's bug stays fixed",
-      leaked.length === 0,
-      `got ${leaked.map((row) => row.kind).join(", ")}`,
+      `and holds none of this run's follow-ups — saw 0 of the owner's ${ownerStamped.length} — 00 §1.13's bug stays fixed`,
+      ownerStamped.length > 0 && leaked.length === 0,
+      `${leaked.map((row) => row.kind).join(", ") || "no leak"}; owner ${ownerStamped.length}, stranger scope ${strangerAll.length}`,
     );
   }
 

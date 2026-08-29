@@ -2,15 +2,10 @@ import { getFormatter, getTranslations, setRequestLocale } from "next-intl/serve
 
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
 import { requireSession } from "@/lib/authz";
-import {
-  listNotifications,
-  sweepNotifications,
-  RESOLUTION_RULES,
-  type NotificationRow,
-} from "@/lib/notifications";
+import { listNotifications, type NotificationRow } from "@/lib/notifications";
 
 import { anchorHref } from "../_components/anchors";
 import { ListPagination } from "../_components/list-controls";
@@ -20,16 +15,25 @@ import { MarkReadButton } from "./mark-read-button";
 export const dynamic = "force-dynamic";
 
 /**
- * Notifications `[07 E5]`, `[07 G1]`, `[21 §2]`.
+ * The bell `S92` — **news only, never work**, in **one list**, newest first.
  *
- * **Two tiers, shown apart.** Act-now is what is waiting on you and sits above;
- * the daily digest of what went stale sits below and does not interrupt.
- * Without the split reps mute everything and miss what mattered.
+ * **What `S91` took off this screen.** It was two cards side by side: *Waiting
+ * on you* on the wide side and *Daily summary* on the narrow one, `07 E5`'s two
+ * tiers shown apart. Both halves are gone — there is no digest to summarise and
+ * no tier to sort by — and with them the *Waiting* and *Done* badges, which
+ * read `resolved_at`, and the per-row line saying how a persistent entry would
+ * clear, which read `RESOLUTION_RULES`. **Every one of the six types is
+ * something that has already happened to the reader**, so *Unread* is the only
+ * state a row can be in, and reading it is the only thing to do.
  *
- * **The sweep runs on read**: FACET has no scheduler, this is the commonest
- * read, and it is the same function a scheduled job will call. It writes
- * nothing when nothing is due. Quotation expiry used to run the same way, on
- * a quotation list, until `S67` — reading a quotation no longer writes to it.
+ * **The screen no longer writes on a read.** `sweepNotifications()` ran here on
+ * every request because FACET has no scheduler; it resolved conditions and
+ * generated digests, and `S91` deletes both. Marking read is still a write and
+ * still a POST — what changed is that opening the page is now only a read.
+ *
+ * **The work is not here and never was.** It is on `S87`'s list, on `/`, which
+ * is the sentence `S91` is. `D64` says the same thing about this screen's old
+ * block on the dashboard: twenty-five rows of news where work belonged.
  *
  * **Not gated.** A notification is addressed to one person, so the page needs
  * no permission and no visibility filter beyond that — the recipient term lives
@@ -50,20 +54,16 @@ export default async function NotificationsPage({
   const t = await getTranslations();
   const format = await getFormatter();
 
-  await sweepNotifications();
-
   const currentPage = Number(page) || 1;
   const { rows, total } = await listNotifications(session, {
     page: currentPage,
   });
 
-  // `row.waiting` is the one definition `[21 §4]`, in `src/lib/notifications.ts`
-  // beside the badge's own query. The rule used to be spelled out here and on
-  // the Today screen, which is two places for it to drift from the badge — and
-  // it had: both counted a non-persistent act-now entry forever, because
-  // nothing resolves one and reading it changed nothing.
-  const waiting = rows.filter((row) => row.waiting);
-  const rest = rows.filter((row) => !row.waiting);
+  // The one state a row can be in, and the one the badge counts `unreadCount`.
+  // There is deliberately no second partition here: the two this screen used to
+  // make — waiting/done and act-now/digest — each read a column `S91` deletes,
+  // and a screen re-deriving a division the data layer no longer makes is how
+  // the badge and the list drifted apart the first time.
   const hasUnread = rows.some((row) => !row.readAt);
 
   return (
@@ -84,46 +84,28 @@ export default async function NotificationsPage({
         </p>
       ) : (
         <>
-          {/* The concept's two columns `[22 §3]`, and the split is already the
-              right one: act-now is what the reader owes, the digest is what
-              merely happened `[07 G1]`. Act-now takes the wide side. */}
-          <div className="grid items-start gap-4 lg:grid-cols-[1.25fr_1fr]">
-            {waiting.length > 0 ? (
-              <Card data-slot="notifications-act-now">
-                <CardHeader>
-                  <CardTitle>{t("notifications.detail.actNow")}</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-4">
-                  {waiting.map((row) => (
-                    <NotificationEntry
-                      key={row.id}
-                      row={row}
-                      t={t}
-                      format={format}
-                    />
-                  ))}
-                </CardContent>
-              </Card>
-            ) : null}
-
-            {rest.length > 0 ? (
-              <Card data-slot="notifications-digest">
-                <CardHeader>
-                  <CardTitle>{t("notifications.detail.digest")}</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-4">
-                  {rest.map((row) => (
-                    <NotificationEntry
-                      key={row.id}
-                      row={row}
-                      t={t}
-                      format={format}
-                    />
-                  ))}
-                </CardContent>
-              </Card>
-            ) : null}
-          </div>
+          {/* **One card, one column.** It was `22 §3`'s two — act-now on the
+              wide side, the digest on the narrow — and that split was the
+              screen's whole shape. `S91` leaves one kind of thing, so a grid
+              holding one child would be scaffolding for a second that cannot
+              arrive. No card header either: a lone card headed *News* on a page
+              titled *Notifications* says it twice `D21`. */}
+          {/* `data-total` is the whole scope, not the page — `ListCard`
+              carries one for the same reason and this screen uses a bare
+              `ListPagination`, which does not. §29 prints what it read against
+              it, so a negative cannot pass over a page that rendered nothing. */}
+          <Card data-slot="notifications-news" data-total={String(total)}>
+            <CardContent className="flex flex-col gap-4">
+              {rows.map((row) => (
+                <NotificationEntry
+                  key={row.id}
+                  row={row}
+                  t={t}
+                  format={format}
+                />
+              ))}
+            </CardContent>
+          </Card>
 
           <ListPagination
             basePath="/notifications"
@@ -169,25 +151,18 @@ function NotificationEntry({
     ? t(`enums.notificationType.${row.typeName}`)
     : row.typeKey;
 
-  // `21 §3` — every persistent type states how it clears, for every anchor it
-  // can carry. A badge with no stated way out is the failure `21 §4` forbids.
-  const rule = RESOLUTION_RULES.find(
-    (candidate) =>
-      candidate.typeKey === row.typeKey &&
-      candidate.anchorType === row.anchorType,
-  );
-
   return (
-    <div className="flex flex-col gap-1 border-s-2 ps-4">
+    // The handle `verify:routes` §29 counts, so its negatives — no digest card,
+    // no act-now card, no link into the working list — guard on a non-empty
+    // read rather than passing on a page that rendered nothing `CLAUDE.md`.
+    <div
+      data-slot="notification-entry"
+      className="flex flex-col gap-1 border-s-2 ps-4"
+    >
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-start text-sm font-medium">{title}</span>
-        {row.resolvedAt ? (
-          <Badge variant="secondary">{t("notifications.fields.done")}</Badge>
-        ) : row.waiting ? (
-          <Badge variant="destructive">
-            {t("notifications.fields.waiting")}
-          </Badge>
-        ) : null}
+        {/* The only badge left. *Done* read `resolved_at` and *Waiting* read
+            the tier and the persistence flag; `S91` deletes all three. */}
         {!row.readAt ? (
           <Badge variant="outline">{t("notifications.fields.unread")}</Badge>
         ) : null}
@@ -196,10 +171,15 @@ function NotificationEntry({
       {/* The anchor is a link only while the viewer may still open it
           `[20 §8.2]`: a share can be revoked and a company can be handed on,
           and the notification row outlives either. */}
-      {row.anchorId ? (
+      {row.anchorType && row.anchorId ? (
         row.anchorViewable ? (
           <Link
-            href={anchorHref(row.anchorType ?? "company", row.anchorId ?? "")}
+            // **No `??` fallbacks.** `anchorType` was defaulted to `"company"`
+            // and `anchorId` to `""` because the database allowed a half-filled
+            // pair; `0033`'s `notifications_record_pair` CHECK makes that row
+            // impossible, so the guard above narrows both and a screen no
+            // longer guesses at a record type `AUDIT 1 E2`.
+            href={anchorHref(row.anchorType, row.anchorId)}
             className="text-start text-sm hover:underline"
           >
             {row.anchorLabel ?? t("common.view")}
@@ -335,33 +315,6 @@ function NotificationEntry({
             </span>
           )}
         </div>
-      ) : null}
-
-      {row.digestDate ? (
-        <p className="text-muted-foreground text-start text-sm">
-          {t("notifications.detail.digestSummary", {
-            total: Object.values(row.digestCounts ?? {}).reduce(
-              (sum, n) => sum + n,
-              0,
-            ),
-            date: row.digestDate,
-          })}{" "}
-          <Link href="/follow-ups" className="hover:underline">
-            {t("notifications.detail.digestLink")}
-          </Link>
-        </p>
-      ) : null}
-
-      {row.isPersistent && !row.resolvedAt ? (
-        <p className="text-muted-foreground text-start text-xs">
-          {t("notifications.detail.persistent")}
-          {/* One rule left since `S67` took `thread_no_longer_expired` with the
-              expiry notification. The branch goes rather than standing as a
-              choice between one thing and nothing. */}
-          {rule
-            ? ` ${t("notifications.detail.clearsInteractionAgainstCompany")}`
-            : ""}
-        </p>
       ) : null}
 
       <div className="flex flex-wrap items-center gap-3">

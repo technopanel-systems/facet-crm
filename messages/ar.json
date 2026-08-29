@@ -165,7 +165,6 @@
       "recordAssigned": "أُسند إليك",
       "recordHandedOver": "تم تسليم عمل إليك",
       "shareGranted": "تمت مشاركته معك",
-      "followUpDigest": "المتابعات اليومية",
       "mentionReceived": "أشار إليك",
       "decisionEndedWork": "قرار أنهى عملك",
       "creditGranted": "تمت مشاركة رصيد معك"
@@ -989,27 +988,15 @@
   },
   "notifications": {
     "title": "الإشعارات",
-    "empty": "لا يوجد شيء بانتظارك.",
+    "empty": "لا توجد أخبار بعد.",
     "fields": {
-      "what": "ماذا",
-      "about": "بخصوص",
-      "when": "متى",
-      "status": "الحالة",
-      "waiting": "بالانتظار",
-      "done": "مكتمل",
       "unread": "غير مقروء"
     },
     "detail": {
-      "hint": "ما ينتظرك يبقى هنا حتى يُنجَز. وأسفله ملخص يومي لما توقف التواصل بشأنه.",
-      "actNow": "بانتظارك",
-      "digest": "الملخص اليومي",
-      "persistent": "يبقى هذا حتى يُنجَز العمل — ولا يمكن تجاهله.",
+      "hint": "ما جرى على عملك — قرار أو مشاركة أو إشارة. وما زال بانتظارك يظهر في شاشة اليوم.",
       "anchorHidden": "لم يعد بإمكانك فتح السجل المشار إليه.",
       "handover": "سلَّم {name} إليك {companies} شركات و{projects} مشاريع و{threads} عروض أسعار.",
       "handoverUnknown": "تم تسليم عمل إليك.",
-      "digestSummary": "{total} متابعات في {date}.",
-      "digestLink": "فتح المتابعات",
-      "clearsInteractionAgainstCompany": "يزول عند تسجيلك تواصلاً مع الشركة.",
       "mention": "أشار إليك {name} في تعليق.",
       "mentionUnknown": "أشار إليك أحدهم في تعليق.",
       "mentionLink": "افتح السجل",

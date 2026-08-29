@@ -81,7 +81,7 @@ import {
 import { dailyActivity } from "@/lib/daily-activity";
 import { NOTIFICATION_TYPES, SAUDI_CODE } from "@/lib/enums";
 import { listCountries } from "@/lib/lookups";
-import { listNotifications, markRead, unresolvedCount } from "@/lib/notifications";
+import { listNotifications, markRead, unreadCount } from "@/lib/notifications";
 import {
   createQuotationThread,
   issueVersion,
@@ -724,16 +724,18 @@ async function main(): Promise<void> {
 
   console.log("\n4. A mention raises a notification [25 §11], [21 §4]");
 
-  check(
-    "mention.received is act-now and NOT persistent [21 §4]",
-    mentionType.tier === "act_now" && mentionType.isPersistent === false,
-    `got tier=${mentionType.tier} persistent=${mentionType.isPersistent}`,
-  );
-  // The channel claim that stood here is gone with its column. `0027` dropped
-  // `notification_types.default_channel` and `notifications.channel`: every
-  // row said `in_app`, and the only reader of the first was the writer of the
-  // second. Delivery is in-app because there is no other kind, which is a
-  // stronger statement than a column asserting it.
+  // **The tier-and-persistence claim is gone with its two columns** `S91`,
+  // `0033`. It read *mention.received is act-now and NOT persistent [21 §4]*,
+  // and its whole point was that reading such a row clears the badge — which
+  // §9 below drives for real, against `unreadCount`, and which is now true of
+  // every type rather than of this one. A column assertion is the weaker of
+  // the two and it is the one that left.
+  //
+  // The channel claim that stood beside it went the same way at `0027`, which
+  // dropped `notification_types.default_channel` and `notifications.channel`:
+  // every row said `in_app`, and the only reader of the first was the writer
+  // of the second. Delivery is in-app because there is no other kind, which is
+  // a stronger statement than a column asserting it.
 
   const before = await mentionsFor(repB.user.id);
   await addComment(repA, {
@@ -1070,11 +1072,17 @@ async function main(): Promise<void> {
     (await listComments(coordinator, "quotation_thread", thread.id)).length === beforeRollback,
   );
 
-  /* --- 9. A non-persistent act-now can be dismissed --------------- */
+  /* --- 9. Reading a notification clears the bell [21 §4], [S91] --- */
 
-  console.log("\n9. A notification with no condition can be dismissed [21 §4]");
+  console.log("\n9. Reading a notification clears the bell [21 §4], [S91]");
 
-  const waitingBefore = await unresolvedCount(repB);
+  // `21 §4` gave dismissal only to a type with NO resolution condition, and the
+  // badge query needed three terms plus a join to say so. `S91` deletes the
+  // conditions, the tiers and the persistence flag, so the badge is a bare
+  // unread count and this is now the whole behaviour of the bell. The section
+  // still drives a mention because that is what this script can raise, not
+  // because a mention is special any more.
+  const waitingBefore = await unreadCount(repB);
   check(
     "an unread mention is waiting on the reader",
     waitingBefore > 0,
@@ -1087,20 +1095,22 @@ async function main(): Promise<void> {
   );
   for (const notification of mine) await markRead(repB, notification.id);
 
+  // **The negative guards on a non-empty read** (`CLAUDE.md`): with no
+  // mentions to mark, `waitingBefore - 0 === waitingBefore` would pass on a
+  // badge nothing had touched.
+  const afterRead = await unreadCount(repB);
   check(
-    "*** reading it clears the badge — 21 §4's own words, finally built *** [21 §4]",
-    (await unresolvedCount(repB)) === waitingBefore - mine.length,
-    `got ${await unresolvedCount(repB)}, expected ${waitingBefore - mine.length}`,
+    `*** reading it clears the badge — read ${mine.length} of ${waitingBefore} unread *** [21 §4], [S91]`,
+    mine.length > 0 && afterRead === waitingBefore - mine.length,
+    `got ${afterRead}, expected ${waitingBefore - mine.length}`,
   );
-  check(
-    "…and it is still NOT resolved — reading is not doing [07 G1]",
-    (
-      await db
-        .select({ resolvedAt: notifications.resolvedAt })
-        .from(notifications)
-        .where(eq(notifications.id, mine[0]!.id))
-    )[0]?.resolvedAt === null,
-  );
+  // **The companion claim is dropped, not moved** — *"…and it is still NOT
+  // resolved: reading is not doing"*. It read `notifications.resolved_at`,
+  // which `0033` drops: `S91` deletes the resolution conditions and the sweep
+  // that wrote the column, so there is no second state for reading to leave
+  // untouched. Reading IS doing now, for a bell that carries only news `S92`,
+  // and the assertion above is the whole of it. Nothing here moved to another
+  // script; the claim stopped existing.
 
   /* --- 10. Every write is audited --------------------------------- */
 

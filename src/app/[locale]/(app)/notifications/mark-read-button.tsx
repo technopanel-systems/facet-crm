@@ -9,12 +9,12 @@ import { emptyFormState, type FormState } from "@/lib/validation";
 type Action = (state: FormState, formData: FormData) => Promise<FormState>;
 
 /**
- * Mark one notification read — and only read `[07 G1]`.
+ * Mark one notification read `S91` — which is now the only disposal there is.
  *
- * There is deliberately no dismiss control beside it. An act-now entry stays
- * until the condition it points at clears, which is what makes the tier worth
- * trusting; the row says so in words rather than leaving the missing button to
- * be read as an oversight.
+ * There is deliberately no dismiss control beside it. `07 G1` withheld one so
+ * an act-now entry could not be swiped past its condition; there are no
+ * conditions since `S91`, and a bell carrying news `S92` has nothing a dismiss
+ * would mean that read does not.
  *
  * Its own form and its own action state, so one row's failure cannot disturb
  * another — the same reasoning as `TargetRow` and the quotation line editors.

@@ -165,7 +165,7 @@ import {
   type DispatchInput,
 } from "@/lib/dispatches";
 import { NOTIFICATION_TYPES, SAUDI_CODE } from "@/lib/enums";
-import { followUpsForRecipient, setNextFollowUp } from "@/lib/follow-ups";
+import { followUpScope, setNextFollowUp } from "@/lib/follow-ups";
 import { listCountries } from "@/lib/lookups";
 import { listNotifications, type DecisionPayload } from "@/lib/notifications";
 import {
@@ -1952,9 +1952,12 @@ async function main(): Promise<void> {
    *
    * A project of its own, with no thread and no dispatch, so the fallback
    * branch is what fires; `created_at` is backdated by hand, the shape §12
-   * already uses for its share row. `followUpsForRecipient` rather than
-   * `followUps`: the latter pages, and a page-one question is not the question
-   * being asked — §12's own trap.
+   * already uses for its share row. **`followUpScope` rather than `followUps`**:
+   * the latter pages, and a page-one question is not the question being asked —
+   * §12's own trap. It read `followUpsForRecipient`, which asked in the
+   * recipient's own scope; that existed for the daily digest and left with it
+   * in session 24 `S91`. Here the caller IS the recipient, so this asks the
+   * identical question.
    */
   await db
     .update(projects)
@@ -1965,8 +1968,8 @@ async function main(): Promise<void> {
     rows.filter(
       (row) => row.anchorType === "project" && row.anchorId === stale.id,
     ).length;
-  const repAQueue = staleRows(await followUpsForRecipient(repA));
-  const coordinatorQueue = staleRows(await followUpsForRecipient(coordinator));
+  const repAQueue = staleRows((await followUpScope(repA)).rows);
+  const coordinatorQueue = staleRows((await followUpScope(coordinator)).rows);
   check(
     "*** the owner's queue holds the stale project *** [07 D5]",
     repAQueue === 1,

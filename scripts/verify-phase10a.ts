@@ -9,8 +9,9 @@
  * in process — no browser, no HTTP — and checks the things that are otherwise
  * only claimed:
  *
- *   1. The seed: five notification types with the right tier and persistence
- *      and **no sixth**, and all five thresholds `[21 §2]`, `[07 D5]`.
+ *   1. The seed: `S92`'s six notification types and **no seventh**, with
+ *      `followup.digest` asserted ABSENT, and all five thresholds `[21 §2]`,
+ *      `[07 D5]`, `S91`.
  *   2. Every gate refuses with its own key — and the negative claim that
  *      follow-ups and notifications refuse NOBODY `[21 §9]`.
  *   3. The dormancy CHECK holds **at the database** `[13 §1]`, `[21 §7]`.
@@ -20,11 +21,10 @@
  *   7. `on hold until` suppresses every kind, and a past date does not `[20 §5]`.
  *   8. Archived and re-included companies raise nothing, and a stale
  *      re-inclusion stops shielding `[07 E6]`, `[21 §7]`.
- *   9. *** The digest reads the day's settled state at end of day *** `[20 §9]`.
- *  10. Persistence: raised once, read is not resolved, and a type with no
- *      condition is not persistent `[07 G1]`, `[21 §4]`.
- *  11. Resolution by condition, for every persistent type × every anchor it can
- *      carry — the table that fails when one is missing `[21 §3]`, `[21 §4]`.
+ *   9. *** `S91`'s machinery is GONE and cannot come back unseen *** — no
+ *      digest type, no digest row, and no notification written by a read.
+ *  10. The bell: every raise lands, and READING is what clears the badge
+ *      `S91`, `S92`. This section used to assert the opposite of both.
  *  12. *** A handover produces ONE notification, not one per record *** `[21 §5]`.
  *  13. Recipient filtering is in the application layer `[00 §1.13]`.
  *  14. Visibility in both directions, with no new predicate written `[21 §1]`.
@@ -96,15 +96,12 @@ import {
   type FollowUpKind,
   type NotificationTypeKey,
 } from "@/lib/enums";
-import { followUps, followUpsForRecipient } from "@/lib/follow-ups";
+import { followUps, followUpScope } from "@/lib/follow-ups";
 import { listCountries } from "@/lib/lookups";
 import {
   listNotifications,
   markRead,
-  RESOLUTION_RULES,
-  sweepNotifications,
-  unresolvedCount,
-  type NotificationAnchorType,
+  unreadCount,
 } from "@/lib/notifications";
 import { createReport, today } from "@/lib/reports";
 import {
@@ -313,7 +310,7 @@ async function main(): Promise<void> {
 
   /* --- 1. The seed [21 §2], [07 D5] --------------------------------- */
 
-  console.log("\n1. The seed: seven notification types, and all five thresholds");
+  console.log("\n1. The seed: six notification types, and all five thresholds");
 
   const types = await db.select().from(notificationTypes);
   if (types.length === 0) {
@@ -324,41 +321,50 @@ async function main(): Promise<void> {
   }
   const typeByKey = new Map(types.map((type) => [type.key, type]));
 
-  const expected: {
-    key: NotificationTypeKey;
-    tier: "act_now" | "digest";
-    persistent: boolean;
-  }[] = [
-    { key: NOTIFICATION_TYPES.recordAssigned, tier: "act_now", persistent: true },
-    // NOT persistent: no anchor, no completion condition `[21 §4, §5]`.
-    { key: NOTIFICATION_TYPES.recordHandedOver, tier: "act_now", persistent: false },
-    { key: NOTIFICATION_TYPES.shareGranted, tier: "act_now", persistent: true },
-    { key: NOTIFICATION_TYPES.followUpDigest, tier: "digest", persistent: false },
-    // `25 §11`'s sixth — see the count assertion below. NOT persistent, for
-    // `record.handed_over`'s reason `[21 §4]`: being mentioned has no condition
-    // that can clear.
-    { key: NOTIFICATION_TYPES.mentionReceived, tier: "act_now", persistent: false },
-    // `S92`'s two added items — `S128` and `S129`. Both act-now and NOT
-    // persistent: the decision has already happened and the credit has already
-    // been given, so neither has a condition that could clear `[21 §4]`. That
-    // is also what keeps them clear of the persistence machinery `S91` deletes,
-    // and it is why §11 below does not have to gain a rule for either.
-    { key: NOTIFICATION_TYPES.decisionEndedWork, tier: "act_now", persistent: false },
-    { key: NOTIFICATION_TYPES.creditGranted, tier: "act_now", persistent: false },
+  /**
+   * **The tier and persistence columns are gone** `S91`, `0033`, so what each
+   * row is asserted to BE is now just that it exists. The claim those two
+   * columns carried — *this one interrupts, that one can be dismissed by
+   * reading* — is asserted where it can actually be observed: §10 below drives
+   * `markRead` against `unreadCount` and watches the badge fall.
+   *
+   * `S92` names the six exactly: *a rep was handed to you*, *you have been
+   * shared a record*, plus `record.assigned`, `mention.received`,
+   * `decision.ended_work` `S128` and `credit.granted` `S129`.
+   */
+  const expected: NotificationTypeKey[] = [
+    NOTIFICATION_TYPES.recordAssigned,
+    NOTIFICATION_TYPES.recordHandedOver,
+    NOTIFICATION_TYPES.shareGranted,
+    NOTIFICATION_TYPES.mentionReceived,
+    NOTIFICATION_TYPES.decisionEndedWork,
+    NOTIFICATION_TYPES.creditGranted,
   ];
 
   for (const want of expected) {
-    const row = typeByKey.get(want.key);
     check(
-      `${want.key} is seeded as ${want.tier}, persistent=${want.persistent} [21 §2, §4]`,
-      row?.tier === want.tier && row?.isPersistent === want.persistent,
-      `got tier=${row?.tier} persistent=${row?.isPersistent}`,
+      `${want} is seeded [21 §2], [S92]`,
+      typeByKey.has(want),
+      `got ${[...typeByKey.keys()].join(", ")}`,
     );
     // No channel check: `0027` dropped `default_channel` and
     // `notifications.channel` together. See `schema.ts` above
     // `notificationTypes` for why a column asserting the only possible value
     // was worth less than not having one.
   }
+
+  /**
+   * **The one that must NOT be there** `S91`. A count of six would go green on
+   * six wrong rows, and a deletion nothing asserts is a deletion that comes
+   * back the next time somebody re-seeds from an old branch. `followup.digest`
+   * was the only type that ever carried WORK rather than news, and *the list is
+   * the notification* is the sentence that removes it.
+   */
+  check(
+    `followup.digest is GONE — saw ${types.length} types [S91]`,
+    types.length > 0 && !typeByKey.has("followup.digest"),
+    `got ${[...typeByKey.keys()].join(", ")}`,
+  );
   /**
    * A type nothing produces is the shape of v1's dead approval gate `[20 §11]`.
    *
@@ -384,16 +390,22 @@ async function main(): Promise<void> {
    * exactly rather than be relaxed: a seeded type with no producer. Move it
    * only alongside one, in either direction.
    *
-   * **It is seven now**, and both additions moved it alongside their producers
-   * in the same slice, which is the rule above rather than an exception to it.
-   * `S92` names them: *the news also carries credit granted to you (`S129`),
-   * and a decision that ended your work (`S128`)*. `decision.ended_work` is
-   * raised by `cancelDispatch`, `refuseDispatchRequest`, `rejectThread` and
-   * `cancelThread`; `credit.granted` by `setCreditSplit`.
+   * **It went to seven, and `S91` took it back to six.** The two additions
+   * moved it alongside their producers in the same slice, which is the rule
+   * above rather than an exception to it — `S92` names them: *the news also
+   * carries credit granted to you (`S129`), and a decision that ended your work
+   * (`S128`)*. `decision.ended_work` is raised by `cancelDispatch`,
+   * `refuseDispatchRequest`, `rejectThread` and `cancelThread`;
+   * `credit.granted` by `setCreditSplit`.
+   *
+   * **The subtraction is the same test read the other way**, and it is the
+   * only one so far taken by a rule rather than by a missing producer: nothing
+   * is wrong with `generateDigests`, and `S91` says the delivery should not
+   * exist. Six is what `S92` enumerates.
    */
   check(
-    "exactly seven notification types — 25 §11's six, less S67's, plus S92's two [21 §2], [S92]",
-    types.length === 7,
+    "exactly six notification types — S92's own list, no seventh [21 §2], [S92]",
+    types.length === 6,
     `got ${types.map((type) => type.key).join(", ")}`,
   );
 
@@ -969,92 +981,136 @@ async function main(): Promise<void> {
     afterDormancy.has(staleReinclusion.id),
   );
 
-  /* --- 9. The digest [20 §9] ---------------------------------------- */
+  /* --- 9. S91's machinery is gone [S91] ----------------------------- */
 
-  console.log("\n9. *** The digest reads the day's settled state at end of day ***");
+  console.log("\n9. *** The digest machinery is GONE, and stays gone ***");
 
+  /**
+   * **What this section asserted before session 24, and why none of it moved.**
+   *
+   * It was headed *the digest reads the day's settled state at end of day*
+   * `[20 §9]` and made five claims, every one about `generateDigests` and the
+   * `followup.digest` row it wrote:
+   *
+   *  - *the rep with open follow-ups got exactly one digest* `[07 E5]`
+   *  - *it is dated YESTERDAY, never today* `[20 §9]` — a correction made
+   *    minutes after a report could not produce a notification that should not
+   *    have been sent
+   *  - *the digest counts what the recipient's own scope holds* `[21 §2]`
+   *  - *three sweeps write ONE digest* — `notifications_digest_key` `[21 §10]`
+   *  - *a rep with nothing open gets no digest — silence is not news* `[07 D6]`
+   *
+   * `S91` deletes the delivery all five describe, so there is nothing left for
+   * them to be true about. **None of them moved to another script**, and one of
+   * them deserves a note: `20 §9`'s end-of-day rule was the reason the digest
+   * was generated for yesterday, and it has not been overturned — it simply has
+   * no outward-firing delivery left to govern. The list is read live, in the
+   * present tense, and a correction changes what it says immediately.
+   *
+   * **What stands here instead is the negative**, because a removal nothing
+   * asserts is a removal that comes back. §1 above already refuses the type;
+   * this refuses the ROWS and the write. Both guard on a non-empty read.
+   */
   const ownerScope = await scopeForUser(ownerUser.id);
   if (!ownerScope) throw new Error("scopeForUser returned null for the owner");
-  const ownerRows = await followUpsForRecipient(ownerScope);
-
-  await sweepNotifications();
-  const digests = async () =>
-    db
-      .select()
-      .from(notifications)
-      .innerJoin(
-        notificationTypes,
-        eq(notificationTypes.id, notifications.notificationTypeId),
-      )
-      .where(
-        and(
-          eq(notifications.recipientUserId, ownerUser.id),
-          eq(notificationTypes.key, NOTIFICATION_TYPES.followUpDigest),
-        ),
-      );
-
-  const firstPass = await digests();
+  const ownerRows = (await followUpScope(ownerScope)).rows;
   check(
-    "the rep with open follow-ups got exactly one digest [07 E5]",
-    firstPass.length === 1,
-    `got ${firstPass.length}`,
-  );
-  check(
-    "*** it is dated YESTERDAY, never today — the day's settled state [20 §9] ***",
-    firstPass[0]?.notifications.digestDate === shiftDays(today(), -1),
-    `got ${firstPass[0]?.notifications.digestDate}`,
-  );
-  const payload = firstPass[0]?.notifications.payload as
-    | { total?: number }
-    | null;
-  check(
-    "the digest counts what the recipient's own scope holds [21 §2]",
-    payload?.total === ownerRows.length,
-    `payload ${payload?.total} vs scope ${ownerRows.length}`,
+    `the owner has open follow-ups to digest, if there were a digest — saw ${ownerRows.length}`,
+    ownerRows.length > 0,
+    `got ${ownerRows.length}`,
   );
 
-  await sweepNotifications();
-  await sweepNotifications();
-  const thirdPass = await digests();
+  const [notificationTotal] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(notifications);
   check(
-    "*** three sweeps write ONE digest — notifications_digest_key [21 §10] ***",
-    thirdPass.length === 1,
-    `got ${thirdPass.length}`,
+    `there are notifications to look through — saw ${notificationTotal?.n}`,
+    (notificationTotal?.n ?? 0) > 0,
   );
 
-  const strangerDigests = await db
-    .select()
+  /**
+   * **Every row's type still resolves, so no digest row can be hiding.** `0033`
+   * deleted the nine `followup.digest` rows before deleting their type, and the
+   * foreign key means a tenth cannot appear without one. This is the assertion
+   * that fires if a later migration ever re-seeds the type.
+   *
+   * **The first version of this check was wrong and passed for the wrong
+   * reason**, which is worth leaving written down. It read
+   * `payload ? 'counts'` — but `record.handed_over` carries `counts` too
+   * `[21 §5]`, so the claim was *no handover exists*, not *no digest exists*.
+   * It went green on the first run only because §12 raises the handover AFTER
+   * §9 reads, and red on the second when the previous run's rows were still
+   * there. The digest's own signature is `total` beside `counts`; no other
+   * payload has it.
+   */
+  const [orphanTypes] = await db
+    .select({ n: sql<number>`count(*)::int` })
     .from(notifications)
-    .innerJoin(
-      notificationTypes,
-      eq(notificationTypes.id, notifications.notificationTypeId),
-    )
     .where(
-      and(
-        eq(notifications.recipientUserId, strangerUser.id),
-        eq(notificationTypes.key, NOTIFICATION_TYPES.followUpDigest),
-      ),
+      sql`not exists (select 1 from notification_types nt
+                       where nt.id = ${notifications.notificationTypeId})`,
     );
   check(
-    "a rep with nothing open gets no digest — silence is not news [07 D6]",
-    strangerDigests.length === 0,
-    `got ${strangerDigests.length}`,
+    `*** every notification's type still exists — saw 0 orphans of ${notificationTotal?.n} [S91] ***`,
+    orphanTypes?.n === 0,
+    `got ${orphanTypes?.n}`,
+  );
+  const [digestPayloads] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(notifications)
+    .where(sql`${notifications.payload} ? 'total'`);
+  check(
+    `*** no notification carries a digest payload — saw 0 of ${notificationTotal?.n} [S91] ***`,
+    digestPayloads?.n === 0,
+    `got ${digestPayloads?.n}`,
   );
 
-  /* --- 10. Persistence [07 G1], [21 §4] ------------------------- */
+  const strangerScope = await scopeForUser(strangerUser.id);
+  if (!strangerScope) throw new Error("scopeForUser returned null for the stranger");
+  const beforeRead = notificationTotal?.n ?? 0;
+  await followUpScope(ownerScope);
+  await followUpScope(strangerScope);
+  const [afterRead] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(notifications);
+  check(
+    `*** computing follow-ups for two people wrote nothing — ${beforeRead} then ${afterRead?.n} [21 §1], [S91] ***`,
+    beforeRead > 0 && afterRead?.n === beforeRead,
+    `${beforeRead} then ${afterRead?.n}`,
+  );
 
-  console.log("\n10. Persistence: raised once, and reading is not resolving");
+  /* --- 10. The bell: every raise lands, reading clears it [S91] ---- */
 
-  // **This used to ride on `quotation.expired`.** `S67` deleted that type with
-  // the state behind it — and has since taken validity out of FACET entirely —
-  // so the same four claims are made on `record.assigned` instead: act-now,
-  // persistent, anchored to one record. They were never claims about expiry;
-  // they are claims about the notification table, and the type was the vehicle.
-  //
-  // `reassignCompany` raises unconditionally, so calling it twice attempts two
-  // raises for the same recipient and record. `notifications_live_key` — the
-  // partial unique index over unresolved rows with a `record_id` — is what
-  // must keep exactly one.
+  console.log("\n10. Every raise lands, and READING is what clears the badge");
+
+  /**
+   * **This section asserted the opposite of both of its claims, and the rule
+   * changed under it.** It was headed *Persistence: raised once, and reading is
+   * not resolving*, and it proved:
+   *
+   *  - *two assignments raise ONE notification* — `notifications_live_key`, the
+   *    partial unique index over unresolved rows carrying a `record_id`
+   *  - *marking read sets `read_at`* — still true and still asserted below
+   *  - *and leaves `resolved_at` null: it cannot be dismissed* `[07 G1]`
+   *  - *the badge does not fall when the entry is read* `[07 G1]`
+   *
+   * `S91` deletes the persistence flag, the resolution conditions and the sweep
+   * that wrote `resolved_at`; `0033` drops the column and both partial unique
+   * indexes. So the third claim has no column, and the first and fourth are now
+   * FALSE — deliberately, and this is where that is proved rather than assumed.
+   *
+   * **The badge had to change or become undismissable.** With nothing writing
+   * `resolved_at`, the old query's `resolved_at is null` term was true of every
+   * row for ever: a count that could only rise. `07 G1` invented persistence to
+   * stop reps ignoring the bell, and keeping half of it would have produced
+   * exactly the badge it feared. `unreadCount` is the whole of it now, which is
+   * `21 §4`'s own exception — *a type with no resolution condition can be
+   * dismissed* — read as the rule, because since `S92` every type is news.
+   *
+   * `reassignCompany` raises unconditionally, so calling it twice makes two
+   * raises for the same recipient and record. With `notifications_live_key`
+   * gone, two is the right answer: two things happened.
+   */
   const persistCompany = await makeCompany("persist", 1);
   await reassignCompany(manager, persistCompany.id, ownerUser.id);
   await reassignCompany(manager, persistCompany.id, ownerUser.id);
@@ -1074,164 +1130,57 @@ async function main(): Promise<void> {
       ),
     );
   check(
-    "two assignments raise ONE notification - notifications_live_key [21 §10]",
-    assignedRows.length === 1,
+    "*** two assignments raise TWO — notifications_live_key is gone [S91] ***",
+    assignedRows.length === 2,
     `got ${assignedRows.length}`,
   );
 
-  const persistedId = assignedRows[0]?.notifications.id;
-  if (persistedId) {
-    const before = await unresolvedCount(owner);
-    await markRead(owner, persistedId);
-    const [afterRead] = await db
+  const raisedId = assignedRows[0]?.notifications.id;
+  if (raisedId) {
+    const badgeBefore = await unreadCount(owner);
+    check(
+      `the badge has something to lose — saw ${badgeBefore} unread`,
+      badgeBefore > 0,
+      `got ${badgeBefore}`,
+    );
+    await markRead(owner, raisedId);
+    const [wasRead] = await db
       .select()
       .from(notifications)
-      .where(eq(notifications.id, persistedId));
+      .where(eq(notifications.id, raisedId));
+    check("marking read sets read_at [07 G1]", wasRead?.readAt !== null);
+    const badgeAfter = await unreadCount(owner);
     check(
-      "marking read sets read_at [07 G1]",
-      afterRead?.readAt !== null,
-    );
-    check(
-      "*** and leaves resolved_at null: it cannot be dismissed [07 G1] ***",
-      afterRead?.resolvedAt === null,
-      `got ${afterRead?.resolvedAt}`,
-    );
-    check(
-      "the badge does not fall when the entry is read [07 G1]",
-      (await unresolvedCount(owner)) === before,
+      `*** and the badge FALLS by exactly one — ${badgeBefore} then ${badgeAfter} [S91] ***`,
+      badgeBefore > 0 && badgeAfter === badgeBefore - 1,
+      `${badgeBefore} then ${badgeAfter}`,
     );
   }
 
-  /* --- 11. Resolution by condition, per type AND per anchor [21 §3] - */
-
-  console.log("\n11. Every persistent type × every anchor it can carry has a rule");
+  /* --- 11. Resolution by condition — DELETED with S91 --------------- */
 
   /**
-   * The anchors each persistent type may be raised with. This is the claim;
-   * `RESOLUTION_RULES` is the implementation. Asserting them against each other
-   * in BOTH directions is what makes `21 §4` a rule rather than a hope — a new
-   * anchor added with no way to clear it fails here.
+   * **This section is gone, and it is named here rather than left as a gap in
+   * the numbering.** It was headed *every persistent type × every anchor it can
+   * carry has a rule* `[21 §3]`, `[21 §4]`, and it asserted `RESOLUTION_RULES`
+   * against a hand-written `anchorsByType` in BOTH directions — every persistent
+   * type declared its anchors, every declared anchor had a stated rule, and
+   * every rule named a real anchor on a genuinely persistent type. It then
+   * proved each condition was REACHABLE: it planted a `record.assigned` and two
+   * `share.granted` rows, logged one interaction against the company, swept,
+   * and checked all three had resolved — with *a first VIEW is not a
+   * resolution* beside it `[07 G1]`.
+   *
+   * `S91` deletes the per-anchor resolution conditions outright, and `0033`
+   * drops `is_persistent` and `resolved_at`. **Nothing here moved**: there is no
+   * table to iterate, no flag to filter on, and no column for a sweep to write.
+   * The claim `21 §4` was protecting — that no rep is ever left holding a badge
+   * with no way to clear it — is now structural rather than checked: reading
+   * clears everything, and §10 above drives that.
+   *
+   * `verify-sharing` §9 lost the mirror of this against real shares, and says
+   * the same there.
    */
-  const anchorsByType: Record<string, NotificationAnchorType[]> = {
-    [NOTIFICATION_TYPES.recordAssigned]: ["company"],
-    // `record_shares` permits three more record types, but no visibility filter
-    // reads a share on them, so none is ever raised `[21 §3]`.
-    [NOTIFICATION_TYPES.shareGranted]: [
-      "company",
-      "project",
-      "quotation_thread",
-    ],
-  };
-
-  for (const type of types.filter((row) => row.isPersistent)) {
-    const anchors = anchorsByType[type.key];
-    check(
-      `${type.key} declares the anchors it can carry [21 §4]`,
-      Array.isArray(anchors) && anchors.length > 0,
-    );
-    for (const anchor of anchors ?? []) {
-      check(
-        `${type.key} on a ${anchor} has a stated resolution rule [21 §3]`,
-        RESOLUTION_RULES.some(
-          (rule) => rule.typeKey === type.key && rule.anchorType === anchor,
-        ),
-      );
-    }
-  }
-  for (const rule of RESOLUTION_RULES) {
-    check(
-      `the rule for ${rule.typeKey} on a ${rule.anchorType} names a real anchor [21 §3]`,
-      (anchorsByType[rule.typeKey] ?? []).includes(rule.anchorType),
-    );
-    check(
-      `${rule.typeKey} is persistent, so its rule is load-bearing [21 §4]`,
-      typeByKey.get(rule.typeKey)?.isPersistent === true,
-    );
-  }
-
-  console.log("\n    …and each condition is reachable, not merely stated");
-
-  // **The expiry case is gone.** It read: extend the quotation, sweep, and the
-  // `quotation.expired` notification resolves. `S67` removed the type, the
-  // sweep step that raised it and the state it watched, and then the validity
-  // date itself along with `extendValidity`. There is no condition to reach and
-  // nothing left that could move one.
-
-  // Assignment and share: an interaction against the anchor's company clears
-  // them, on all three anchors. `share.granted` has no producer yet `[21 §11]`,
-  // so the rows are inserted directly — the RULE is what is under test.
-  const shareTypeId = typeByKey.get(NOTIFICATION_TYPES.shareGranted)?.id;
-  const assignedTypeId = typeByKey.get(NOTIFICATION_TYPES.recordAssigned)?.id;
-  const reachCompany = await makeCompany("reach", 1);
-  const reach = await makeProject("reach", reachCompany.id, 1, "requested");
-  // `origin: "assigned"` — `company_rep_origin` dropped `'shared'` in feature
-  // slice 6, unused by real code and only ever written by fixtures `[26 §2]`.
-  await db.insert(companyReps).values({
-    companyId: reachCompany.id,
-    userId: otherUser.id,
-    origin: "assigned",
-  });
-
-  const planted = await db
-    .insert(notifications)
-    .values([
-      {
-        recipientUserId: otherUser.id,
-        notificationTypeId: assignedTypeId!,
-        recordType: "company" as const,
-        recordId: reachCompany.id,
-      },
-      {
-        recipientUserId: otherUser.id,
-        notificationTypeId: shareTypeId!,
-        recordType: "project" as const,
-        recordId: reach.project.id,
-      },
-      {
-        recipientUserId: otherUser.id,
-        notificationTypeId: shareTypeId!,
-        recordType: "quotation_thread" as const,
-        recordId: reach.thread.id,
-      },
-    ])
-    .returning({ id: notifications.id, recordType: notifications.recordType });
-
-  await createReport(other, {
-    entryType: "interaction",
-    companyId: reachCompany.id,
-    contactId: null,
-    projectId: null,
-    channel: "visit",
-    outcome: "introduced",
-    category: null,
-    cityId: null,
-    onHoldUntil: null,
-    narrative: `${stamp} worked it`,
-    reportDate: today(),
-    signals: [],
-  });
-  await sweepNotifications();
-
-  const resolvedPlanted = await db
-    .select({ id: notifications.id, resolvedAt: notifications.resolvedAt })
-    .from(notifications)
-    .where(
-      inArray(
-        notifications.id,
-        planted.map((row) => row.id),
-      ),
-    );
-  for (const row of planted) {
-    const after = resolvedPlanted.find((candidate) => candidate.id === row.id);
-    check(
-      `an interaction resolves the ${row.recordType} anchor [21 §3]`,
-      after?.resolvedAt !== null,
-    );
-  }
-  check(
-    "a first VIEW is not a resolution — only the logged interaction was [07 G1]",
-    resolvedPlanted.length === 3,
-  );
 
   /* --- 12. A handover is ONE notification [21 §5] ------------------- */
 
@@ -1319,9 +1268,8 @@ async function main(): Promise<void> {
     `got ${JSON.stringify(handoverPayload)}`,
   );
   check(
-    "it carries no anchor, which is why it is not persistent [21 §4, §5]",
-    handoverRows[0]?.notifications.recordId === null &&
-      handoverRows[0]?.notification_types.isPersistent === false,
+    "it carries no anchor — one summary, not one per record [21 §5]",
+    handoverRows[0]?.notifications.recordId === null,
   );
 
   // The contrast that makes §5 a rule rather than an implementation detail.
@@ -1470,13 +1418,14 @@ async function main(): Promise<void> {
 
   console.log("\n16. Every write is audited");
 
+  // `notification.resolved` was here and is gone with its writer `S91`: the
+  // sweep was the only thing that ever wrote one, and there is no sweep.
   const OWN_ACTIONS = [
     "company.reincluded",
     "company.reassigned",
     "company.archived",
     "company.dormancy_reviewed",
     "notification.raised",
-    "notification.resolved",
     "notification.read",
   ];
   const entries = await db
@@ -1497,7 +1446,6 @@ async function main(): Promise<void> {
     "company.reassigned",
     "company.archived",
     "notification.raised",
-    "notification.resolved",
     "notification.read",
   ]) {
     check(
@@ -1509,14 +1457,28 @@ async function main(): Promise<void> {
     `        actions seen: ${[...new Set(entries.map((row) => row.action))].sort().join(", ")}`,
   );
 
-  // The sweep audits under a NULL actor, on purpose `[16 §3]` — the person who
-  // opened the screen did not expire the quotation. `verify:phase11` §16 was
-  // scoped for exactly this reason; the same care applies here.
+  /**
+   * **Two claims went with `S91`, and the second is the interesting one.**
+   *
+   *  - *`notification.resolved` is written to the audit log* `[07 E1]` — the
+   *    sweep wrote it, and there is no sweep. Dropped, nowhere to move it.
+   *  - *the sweep's own entries name no actor, deliberately* `[16 §3]` — the
+   *    person who opened the screen did not resolve anything, so the sweep
+   *    audited under a null actor. **That rule is not overturned; it has no
+   *    remaining subject in this module.** Nothing in FACET now writes because
+   *    somebody looked at a screen, which is a stronger version of the same
+   *    idea, and `§9` above asserts it directly: two follow-up derivations
+   *    wrote nothing at all.
+   *
+   * What replaces them here is the positive: every notification row this run
+   * raised names the actor who caused it, because a raise happens inside the
+   * caller's transaction and never out of band.
+   */
+  const raised = entries.filter((row) => row.action === "notification.raised");
   check(
-    "the sweep's own entries name no actor, deliberately [16 §3]",
-    entries
-      .filter((row) => row.action.startsWith("notification."))
-      .some((row) => row.actorUserId === null),
+    `every notification.raised names its actor — saw ${raised.length} [07 E1], [S91]`,
+    raised.length > 0 && raised.every((row) => row.actorUserId !== null),
+    `${raised.filter((row) => row.actorUserId === null).length} of ${raised.length} have no actor`,
   );
 }
 

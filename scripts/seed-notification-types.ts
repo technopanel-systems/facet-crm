@@ -4,16 +4,21 @@
  * lookups and settings.
  *
  * **Insert if absent, and never overwrite.** Same rule as `seed-settings.ts`,
- * for the same reason: `10 §10` makes the tier and persistence data precisely
- * so they can be changed, and a seed run that quietly reset `is_persistent`
- * would undo that without saying so.
+ * and it now guards only the two names: `10 §10` keeps the type a lookup so a
+ * label can be corrected in the database, and a seed run that reset one would
+ * undo that without saying so.
  *
- * The channel was a third such value until `0027`. It is gone: every row said
- * `in_app`, and the column reading it existed only to stamp a second column
- * nothing read.
+ * **There is nothing else left to overwrite.** `tier` and `is_persistent` went
+ * with `S91` in `0033`, and the channel went with `0027` — every row said
+ * `in_app` and the column reading it existed only to stamp a second column
+ * nothing read. Three settable values became none.
  *
- * Nothing is deleted either — a type that stops being produced keeps its row,
- * because notifications already raised point at it `[12 §7]`.
+ * **Nothing is deleted HERE, and `0033` is not a counter-example.** A type that
+ * stops being produced keeps its row, because notifications already raised
+ * point at it `[12 §7]` — that is why this loop has no delete branch. `S91`
+ * removing `followup.digest` is a rule retiring a type, which is a migration's
+ * business and takes the nine rows with it; a seed run must never make that
+ * decision on its own.
  */
 
 process.loadEnvFile(".env");
@@ -45,8 +50,6 @@ export async function seedNotificationTypes(): Promise<void> {
       key: row.key,
       nameEn: row.nameEn,
       nameAr: row.nameAr,
-      tier: row.tier,
-      isPersistent: row.isPersistent,
     });
     inserted += 1;
   }

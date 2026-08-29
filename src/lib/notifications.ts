@@ -4,22 +4,25 @@
  * The tables have existed since migration `0000` and nothing has ever written
  * either. This module is the writer and the reader.
  *
- * **Two tiers, and they do different jobs `[07 E5]`.** Act-now is something
- * waiting on you and interrupts; digest is one daily summary of what went stale
- * and does not. Without the split, reps mute everything and miss what mattered.
+ * **This is a bell, and a bell carries news only, never work** `S92`. Six
+ * types, every one of them something that has already happened to the reader:
+ * a record assigned, a handover, a share granted, a mention, a decision that
+ * ended their work `S128`, a share of credit `S129`. Nothing here is waiting on
+ * anybody — what waits is on `S87`'s list, and the list is the notification.
  *
- * **Act-now is persistent and resolution is by condition, not by click**
- * `[07 G1]`, `[10 §10]`. A notification clears when the thing it points at is
- * done. `markRead` sets `read_at` and never `resolved_at` — reading is not
- * doing.
+ * **What `S91` deleted, and what it leaves.** Gone: the two tiers, the
+ * `is_persistent` flag, the per-anchor resolution conditions, the sweep that
+ * re-derived them, and the one daily `followup.digest` — which was the only
+ * type that ever carried work, and carried it as `S87`'s list said twice and a
+ * day late. What survives is the delivery core: `raise` inside the caller's
+ * transaction, `listNotifications`, `unreadCount` and `markRead`.
  *
- * **Persistence belongs only to a type whose condition can clear** `[21 §4]`.
- * `record.handed_over` is act-now and NOT persistent: it has no anchor and no
- * completion condition, so persistence would make it permanent. A badge the rep
- * can never clear is what makes the whole tier get ignored — the opposite of
- * what `07 G1` wanted from persistence. Every persistent type states its rule
- * for every anchor it can carry `[21 §3]`, and
- * `scripts/verify-phase10a.ts` §11 fails if one is missing.
+ * **The badge counts UNREAD, and that is a consequence of the deletion rather
+ * than a preference.** It counted unresolved act-now rows, and nothing writes
+ * `resolved_at` once the sweep is gone — the column and the query would have
+ * been a badge that could never reach zero. Reading is now the only disposal
+ * there is, which is what `21 §4` already said for a type with no condition to
+ * clear; every type is now that type.
  *
  * **The recipient filter is in this file, in every query's own `WHERE`.**
  * `00 §1.13` records v1's bug exactly: neither notifications page filtered by
@@ -33,24 +36,23 @@
  * rule about the audit log, which holds for the same reason wherever a row
  * names a record it does not gate.
  *
- * **The sweep is idempotent, runs under the system actor, and runs on read** —
- * the one function a scheduled job will call when Phase 12 adds one, with no
- * second code path. It took that shape from the quotation expiry sweep, which
- * `S67` deleted along with the state it wrote.
+ * **There is no sweep.** One ran on every read of `/notifications` — FACET has
+ * no scheduler and that was the commonest read — resolving conditions and
+ * writing the day's digest. It was written to be the one function a Phase 12
+ * job would call, and it took that shape from the quotation expiry sweep, which
+ * `S67` had already deleted along with the state it wrote. `S91` finished the
+ * pattern: **nothing in FACET writes because somebody looked at a screen.**
  *
- * **`S92`'s two added items — `S128` and `S129` — use only what `S91` keeps.**
- * `S91` deletes the tiers, the persistence flags, the per-anchor resolution
- * conditions and the daily digest (`SPEC §15`); what survives is the delivery
- * core — this module's `raise` inside the caller's transaction,
- * `listNotifications`, `unresolvedCount` and `markRead`. Neither new type has a
- * `RESOLUTION_RULES` row, a sweep branch, a digest date or an anchor, so
- * nothing they stand on is on that list, and the waiting-list slice cannot take
- * them with it (`WORKFLOW §5`). The two seeded rows do carry `tier` and
- * `is_persistent` — but that is seed DATA, and when those columns go the rows
- * stay and the news still reads.
+ * **`S92`'s two added items survived the deletion, which was the risk.**
+ * `decision.ended_work` `S128` and `credit.granted` `S129` were added in the
+ * slices before this one, and `WORKFLOW §5` recorded the danger outright — the
+ * deletion must not take them with it. Neither ever had a `RESOLUTION_RULES`
+ * row, a sweep branch, a digest date or an anchor, so neither stood on anything
+ * `S91` names. Their two seeded rows carried `tier` and `is_persistent` as DATA
+ * and nothing else; `0033` dropped the columns and the rows stayed.
  */
 
-import { and, count, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -62,10 +64,9 @@ import {
   quotationThreads,
   users,
 } from "@/db/schema";
-import { withAudit, type AuditActor, type AuditEntry } from "@/lib/audit";
+import { withAudit, type AuditEntry } from "@/lib/audit";
 import {
   canOpenRecord,
-  scopeForUser,
   visibleCommentsFilter,
   type AuthSession,
   type ViewableRecordType,
@@ -78,12 +79,6 @@ import {
   type NotificationTypeKey,
   type NotificationTypeName,
 } from "@/lib/enums";
-import { followUpsForRecipient, type FollowUpRow } from "@/lib/follow-ups";
-import { today } from "@/lib/reports";
-import { shiftDays } from "@/lib/working-days";
-
-/** `16 §3` — the sweep acts; whoever opened the screen did not. */
-const SYSTEM_ACTOR: AuditActor = { actorUserId: null, actingAsUserId: null };
 
 const PAGE_SIZE = 25;
 
@@ -271,37 +266,13 @@ export type NotificationRow = {
   /** Null when a row points at a type this build does not know — never thrown
    *  away, because `10 §10` lets a type be added as data. */
   typeName: NotificationTypeName | null;
-  tier: "act_now" | "digest";
-  isPersistent: boolean;
-  /**
-   * Is this still waiting on the reader? The one definition of the badge
-   * `[21 §4]`.
-   *
-   * `07 G1` makes an act-now entry persistent and undismissable, and `21 §4`
-   * states the exception in its own words: where no resolution condition can
-   * become true, *"`is_persistent` is false and **it can be dismissed**."* That
-   * sentence had no implementation — the badge counted every unresolved act-now
-   * row, `markRead` deliberately never touches `resolved_at`, and no sweep
-   * resolves a non-persistent type. So `record.handed_over` incremented the
-   * bell forever, and `mention.received` — the highest-volume type in FACET
-   * once it replaces WhatsApp — would have buried the tier within weeks.
-   *
-   * So: a persistent entry waits until its condition clears, and a
-   * non-persistent one waits until it is read. Reading is not doing, for a type
-   * whose condition can be done. For news there is nothing to do but read it.
-   */
-  waiting: boolean;
   anchorType: NotificationAnchorType | null;
   anchorId: string | null;
   /** Only set when the viewer may still open it `[20 §8.2]`. */
   anchorViewable: boolean;
   anchorLabel: string | null;
   payload: HandoverPayload | MentionPayload | DecisionPayload | CreditPayload | null;
-  digestDate: string | null;
-  /** How many follow-ups the digest covered, by kind. */
-  digestCounts: Record<string, number> | null;
   readAt: Date | null;
-  resolvedAt: Date | null;
   createdAt: Date;
 };
 
@@ -317,7 +288,6 @@ export type RaiseInput = {
   anchorType?: NotificationAnchorType;
   anchorId?: string;
   payload?: unknown;
-  digestDate?: string;
 };
 
 /**
@@ -326,10 +296,12 @@ export type RaiseInput = {
  * Takes the caller's `tx` so the notification and the act that caused it commit
  * together — a rep must never be told about an assignment that rolled back.
  *
- * The idempotence is the database's, not a read-then-write: `notifications_live_key`
- * for a persistent anchor and `notifications_digest_key` for a digest day, both
- * partial unique indexes, both resolved by `on conflict do nothing`. A sweep
- * that runs twice in the same second writes one row.
+ * **The `on conflict do nothing` has no index left to fire on, and stays.**
+ * `notifications_live_key` and `notifications_digest_key` were the two partial
+ * unique indexes behind it and both went with `S91`. Every raise now inserts,
+ * which is right for news — a second refusal is a second thing that happened.
+ * The clause is kept because the insert's uniqueness is the database's business
+ * and a future index must not need this call site rewritten.
  *
  * **A recipient who is inactive gets nothing.** Deactivation revokes access
  * immediately `[07 B7]`, and a notification is new work.
@@ -368,7 +340,6 @@ export async function raise(
       recordType: input.anchorType,
       recordId: input.anchorId,
       payload: input.payload ?? null,
-      digestDate: input.digestDate,
     })
     .onConflictDoNothing()
     .returning({ id: notifications.id });
@@ -390,270 +361,33 @@ export async function raise(
 }
 
 /* ------------------------------------------------------------------ *
- * The sweep `[16 §3]`
- * ------------------------------------------------------------------ */
-
-export type SweepResult = { resolved: number; digests: number };
-
-/**
- * Bring the notification table in step with the world, idempotently.
- *
- * Two steps, in order:
- *
- *  1. **Resolve**, by condition and nothing else `[07 G1]`, `[10 §10]`: every
- *     live `record.assigned` or `share.granted` whose recipient has since
- *     logged an interaction against the anchor's company `[21 §3]`, and every
- *     live notification whose share has been revoked.
- *  2. **Digest** — one `followup.digest` per recipient for the most recent
- *     COMPLETED day.
- *
- * **The sweep raises nothing, so `SweepResult` no longer counts it.** There was
- * a third step and a `quotation.expired` type until `S67`: one notification per
- * thread carrying `end_state = 'expired'`, resolved when the thread stopped
- * carrying it. Both halves stood on a state that no longer exists — validity is
- * a note, so nothing expires, and a bell that rings because a date passed is
- * exactly the gate `S67` denies. Assignment, sharing and mentions still raise;
- * they do it from their own call sites and never from here.
- *
- * **Resolution is re-derived here rather than written at the completing call
- * site**, which is what "by condition, not by click" actually asks for: the
- * sweep asks whether the condition holds now. It also keeps `reports.ts`
- * unaware of notifications — a report is a record of what happened, not a
- * notification mechanism, and the import would have been a cycle.
- *
- * **Why the digest is generated for yesterday and never today** `[20 §9]`:
- * *"Anything firing outward reads the day's settled state at end of day, not
- * the moment of entry, so a correction made minutes later cannot produce a
- * notification that should not have been sent."* A report corrected during a
- * day changes what that day's digest says, because the digest for that day is
- * not written until the day is over.
- */
-export async function sweepNotifications(): Promise<SweepResult> {
-  return withAudit(SYSTEM_ACTOR, async (tx, log) => {
-    const resolved =
-      (await resolveOnInteraction(tx, log)) +
-      (await resolveRevokedShares(tx, log));
-    const digests = await generateDigests(tx, log);
-    return { resolved, digests };
-  });
-}
-
-/**
- * `21 §3` — the recipient has since logged an interaction against the anchor's
- * company, which is what "worked it" means for an assignment or a share.
- *
- * One statement covering all three anchors a share can carry, in the same order
- * `RESOLUTION_RULES` lists them. A **first view is deliberately not** a
- * resolution: opening a record is a click by another name, and `07 G1` refuses
- * the click because *"a notification that can be swiped away is a notification
- * that gets swiped away."*
- *
- * `contact`, `quotation_version` and `dispatch` are absent because no
- * notification is ever raised for them — `visibleContactsFilter`,
- * `visibleDispatchesFilter` and `visibleRepReportsFilter` carry no share term,
- * so a share on one grants nothing and announcing it would be a permanent badge
- * over nothing `[21 §3]`.
- */
-async function resolveOnInteraction(
-  tx: Tx,
-  log: (entry: AuditEntry) => void,
-): Promise<number> {
-  const cleared = await tx
-    .update(notifications)
-    .set({ resolvedAt: new Date() })
-    .where(
-      and(
-        isNull(notifications.resolvedAt),
-        sql`${notifications.recordId} is not null`,
-        sql`${notifications.notificationTypeId} in (
-          select nt.id from notification_types nt
-           where nt.key in (${NOTIFICATION_TYPES.recordAssigned},
-                            ${NOTIFICATION_TYPES.shareGranted})
-        )`,
-        sql`exists (
-          select 1 from rep_reports r
-           where r.user_id = ${notifications.recipientUserId}
-             and r.entry_type = 'interaction'
-             and r.created_at > ${notifications.createdAt}
-             and (
-               (${notifications.recordType} = 'company'
-                  and r.company_id = ${notifications.recordId})
-               or (${notifications.recordType} = 'quotation_thread'
-                  and r.company_id = (select qt.company_id from quotation_threads qt
-                                       where qt.id = ${notifications.recordId}))
-               or (${notifications.recordType} = 'project'
-                  and exists (select 1 from project_companies pc
-                               where pc.project_id = ${notifications.recordId}
-                                 and pc.removed_at is null
-                                 and pc.company_id = r.company_id))
-             )
-        )`,
-      ),
-    )
-    .returning({ id: notifications.id });
-
-  for (const row of cleared) {
-    log({
-      action: "notification.resolved",
-      entityType: "notification",
-      entityId: row.id,
-      after: { reason: "interaction_against_company" },
-    });
-  }
-  return cleared.length;
-}
-
-/**
- * A `share.granted` whose share has been revoked is withdrawn `[21 §4]`.
- *
- * **This is not a second way for the grantee to clear it, and that is why it is
- * not in `RESOLUTION_RULES`.** That table is what the *recipient* can do, and
- * the notifications screen renders it to them as advice; "clears when somebody
- * revokes it" is not advice anyone can act on. §3's rule for all three anchors
- * is unchanged and untouched.
- *
- * What this fixes is a badge with no way out. `21 §3` gives `share.granted` one
- * condition — the grantee logs an interaction against the anchor's company —
- * and `createReport` requires `canViewRecord` on that company. Revoke the share
- * and the grantee, holding the record no other way, can no longer log it: the
- * persistent entry then sits in the tier forever. `21 §4` is explicit that a
- * type is persistent only where its condition *"can actually become true"*, and
- * that a badge the rep can never clear is what makes the whole tier get
- * ignored. So the sweep withdraws the announcement when the thing announced has
- * gone.
- *
- * **The condition is "granted and then revoked", not "holds no live share".**
- * The looser reading is the one to reach for and it is wrong twice over. It
- * would resolve any `share.granted` row with no `record_shares` row behind it
- * at all — which is exactly what `verify-phase10a.ts` §11 plants, deliberately,
- * to test `21 §3`'s rule without a producer. Those rows would then clear on the
- * first sweep and that script's *"an interaction resolves the project anchor"*
- * would go green whether or not `resolveOnInteraction` still worked. An
- * assertion that passes for the wrong reason is worse than one that fails.
- *
- * By condition, like its two neighbours: it asks what is true now, not what
- * happened. A share revoked and granted again before the sweep runs keeps its
- * entry, and so does a grantee holding the record through a second live share.
- */
-async function resolveRevokedShares(
-  tx: Tx,
-  log: (entry: AuditEntry) => void,
-): Promise<number> {
-  const cleared = await tx
-    .update(notifications)
-    .set({ resolvedAt: new Date() })
-    .where(
-      and(
-        isNull(notifications.resolvedAt),
-        sql`${notifications.recordId} is not null`,
-        sql`${notifications.notificationTypeId} = (
-          select nt.id from notification_types nt
-           where nt.key = ${NOTIFICATION_TYPES.shareGranted}
-        )`,
-        sql`exists (
-          select 1 from record_shares rs
-           where rs.record_type = ${notifications.recordType}
-             and rs.record_id = ${notifications.recordId}
-             and rs.shared_with_user_id = ${notifications.recipientUserId}
-             and rs.revoked_at is not null
-        )`,
-        sql`not exists (
-          select 1 from record_shares rs
-           where rs.record_type = ${notifications.recordType}
-             and rs.record_id = ${notifications.recordId}
-             and rs.shared_with_user_id = ${notifications.recipientUserId}
-             and rs.revoked_at is null
-        )`,
-      ),
-    )
-    .returning({ id: notifications.id });
-
-  for (const row of cleared) {
-    log({
-      action: "notification.resolved",
-      entityType: "notification",
-      entityId: row.id,
-      after: { reason: "share_revoked" },
-    });
-  }
-  return cleared.length;
-}
-
-/**
- * One digest per recipient for the most recent completed day.
- *
- * Every active user is asked, and each one's follow-ups are computed **in that
- * user's own scope** — `scopeForUser` — never the caller's. A user with nothing
- * open gets no row: a daily notification saying "nothing" is noise, and
- * `07 D6`'s rule against writing to satisfy a process applies to the system
- * too.
- */
-async function generateDigests(
-  tx: Tx,
-  log: (entry: AuditEntry) => void,
-): Promise<number> {
-  const digestDate = shiftDays(today(), -1);
-
-  const active = await tx
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.isActive, true));
-
-  let written = 0;
-  for (const user of active) {
-    const scope = await scopeForUser(user.id);
-    if (!scope) continue;
-
-    const rows = await followUpsForRecipient(scope);
-    if (rows.length === 0) continue;
-
-    const id = await raise(tx, log, {
-      typeKey: NOTIFICATION_TYPES.followUpDigest,
-      recipientUserId: user.id,
-      payload: { counts: countByKind(rows), total: rows.length },
-      digestDate,
-    });
-    if (id) written += 1;
-  }
-  return written;
-}
-
-function countByKind(rows: FollowUpRow[]): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const row of rows) counts[row.kind] = (counts[row.kind] ?? 0) + 1;
-  return counts;
-}
-
-/* ------------------------------------------------------------------ *
  * Reading — recipient-filtered, every time `[00 §1.13]`
  * ------------------------------------------------------------------ */
 
 /**
- * Act-now notifications still waiting on this person, for the nav badge.
+ * Unread news for this person, for the bell badge.
  *
- * The SQL twin of `NotificationRow.waiting` — read its comment for why the
- * second term exists. The two are one rule: a change to either is a change to
- * both.
+ * **Two terms, and no join.** It was four terms over a join on
+ * `notification_types` — act-now tier, unresolved, and persistent-or-unread —
+ * and `S91` deleted three of the columns those terms read. What is left is the
+ * only disposal a bell has: `21 §4` already gave reading to a type whose
+ * condition cannot clear, and since `S92` every type is news, so every type is
+ * that type.
+ *
+ * **Keeping `resolved_at` in this query would have been the worse half of the
+ * deletion.** Nothing writes it once the sweep is gone, so `resolved_at is
+ * null` is true of every row for ever and the badge could never reach zero —
+ * the undismissable badge `07 G1` was warned about, arrived at by removing the
+ * machinery that was supposed to cause it. The column goes in the same slice.
  */
-export async function unresolvedCount(session: AuthSession): Promise<number> {
+export async function unreadCount(session: AuthSession): Promise<number> {
   const [row] = await db
     .select({ total: count() })
     .from(notifications)
-    .innerJoin(
-      notificationTypes,
-      eq(notificationTypes.id, notifications.notificationTypeId),
-    )
     .where(
       and(
         eq(notifications.recipientUserId, session.user.id),
-        eq(notificationTypes.tier, "act_now"),
-        isNull(notifications.resolvedAt),
-        // `21 §4` — a type with no resolution condition "can be dismissed",
-        // and reading it is the only dismissal there is.
-        or(
-          eq(notificationTypes.isPersistent, true),
-          isNull(notifications.readAt),
-        ),
+        isNull(notifications.readAt),
       ),
     );
   return row?.total ?? 0;
@@ -666,7 +400,13 @@ export type NotificationList = {
 };
 
 /**
- * This person's notifications, newest first, act-now above digest.
+ * This person's news, newest first.
+ *
+ * **One list, in one order.** It used to sort unresolved rows above resolved
+ * ones before the date, so an act-now entry outranked a digest from the same
+ * hour `[07 E5]`. Both halves of that comparison are gone: there is no digest
+ * and nothing resolves. News is chronological, which is the only ranking a
+ * record of what happened can honestly have.
  *
  * The recipient term is written here rather than composed from `authz` on
  * purpose: it is an equality on one column, not a visibility question, and a
@@ -684,14 +424,10 @@ export async function listNotifications(
     .select({
       id: notifications.id,
       typeKey: notificationTypes.key,
-      tier: notificationTypes.tier,
-      isPersistent: notificationTypes.isPersistent,
       recordType: notifications.recordType,
       recordId: notifications.recordId,
       payload: notifications.payload,
-      digestDate: notifications.digestDate,
       readAt: notifications.readAt,
-      resolvedAt: notifications.resolvedAt,
       createdAt: notifications.createdAt,
     })
     .from(notifications)
@@ -700,12 +436,7 @@ export async function listNotifications(
       eq(notificationTypes.id, notifications.notificationTypeId),
     )
     .where(where)
-    .orderBy(
-      // Unresolved first, then newest. An act-now entry that is still waiting
-      // sits above a digest from the same hour `[07 E5]`.
-      sql`${notifications.resolvedAt} is not null`,
-      desc(notifications.createdAt),
-    )
+    .orderBy(desc(notifications.createdAt))
     .limit(PAGE_SIZE)
     .offset((page - 1) * PAGE_SIZE);
 
@@ -724,14 +455,10 @@ export async function listNotifications(
 type RawNotification = {
   id: string;
   typeKey: string;
-  tier: "act_now" | "digest";
-  isPersistent: boolean;
   recordType: string | null;
   recordId: string | null;
   payload: unknown;
-  digestDate: string | null;
   readAt: Date | null;
-  resolvedAt: Date | null;
   createdAt: Date;
 };
 
@@ -764,12 +491,6 @@ async function decorate(
     id: row.id,
     typeKey: row.typeKey,
     typeName: notificationTypeName(row.typeKey) ?? null,
-    tier: row.tier,
-    isPersistent: row.isPersistent,
-    waiting:
-      row.tier === "act_now" &&
-      row.resolvedAt === null &&
-      (row.isPersistent || row.readAt === null),
     anchorType,
     anchorId: row.recordId,
     anchorViewable,
@@ -778,10 +499,7 @@ async function decorate(
         ? await anchorName(anchorType, row.recordId)
         : null,
     payload: await decodePayload(session, row),
-    digestDate: row.digestDate,
-    digestCounts: digestCounts(row.payload),
     readAt: row.readAt,
-    resolvedAt: row.resolvedAt,
     createdAt: row.createdAt,
   };
 }
@@ -1064,7 +782,7 @@ async function creditPayload(
 
 /**
  * Where a record lives. The twin of `_components/anchors.ts`, which cannot be
- * imported here — it is a screen module, and this one is read by the sweep.
+ * imported here — it is a screen module, and this one is data-layer.
  */
 function recordHref(recordType: ViewableRecordType, id: string): string {
   if (recordType === "quotation_thread") return `/quotations/${id}`;
@@ -1074,23 +792,15 @@ function recordHref(recordType: ViewableRecordType, id: string): string {
   return `/companies/${id}`;
 }
 
-function digestCounts(value: unknown): Record<string, number> | null {
-  if (!value || typeof value !== "object") return null;
-  const counts = (value as Record<string, unknown>).counts;
-  if (!counts || typeof counts !== "object") return null;
-  const entries = Object.entries(counts as Record<string, unknown>).filter(
-    ([, n]) => typeof n === "number",
-  ) as [string, number][];
-  return entries.length > 0 ? Object.fromEntries(entries) : null;
-}
-
 /**
  * Mark one notification read.
  *
- * **Reading is not resolving** `[07 G1]`: `resolved_at` is untouched, so a
- * persistent entry stays in the badge until the condition clears. The recipient
- * term is in the `WHERE`, not checked beforehand — a mismatched id updates zero
- * rows rather than somebody else's `[00 §1.13]`.
+ * **Reading is the whole disposal now** `S91`. `07 G1` kept `resolved_at`
+ * untouched here so a persistent entry stayed in the badge until its condition
+ * cleared; there are no persistent entries and no conditions, so this is what
+ * takes a row out of `unreadCount`. The recipient term is in the `WHERE`, not
+ * checked beforehand — a mismatched id updates zero rows rather than somebody
+ * else's `[00 §1.13]`.
  */
 export async function markRead(
   session: AuthSession,
@@ -1149,42 +859,5 @@ export async function markAllRead(session: AuthSession): Promise<number> {
     return rows.length;
   });
 }
-
-/**
- * `21 §3` — the resolution rule for every persistent type and every anchor it
- * can carry, as data rather than prose.
- *
- * It exists so `verify-phase10a.ts` §11 can iterate it and fail when a
- * persistent type has an anchor with no rule: `21 §4` makes that a rule rather
- * than a hope, because an anchor with no reachable condition is a badge the rep
- * can never clear.
- */
-export const RESOLUTION_RULES: {
-  typeKey: NotificationTypeKey;
-  anchorType: NotificationAnchorType;
-  /** How the condition clears, as a translation key on the screen. */
-  rule: "interaction_against_company";
-}[] = [
-  {
-    typeKey: NOTIFICATION_TYPES.recordAssigned,
-    anchorType: "company",
-    rule: "interaction_against_company",
-  },
-  {
-    typeKey: NOTIFICATION_TYPES.shareGranted,
-    anchorType: "company",
-    rule: "interaction_against_company",
-  },
-  {
-    typeKey: NOTIFICATION_TYPES.shareGranted,
-    anchorType: "project",
-    rule: "interaction_against_company",
-  },
-  {
-    typeKey: NOTIFICATION_TYPES.shareGranted,
-    anchorType: "quotation_thread",
-    rule: "interaction_against_company",
-  },
-];
 
 export type { NotificationTypeKey };

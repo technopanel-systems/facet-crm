@@ -2,10 +2,14 @@ import { cache } from "react";
 
 import { requireSession } from "@/lib/authz";
 import { followUpScope } from "@/lib/follow-ups";
-import { unresolvedCount } from "@/lib/notifications";
+import { unreadCount } from "@/lib/notifications";
 
 /**
  * The two numbers the shell shows: the Today badge and the bell.
+ *
+ * **The bell's number is UNREAD since `S91`.** It was unresolved act-now rows,
+ * over a join and three terms; nothing writes `resolved_at` now, so that count
+ * could only ever have risen. Reading is the disposal.
  *
  * Wrapped in React `cache()` with **zero arguments**, so the layout and the
  * Today screen share one computation per request rather than deriving the same
@@ -27,9 +31,9 @@ import { unresolvedCount } from "@/lib/notifications";
  */
 export const shellCounts = cache(async () => {
   const session = await requireSession();
-  const [follow, unresolved] = await Promise.all([
+  const [follow, unread] = await Promise.all([
     followUpScope(session),
-    unresolvedCount(session),
+    unreadCount(session),
   ]);
-  return { session, follow, unresolved };
+  return { session, follow, unread };
 });

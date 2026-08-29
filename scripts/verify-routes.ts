@@ -135,6 +135,17 @@
  *      are asserted on the `dir` attribute, which is the same marker in both
  *      locales where the words are not.
  *
+ *  29. **The bell carries news only** `S91` `S92` — the two cards the tier
+ *      split rendered are asserted ABSENT on `/notifications`, and so is any
+ *      entry linking into `/follow-ups`, which was the daily digest's own link
+ *      and the one thing on that screen that ever pointed at WORK. Every
+ *      negative is guarded on a non-empty read of
+ *      `data-slot="notification-entry"` against the card's `data-total`, and
+ *      prints what it saw: *no digest card* means nothing on a page that
+ *      rendered nothing. This is the `NOT_COMMENTABLE` shape `27b` used for
+ *      the screens `S114` narrowed, at a second address — a deletion that
+ *      nothing asserts is a deletion that comes back.
+ *
  *  23. **Operability** `D20` — for every form this walk reaches, in either
  *      locale, as any of the three identities: each field the screen says its
  *      action requires is present as a **native, focusable control carrying
@@ -7010,6 +7021,77 @@ async function main(): Promise<void> {
           columns.every((column) => column.includes("min-w-60")),
         `${columns.filter((one) => one.includes("min-w-60")).length} of ` +
           `${columns.length} columns at 240px`,
+      );
+    }
+  }
+
+  /* ── 29 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n29. The bell carries news only — S91's machinery asserted ABSENT [S91], [S92]",
+  );
+  {
+    /**
+     * **A removal that nothing guards is a removal that comes back.** Session
+     * 24 took the two tiers, the daily digest and the per-anchor resolution
+     * conditions off `/notifications` `S91`; re-adding any of them would go
+     * green everywhere, because every other check on this screen asks what is
+     * present. So this asks what is not — the `NOT_COMMENTABLE` shape `27b`
+     * used for the screens `S114` narrowed.
+     *
+     * **Every negative here is guarded on a non-empty read** `CLAUDE.md`, and
+     * prints what it saw. `data-slot="notification-entry"` is the handle and
+     * `data-total` on the card is the scope, so *no digest card* cannot pass
+     * on a page that rendered nothing at all — which is the failure mode four
+     * of this suite's page-one reads shipped with.
+     */
+    const rep = jars["rep-a@example.test"];
+    for (const locale of ["en", "ar"] as const) {
+      const { body, status } = await get(rep, `/${locale}/notifications`);
+      check(`${locale}: /notifications answers 200`, status === 200, `got ${status}`);
+
+      const entries = (body.match(/data-slot="notification-entry"/g) ?? []).length;
+      const total = Number(attrOf(body, "notifications-news", "data-total") ?? "0");
+      check(
+        `${locale}: the bell has news to look at — saw ${entries} of ${total}`,
+        entries > 0 && total >= entries,
+        `${entries} entries, data-total ${total}`,
+      );
+      if (entries === 0) {
+        console.log(`  --    ${locale}: nothing on the bell; the negatives are skipped`);
+        continue;
+      }
+
+      // The two cards the tier split rendered. `07 E5` put act-now on the wide
+      // side and the digest on the narrow one; `S91` leaves one kind of thing.
+      for (const slot of ["notifications-act-now", "notifications-digest"]) {
+        check(
+          `${locale}: no ${slot} card — saw ${entries} entries to hold one [S91]`,
+          !body.includes(`data-slot="${slot}"`),
+        );
+      }
+      check(
+        `${locale}: one news card holds all ${entries} entries [S92]`,
+        (body.match(/data-slot="notifications-news"/g) ?? []).length === 1,
+      );
+
+      // **The digest's own link, which is the sharpest marker of the three.**
+      // A digest row rendered *"{total} follow-ups on {date}"* with a link into
+      // `/follow-ups` — the one thing on this screen that ever pointed at WORK.
+      // `S92` is *news only, never work*, so a bell that links into the working
+      // list has grown the thing this rule removed, whatever the card is called.
+      //
+      // **Scanned over the WHOLE page, not from the news card onward**, and
+      // that is the second version. The first sliced the body at
+      // `data-slot="notifications-news"`, which made it blind to anything
+      // rendered ABOVE that card — and when this section was fed its defect,
+      // two of the three negatives went red and this one stayed green on a
+      // planted `/follow-ups` link sitting in a planted act-now card. The rail
+      // carries no such link (`D49`: not a rail item), so the whole body is
+      // both safe to scan and the only scope that cannot be walked around.
+      check(
+        `${locale}: nothing on the bell links into the working list — saw ${entries} entries [S92]`,
+        !/href="\/(?:en|ar)\/follow-ups"/.test(body),
       );
     }
   }

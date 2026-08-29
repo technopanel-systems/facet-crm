@@ -56,7 +56,7 @@ export default async function AppLayout({
 
   const t = await getTranslations();
   // `19 §4` — the layout computes, the client component receives primitives.
-  const { session, follow, unresolved } = await shellCounts();
+  const { session, follow, unread } = await shellCounts();
 
   return (
     <div className="flex min-h-svh flex-col md:flex-row">
@@ -85,7 +85,7 @@ export default async function AppLayout({
               className="text-muted-foreground hover:bg-surface hover:border-line hover:text-foreground relative grid size-8 place-items-center rounded-lg border border-transparent transition-colors max-md:size-11"
             >
               <Bell className="size-4" aria-hidden />
-              {unresolved > 0 ? (
+              {unread > 0 ? (
                 <span
                   data-slot="bell-dot"
                   className="bg-brand border-canvas absolute end-1.5 top-1.5 size-2 rounded-full border-2"
@@ -93,7 +93,7 @@ export default async function AppLayout({
                 />
               ) : null}
               <span className="sr-only" dir="ltr">
-                {unresolved}
+                {unread}
               </span>
             </Link>
             <LocaleSwitcher />

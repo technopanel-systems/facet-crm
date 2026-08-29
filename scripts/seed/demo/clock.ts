@@ -91,8 +91,11 @@ export const NOT_SHIFTED: readonly (readonly [
   ["record_shares", "revoked_at", "nothing here revokes a share `S100`"],
   ["comments", "edited_at", "nothing here edits a comment `[25 §12]`"],
   ["notifications", "read_at", "nobody has read them"],
-  ["notifications", "resolved_at", "nothing resolves — `S91` deletes the machinery"],
-  ["notifications", "digest_date", "a day, not an instant"],
+  // `resolved_at` and `digest_date` were the next two rows until `0033`. This
+  // list said of the first "nothing resolves — `S91` deletes the machinery",
+  // written a slice early; `S91` has now deleted the columns as well, and the
+  // guard above is what named them the moment they went.
+
 ] as const;
 
 /** Refuse to run against a schema either list has drifted from. */

@@ -21,9 +21,11 @@
  * correction failure `20 §9`'s end-of-day rule exists to prevent. `tasks` stays
  * empty and `tasks.system_trigger` stays unused.
  *
- * **The only thing a follow-up ever raises is one digest notification per
- * recipient per day** — `src/lib/notifications.ts`, `07 E5`. Six kinds, still
- * one delivery: `21 §2`'s "five types and no sixth" is about deliveries.
+ * **A follow-up raises nothing at all** `S91`. It used to raise one
+ * `followup.digest` per recipient per day `[07 E5]`, and that type is deleted
+ * along with the tiers, the persistence flags and the sweep: *the list IS the
+ * notification*. Six kinds, no delivery. The bell beside it carries news only
+ * `S92` and never reads this file.
  *
  * **No predicate is written here.** Each source composes an existing filter
  * from `authz` — `visibleCompaniesFilter`, `ownProjectsFilter`,
@@ -55,7 +57,7 @@
  * `[20 §5]`; the company archived `[07 E6]` or a merge tombstone `[07 B5]`;
  * and a `reincluded` dormancy review inside one threshold period `[21 §7]`,
  * without which route 1 of `07 E6` does nothing and the company is back in
- * tomorrow's digest.
+ * tomorrow's list.
  *
  * **A follow-up date is about the RECORD** — *"I will get to this one then"*.
  * So it drops only rows whose own anchor carries the date. Suppressing a
@@ -602,7 +604,7 @@ async function projectStageUnchanged(
         // asks whose desk a record sits on, which since `S76` is a different
         // question from who may read it: the coordinator reads every project
         // and owns none, and the read filter here would put every rep's stale
-        // project on their waiting list and in their digest. No rule asks for
+        // project on their waiting list. No rule asks for
         // that. The two are asserted as a pair in `verify:slice3` §16.
         ownProjectsFilter(session),
         // **`end_state` carries only `'lost'` since `S31`**, so this reads
@@ -1216,23 +1218,6 @@ export async function followUps(
     counts,
     thresholds,
   };
-}
-
-/**
- * The same question asked **as** somebody else — what this user's own scope
- * holds, not the caller's.
- *
- * This is the recipient filter the daily digest needs, in the application
- * layer. `00 §1.13` records v1 doing the opposite: both notification pages
- * selected every row and left the filtering to RLS, which FACET does not have
- * `[03]`. Here the scope is built from the recipient's identity before a single
- * row is read.
- */
-export async function followUpsForRecipient(
-  scope: AuthSession,
-): Promise<FollowUpRow[]> {
-  const thresholds = await getFollowUpThresholds();
-  return gather(scope, thresholds);
 }
 
 /* ------------------------------------------------------------------ *

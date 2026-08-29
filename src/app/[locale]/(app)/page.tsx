@@ -60,9 +60,10 @@ const REQUEST_ROWS = 5;
  * outright as the block standing in for something else. News belongs to the
  * bell `S92`; work belongs to the list.
  *
- * **It does not call `sweepNotifications()`.** That is a write path and it stays
- * on `/notifications`, where it already lives. The home page is the commonest
- * read in the application and must not change how often the sweep runs.
+ * **There is no sweep to call any more.** `sweepNotifications()` lived on
+ * `/notifications` and ran on read because FACET has no scheduler; `S91` deleted
+ * the resolution conditions and the digest it existed to produce, so neither
+ * screen writes on a read now. This one never did.
  *
  * **It shows no coverage region** `[22 §6.5]`. `coverage()` filters `quietOnly`
  * after paginating, so it returns the quiet companies among the alphabetically

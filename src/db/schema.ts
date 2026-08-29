@@ -346,13 +346,12 @@ export const duplicateResolutionEnum = pgEnum("duplicate_resolution", [
   "false_flag",
 ]);
 
-/** `[07 E5]`, `[07 G1]` */
-export const notificationTierEnum = pgEnum("notification_tier", [
-  "act_now",
-  "digest",
-]);
-
-/* `notification_channel` was an enum here until `0027`. `[04 Q17, C3]` argued
+/* `notification_tier` was an enum here until `0033`. `07 E5` split delivery
+ * into act-now and digest; `S91` deletes the split outright — *the list IS the
+ * notification* — and `S92` leaves a bell carrying news only, which is one
+ * kind. Its one column, `notification_types.tier`, went with it.
+ *
+ * `notification_channel` was an enum here until `0027`. `[04 Q17, C3]` argued
  * the column should exist from day one "so adding a channel is a migration,
  * not a rewrite of every call site" — speculative generality, and no rule in
  * `SPEC.md` ever asked for a second channel. Both its columns went with it:
@@ -2361,8 +2360,13 @@ export const commentMentions = pgTable(
 
 /**
  * `10 §10` — type is a lookup, not an enum in code: the full trigger list
- * stays open, and adding a type must be data, not a migration. Each type
- * carries its tier and whether it is persistent.
+ * stays open, and adding a type must be data, not a migration.
+ *
+ * **`tier` and `is_persistent` were columns here until `0033`** `S91`, which
+ * deletes the two tiers and the persistence flag together. A row is now a key
+ * and its two names. `07 G1`'s undismissable act-now badge has no tier to sit
+ * in and no flag to set, and `21 §3`'s per-anchor resolution rules — the thing
+ * `is_persistent` existed to make safe — are gone with it.
  *
  * **`default_channel` was a third until `0027`**, and it is the clearest case
  * in the sweep of a column whose reader was itself dead: the one query that
@@ -2378,18 +2382,27 @@ export const notificationTypes = pgTable(
     key: text("key").notNull(),
     nameEn: text("name_en").notNull(),
     nameAr: text("name_ar").notNull(),
-    tier: notificationTierEnum("tier").notNull(),
-    /** Act-now notifications stay until the action is resolved `[07 G1]`. */
-    isPersistent: boolean("is_persistent").notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("notification_types_key").on(t.key)],
 );
 
 /**
- * `09 §9.1` — in-app only. Resolution is by condition, not by click
- * `[10 §10]`: `resolved_at` is written by the completing action, which is what
- * makes persistence safe rather than maddening `[07 G1]`.
+ * `09 §9.1` — in-app only, and since `S91` a **bell carrying news** `S92`:
+ * something that has already happened to the recipient, disposed of by being
+ * read and by nothing else.
+ *
+ * **`resolved_at` and `digest_date` were columns here until `0033`.**
+ * Resolution was by condition rather than by click `[10 §10]` and the sweep in
+ * `notifications.ts` wrote it; `S91` deletes the sweep, so nothing would have
+ * written the column and `resolved_at is null` would have been true of every
+ * row for ever — the badge that can never clear, arrived at by deleting the
+ * machinery meant to prevent it. `digest_date` keyed the one daily
+ * `followup.digest`, which is the type `S91` removes. **Both partial unique
+ * indexes went with them**: `notifications_digest_key` was one digest per
+ * recipient per day, and `notifications_live_key` was one live persistent row
+ * per anchor. News does not deduplicate — a second refusal is a second thing
+ * that happened.
  *
  * **There is no `channel` column** since `0027`. `[04 Q17, C3]` wanted one on
  * every row "from day one" so a second channel would be a migration rather
@@ -2412,6 +2425,11 @@ export const notifications = pgTable(
     notificationTypeId: uuid("notification_type_id")
       .notNull()
       .references(() => notificationTypes.id),
+    /**
+     * The anchor, **both halves or neither** — the CHECK below, `AUDIT 1 E2`.
+     * A mention carries no anchor and a handover carries none either; what
+     * cannot happen is a type carrying one and not the other.
+     */
     recordType: recordTypeEnum("record_type"),
     recordId: uuid("record_id"),
     /**
@@ -2421,31 +2439,24 @@ export const notifications = pgTable(
      * than one per record and this table has no title or body column by design.
      */
     payload: jsonb("payload"),
-    /**
-     * `[21 §10]` — the calendar day a digest summarises, and the key that makes
-     * generation idempotent under sweep-on-read. A stored column rather than an
-     * expression index because `(created_at AT TIME ZONE 'Asia/Riyadh')::date`
-     * is STABLE, not IMMUTABLE, and Postgres will not index it.
-     */
-    digestDate: date("digest_date"),
     readAt: timestamp("read_at", { withTimezone: true }),
-    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [
     index("notifications_recipient_idx").on(t.recipientUserId, t.createdAt),
-    /** One digest per recipient per day, however many times the sweep runs. */
-    uniqueIndex("notifications_digest_key")
-      .on(t.recipientUserId, t.notificationTypeId, t.digestDate)
-      .where(sql`${t.digestDate} is not null`),
     /**
-     * A persistent notification is raised at most once while unresolved
-     * `[07 G1]`. This is what makes re-deriving on every sweep safe rather than
-     * duplicating: the raise is an `on conflict do nothing`.
+     * The nullable pair is filled together or not at all `AUDIT 1 E2`.
+     *
+     * Three identically-shaped pairs elsewhere in this file each carry one of
+     * these and this pair did not, so the database allowed a half-filled row
+     * and `notifications/page.tsx` invented `?? "company"` and `?? ""` to
+     * render around it — a screen guessing at a record type. The guess is gone
+     * and this is what makes it unnecessary.
      */
-    uniqueIndex("notifications_live_key")
-      .on(t.recipientUserId, t.notificationTypeId, t.recordType, t.recordId)
-      .where(sql`${t.resolvedAt} is null and ${t.recordId} is not null`),
+    check(
+      "notifications_record_pair",
+      sql`(${t.recordType} is null) = (${t.recordId} is null)`,
+    ),
   ],
 );
 

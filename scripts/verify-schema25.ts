@@ -534,6 +534,37 @@ const SWEEP_DROPPED_INDEXES = [
   "audit_log_actor_idx",
 ];
 
+/**
+ * `S91` — *there are no notification tiers, no persistence flags, no per-anchor
+ * resolution conditions and no daily digest*. `0033`'s four columns.
+ *
+ * **`resolved_at` is the one worth naming**, because dropping it was not
+ * tidying. The sweep was its only writer and `S91` deletes the sweep; left in
+ * place, `resolved_at is null` would have been true of every row for ever and
+ * the bell's badge could never have reached zero — the undismissable badge
+ * `07 G1` invented persistence to avoid, reached by removing the machinery
+ * meant to prevent it. The badge counts UNREAD now, and `read_at` stays.
+ */
+const S91_DROPPED_COLUMNS = [
+  "notification_types.tier",
+  "notification_types.is_persistent",
+  "notifications.digest_date",
+  "notifications.resolved_at",
+];
+
+/**
+ * Both partial unique indexes, dropped with the columns their predicates read.
+ * `notifications_digest_key` was one digest per recipient per day;
+ * `notifications_live_key` was one live persistent row per anchor, which made
+ * re-deriving on every sweep idempotent rather than duplicating. **News does
+ * not deduplicate** — a second refusal is a second thing that happened — and
+ * `verify:phase10a` §10 asserts that directly, two assignments raising two.
+ */
+const S91_DROPPED_INDEXES = [
+  "notifications_digest_key",
+  "notifications_live_key",
+];
+
 /** Whole tables feature slice 6 dropped `[26 §2, §6]`. */
 const SLICE6_DROPPED_TABLES = ["product_colours", "activities", "tasks"];
 
@@ -717,6 +748,13 @@ async function main(): Promise<void> {
   for (const name of SWEEP_DROPPED_INDEXES) {
     check(`index ${name} is gone [0027]`, !liveIndexes.has(name));
   }
+  // `S91`'s two. These WOULD have fallen out of the column drops — Postgres
+  // takes an index with any column its predicate reads — so this asserts the
+  // migration's explicit DROPs rather than an implication, which is the same
+  // reason the four above are named.
+  for (const name of S91_DROPPED_INDEXES) {
+    check(`index ${name} is gone [S91]`, !liveIndexes.has(name));
+  }
   // The six on the tables a rule still wants are NOT dropped, and this is the
   // half that would go quiet if a later sweep took them by mistake.
   for (const name of [
@@ -801,6 +839,40 @@ async function main(): Promise<void> {
     )) as unknown as { typname: string }[];
     check(`type ${typeName} is gone [0027]`, dropped.length === 0);
   }
+
+  /* --- S91: the list is the notification, 0033 ----------------------- */
+
+  for (const key of S91_DROPPED_COLUMNS) {
+    check(`${key} is gone [S91]`, !columns.has(key));
+  }
+  const tierType = (await db.execute(
+    sql`select typname from pg_type where typname = 'notification_tier'`,
+  )) as unknown as { typname: string }[];
+  check(
+    "the notification_tier TYPE is dropped too, not merely unreferenced [S91]",
+    tierType.length === 0,
+  );
+
+  // **The half that would go quiet if a later sweep over-reached.** `read_at`
+  // is the whole disposal a bell has since `S91`, and `payload` carries every
+  // `S128` reason and `S129` share — a row `S112` deliberately shows without
+  // joining back to a record the reader may not open.
+  for (const key of ["notifications.read_at", "notifications.payload"]) {
+    check(`${key} SURVIVES — it is what a bell needs [S91], [S92]`, columns.has(key));
+  }
+
+  // `S92` names six types and the seventh must be absent. `verify:phase10a` §1
+  // makes the same claim against the seed; this makes it against the rows.
+  const digestType = (await db.execute(
+    sql`select key from notification_types where key = 'followup.digest'`,
+  )) as unknown as { key: string }[];
+  const typeCount = (await db.execute(
+    sql`select count(*)::int as n from notification_types`,
+  )) as unknown as { n: number }[];
+  check(
+    `followup.digest has no row — saw ${typeCount[0]?.n} types [S91], [S92]`,
+    (typeCount[0]?.n ?? 0) > 0 && digestType.length === 0,
+  );
 
   // `record_type` is the one the sweep rebuilt rather than dropped: six other
   // columns still carry it. `quotation_version` was the canonical dead value —
@@ -999,6 +1071,59 @@ async function main(): Promise<void> {
   // `rep_reports.reference`; section 2 asserts the column and its CHECK are
   // both gone. Signal references are untouched and live on
   // `rep_report_signals.reference`, which `S45` requires.
+
+  /**
+   * `AUDIT 1 E2` — **`notifications.record_type`/`record_id`, filled together
+   * or not at all**, `0033`. It was the one nullable pair in the schema with no
+   * pairing CHECK where three identically-shaped pairs each had one
+   * (`projects_loss_pair`, `quotation_threads`' closed pair,
+   * `dispatches_quotation_pair`), and the cost was on the screen:
+   * `notifications/page.tsx` reached for `?? "company"` and `?? ""` to render
+   * around a row the database had allowed to be half-filled. A screen guessing
+   * a record type is a link into the wrong record.
+   *
+   * **Both directions, because a one-sided CHECK is half a rule.** The insert
+   * borrows a live user and a live type rather than inventing ids, so a
+   * foreign key cannot be what refuses it — the constraint name is asserted,
+   * not merely the failure.
+   */
+  await databaseRefuses(
+    "a notification with a record type and no id is refused [AUDIT 1 E2]",
+    "notifications_record_pair",
+    `insert into notifications (recipient_user_id, notification_type_id, record_type, record_id)
+     select u.id, nt.id, 'company'::record_type, null
+       from users u, notification_types nt
+      where u.is_active = true and nt.key = 'record.assigned'
+      limit 1`,
+  );
+  await databaseRefuses(
+    "a notification with a record id and no type is refused [AUDIT 1 E2]",
+    "notifications_record_pair",
+    `insert into notifications (recipient_user_id, notification_type_id, record_type, record_id)
+     select u.id, nt.id, null, c.id
+       from users u, notification_types nt, companies c
+      where u.is_active = true and nt.key = 'record.assigned'
+      limit 1`,
+  );
+  // The positive half, so the two negatives above cannot be passing because
+  // the insert was malformed in some other way: the same statement with BOTH
+  // halves filled must land.
+  await allows(
+    "…and one carrying both halves is accepted [AUDIT 1 E2]",
+    async () => {
+      const landed = (await db.execute(
+        sql.raw(
+          `insert into notifications (recipient_user_id, notification_type_id, record_type, record_id)
+           select u.id, nt.id, 'company'::record_type, c.id
+             from users u, notification_types nt, companies c
+            where u.is_active = true and nt.key = 'record.assigned'
+            limit 1
+           returning id`,
+        ),
+      )) as unknown as { id: string }[];
+      if (landed.length !== 1) throw new Error(`inserted ${landed.length} rows`);
+    },
+  );
 
   /* --- 4. The seeds [25 §5, §33] --------------------------------------- */
 

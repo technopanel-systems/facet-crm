@@ -627,17 +627,20 @@ which is unique. The coordinator writes it when SMAC issues it — usually at
 once. **It is not a condition of approval**; a dispatch is approved, then
 numbered.
 
-**S122. [CHANGE]** A **refused dispatch request is archived**, not deleted, and
-kept out of the working lists once the rep has been told (S128). A rep sees
-their own; coordinators and managers see all. Only the coordinator may revive
-one, and a revived request is treated as new. A rep who wants to withdraw a
-submitted request asks the coordinator to refuse it — there is no separate act.
-A revived request returns to the **rep**, unsubmitted, and they edit and submit
-it as they would a new one (S125). All of that ships but the **timing**: a
-refused request leaves the working lists **at refusal**, which is now the same
-moment the rep is told (S128) rather than one the telling could gate. Whether
-being told should ever *gate* it is still open, and the alternative needs a read
-state, which S91 forbids.
+**S122.** A **refused dispatch request is archived**, not deleted, and kept out
+of the working lists **at refusal**. A rep sees their own; coordinators and
+managers see all. Only the coordinator may revive one, and a revived request is
+treated as new. A rep who wants to withdraw a submitted request asks the
+coordinator to refuse it — there is no separate act. A revived request returns
+to the **rep**, unsubmitted, and they edit and submit it as they would a new one
+(S125).
+
+**"Told" means sent, and the gate is nominal — the rule says so in its own
+words.** Refusal is the one moment: the request leaves the working lists and the
+bell is raised (S128, S92) in the same act, so there is nothing for the telling
+to gate. The alternative — archiving held open until the rep has *read* it —
+needs a read state on the news, which is the persistence machinery S91 forbids.
+It is therefore not open, and no dismissal is tracked.
 
 **S124.** **The coordinator refuses a dispatch request**, the same
 person who approves one. A refusal carries a reason and archives the request
@@ -753,24 +756,34 @@ submitted. What does not exist is the one list they join (S87).
 3. **Closed with a reason** — a project or quotation is **lost** (S43-S49); a
    dispatch request is **refused** (S124). Different vocabularies, same exit.
 
-An item leaving the list by refusal, rejection or cancellation is **shown to the
-person it was taken from as it leaves** (S128). Leaving the list is not the same
-as leaving without a word. All three exits work today on their own anchors. What
-does not exist is the single list they leave.
+An item leaving the list by refusal, rejection or cancellation is **told to the
+person it was taken from, on the bell** (S128, S92). Leaving the list is not the
+same as leaving without a word — but the telling is **news, not a second list
+item**: nothing is waiting on the person told, so nothing of theirs is left
+open. The record keeps its reason in the **archive** (S122), which is where it
+is looked up afterwards. Three surfaces, three jobs — the bell tells once, the
+archive holds permanently, and **nothing lingers on the working list**, because
+a refused row sitting in someone's list is a job that is not a job. All three
+exits work today on their own anchors. What does not exist is the single list
+they leave.
 
-**S91. [CHANGE]** **The list is the notification.** There are no notification
-tiers, no persistence flags, no per-anchor resolution conditions and no daily
-digest. If it is on the list it is waiting; if not, it is not.
+**S91.** **The list is the notification.** There are no notification tiers, no
+persistence flags, no per-anchor resolution conditions and no daily digest. If
+it is on the list it is waiting; if not, it is not.
 
-**S92. [CHANGE]** A **bell** carries news only, never work: *a rep was handed to
-you*, *you have been shared a record*. A handover raises one summary, not one
-per record. The news also carries **credit granted to you (S129)**, and **a
-decision that ended your work (S128)** — a refusal, a rejection, a cancellation.
-Both are news: nothing is waiting on the person told, so neither belongs on the
-list. All four items are raised today, and a handover raises one summary rather
-than one per record. **The narrowing to news only is what does not ship**: the
-digest still carries work, and it leaves with the rest of the machinery S91
-deletes.
+The bell's badge therefore counts **unread**, and reading is the only disposal
+there is. It counted unresolved entries, and nothing resolves any more — a
+count that could only ever rise is the badge nobody looks at, which is what
+persistence was invented to prevent.
+
+**S92.** A **bell** carries news only, never work: *a rep was handed to you*,
+*you have been shared a record*. A handover raises one summary, not one per
+record. The news also carries **credit granted to you (S129)**, and **a decision
+that ended your work (S128)** — a refusal, a rejection, a cancellation. Both are
+news: nothing is waiting on the person told, so neither belongs on the list.
+
+**Six items and no seventh.** The daily digest was the seventh and the only one
+that ever carried work; it left with the machinery S91 deletes.
 
 **S93.** **Friday and Saturday are the weekend for everyone.** Saturday work is
 recorded and never required.

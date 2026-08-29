@@ -378,7 +378,7 @@ export type DormancyOutcome = (typeof DORMANCY_OUTCOMES)[number];
  * and if a mention implies work, that work raises its own notification through
  * the normal path.
  *
- * **`S92`'s two added items are the seventh and eighth, and both are news.**
+ * **`S92`'s two added items are the fifth and sixth, and both are news.**
  * *A bell carries news only, never work* — *the news also carries credit
  * granted to you (`S129`), and a decision that ended your work (`S128`)*.
  * Nothing is waiting on the person told by either, which is the same sentence
@@ -393,12 +393,17 @@ export type DormancyOutcome = (typeof DORMANCY_OUTCOMES)[number];
  * of credit has already been given. There is nothing to do but read it. That is
  * also what keeps them clear of the persistence machinery `S91` deletes — see
  * the note above `DecisionPayload` in `src/lib/notifications.ts`.
+ *
+ * **`followup.digest` is gone `S91`.** It was the seventh, and the only one
+ * that carried WORK rather than news: one daily summary of what had gone stale,
+ * which is `S87`'s list said a second time and a day late. `S92` names six and
+ * this is the six. Nothing else left with it — the digest was the only type
+ * standing on a tier, a `digest_date` or a resolution condition.
  */
 export const NOTIFICATION_TYPES = {
   recordAssigned: "record.assigned",
   recordHandedOver: "record.handed_over",
   shareGranted: "share.granted",
-  followUpDigest: "followup.digest",
   mentionReceived: "mention.received",
   decisionEndedWork: "decision.ended_work",
   creditGranted: "credit.granted",
@@ -429,8 +434,10 @@ export function notificationTypeName(
  * they are one kind.
  *
  * Two are newer, and neither is a notification type — `21 §2`'s "five types
- * and no sixth" is about deliveries, and both of these reach the rep through
- * the one `followup.digest` that already summarises whatever is true:
+ * and no sixth" is about deliveries, and **a follow-up is not a delivery**: all
+ * six reach the rep by being ON the list `S91`, which is the whole of that
+ * rule. They used to reach him through one `followup.digest` as well, and that
+ * type is deleted:
  *
  *  - `quotation_returned` — returned for edits and not yet resubmitted, the
  *    gap `22 §6.11` recorded and held back until the slice-2 tag had been

@@ -165,7 +165,6 @@
       "recordAssigned": "Assigned to you",
       "recordHandedOver": "Work handed over to you",
       "shareGranted": "Shared with you",
-      "followUpDigest": "Daily follow-ups",
       "mentionReceived": "Mentioned you",
       "decisionEndedWork": "A decision ended your work",
       "creditGranted": "Credit shared with you"
@@ -989,27 +988,15 @@
   },
   "notifications": {
     "title": "Notifications",
-    "empty": "Nothing waiting for you.",
+    "empty": "No news yet.",
     "fields": {
-      "what": "What",
-      "about": "About",
-      "when": "When",
-      "status": "Status",
-      "waiting": "Waiting",
-      "done": "Done",
       "unread": "Unread"
     },
     "detail": {
-      "hint": "Things waiting on you stay here until they are done. A daily summary of what has gone quiet sits below them.",
-      "actNow": "Waiting on you",
-      "digest": "Daily summary",
-      "persistent": "This stays until the work is done — it cannot be dismissed.",
+      "hint": "What has happened to your work — a decision, a share, a mention. Anything still waiting on you is on Today.",
       "anchorHidden": "The record this points at is no longer yours to open.",
       "handover": "{name} handed over {companies} companies, {projects} projects and {threads} quotations.",
       "handoverUnknown": "Work was handed over to you.",
-      "digestSummary": "{total} follow-ups on {date}.",
-      "digestLink": "Open follow-ups",
-      "clearsInteractionAgainstCompany": "Clears when you log an interaction with the company.",
       "mention": "{name} mentioned you in a comment.",
       "mentionUnknown": "Somebody mentioned you in a comment.",
       "mentionLink": "Open the record",
