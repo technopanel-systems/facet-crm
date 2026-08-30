@@ -18,17 +18,30 @@ export function AccountActionForm({
   label,
   hint,
   variant,
+  slot,
 }: {
   action: (state: FormState) => Promise<FormState>;
   label: string;
   hint: string;
   variant: "destructive" | "secondary";
+  /**
+   * Which of the two this is, as a DOM marker. The label is translated and the
+   * class is styling, so neither identifies the form — and `verify:routes` §30
+   * has to POST the deactivation and never the reactivation, on a page that
+   * renders three forms `CLAUDE.md`. Named by the caller rather than derived
+   * from `variant`, so appearance never decides identity.
+   */
+  slot: "account-deactivate" | "account-reactivate";
 }) {
   const t = useTranslations();
   const [state, formAction, pending] = useActionState(action, emptyFormState);
 
   return (
-    <form action={formAction} className="flex flex-col items-start gap-3">
+    <form
+      action={formAction}
+      data-slot={slot}
+      className="flex flex-col items-start gap-3"
+    >
       <p className="text-muted-foreground text-start text-sm">{hint}</p>
       {state.error ? (
         <p role="alert" className="text-destructive text-start text-sm">

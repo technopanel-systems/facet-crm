@@ -154,7 +154,7 @@ shaped like `<namespace>.<key>` — that asserts no lookup silently failed.
 **Check laptop width first — 1366 and 1440 — then wide.** A wide viewport hides
 exactly the wrapping defects a laptop shows.
 
-**A check can pass for the wrong reason, and this has happened eight times.**
+**A check can pass for the wrong reason, and this has happened nine times.**
 Two shapes. **A wrong assertion:** `§17` once asserted the *inverse* of `D20` on
 its own markers, so it went green over the thing the rule forbids. **An
 assertion that reads nothing:** four page-one reads with no total guard, three
@@ -176,9 +176,12 @@ and `0028`–`0031` all carry hand-picked `when` values, so this is live rather
 than historical. **Confirm from `information_schema` or
 `drizzle.__drizzle_migrations`, never from the success line.**
 
-**Auth bridge:** re-run the session checks after any upgrade of `next-auth`,
-`@auth/core`, `@auth/drizzle-adapter` or `next` — failure is **silent**, login
-works but sessions stop being revocable.
+**Auth bridge:** re-run **`verify:routes` §30** — which signs in over HTTP,
+reads the `sessions` row its cookie names, and re-requests after a
+deactivation — after any upgrade of `next-auth`, `@auth/core`,
+`@auth/drizzle-adapter` or `next`; failure is **silent**, login works but
+sessions stop being revocable, and `verify:phase11` §6 cannot see it because
+it inserts the row it then watches disappear.
 
 ## Working style
 

@@ -225,6 +225,7 @@ export default async function UserDetailPage({
               {isSelf ? null : (
                 <AccountActionForm
                   action={deactivateUserAction.bind(null, user.id)}
+                  slot="account-deactivate"
                   label={t("team.actions.deactivate")}
                   hint={t("team.actions.deactivateHint")}
                   variant="destructive"
@@ -240,6 +241,7 @@ export default async function UserDetailPage({
               </Button>
               <AccountActionForm
                 action={reactivateUserAction.bind(null, user.id)}
+                slot="account-reactivate"
                 label={t("team.actions.reactivate")}
                 hint={t("team.actions.reactivateHint")}
                 variant="secondary"

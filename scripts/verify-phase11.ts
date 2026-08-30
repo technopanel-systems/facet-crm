@@ -4,9 +4,13 @@
  *
  * `scripts/verify-slice3.ts` is the pattern this copies, for the reason
  * `CLAUDE.md` records: the throwaway script that verified the auth checklist
- * was deleted, so its results cannot be reproduced. This one is **kept** — and
- * section 6 below is the first automated half of that checklist, which
- * `CLAUDE.md` calls the highest-value test in the repo to write.
+ * was deleted, so its results cannot be reproduced. This one is **kept**.
+ *
+ * **Section 6 is NOT the auth-bridge check, and used to read as though it
+ * were.** It proves `deactivateUser`'s SQL on a `sessions` row it inserts
+ * itself, which is worth keeping and is not the risk `CLAUDE.md` names. The
+ * bridge — *does signing in still create a database session row?* — can only
+ * be asked over HTTP, and lives in `verify:routes` §30. `WORKFLOW §5` `S44-1`.
  *
  * It drives `src/lib/authz.ts` and `src/lib/team.ts` in process — no browser,
  * no HTTP — and checks the things that are otherwise only claimed:
@@ -18,7 +22,8 @@
  *      duplicate email is a field message rather than a 500 `[11 §1]`.
  *   4. Edit, including the email `[19 §6]`, audited on changed keys only.
  *   5. Self-deactivation is refused `[19 §5]`.
- *   6. Deactivation kills a live session in the same transaction `[07 B7]`.
+ *   6. Deactivation's `DELETE`, and the impersonation release, on a session
+ *      row this script inserted itself `[07 B7]`, `[07 A6]` — not the bridge.
  *   7. Deactivation deletes nothing and is idempotent `[04 C2]`, `[12 §7]`.
  *   8. Reactivation restores the flag and restores NO session `[19 §7]`.
  *   9. Handover is shut while the account is active `[19 §3]`, and
@@ -457,10 +462,38 @@ async function main(): Promise<void> {
     managerStill.isActive === true,
   );
 
-  /* --- 6. Deactivation kills live sessions [07 B7], [11 §4.1] ------ */
+  /* --- 6. The DELETE and the impersonation release [07 B7], [07 A6] --- */
 
+  /**
+   * **What this proves, and what it cannot.**
+   *
+   * It proves that `deactivateUser` deletes the target's `sessions` rows in
+   * the same transaction as the flag flip, and that a session *impersonating*
+   * them is released rather than deleted `[07 A6]` — which nothing else in
+   * the tree asserts.
+   *
+   * **On a row it inserted itself.** That clause is the whole limit. This
+   * section never signs in, never issues a cookie and never makes a request,
+   * so it measures the `DELETE`, which was never the risk. The risk
+   * `CLAUDE.md`'s auth-bridge clause names is the `jwt.encode` override in
+   * `src/auth/index.ts` silently ceasing to mint a database session: login
+   * would keep working, the cookie would carry an unrevocable JWT, **and this
+   * section would stay green**, because the row it watches disappear is the
+   * row it planted. That is a check passing for the wrong reason — `WORKFLOW
+   * §5` `S44-1`, and `WORKFLOW §7`'s rule that a thing only partly proved says
+   * so in its own text.
+   *
+   * **The half this cannot see is `verify:routes` §30**, which signs in over
+   * HTTP, reads the `sessions` row the cookie names, proves the live session
+   * renders a real page, and asserts the very next request after a
+   * deactivation is refused `S101`.
+   */
   console.log(
-    "\n6. *** Deactivation kills a live session, in the same transaction ***",
+    "\n6. Deactivation's DELETE and the impersonation release, on a row this" +
+      " script INSERTED ITSELF — not the bridge [07 A6]",
+  );
+  console.log(
+    "      the bridge itself is verify:routes §30 — this cannot see it",
   );
 
   const victim = await createUser(manager, {
@@ -483,7 +516,7 @@ async function main(): Promise<void> {
     },
   ]);
   check(
-    "the victim has a live session before deactivation",
+    "the victim has a hand-inserted session row before deactivation",
     (await sessionCount(victim.id)) === 1,
   );
 

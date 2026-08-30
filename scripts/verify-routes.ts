@@ -185,6 +185,14 @@
  * Section 0 runs before all of them, and refuses a server that booted before
  * the build — the hole every one of the above passed straight through `[23]`.
  *
+ * **Section 30 is the one section that is not pure HTTP**, and it is the only
+ * check in the tree that touches the auth bridge `CLAUDE.md`. It signs in as a
+ * throwaway account it creates, reads the `sessions` row its cookie names,
+ * proves the live session renders a real page, deactivates through the real
+ * screen, and asserts the very next request is refused `S101`. Two SELECTs;
+ * every write goes over HTTP. See the note at the `@/db` import for why the
+ * black-box property was spent, and `WORKFLOW §5` `S44-1` for what it replaces.
+ *
  * **It replaces a script stage 1 wrote and threw away** `[23]`. A restyle that
  * 500s a screen is the redesign's failure mode, and the four checks cannot see
  * it: `typecheck` passed while a client component imported a data module, and
@@ -195,7 +203,10 @@
  *   DEV_FIXTURE_PASSWORD=… npm run verify:routes
  *
  * Needs `npm run db:seed` and `npm run dev:fixtures` first. Point it elsewhere
- * with `VERIFY_BASE_URL`.
+ * with `VERIFY_BASE_URL`. **`DATABASE_URL` must name the same database the
+ * server is using** — section 30 reads the `sessions` table the login it just
+ * performed wrote to, so two different databases would fail it for a reason
+ * that is not the bridge.
  *
  * **Assert on DOM markers, never on translated strings** `[23]`: next-intl
  * ships the whole catalogue to every page, so a string grep proves nothing —
@@ -211,6 +222,34 @@
  */
 
 import { readFileSync, statSync } from "node:fs";
+
+/**
+ * **This script was pure black-box HTTP, and §30 breaks that deliberately.**
+ *
+ * Every other section reaches the app the way a browser does and imports
+ * nothing from `@/`. §30 asks a question no browser can answer — *did signing
+ * in create a database session row?* — and that is the bridge itself rather
+ * than a proxy for it. A cookie that merely LOOKS like a uuid is the proxy;
+ * the row is the thing `CLAUDE.md`'s auth-bridge clause is about.
+ *
+ * **Four names, and the boundary is deliberate.** `db` is used for two SELECTs
+ * and nothing else — §30 does every WRITE over HTTP, through the real
+ * `/users/new` and `/users/[id]` forms, so the walk still drives screens.
+ * `@/lib/authz` is NOT imported: `createUser` and `deactivateUser` would have
+ * pulled the whole data layer in and skipped the screens a manager actually
+ * uses `S101`.
+ *
+ * **What it costs at module scope: nothing, and that was run rather than
+ * read.** `@/env`'s variables are lazy getters and `@/db` opens its pool on
+ * first use, so importing these with BOTH `AUTH_SECRET` and `DATABASE_URL`
+ * absent loads the graph, throws nothing and opens no connection — measured
+ * before this was written. `@/db` never reaches `src/auth/index.ts`, so no
+ * secret is demanded. What is spent is the property, not startup behaviour.
+ */
+import { eq } from "drizzle-orm";
+
+import { closeDatabase, db } from "@/db";
+import { sessions, users } from "@/db/schema";
 
 process.loadEnvFile(".env");
 
@@ -7096,6 +7135,362 @@ async function main(): Promise<void> {
     }
   }
 
+  /* ── 30 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n30. *** The auth bridge: a real login, then revoked, over HTTP *** [S101]",
+  );
+  {
+    /**
+     * **The check `verify:phase11` §6 cannot be.**
+     *
+     * §6 hand-inserts a `sessions` row with a made-up token, calls
+     * `deactivateUser` and asserts the row is gone — so it inserted the very
+     * row it then watches disappear. It proves the `DELETE` fires, which was
+     * never the risk. The risk `CLAUDE.md`'s auth-bridge clause names is the
+     * `jwt.encode` override in `src/auth/index.ts` silently ceasing to mint a
+     * database session: the cookie then carries a JWT that no deactivation can
+     * revoke, login still works, and **§6 stays green** because it never
+     * signed in. `WORKFLOW §5` `S44-1` — the ninth sighting of a check passing
+     * for the wrong reason, and the first on the gate deciding whether a
+     * sacked employee is still logged in.
+     *
+     * So this signs in for real and asks whether the very next request after a
+     * deactivation is dead.
+     *
+     * **Setup is reported apart from the claim, deliberately.** Creating the
+     * account and signing in are preconditions, not evidence. A `/users/new`
+     * failure has nothing to do with the bridge, and a red that reads as *"the
+     * bridge is broken"* when the fixture broke teaches the wrong thing — the
+     * same class of defect as a missing control. `setup()` carries its own
+     * prefix, and any setup failure abandons the section with **the bridge was
+     * NOT measured** rather than asserting on a broken fixture.
+     *
+     * **Nothing here touches the nine real accounts.** The subject is created
+     * for this run, is named `verifyroutes-<epoch>-bridge@example.test` so
+     * `cleanup:verify`'s pattern sweeps it, and ends deactivated `S111`.
+     */
+    const manager = jars["manager@example.test"];
+    const bridgeStamp = `verifyroutes-${Date.now()}`;
+    const bridgeEmail = `${bridgeStamp}-bridge@example.test`;
+    let victimId = "";
+
+    /**
+     * A precondition, reported as one. It still fails the run — a setup that
+     * silently skipped the claim would be a section that reads nothing, which
+     * is the other half of `CLAUDE.md`'s wrong-reason rule.
+     */
+    let setupBroke = "";
+    const setup = (step: string, ok: boolean, detail = ""): boolean => {
+      checks += 1;
+      if (ok) {
+        console.log(`  setup ${step}`);
+        return true;
+      }
+      failures += 1;
+      setupBroke = step;
+      console.log(`  SETUP FAILED at ${step}${detail ? ` — ${detail}` : ""}`);
+      return false;
+    };
+    const notMeasured = (why: string): void => {
+      console.log(
+        `  ----  THE BRIDGE WAS NOT MEASURED — ${why}. The assertions below did` +
+          " not run; this is not evidence about the bridge either way.",
+      );
+    };
+
+    /**
+     * **A database that cannot be reached is a broken fixture, never a broken
+     * bridge.** Without this, an unreachable database throws inside the
+     * `sessions` read and the section either crashes mid-claim or — worse —
+     * reports *"saw 0 rows, the bridge is DOWN"*, which is a live security
+     * verdict drawn from a connection error. Both SELECTs go through here so
+     * the failure can only ever be reported as setup.
+     */
+    const query = async <T>(
+      what: string,
+      run: () => Promise<T>,
+    ): Promise<T | null> => {
+      try {
+        return await run();
+      } catch (error) {
+        setup(`${what} — the database is unreachable`, false, String(error));
+        return null;
+      }
+    };
+
+    const measure = async (): Promise<void> => {
+      /* --- setup: a throwaway subject, created through the real form ---- */
+
+      // The subject takes rep-a's OWN `role_id` rather than a role matched by
+      // name: it is deterministic, needs no `roles` import, and guarantees the
+      // subject is exactly as privileged as the rep whose screens this walk
+      // already drives. One of the two SELECTs this section is allowed.
+      const repRow = await query("read rep-a's role", async () => {
+        const [row] = await db
+          .select({ roleId: users.roleId })
+          .from(users)
+          .where(eq(users.email, "rep-a@example.test"))
+          .limit(1);
+        return row;
+      });
+      if (repRow === null) return;
+      if (!setup("read rep-a's role", Boolean(repRow?.roleId))) return;
+
+      const form = await get(manager, "/en/users/new");
+      if (!setup("GET /en/users/new", form.status === 200, `got ${form.status}`))
+        return;
+
+      const creation = envelopeOf(form.body);
+      creation.set("name", `${bridgeStamp} Bridge Subject`);
+      creation.set("email", bridgeEmail);
+      creation.set("roleId", repRow.roleId);
+      // The fixture password, so the existing `login()` helper works unchanged.
+      creation.set("password", PASSWORD as string);
+      creation.set("region", "");
+      const created = await fetch(`${BASE}/en/users/new`, {
+        method: "POST",
+        headers: { cookie: header(manager), origin: BASE },
+        body: creation,
+        redirect: "manual",
+      });
+      store(manager, created);
+      const createdAt = created.headers.get("location") ?? "";
+      victimId = createdAt.match(/\/users\/([0-9a-f-]{36})/)?.[1] ?? "";
+      if (
+        !setup(
+          "POST /en/users/new",
+          created.status === 303 && Boolean(victimId),
+          `got ${created.status} ${createdAt}`,
+        )
+      )
+        return;
+
+      const jar = await login(bridgeEmail);
+      const cookieToken =
+        jar.get("__Secure-authjs.session-token") ??
+        jar.get("authjs.session-token") ??
+        "";
+      if (!setup("sign in over HTTP", cookieToken.length > 0, "no session cookie"))
+        return;
+
+      /* --- THE BRIDGE: is the cookie a database session row? ------------ */
+
+      // The second and last SELECT. **This is the bridge**, and it is why the
+      // zero-`@/` property was spent: a cookie that merely LOOKS like a uuid
+      // is a proxy for the claim, and the row is the claim.
+      const rows = await query("read the sessions table", () =>
+        db
+          .select({ token: sessions.sessionToken })
+          .from(sessions)
+          .where(eq(sessions.userId, victimId)),
+      );
+      if (rows === null) {
+        notMeasured("the sessions table could not be read");
+        return;
+      }
+      check(
+        `*** signing in wrote a database session row — saw ${rows.length} *** [S101]`,
+        rows.length === 1,
+        `${rows.length} rows — 0 means the jwt.encode bridge is DOWN and ` +
+          "sessions are not revocable",
+      );
+      check(
+        "*** ...and the cookie carries THAT row's token, not a JWT ***",
+        rows.some((row) => row.token === cookieToken),
+        `cookie ${cookieToken.length} chars — a uuid is 36, a JWT is far ` +
+          "longer and carries two dots",
+      );
+
+      /* --- THE CONTROL --------------------------------------------------- */
+
+      /**
+       * **The 200 is what makes the 307 below mean anything, and it must stay
+       * here.** A server refusing everything for the wrong reason — a dead
+       * port, a wrong base URL, a container that never booted — answers the
+       * post-deactivation request with a redirect too, and without this the
+       * section reads that clean sweep of refusals as a pass.
+       *
+       * **Same run, same server, same account, moments apart.** A 200 observed
+       * by an earlier section, or against a different container, does not
+       * license the conclusion: the only thing that changes between this and
+       * the assertion below is the deactivation. Do not "tidy" this out as
+       * redundant with §2's sign-in check — that is a different identity on a
+       * different jar at a different time.
+       *
+       * The fetch is wrapped so a connection error becomes a CONTROL failure
+       * rather than a crash: the section must be able to SAY the control did
+       * not hold.
+       */
+      const request = async (
+        path: string,
+      ): Promise<{ status: number; location: string; bytes: number; error: string }> => {
+        try {
+          const response = await fetch(`${BASE}${path}`, {
+            headers: { cookie: header(jar) },
+            redirect: "manual",
+          });
+          const body = await response.text();
+          return {
+            status: response.status,
+            location: response.headers.get("location") ?? "",
+            bytes: body.length,
+            error: "",
+          };
+        } catch (error) {
+          return { status: 0, location: "", bytes: 0, error: String(error) };
+        }
+      };
+
+      let controlHeld = true;
+      for (const locale of ["en", "ar"] as const) {
+        const seen = await request(`/${locale}`);
+        const held = seen.status === 200 && seen.bytes > 1000;
+        if (!held) controlHeld = false;
+        check(
+          `CONTROL ${locale}: the live session renders a real page — saw ` +
+            `${seen.status}, ${seen.bytes} bytes`,
+          held,
+          seen.error || `got ${seen.status} ${seen.location}`,
+        );
+      }
+      if (!controlHeld) {
+        notMeasured("the control did not hold, so a refusal below proves nothing");
+        return;
+      }
+
+      /* --- revoke, through the screen a manager actually uses ----------- */
+
+      const detail = await get(manager, `/en/users/${victimId}`);
+      // **By its `data-slot`, never by position or count.** The page renders
+      // three forms — Sign out, the theme toggle and this one — and the
+      // reactivation occupies the very same slot once the account is off, so
+      // "the only form" and "the last form" both eventually post the wrong
+      // thing. The first draft of this section counted, saw 3 where it
+      // expected 1, and stopped: that is why the marker exists.
+      const deactivateForm = accountForm(detail.body, "account-deactivate");
+      if (!setup("find the deactivate form by data-slot", Boolean(deactivateForm)))
+        return;
+
+      const revoked = await fetch(`${BASE}/en/users/${victimId}`, {
+        method: "POST",
+        headers: { cookie: header(manager), origin: BASE },
+        body: envelopeOf(deactivateForm as string),
+        redirect: "manual",
+      });
+      store(manager, revoked);
+      if (
+        !setup(
+          "POST the deactivation",
+          revoked.status === 200 || revoked.status === 303,
+          `got ${revoked.status}`,
+        )
+      )
+        return;
+
+      /* --- THE VERY NEXT REQUEST ---------------------------------------- */
+
+      /**
+       * **Two halves that prove different things, in an order that matters.
+       * This section learned both the hard way, by being fed its own defect.**
+       *
+       * Fed the `tx.delete(sessions)` in `deactivateUser` commented out, the
+       * redirect assertion below **stayed green**: `getSession` re-reads
+       * `is_active` on every request and refuses an inactive user whether or
+       * not the row died. So the redirect proves *the person is locked out*,
+       * never *the session was revoked*.
+       *
+       * **And the row count only proves it if it is read FIRST.**
+       * `authz.ts:222` deletes the user's sessions itself the moment it sees
+       * an inactive account — so a row count taken after the victim's next
+       * request measures that cleanup, not `deactivateUser`, and the second
+       * draft of this section went green on the defect for exactly that
+       * reason. The read below happens before the victim's jar touches the
+       * server again; the manager's POST does not disturb it, because
+       * `getSession` ran for the manager.
+       *
+       * Both are kept, in this order: the row is the cause, the redirect is
+       * the outcome a person experiences.
+       */
+      const left = await query("re-read the sessions table", () =>
+        db
+          .select({ token: sessions.sessionToken })
+          .from(sessions)
+          .where(eq(sessions.userId, victimId)),
+      );
+      if (left === null) {
+        notMeasured("the sessions table could not be re-read");
+        return;
+      }
+      check(
+        `*** deactivation revoked the row that real login wrote — saw ` +
+          `${left.length} of ${rows.length} *** [S101]`,
+        left.length === 0,
+        `${left.length} row(s) survived deactivation — the session was NOT ` +
+          "revoked, only the account flag was flipped",
+      );
+
+      // `S101` says *immediately*. `/en` is the very next request this jar
+      // makes after the deactivation; `/ar` follows it and additionally shows
+      // the refusal is locale-aware rather than a bare `/login`.
+      for (const locale of ["en", "ar"] as const) {
+        const seen = await request(`/${locale}`);
+        check(
+          `${locale}: the very next request is refused — saw ${seen.status} ` +
+            `${seen.location || "(no location)"} [S101]`,
+          (seen.status === 302 || seen.status === 303 || seen.status === 307) &&
+            seen.location.includes(`/${locale}/login`),
+          seen.error ||
+            `got ${seen.status} ${seen.location} — a 200 here means the person ` +
+              "is still being served, which is a live security defect",
+        );
+      }
+    };
+
+    try {
+      await measure();
+    } finally {
+      /**
+       * `S111` — the subject ends deactivated whatever happened above, so an
+       * early exit cannot leave a live loginable account behind.
+       *
+       * **It re-reads the page rather than re-posting blindly.** Once the
+       * account is inactive the detail screen renders the REACTIVATE form in
+       * the same and only slot, so a blind re-post of "the one form" would
+       * switch the account back on — the cleanup undoing the thing the section
+       * just proved. The handover link renders only on the inactive branch,
+       * which is the marker that tells the two apart.
+       */
+      if (victimId) {
+        const page = await get(manager, `/en/users/${victimId}`);
+        const stillOn = accountForm(page.body, "account-deactivate");
+        if (!stillOn) {
+          console.log("  --    the subject is deactivated [S111]");
+        } else {
+          await fetch(`${BASE}/en/users/${victimId}`, {
+            method: "POST",
+            headers: { cookie: header(manager), origin: BASE },
+            body: envelopeOf(stillOn),
+            redirect: "manual",
+          });
+          // **Re-read rather than announce.** Saying "deactivated now" on the
+          // strength of having posted is the same shape of claim this whole
+          // section exists to refuse.
+          const after = await get(manager, `/en/users/${victimId}`);
+          const off = !accountForm(after.body, "account-deactivate");
+          console.log(
+            `  --    the subject was left active by an early exit at ` +
+              `"${setupBroke || "an assertion"}" — ` +
+              (off
+                ? "deactivated now [S111]"
+                : "AND COULD NOT BE DEACTIVATED. Run npm run cleanup:verify [S111]"),
+          );
+          if (!off) failures += 1;
+        }
+      }
+    }
+  }
+
   /* ── 23 ──────────────────────────────────────────────────────────────── */
 
   console.log(
@@ -7204,6 +7599,21 @@ async function main(): Promise<void> {
   }
 }
 
+/**
+ * The `<form>` carrying one `data-slot`, whole, or null.
+ *
+ * `envelopeOf` needs the form's own `$ACTION` inputs and nobody else's, so the
+ * match is bounded at the first `</form>` after the marker. Used only by §30,
+ * where posting the wrong form would reactivate the account it just revoked.
+ */
+function accountForm(body: string, slot: string): string | null {
+  const at = body.indexOf(`data-slot="${slot}"`);
+  if (at === -1) return null;
+  const start = body.lastIndexOf("<form", at);
+  const end = body.indexOf("</form>", at);
+  return start === -1 || end === -1 ? null : body.slice(start, end + 7);
+}
+
 /** One `data-` attribute off the element carrying `data-slot="…"`. */
 function attrOf(body: string, slot: string, attr: string): string | null {
   const tag = body.match(new RegExp(`<[a-z]+[^>]*data-slot="${slot}"[^>]*>`));
@@ -7283,16 +7693,21 @@ function nameOf(body: string): string | undefined {
 }
 
 main()
-  .then(() => {
+  .then(async () => {
     console.log(
       failures === 0
         ? `\nAll ${checks} checks passed.`
         : `\n${failures} of ${checks} CHECK(S) FAILED.`,
     );
+    // §30 is the only section that opens a connection, and it opens one lazily
+    // on its first SELECT. Closing is tidiness rather than necessity — the
+    // explicit `process.exit` below ends the process either way.
+    await closeDatabase();
     process.exit(failures === 0 ? 0 : 1);
   })
-  .catch((error) => {
+  .catch(async (error) => {
     console.error(error);
+    await closeDatabase();
     process.exit(1);
   });
 

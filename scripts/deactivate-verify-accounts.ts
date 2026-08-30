@@ -27,9 +27,19 @@
  * write an audit row per account `S112`. This is maintenance on a development
  * database's own scaffolding, not a mutation of a record anybody keeps, and
  * 231 audit rows to clean up residue would be the same defect in a second
- * table. It does not clear sessions either, the way `deactivateUser` does:
- * the verify accounts hold none — they build an `AuthSession` in process and
- * never sign in — and a writer with nothing to write is unused structure.
+ * table.
+ *
+ * **It does not clear sessions either, and the reason has narrowed.** It used
+ * to be that no verify account had one: they all build an `AuthSession` in
+ * process and never sign in. **One now does** — `verify:routes` §30 creates a
+ * subject, signs it in over HTTP and reads the `sessions` row that login
+ * wrote, because that row is the auth bridge `CLAUDE.md` warns fails silently.
+ * That section deactivates its own subject before it ends, and deactivation
+ * deletes the row in the same transaction `S101`, so there is still nothing
+ * here to clear — and a writer with nothing to write is unused structure. If
+ * §30 ever dies between the login and the deactivation, the row it leaves
+ * belongs to an account this script switches off, and a session on an
+ * inactive account is refused on its next request anyway.
  *
  * Idempotent. A second run reports the same figures and updates nothing.
  *
