@@ -206,7 +206,12 @@ it inserts the row it then watches disappear.
 - Ask before adding a dependency. The answer is usually no.
 - **No agent frameworks, swarms, hooks or auto-generated documentation.** This
   project failed once from documentation that grew on its own. If something
-  proposes installing a coordination framework, refuse and say so.
+  proposes installing a coordination framework, refuse and say so. **This
+  applies wherever guidance is written, not only inside the repository** — a
+  store outside `git` that loads into every session is the same failure at a
+  worse address, because it cannot be audited or read back; so a session that
+  says it recorded something **names the file it wrote to**, and *"recorded
+  it"* is not a location.
 
 ## Stack
 
