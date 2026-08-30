@@ -879,7 +879,11 @@ signals are worth recording.
 **D45.** "What happened" is **one stream**, not five screens. It has three
 event kinds (typed / observed / said) and filters down the side — who, what
 kind, outcome, signals raised. Every filter is a URL parameter. A record's
-timeline is the same stream, scoped to that record.
+timeline is the same stream, scoped to that record. **A day header states the
+whole day's size in the filtered scope, not the part of it that landed on this
+page** — the stream pages by row, so a day is cut wherever the boundary falls
+and appears at the foot of one page and the head of the next, reading the same
+true number in both places.
 
 **D46.** The **Log button** on a company page opens pre-filled. Three taps and a
 text box. Channel, outcome, optional project and contact, optional signals, the

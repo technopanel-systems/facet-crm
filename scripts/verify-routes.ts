@@ -7963,6 +7963,218 @@ async function main(): Promise<void> {
     }
   }
 
+  /* ── 32 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n32. /activity — a day header counts the DAY, not the page it landed on [D45], [D24]",
+  );
+  {
+    /*
+     * **The defect needs a page boundary, so this section crosses one.**
+     * `stream.tsx` grouped the page it had been handed and printed each day's
+     * share of it, while `gather` sorts day-major — so a day cut by the
+     * boundary rendered TWICE, once at the foot of one page and once at the
+     * head of the next, and neither number was the day's `S45-3`.
+     *
+     * **Nothing checked this.** `§25` names `data-slot="stream-day"` four times
+     * and every one is a boolean `includes()` — *is there a day block at all*.
+     * It reads no day's number and crosses no boundary, so it stays green under
+     * the injection that catches this, which is the honest version of the
+     * artefact `7f51569` and `ce70523` built deliberately.
+     *
+     * **`data-day` and `data-count` exist for this section.** What renders is a
+     * locale-formatted date and a bare text node; `CLAUDE.md` asserts on
+     * markers, not translated strings, and the formatted date is not even the
+     * same string in `ar`.
+     */
+    const setup = (step: string, ok: boolean, detail = ""): boolean => {
+      checks += 1;
+      if (ok) {
+        console.log(`  setup ${step}`);
+        return true;
+      }
+      failures += 1;
+      console.log(`  SETUP FAILED at ${step}${detail ? ` — ${detail}` : ""}`);
+      return false;
+    };
+
+    // Read from the data module, never typed here — `§24`'s device.
+    const pageSize = Number(
+      readFileSync("src/lib/timeline.ts", "utf8").match(
+        /const TIMELINE_PAGE_SIZE = (\d+);/,
+      )?.[1] ?? "0",
+    );
+    setup(
+      "TIMELINE_PAGE_SIZE was read from timeline.ts, not copied into this script",
+      pageSize > 0,
+      `${pageSize}`,
+    );
+
+    /** The `<li data-slot="stream-day">` opening tags, in render order. */
+    const dayTags = (body: string) =>
+      [...body.matchAll(/<li\b[^>]*>/g)]
+        .map((m) => m[0])
+        .filter((tag) => tag.includes('data-slot="stream-day"'));
+    const dayOf = (tag: string) => tag.match(/data-day="([^"]*)"/)?.[1] ?? "";
+    const countOf = (tag: string) =>
+      Number(tag.match(/data-count="([^"]*)"/)?.[1] ?? "-1");
+    const totalOf = (body: string) =>
+      Number(
+        body.match(/data-slot="list-card"[^>]*data-total="(\d+)"/)?.[1] ?? "-1",
+      );
+    /**
+     * How many rows one day's block holds on this page — the segment from that
+     * day's own `<li>` up to the next day's, counting row markers. Rows carry
+     * no day of their own, so the structure is the only honest link.
+     */
+    const rowsForDay = (body: string, day: string): number => {
+      const at = body.indexOf(`data-day="${day}"`);
+      if (at === -1) return 0;
+      const rest = body.slice(at);
+      const next = rest.slice(1).indexOf('data-slot="stream-day"');
+      const block = next === -1 ? rest : rest.slice(0, next + 1);
+      return (block.match(/data-timeline-event=""/g) ?? []).length;
+    };
+
+    for (const locale of ["en", "ar"] as const) {
+      // The manager, whose stream is the widest — `§25` proves a rep's is a
+      // strict subset, so this is the identity most likely to span pages.
+      const jar = jars["manager@example.test"];
+      const first = await get(jar, `/${locale}/activity`);
+      if (
+        !setup(
+          `${locale}: /activity answers 200`,
+          first.status === 200,
+          `saw ${first.status}`,
+        )
+      )
+        continue;
+
+      const total = totalOf(first.body);
+      if (
+        !setup(
+          `${locale}: the stream's total and its day markers are readable`,
+          total > 0 && dayTags(first.body).length > 0,
+          `total ${total}, ${dayTags(first.body).length} day block(s)`,
+        )
+      )
+        continue;
+
+      if (!pageSize || total <= pageSize) {
+        console.log(
+          `  --    ${locale}: ${total} events at ${pageSize}/page is one page — no boundary to cross, NOT MEASURED`,
+        );
+        continue;
+      }
+
+      /* Walk the boundaries looking for a day that spans one. Day-major order
+         means a straddle can only ever be the last day of a page against the
+         first of the next, and there is at most one per boundary. */
+      const lastPage = Math.ceil(total / pageSize);
+      const bodies = new Map<number, string>([[1, first.body]]);
+      const bodyFor = async (page: number) => {
+        const held = bodies.get(page);
+        if (held !== undefined) return held;
+        const fetched = (await get(jar, `/${locale}/activity?page=${page}`))
+          .body;
+        bodies.set(page, fetched);
+        return fetched;
+      };
+
+      let straddle = "";
+      let cutPage = 0;
+      for (let page = 1; page < lastPage && !straddle; page += 1) {
+        const here = dayTags(await bodyFor(page));
+        const next = dayTags(await bodyFor(page + 1));
+        const tail = here.at(-1);
+        const head = next[0];
+        if (!tail || !head) continue;
+        if (dayOf(tail) && dayOf(tail) === dayOf(head)) {
+          straddle = dayOf(tail);
+          cutPage = page;
+        }
+      }
+
+      /* **NOT MEASURED, never `ok`.** A run where no day is cut cannot tell a
+         day count from a page count, and that is the whole claim. */
+      if (!straddle) {
+        console.log(
+          `  --    ${locale}: no day spans a boundary over ${lastPage} page(s) of ${total} — NOT MEASURED`,
+        );
+        continue;
+      }
+
+      const cutBody = await bodyFor(cutPage);
+      const nextBody = await bodyFor(cutPage + 1);
+      const statedHere = countOf(dayTags(cutBody).at(-1) as string);
+      const statedNext = countOf(dayTags(nextBody)[0] as string);
+      const rowsHere = rowsForDay(cutBody, straddle);
+      const rowsNext = rowsForDay(nextBody, straddle);
+
+      check(
+        `${locale}: *** a day split across pages reads the SAME count on both — saw ${straddle} ${statedHere} then ${statedNext} across pages ${cutPage}/${cutPage + 1} *** [D45]`,
+        statedHere > 0 && statedHere === statedNext,
+        `${lastPage} pages of ${total}`,
+      );
+
+      /* **The positive control.** A page-local count is `count === rows` on
+         every page and can never exceed the rows beneath it; a day count does,
+         the moment the boundary cuts the day. */
+      check(
+        `${locale}: *** the count is the DAY's size, not the page's — saw ${statedHere} over ${rowsHere} row(s) on page ${cutPage} *** [D45]`,
+        rowsHere > 0 && statedHere > rowsHere,
+        `day ${straddle}`,
+      );
+
+      /* Summed across the pages it spans, the day's own rows are the count.
+         Walk on while the day keeps appearing — it may span more than two. */
+      let spanned = rowsHere;
+      let page = cutPage + 1;
+      while (page <= lastPage) {
+        const body = await bodyFor(page);
+        const held = rowsForDay(body, straddle);
+        if (held === 0) break;
+        spanned += held;
+        page += 1;
+      }
+      check(
+        `${locale}: *** and that count is its rows summed across the pages it spans — saw ${spanned} of ${statedHere} *** [D45]`,
+        spanned > 0 && spanned === statedHere,
+        `${straddle} over pages ${cutPage}..${page - 1}`,
+      );
+
+      /*
+       * **There is deliberately NO cross-check against `?from=D&to=D` here,
+       * and the reason is worth more than the assertion was.** The first cut of
+       * this section asserted the day's count against that day's ranged total,
+       * on the assumption that narrowing to one day reads the same set. It does
+       * not: `companyAddedEvents` opens with
+       * `if (!scope.companyId && !range) return []`, so **the unranged stream
+       * omits `company_added` entirely** and the ranged one includes it.
+       * Measured on the reseeded database as the manager: unranged **299**
+       * events over five kinds, all-time ranged **426** over six, the whole
+       * difference being **127 `company_added`** and nothing else. The
+       * assertion was comparing two sets that differ by construction, and it
+       * went red on a correct fold — `S45-1`'s shape, caught before shipping
+       * because it was asserted apart from the three above rather than folded
+       * into them. `WORKFLOW §5 S45-7` carries whether hiding a third of the
+       * stream by default is intended; this section does not re-litigate it.
+       */
+
+      /* Nothing above read an empty page. */
+      const walked = [...bodies.values()].reduce(
+        (n, body) => n + (body.match(/data-timeline-event=""/g) ?? []).length,
+        0,
+      );
+      check(
+        `${locale}: the walk read rows on every page it fetched — saw ${walked} row(s) over ${bodies.size} page(s) of ${total} [D45]`,
+        walked > 0 && walked >= rowsHere + rowsNext,
+        `${bodies.size} fetched`,
+      );
+    }
+  }
+
+
   /* ── 23 ──────────────────────────────────────────────────────────────── */
 
   console.log(

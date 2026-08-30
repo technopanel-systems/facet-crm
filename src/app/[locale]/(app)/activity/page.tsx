@@ -230,6 +230,7 @@ export default async function ActivityPage({
                 <StreamList
                   events={stream.events}
                   subjects={stream.subjects}
+                  dayCounts={stream.dayCounts}
                 />
               </ListCard>
             )

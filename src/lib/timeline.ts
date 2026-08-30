@@ -922,6 +922,11 @@ export type Stream = {
   page: number;
   /** `event.key` -> the name of the record the event is about. */
   subjects: Map<string, string>;
+  /**
+   * `event.day` -> how many events that day holds **in the whole filtered
+   * scope**, never on the page `D45`. Folded before the slice `S45-3`.
+   */
+  dayCounts: Map<string, number>;
 };
 
 /** The raw strings `/activity` and the count route each arrive holding. */
@@ -1186,6 +1191,15 @@ async function filteredStream(
   return { events, subjects };
 }
 
+/** How many events each day holds, over whatever set it is given. */
+function tallyDays(events: TimelineEvent[]): Map<string, number> {
+  const days = new Map<string, number>();
+  for (const event of events) {
+    days.set(event.day, (days.get(event.day) ?? 0) + 1);
+  }
+  return days;
+}
+
 /**
  * One stream `D45`, paged `D24`.
  *
@@ -1193,6 +1207,26 @@ async function filteredStream(
  * yesterday, which is one report on the seeded database — a screen called a
  * stream that opens on two rows reads as broken. `from`/`to` are the
  * narrowing, and they are native date inputs `D20`.
+ *
+ * **`dayCounts` is folded BEFORE the slice, and that is the whole point**
+ * `S45-3`. `stream.tsx` used to count each day off the page it had been handed,
+ * so a day cut by the boundary reported only the part that landed — and since
+ * `gather` sorts day-major a split day renders twice, once at the foot of one
+ * page and once at the head of the next, with neither number the day's. Both
+ * now read the day's real size, which is what `/companies` §20 and
+ * `/dispatches` §24 already assert for a group header cut by a page.
+ *
+ * **One array, so the two cannot drift**: the page is `events.slice(...)` of
+ * the very array folded here, and `total` on the next line is the same array's
+ * length. Two computations kept in step by hand is what produced the defect.
+ *
+ * It also picks up every filter for free. Only `from`/`to` narrow the SQL —
+ * `who`, `kind`, `outcome`, `signal` and `q` are resolved in `filteredStream`
+ * over this array — so folding the post-filter set respects all seven without
+ * anyone having to remember to, which is `S45-5`'s trap closed by construction.
+ * A SQL `GROUP BY` could not do this: four of the filters never reach Postgres,
+ * and giving them a WHERE would be the second definition of the stream that the
+ * header of this file, `filteredStream` and `countStreamSince` all refuse.
  */
 export async function streamFor(
   session: AuthSession,
@@ -1207,6 +1241,7 @@ export async function streamFor(
     total: events.length,
     page,
     subjects,
+    dayCounts: tallyDays(events),
   };
 }
 

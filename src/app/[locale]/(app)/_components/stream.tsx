@@ -256,7 +256,13 @@ async function SelectField({
   );
 }
 
-/** One day's events, and how many of them there were. */
+/**
+ * The page's events, split into the day runs they belong to.
+ *
+ * **This decides which rows sit under which header, never the number** — the
+ * number is `dayCounts`, folded over the whole filtered scope before the slice
+ * `S45-3`. `/dispatches` splits its page the same way for the same reason.
+ */
 function groupByDay(events: TimelineEvent[]): [string, TimelineEvent[]][] {
   const days = new Map<string, TimelineEvent[]>();
   for (const event of events) {
@@ -276,20 +282,37 @@ function groupByDay(events: TimelineEvent[]): [string, TimelineEvent[]][] {
  * the count carries `dir="ltr"` `D62`, so `ms-*` puts its gap on the count's
  * outer edge and the number touches the date in Arabic. Three lists were fixed
  * of exactly this in session 28.
+ *
+ * **The count is the day's, not the page's** `S45-3`. It arrives from
+ * `streamFor`, folded before the slice, so a day cut by the page boundary reads
+ * its real size at the foot of one page and the head of the next rather than
+ * two halves that look like two days.
  */
 export async function StreamList({
   events,
   subjects,
+  dayCounts,
 }: {
   events: TimelineEvent[];
   subjects: Map<string, string>;
+  dayCounts: Map<string, number>;
 }) {
   const format = await getFormatter();
 
   return (
     <ul className="flex flex-col px-4 pt-1 pb-2">
       {groupByDay(events).map(([day, entries]) => (
-        <li key={day} data-slot="stream-day" className="flex flex-col">
+        <li
+          key={day}
+          data-slot="stream-day"
+          // **The raw day and the count, as attributes.** What renders is a
+          // locale-formatted date and a bare text node, and `CLAUDE.md` says a
+          // check asserts on markers rather than translated strings — the
+          // formatted date is not even the same string in `ar`. `S45-3`.
+          data-day={day}
+          data-count={String(dayCounts.get(day) ?? entries.length)}
+          className="flex flex-col"
+        >
           <p className="text-faint mt-3 mb-0.5 flex items-baseline gap-1.5 text-start text-[10.5px] font-semibold">
             {/* A calendar day in Riyadh, not an instant. */}
             <span className="num" dir="ltr">
@@ -300,7 +323,11 @@ export async function StreamList({
             </span>
             <span aria-hidden="true">·</span>
             <span className="num" dir="ltr">
-              {entries.length}
+              {/* The fallback is unreachable — the page is a subset of the set
+                  `dayCounts` was folded from — and it is `entries.length` so
+                  that a day could never render as a bare 0 if it ever became
+                  reachable. */}
+              {dayCounts.get(day) ?? entries.length}
             </span>
           </p>
           <ul className="flex flex-col">
