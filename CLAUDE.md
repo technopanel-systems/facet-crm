@@ -167,9 +167,28 @@ credibility exactly as a false green does, and it is the shape that gets a
 correct screen "fixed": `S45-1` opened with a founder decision to rewrite
 working code. So — **an assertion prints what it read** (`saw N of TOTAL`), **a
 negative guards on a non-empty read** first, and **a check spanning a paginated
-list asserts across the pages**, never on page one. A check nobody has seen fail
-has not been shown to work: feed it the defect and watch it go red, the way
-`§23` was fed the two shapes its own slice removed.
+list asserts across the pages**, never on page one.
+
+**And it prints the read on the GREEN line.** `check()` shows `detail` only on
+failure, so a number parked there is invisible exactly when the check claims to
+have worked, and a green line that carries nothing re-derivable looks identical
+to one that does. **So read your own passing output**: after a check goes green,
+read the green line and ask whether somebody else could re-derive the claim from
+it. If they could not, the number is in the wrong argument. `§24`'s rewrite
+shipped that way for a whole run — four correct numbers, all of them in
+`detail`, all invisible — and it was caught by reading the output rather than
+the code.
+
+A check nobody has seen fail has not been shown to work: feed it the defect and
+watch it go red, the way `§23` was fed the two shapes its own slice removed.
+**Two injections, and the second proves the more valuable half.** Breaking the
+thing under test and watching red is necessary but weak evidence — a suite goes
+red for many reasons. Removing the check's *precondition* and watching the
+section **decline to report** is the harder proof, because it shows the section
+will not quietly report something safe when it cannot measure. `§24` was fed
+both: a page-local count turned 6 of 1680 red, and a scope shrunk to one page
+printed `NOT MEASURED`, ran **zero** of its five assertions and moved the total
+1680 → 1672 — a drop a reader can check.
 
 **Three things a new check does by default**, each of which caught something on
 its first outing. **Prove a cost or import claim by RUNNING it** — reading that
