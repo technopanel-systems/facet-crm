@@ -5015,21 +5015,140 @@ async function main(): Promise<void> {
         );
       }
 
-      /* `D24` — a group header carries its count, and the count is the whole
-       * scope's. Page one of a 37-quiet scope shows 25 quiet rows under a
-       * header reading 37; a header counting the page would read 25 and be
-       * wrong on every page but the last. */
-      const groupCount = one.body.match(
-        /data-slot="company-group"[^>]*data-group="quiet"[^>]*data-count="([^"]*)"/,
+      /*
+       * `D24` — a group header carries its count, and the count is the whole
+       * scope's.
+       *
+       * **This asserted `header >= quietOnPage` until `S45-4`, and that could
+       * not fail on the defect its own comment claimed to catch.** A header
+       * counting the PAGE reads *exactly* `quietOnPage` — rep-a's page one is
+       * 25 quiet rows under a header reading 37, and a page-local count would
+       * read 25, so the assertion compared `25 >= 25` and went green. It was
+       * green on the defect and green on the correct screen alike, and had
+       * never been seen to fail. **Measured, not argued:** with the count
+       * folded off the page's own rows the old line stayed green while the
+       * four below went red. That is `CLAUDE.md`'s *an assertion that reads
+       * nothing*, the eleventh sighting — the same named shape, not a new one.
+       *
+       * The shape below is `§24`'s, deliberately not a second one.
+       *
+       * **`/companies`' two piles PARTITION the scope** — `companies.ts`
+       * returns `touched: total - quiet` off one filtered aggregate — so the
+       * sum-to-total assertion applies here exactly as it does on
+       * `/dispatches`, rather than being forced onto a screen it does not fit.
+       *
+       * **Cost, chosen and not overlooked:** one GET per page per locale, 8 at
+       * rep-a's 180 companies, growing with verify residue. Pages one and two
+       * are already in hand above, so the walk pays for `lastPage - 2` of them.
+       */
+      const pageSize = Number(
+        readFileSync("src/lib/companies.ts", "utf8").match(
+          /const PAGE_SIZE = (\d+);/,
+        )?.[1] ?? "0",
       );
-      const quietOnPage = quietFlags.filter((f) => f === "true").length;
-      if (!groupCount) {
-        console.log(`  --    ${locale}: rep-a has no quiet group`);
+      const totalOf = (body: string) =>
+        Number(
+          body.match(/data-slot="list-card"[^>]*data-total="(\d+)"/)?.[1] ??
+            "-1",
+        );
+      const scopeTotal = totalOf(one.body);
+
+      // **Setup reported apart from the claim** `CLAUDE.md`. A scope that fits
+      // one page cannot show the difference between a scope count and a page
+      // count, so it is NOT MEASURED — never a quiet `ok`.
+      if (!pageSize || scopeTotal < 0) {
+        console.log(
+          `  SETUP FAILED at ${
+            !pageSize ? "PAGE_SIZE in src/lib/companies.ts" : "data-total"
+          } — ${locale}: the group counts are NOT MEASURED`,
+        );
+      } else if (scopeTotal <= pageSize) {
+        console.log(
+          `  --    ${locale}: one page of ${scopeTotal} at ${pageSize}/page — scope-vs-page NOT MEASURED`,
+        );
       } else {
+        const lastPage = Math.ceil(scopeTotal / pageSize);
+        const seen = new Map<string, Set<number>>();
+        const totals = new Set<number>();
+        let rowsWalked = 0;
+        let outran = "";
+        for (let p = 1; p <= lastPage; p += 1) {
+          const body =
+            p === 1 ? one.body : p === 2 ? two.body : (
+              await get(jar, `/${locale}/companies?page=${p}`)
+            ).body;
+          totals.add(totalOf(body));
+          // A row's pile is its `data-quiet` flag — the same marker the order
+          // assertions above read, so a run and a header cannot disagree about
+          // what a pile is.
+          const flags = [
+            ...body.matchAll(
+              /data-slot="silence-meter"[^>]*data-quiet="([^"]*)"/g,
+            ),
+          ].map((m) => m[1]);
+          rowsWalked += flags.length;
+          const headerTags = [...body.matchAll(/<tr\b[^>]*>/g)]
+            .map((m) => m[0])
+            .filter((tag) => tag.includes('data-slot="company-group"'));
+          for (const tag of headerTags) {
+            const group = tag.match(/data-group="([^"]*)"/)?.[1] ?? "";
+            const stated = Number(tag.match(/data-count="([^"]*)"/)?.[1] ?? "-1");
+            const counts = seen.get(group) ?? new Set<number>();
+            counts.add(stated);
+            seen.set(group, counts);
+            const run = flags.filter(
+              (f) => (group === "quiet") === (f === "true"),
+            ).length;
+            if (!outran && stated > run) {
+              outran = `${group} read ${stated} over a run of ${run} on page ${p}`;
+            }
+          }
+        }
+        const read = [...seen]
+          .map(([group, counts]) => `${group} ${[...counts].join("|")}`)
+          .join(" · ");
+        const summed = [...seen.values()].reduce(
+          (n, counts) => n + Math.max(...counts),
+          0,
+        );
+
+        // **The read goes in the LABEL, not `detail`** — `check()` prints
+        // `detail` only on failure, so a number parked there is invisible
+        // exactly when the check claims to have worked `CLAUDE.md`.
         check(
-          `${locale}: the group header counts the SCOPE, not the page [D24]`,
-          Number(groupCount[1]) >= quietOnPage,
-          `header ${groupCount[1]} · page ${quietOnPage}`,
+          `${locale}: the walk read every row of the scope — walked ${rowsWalked} of ${scopeTotal} over ${lastPage} pages [D24]`,
+          seen.size > 0 && rowsWalked === scopeTotal,
+          `${seen.size} groups`,
+        );
+        // **The positive control, and the whole reason for `S45-4`.** A
+        // page-local count is `count === run` on every page and can never
+        // outrun its own page; a scope count does, the moment a group is cut
+        // by the page boundary. `>=` could not tell those apart.
+        check(
+          `${locale}: *** a header outruns its page — the count is the SCOPE's, not the page's — saw ${
+            outran || "nothing outran its page"
+          } *** [D24]`,
+          rowsWalked > 0 && outran !== "",
+          `over ${lastPage} pages`,
+        );
+        check(
+          `${locale}: *** a group's count is the same on every page it appears on — saw ${
+            read || "no group header rendered"
+          } *** [D24]`,
+          seen.size > 0 && [...seen.values()].every((c) => c.size === 1),
+          `over ${lastPage} pages`,
+        );
+        check(
+          `${locale}: *** the group counts sum to the card's own total, over the whole scope — saw ${read} = ${summed} of ${scopeTotal} *** [D24]`,
+          seen.size > 0 && summed === scopeTotal,
+          `over ${lastPage} pages`,
+        );
+        check(
+          `${locale}: the card's own total does not move between pages — saw ${[
+            ...totals,
+          ].join("|")} over ${lastPage} pages [D24]`,
+          totals.size === 1,
+          `${seen.size} groups`,
         );
       }
 

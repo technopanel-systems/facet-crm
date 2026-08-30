@@ -154,15 +154,15 @@ shaped like `<namespace>.<key>` — that asserts no lookup silently failed.
 **Check laptop width first — 1366 and 1440 — then wide.** A wide viewport hides
 exactly the wrapping defects a laptop shows.
 
-**A check can be wrong in the direction that matters, and this has happened ten
-times.** Three shapes. **A wrong assertion:** `§17` once asserted the *inverse*
-of `D20` on its own markers, so it went green over the thing the rule forbids.
-**An assertion that reads nothing:** four page-one reads with no total guard,
-three of them negatives, all correct only because the fixture rows happened to
-be newest. **And the mirror — a check that FAILS for the wrong reason:** `§24`
-summed one page's group headers against the whole scope's total, an equality
-that stops holding the moment a pile falls off page one, and went red on a
-screen that had been correct all along. A wrong red burns the suite's
+**A check can be wrong in the direction that matters, and this has happened
+eleven times.** Three shapes. **A wrong assertion:** `§17` once asserted the
+*inverse* of `D20` on its own markers, so it went green over the thing the rule
+forbids. **An assertion that reads nothing:** four page-one reads with no total
+guard, three of them negatives, all correct only because the fixture rows
+happened to be newest. **And the mirror — a check that FAILS for the wrong
+reason:** `§24` summed one page's group headers against the whole scope's total,
+an equality that stops holding the moment a pile falls off page one, and went
+red on a screen that had been correct all along. A wrong red burns the suite's
 credibility exactly as a false green does, and it is the shape that gets a
 correct screen "fixed": `S45-1` opened with a founder decision to rewrite
 working code. So — **an assertion prints what it read** (`saw N of TOTAL`), **a
