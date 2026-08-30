@@ -88,10 +88,16 @@ build task. `SPEC.md` supersedes all of them.
   not `text-left`. The convention that rots fastest if unenforced.
   **But a logical margin resolves against the element's OWN direction**, so
   `ms-auto` on a run carrying `dir="ltr"` compiles to `margin-left` and lands
-  on the wrong side in Arabic. Three sightings — the rail, `/companies`, the
-  board — each fixed by moving the margin onto a neighbour that carries no
-  `dir`, or by using a `gap`, which has no side to get wrong. A logical
-  utility is not protection when something nearby sets a direction.
+  on the wrong side in Arabic. **Four sightings — the rail, `/companies`, the
+  board, the filter chip — and what they share is a POSITION, not a string:**
+  any `ms-*` or `me-*` on an element that itself carries `dir`. They were
+  `ms-auto` twice, `ms-2` once and `ms-1.5` once, so a sweep grepping the one
+  utility named here finds under half of them. **Where a flex parent already
+  supplies a `gap`, delete the margin** — it is a second spacing mechanism
+  stacked on a working one, and that is the smaller fix; where it is
+  load-bearing, the rail and the board, move it onto a neighbour that carries
+  no `dir`. A logical utility is not protection when something nearby sets a
+  direction.
 - **A Tailwind class that compiles to nothing fails no check.** Tailwind scans
   the SOURCE TEXT, so a bare `/` inside an arbitrary value reads as the opacity
   modifier and an escaped quote reaches the stylesheet as a literal backslash —
