@@ -6320,6 +6320,60 @@ async function main(): Promise<void> {
       check(`${locale}: the stream has rows to reason about`, all > 0, `${all}`);
 
       /*
+       * **The default stream holds every kind, not most of them** `S45-7`.
+       * `companyAddedEvents` used to return nothing unless scoped or ranged, so
+       * `/activity` silently dropped a whole source — and nothing here could
+       * see it, because `D45`'s three kinds fold five of the six into
+       * `observed` and the partition below balances either way.
+       *
+       * **Asserted as a SET against the ranged read, not as a presence test.**
+       * `company_added` is there is a boolean that goes green again the day a
+       * guard comes back for a different kind; *unranged holds what ranged
+       * holds* keeps working whichever source goes missing. `data-event-kind`
+       * exists on the row for this.
+       */
+      /**
+       * The kinds present over the first few pages of a query.
+       *
+       * **Sampled over pages, not read off page one.** The first cut read page
+       * one alone and printed `[comment,dispatched]` — a green line stating
+       * that the stream holds two kinds, which is false and which a reader
+       * would have re-derived wrongly. `CLAUDE.md` says to read your own
+       * passing output; this is what that caught.
+       */
+      const SAMPLE_PAGES = 6;
+      const kindsOver = async (query: string) => {
+        const found = new Set<string>();
+        for (let page = 1; page <= SAMPLE_PAGES; page += 1) {
+          const { body } = await get(
+            jar,
+            `/${locale}/activity${query}${query ? "&" : "?"}page=${page}`,
+          );
+          const seen = [...body.matchAll(/data-event-kind="([^"]+)"/g)];
+          if (seen.length === 0) break;
+          for (const m of seen) found.add(m[1]);
+        }
+        return [...found].sort();
+      };
+      const RANGE = "?from=2000-01-01&to=2099-12-31";
+      const ranged = await get(jar, `/${locale}/activity${RANGE}`);
+      const rangedTotal = totalOf(ranged.body);
+      const unrangedKinds = await kindsOver("");
+      const rangedKinds = await kindsOver(RANGE);
+      check(
+        `${locale}: *** the default stream holds every kind an all-time range holds — saw ${all} over [${unrangedKinds.join(",")}] against ranged ${rangedTotal} over [${rangedKinds.join(",")}], ${SAMPLE_PAGES} pages each *** [D45]`,
+        unrangedKinds.length > 0 &&
+          unrangedKinds.join(",") === rangedKinds.join(",") &&
+          all === rangedTotal,
+        "a source arriving only when ranged is invisible to the three-kind partition",
+      );
+      check(
+        `${locale}: …and company_added is one of them — saw [${unrangedKinds.join(",")}] [D45], [S41]`,
+        unrangedKinds.includes("company_added"),
+        `${unrangedKinds.length} kind(s) over ${SAMPLE_PAGES} pages — re-run \`npm run seed:demo\` if the fixture is thin`,
+      );
+
+      /*
        * **The one assertion that separates one query from three that agree.**
        * `D45` gives the stream three kinds and `D30` three arrangements of ONE
        * query; if typed + observed + said does not equal the unfiltered total,

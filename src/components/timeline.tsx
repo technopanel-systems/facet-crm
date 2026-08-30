@@ -171,6 +171,11 @@ export async function TimelineRow({
       // black-box script, and `D3` — *a field note reaches no timeline* — can
       // only be shown closed by finding one in the stream.
       data-stream-kind={streamKindOf(event.kind)}
+      // **The SIX kinds beside `D45`'s three.** `streamKindOf` folds five of
+      // them into `observed`, so the three cannot tell that a whole source has
+      // stopped arriving — which is how `company_added` was missing from the
+      // default stream unnoticed `S45-7`.
+      data-event-kind={event.kind}
       data-entry-type={
         event.kind === "report" ? event.report.entryType : undefined
       }
@@ -246,6 +251,7 @@ async function CommentRow({
       // `data-slot`, which sections 9 and 14 assert on.
       data-timeline-event=""
       data-stream-kind="said"
+      data-event-kind="comment"
       data-slot="comment"
       className="border-line flex flex-col gap-1 border-b py-2.5 last:border-b-0"
     >

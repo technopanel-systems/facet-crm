@@ -361,14 +361,31 @@ async function reportEvents(
   }));
 }
 
-/** Only a company has this event; a project timeline simply has no row here. */
+/**
+ * Only a company has this event; a project timeline simply has no row here.
+ *
+ * **It used to return nothing at all unless scoped or ranged** — one line,
+ * `if (!scope.companyId && !range) return []`, landed inside a bulk phase-9
+ * commit with no comment and no rule behind it. The effect was that the default
+ * `/activity` omitted this kind entirely: **299 events over five kinds against
+ * 426 over six**, the whole difference being **127 `company_added`**, roughly a
+ * third of the stream withheld until a reader set a range they had no reason to
+ * set `S45-7`. It was the only source in this file so guarded.
+ *
+ * **The cost was volume, it was named, and it is accepted.** Reps adding
+ * companies in bulk and never working them is the behaviour the feed exists to
+ * make visible: if a rep adds forty in a day and the stream looks crowded, the
+ * stream is reporting something true. Steady-state volume is one or two a day
+ * across the team. Nothing structural was hiding behind the guard — the range
+ * predicates are plain `gte`/`lte` on the same `day` this always computes, the
+ * `users` join is a LEFT join, and `visibleCompaniesFilter` applies either way —
+ * so removing it changes what is gathered and nothing about how.
+ */
 async function companyAddedEvents(
   session: AuthSession,
   scope: TimelineScope,
   range?: DateRange,
 ): Promise<TimelineEvent[]> {
-  if (!scope.companyId && !range) return [];
-
   const day = riyadhDay(companies.createdAt);
   const rows = await db
     .select({

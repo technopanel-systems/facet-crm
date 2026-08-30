@@ -883,7 +883,10 @@ timeline is the same stream, scoped to that record. **A day header states the
 whole day's size in the filtered scope, not the part of it that landed on this
 page** — the stream pages by row, so a day is cut wherever the boundary falls
 and appears at the foot of one page and the head of the next, reading the same
-true number in both places.
+true number in both places. **And the default stream shows every event kind** —
+a source that arrives only once a range is set is missing from the screen a
+manager opens as the daily report `S42`, and the three kinds fold five of the
+six into *observed*, so nothing on the screen would show its absence.
 
 **D46.** The **Log button** on a company page opens pre-filled. Three taps and a
 text box. Channel, outcome, optional project and contact, optional signals, the

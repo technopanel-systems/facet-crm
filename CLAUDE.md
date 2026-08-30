@@ -194,7 +194,13 @@ section **decline to report** is the harder proof, because it shows the section
 will not quietly report something safe when it cannot measure. `§24` was fed
 both: a page-local count turned 6 of 1680 red, and a scope shrunk to one page
 printed `NOT MEASURED`, ran **zero** of its five assertions and moved the total
-1680 → 1672 — a drop a reader can check.
+1680 → 1672 — a drop a reader can check. **And the delta is ACCOUNTED, not
+assumed**: twice the obvious reading was wrong, because a probe that changes a
+page size changes what else the run can reach. `§32`'s moved 1700 → 1696 — ten
+claims out and six report-detail checks in, a bigger page one exposing more ids
+to the id harvest — and `§33`'s moved 1689 → 1705, eight out and about
+twenty-four in. Diff the labels between the two runs rather than subtracting
+what you expected to lose.
 
 **A check comparing one computation against a DIFFERENT one stands alone**,
 never merged with assertions over the same computation, so a disagreement names
