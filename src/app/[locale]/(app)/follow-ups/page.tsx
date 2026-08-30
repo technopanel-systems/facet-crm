@@ -85,6 +85,23 @@ export default async function FollowUpsPage({
   // no filter on any list drops the search any more `[22 §3]`.
   const basePath = "/follow-ups";
 
+  /*
+   * **Every control carries the active filter, not just the chips** `S45-6`.
+   * `SearchForm`, `FilterNav` and `ListPagination` each build their href from
+   * an EMPTY `URLSearchParams`, so a parameter survives only if the page hands
+   * it over — and this screen handed over nothing, so searching or paging from
+   * `?group=quiet` silently widened the list to every group. That is `D59`'s
+   * own failure, *the list silently returns the wrong rows*, reached through
+   * the search box and the pager rather than through a chip.
+   *
+   * `activeGroup` rather than the raw `group`, so a junk value is dropped
+   * instead of carried forward — `/companies` passes its validated `sort` the
+   * same way. **`group` is the only member**: this screen's `searchParams` is
+   * `{ q, page, group }` and it does not read `kind` at all, so a hidden field
+   * for one would be a parameter nothing consumes.
+   */
+  const extra = { group: activeGroup };
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -108,6 +125,7 @@ export default async function FollowUpsPage({
         basePath={basePath}
         defaultValue={q}
         placeholder={t("followUps.searchPlaceholder")}
+        hidden={extra}
       />
 
       <FilterNav
@@ -150,6 +168,7 @@ export default async function FollowUpsPage({
           page={currentPage}
           total={total}
           query={q}
+          extra={extra}
         >
           {/* `D56` — below `md` this becomes rows: the kind, the record, and
               **the age**. The kind badge IS the *why* this row is on the list,

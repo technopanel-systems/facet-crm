@@ -1196,7 +1196,10 @@ This broke three lists. **And a chip's count is over the scope its own click
 would produce** — respecting the search it carries and ignoring the filter it
 replaces — because a count over the whole scope promises rows the click does not
 deliver, while a count inside the active filter would read zero on every chip but
-the live one.
+the live one. **And the obligation runs both ways — the search box and the pager
+carry the active FILTER, as the chip carries the search** — because each builds
+its href from an empty query and keeps only what the screen hands it, so a list
+that silently widens on the next page is the same failure one control along.
 
 **D60.** The empty state sits outside the list card, not inside it. D52 decides
 what it says; this decides where. Inside a card with a pagination footer, an

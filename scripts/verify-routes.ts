@@ -8175,6 +8175,160 @@ async function main(): Promise<void> {
   }
 
 
+  /* ── 33 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n33. /follow-ups — the search box and the pager carry the filter too, not just the chips [D59]",
+  );
+  {
+    /*
+     * **The defect is a LOST parameter, so this asserts what SURVIVES** — and
+     * then what the survivor returns, because a correct href that lands on an
+     * unfiltered list would pass a URL-only check `S45-6`.
+     *
+     * `SearchForm`, `FilterNav` and `ListPagination` each build their href from
+     * an empty `URLSearchParams`, so a parameter survives only if the page
+     * hands it over. `/follow-ups` handed over nothing: searching or paging
+     * from `?group=quiet` silently widened the list to every group, which is
+     * `D59`'s own stated failure reached through two controls rather than a
+     * chip. `/companies`, `/dispatches`, `/projects` and `/quotations` all pass
+     * both already.
+     *
+     * **Nothing checked this, on any screen.** Every `?page=` in this file is
+     * hand-built by the script — `§20`, `§24`, `§31`, `§32` included — so no
+     * assertion has ever read a rendered pager's href, and none has ever read a
+     * search form's hidden fields. `§31` proves the chip counts and deliberately
+     * builds its own URLs, which is why it passes unchanged either way.
+     */
+    const setup = (step: string, ok: boolean, detail = ""): boolean => {
+      checks += 1;
+      if (ok) {
+        console.log(`  setup ${step}`);
+        return true;
+      }
+      failures += 1;
+      console.log(`  SETUP FAILED at ${step}${detail ? ` — ${detail}` : ""}`);
+      return false;
+    };
+
+    const pageSize = Number(
+      readFileSync("src/lib/follow-ups.ts", "utf8").match(
+        /FOLLOW_UP_PAGE_SIZE = (\d+);/,
+      )?.[1] ?? "0",
+    );
+    setup(
+      "FOLLOW_UP_PAGE_SIZE was read from follow-ups.ts, not copied into this script",
+      pageSize > 0,
+      `${pageSize}`,
+    );
+
+    const totalOf = (body: string) => {
+      const m = body.match(/data-slot="list-card"[^>]*data-total="(\d+)"/);
+      if (m) return Number(m[1]);
+      return body.includes('data-slot="follow-ups-empty"') ? 0 : -1;
+    };
+    /** The one `<form>` that holds the search input, by its own field. */
+    const searchForm = (body: string) =>
+      body
+        .split("<form")
+        .slice(1)
+        .map((chunk) => chunk.split("</form>")[0])
+        .find((chunk) => /name="q"/.test(chunk)) ?? "";
+    /**
+     * A rendered pager href, as the browser would follow it.
+     *
+     * **Unescaped, and matched WITHOUT assuming a bare `&`.** The markup holds
+     * `?group=quiet&amp;page=2`, so a pattern requiring `[?&]page=` matches
+     * nothing and the check reports *NO pager href* on a pager that is present
+     * and correct — which is exactly what the first run of this section did.
+     */
+    const pagerHref = (body: string) =>
+      (
+        body.match(/href="([^"]*follow-ups[^"]*page=\d+[^"]*)"/)?.[1] ?? ""
+      ).replace(/&amp;/g, "&");
+
+    for (const locale of ["en", "ar"] as const) {
+      const jar = jars["manager@example.test"];
+      const wide = await get(jar, `/${locale}/follow-ups`);
+      if (
+        !setup(
+          `${locale}: /follow-ups answers 200`,
+          wide.status === 200,
+          `saw ${wide.status}`,
+        )
+      )
+        continue;
+      const wideTotal = totalOf(wide.body);
+      if (!setup(`${locale}: the unfiltered total is readable`, wideTotal > 0))
+        continue;
+
+      /* A group whose own list spans more than one page — paging is half the
+         claim and cannot be asserted from a single page. */
+      const groups = [
+        ...new Set(
+          [...wide.body.matchAll(/data-chip="([^"]+)"/g)].map((m) => m[1]),
+        ),
+      ];
+      let group = "";
+      let filteredTotal = -1;
+      for (const candidate of groups) {
+        const body = (await get(jar, `/${locale}/follow-ups?group=${candidate}`))
+          .body;
+        const found = totalOf(body);
+        if (found > pageSize && found < wideTotal) {
+          group = candidate;
+          filteredTotal = found;
+          break;
+        }
+      }
+
+      /* **NOT MEASURED, never `ok`.** A single-page filtered set cannot show
+         whether the pager keeps the filter, and that is half the claim. */
+      if (!group) {
+        console.log(
+          `  --    ${locale}: no group's own list spans more than one page of ${pageSize} (scope ${wideTotal}) — NOT MEASURED`,
+        );
+        continue;
+      }
+
+      const filtered = await get(jar, `/${locale}/follow-ups?group=${group}`);
+      const form = searchForm(filtered.body);
+      const href = pagerHref(filtered.body);
+
+      check(
+        `${locale}: the filter narrows before anything is asserted about it — saw ${filteredTotal} of ${wideTotal} for group=${group} [D59]`,
+        filteredTotal > pageSize && filteredTotal < wideTotal,
+        `${groups.length} chip(s)`,
+      );
+      check(
+        `${locale}: *** the search box carries the active filter — saw ${
+          form.match(/<input[^>]*name="group"[^>]*>/)?.[0] ?? "NO hidden group field"
+        } *** [D59]`,
+        form !== "" &&
+          new RegExp(`name="group"[^>]*value="${group}"|value="${group}"[^>]*name="group"`).test(form),
+        `group=${group}`,
+      );
+      check(
+        `${locale}: *** the pager carries it too — saw ${href || "NO pager href"} *** [D59]`,
+        href !== "" && href.includes(`group=${group}`),
+        `group=${group}`,
+      );
+
+      /* **And the href's RESULT, not merely its text.** A link that reads right
+         and lands on an unfiltered list is the same defect one step later. */
+      const landed = await get(jar, href.replace(/^\/(en|ar)/, `/${locale}`));
+      const landedTotal = totalOf(landed.body);
+      check(
+        `${locale}: *** …and page two of a filtered list is still filtered — saw ${landedTotal} of ${filteredTotal}, against ${wideTotal} unfiltered *** [D59]`,
+        landed.status === 200 &&
+          landedTotal === filteredTotal &&
+          landedTotal !== wideTotal,
+        `followed ${href}`,
+      );
+    }
+  }
+
+
   /* ── 23 ──────────────────────────────────────────────────────────────── */
 
   console.log(
