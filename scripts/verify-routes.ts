@@ -221,7 +221,7 @@
  * note.
  */
 
-import { readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 
 /**
  * **This script was pure black-box HTTP, and §30 breaks that deliberately.**
@@ -8378,6 +8378,331 @@ async function main(): Promise<void> {
           landedTotal === filteredTotal &&
           landedTotal !== wideTotal,
         `followed ${href}`,
+      );
+    }
+  }
+
+
+  /* ── 34 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n34. Nobody — every (app) surface and every action, with no cookie at all [S44-4]",
+  );
+  {
+    /*
+     * **The permanent fourth identity.** `verify:routes` drove three and
+     * asserted the anonymous case exactly twice — `§1`'s `/en/companies` and
+     * `§26`'s 401 — against a surface session 44's throwaway probe measured at
+     * **86**. Two of 86 is the ratio this section exists to close, and the
+     * probe that measured it was deleted by design `S44-4`.
+     *
+     * **UNPROVEN is not passing**, session 44's rule, kept: only an
+     * unambiguous redirect to `/login` or a `401` counts as protected. A 404, a
+     * 5xx, a connection error or a 200 with an empty body is UNPROVEN — named,
+     * counted separately, never folded into the pass. A sweep that mostly could
+     * not tell must not read as a sweep that mostly passed.
+     *
+     * **The positive control is not optional, and this is why.** This section
+     * is a wall of negatives, and a server refusing everything for the wrong
+     * reason — wrong port, dead container, wrong base URL — reads as a clean
+     * sweep. So one route is driven WITH a cookie moments earlier, against the
+     * same server, and must answer 200 with a real body. If it does not, the
+     * sweep is `NOT MEASURED` and asserts nothing at all. **Do not remove this
+     * as redundant**: session 44's probe was licensed by exactly one logged-in
+     * line, and without it 86 refusals prove only that something is not there.
+     */
+    const setup = (step: string, ok: boolean, detail = ""): boolean => {
+      checks += 1;
+      if (ok) {
+        console.log(`  setup ${step}`);
+        return true;
+      }
+      failures += 1;
+      console.log(`  SETUP FAILED at ${step}${detail ? ` — ${detail}` : ""}`);
+      return false;
+    };
+
+    /** No cookie header at all, and no redirect followed — the status is the answer. */
+    const asNobody = async (path: string, body?: FormData) => {
+      try {
+        const response = await fetch(`${BASE}${path}`, {
+          method: body ? "POST" : "GET",
+          // A correct `Origin` on the POST: a CSRF refusal would be a refusal
+          // for the wrong reason, and would pass this section while proving
+          // nothing about the gate `S44-4`.
+          headers: body ? { origin: BASE } : {},
+          body,
+          redirect: "manual",
+        });
+        return {
+          status: response.status,
+          location: response.headers.get("location") ?? "",
+          text: await response.text(),
+        };
+      } catch (error) {
+        return { status: 0, location: "", text: String(error) };
+      }
+    };
+
+    type Verdict = "PROTECTED" | "ANSWERED" | "UNPROVEN";
+    const verdictOf = (r: {
+      status: number;
+      location: string;
+      text: string;
+    }): [Verdict, string] => {
+      if (r.status === 401) return ["PROTECTED", "401"];
+      if (r.status >= 300 && r.status < 400) {
+        return /\/(en|ar)\/login/.test(r.location)
+          ? ["PROTECTED", `${r.status} -> login`]
+          : ["UNPROVEN", `${r.status} -> ${r.location || "nowhere"}`];
+      }
+      if (r.status === 200) {
+        return r.text.length > 0
+          ? ["ANSWERED", `200, ${r.text.length}b`]
+          : ["UNPROVEN", "200 with an empty body"];
+      }
+      if (r.status === 0) return ["UNPROVEN", "no reply"];
+      return ["UNPROVEN", `${r.status}`];
+    };
+
+    /* --- the positive control, first and gating -------------------------- */
+
+    /* Its own base, named, so the control can be pointed somewhere dead to
+       prove this section declines rather than reporting a clean sweep. */
+    const CONTROL_BASE = BASE;
+    const control = await fetch(`${CONTROL_BASE}/en/companies`, {
+      headers: { cookie: header(jars["manager@example.test"]) },
+      redirect: "manual",
+    })
+      .then(async (r) => ({ status: r.status, length: (await r.text()).length }))
+      .catch((e) => ({ status: 0, length: 0, error: String(e) }));
+    const controlHeld = control.status === 200 && control.length > 2000;
+    setup(
+      `CONTROL: the same server answers a signed-in request — saw ${control.status}, ${control.length} bytes`,
+      controlHeld,
+    );
+
+    if (!controlHeld) {
+      console.log(
+        "  ----  NOBODY WAS NOT MEASURED — the control did not hold, so a refusal below" +
+          " proves nothing about the gate. No assertion ran.",
+      );
+    } else {
+      /* --- the surface ------------------------------------------------- */
+
+      const manager = jars["manager@example.test"];
+      const ids: Record<string, string> = {};
+      for (const section of [
+        "companies",
+        "contacts",
+        "projects",
+        "quotations",
+        "dispatches",
+        "reports",
+        "users",
+      ]) {
+        /*
+         * **`reports` is harvested from `?kind=typed`, not from the bare
+         * stream.** It read page one of `/activity` until `S45-7` put 127
+         * `company_added` events back into the default view, at which point
+         * page one held no report row and this setup failed — correctly, and
+         * apart from the claim, which is how it was found rather than
+         * mistaken for a coverage gap.
+         */
+        const from =
+          section === "reports"
+            ? "/en/activity?kind=typed"
+            : `/en/${LIST_ROUTE[section] ?? section}`;
+        const list = await get(manager, from);
+        const id = list.status === 200 ? firstId(list.body, section) : null;
+        if (id) ids[section] = id;
+      }
+      setup(
+        `harvested a real id for ${Object.keys(ids).length} of 7 sections`,
+        Object.keys(ids).length === 7,
+        Object.keys(ids).join(","),
+      );
+
+      /* Two shapes need an id that is not a list's first row. */
+      const quotationBody = ids.quotations
+        ? (await get(manager, `/en/quotations/${ids.quotations}`)).body
+        : "";
+      const versionId =
+        quotationBody.match(/\/versions\/([0-9a-f-]{36})/)?.[1] ?? "";
+      /* `?kind=said` IS the conversation `D45`, so it is where a comment id is
+         certain to be — a company detail page may simply have no comment. */
+      const saidBody = (await get(manager, "/en/activity?kind=said")).body;
+      const commentId = saidBody.match(/id="comment-([0-9a-f-]{36})"/)?.[1] ?? "";
+
+      const paths: string[] = [];
+      for (const locale of ["en", "ar"] as const) {
+        for (const route of STATIC_ROUTES) {
+          paths.push(`/${locale}${route === "/" ? "" : route}` || `/${locale}`);
+        }
+        for (const [section, suffixes] of [
+          ["companies", ["", "/edit", "/timeline"]],
+          ["contacts", ["", "/edit"]],
+          ["projects", ["", "/edit", "/timeline"]],
+          ["quotations", [""]],
+          ["dispatches", ["", "/edit"]],
+          ["reports", ["", "/edit"]],
+          ["users", ["", "/edit", "/handover"]],
+        ] as [string, string[]][]) {
+          if (!ids[section]) continue;
+          for (const suffix of suffixes) {
+            paths.push(`/${locale}/${section}/${ids[section]}${suffix}`);
+          }
+        }
+        if (versionId && ids.quotations) {
+          paths.push(
+            `/${locale}/quotations/${ids.quotations}/versions/${versionId}`,
+          );
+        }
+        if (commentId) paths.push(`/${locale}/comments/${commentId}/edit`);
+      }
+      /** The API surface, including the endpoints login cannot work without. */
+      const API = [
+        "/api/updates?scope=stream&since=2026-01-01T00:00:00.000Z",
+        "/api/health",
+        "/api/auth/session",
+        "/api/auth/csrf",
+        "/api/auth/providers",
+      ];
+      paths.push(...API);
+
+      /* --- the actions, scraped off authenticated renders ---------------- */
+
+      const scraped = new Map<string, { path: string; form: string }>();
+      for (const from of [
+        "/en",
+        "/en/companies",
+        "/en/follow-ups",
+        "/en/targets",
+        "/en/notifications",
+        "/en/activity",
+        ...(ids.companies ? [`/en/companies/${ids.companies}`] : []),
+        ...(ids.projects ? [`/en/projects/${ids.projects}`] : []),
+        ...(ids.quotations ? [`/en/quotations/${ids.quotations}`] : []),
+        ...(ids.dispatches ? [`/en/dispatches/${ids.dispatches}`] : []),
+        ...(ids.users ? [`/en/users/${ids.users}`] : []),
+        ...(ids.reports ? [`/en/reports/${ids.reports}`] : []),
+      ]) {
+        const { body } = await get(manager, from);
+        for (const form of body.match(/<form[^>]*>[\s\S]*?<\/form>/g) ?? []) {
+          const id = form.match(/name="\$ACTION_ID_([^"]+)"/)?.[1] ??
+            form.match(/name="\$ACTION_REF_(\d+)"/)?.[1];
+          if (!id) continue;
+          const key = `${from}::${id}`;
+          if (!scraped.has(key)) scraped.set(key, { path: from, form });
+        }
+      }
+      setup(
+        `scraped ${scraped.size} distinct server action(s) off authenticated renders`,
+        scraped.size > 0,
+      );
+
+      /* --- drive every one of them as nobody ---------------------------- */
+
+      const answered: string[] = [];
+      const unproven: string[] = [];
+      let protectedCount = 0;
+      let driven = 0;
+
+      for (const path of paths) {
+        driven += 1;
+        const [verdict, why] = verdictOf(await asNobody(path));
+        if (verdict === "PROTECTED") protectedCount += 1;
+        else if (verdict === "ANSWERED") answered.push(`${path} (${why})`);
+        else unproven.push(`${path} (${why})`);
+      }
+      for (const [key, { path, form }] of scraped) {
+        driven += 1;
+        const [verdict, why] = verdictOf(await asNobody(path, envelopeOf(form)));
+        if (verdict === "PROTECTED") protectedCount += 1;
+        else if (verdict === "ANSWERED") answered.push(`action ${key} (${why})`);
+        else unproven.push(`action ${key} (${why})`);
+      }
+
+      /** The only surfaces allowed to answer, by identity and with a reason. */
+      const PUBLIC = [
+        // Auth.js's own three: login cannot work without them.
+        "/api/auth/session",
+        "/api/auth/csrf",
+        "/api/auth/providers",
+        // Docker's healthcheck hits this every 30s (`docker-compose.yml`) and
+        // `§0` reads it before any login. It discloses up/down, never data.
+        "/api/health",
+      ];
+      const answeredPaths = answered.map((a) => a.replace(/ \(.*$/, "")).sort();
+
+      /*
+       * **This one is the sweep's arithmetic, NOT the identity claim** — every
+       * surface reached a verdict and none was UNPROVEN. Its first label read
+       * *nobody is refused everywhere*, which the condition does not test: it
+       * balances for any number of answering surfaces, and it stayed green
+       * under the injection that made `/api/updates` answer. That is the
+       * wrong-assertion shape, caught by feeding this section its defect. The
+       * identity claim is the check below, and it is where the exception set
+       * is pinned.
+       */
+      check(
+        `*** every surface reached a verdict — saw ${protectedCount} PROTECTED and ${answeredPaths.length} answering of ${driven}, ${unproven.length} UNPROVEN *** [S44-4]`,
+        driven > 0 &&
+          unproven.length === 0 &&
+          protectedCount + answeredPaths.length === driven,
+        unproven.length > 0
+          ? `UNPROVEN: ${unproven.join(" · ")}`
+          : `answered: ${answeredPaths.join(" · ")}`,
+      );
+      /* **By identity, and as a SET.** A list of exceptions that grows quietly
+         is how this gap reopens, so this is equality and not containment. */
+      check(
+        `*** the only surfaces that answer nobody are the four public ones — saw [${answeredPaths.join(",")}] *** [S44-4]`,
+        answeredPaths.join(",") === [...PUBLIC].sort().join(","),
+        `expected [${[...PUBLIC].sort().join(",")}]`,
+      );
+      check(
+        `nothing was UNPROVEN — saw ${unproven.length} of ${driven} [S44-4]`,
+        unproven.length === 0,
+        unproven.join(" · "),
+      );
+
+      /*
+       * **Coverage measured against the APP, not against this section's own
+       * list** `d66e1a0`. A count of routes compared with a count this section
+       * derived would be two sides of one computation; the other side here is
+       * the filesystem — every `page.tsx` under `(app)`, which is what Next
+       * actually serves.
+       */
+      const onDisk = new Set<string>();
+      const walk = (dir: string) => {
+        for (const entry of readdirSync(dir, { withFileTypes: true })) {
+          const full = `${dir}/${entry.name}`;
+          if (entry.isDirectory()) walk(full);
+          else if (entry.name === "page.tsx") {
+            const shape =
+              full
+                .replace("src/app/[locale]/(app)", "")
+                .replace("/page.tsx", "") || "/";
+            onDisk.add(shape);
+          }
+        }
+      };
+      walk("src/app/[locale]/(app)");
+      const shapeOf = (path: string) =>
+        path
+          .replace(/^\/(en|ar)/, "")
+          .replace(/\/[0-9a-f]{8}-[0-9a-f-]{27}/g, "/[id]") || "/";
+      const drivenShapes = new Set(
+        paths.filter((p) => !p.startsWith("/api")).map(shapeOf),
+      );
+      const missed = [...onDisk]
+        .filter((shape) => !drivenShapes.has(shape.replace(/\[\w+Id\]/g, "[id]")))
+        .sort();
+      check(
+        `*** every (app) route on disk was driven as nobody — saw ${onDisk.size - missed.length} of ${onDisk.size} *** [S44-4]`,
+        onDisk.size > 0 && missed.length === 0,
+        `not driven: ${missed.join(" · ")}`,
       );
     }
   }
