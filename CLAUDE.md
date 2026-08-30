@@ -196,6 +196,15 @@ both: a page-local count turned 6 of 1680 red, and a scope shrunk to one page
 printed `NOT MEASURED`, ran **zero** of its five assertions and moved the total
 1680 → 1672 — a drop a reader can check.
 
+**A check comparing one computation against a DIFFERENT one stands alone**,
+never merged with assertions over the same computation, so a disagreement names
+which side moved. `S45-3`'s fourth assertion cross-checked a day fold against
+`?from=D&to=D`, went red on a fold that was correct, and was attributable only
+because it stood apart — which is how it surfaced `timeline.ts:370` returning
+early when unranged: 299 events over five kinds against 426 over six, the
+difference exactly 127 `company_added`. Merged, it would have been a red with
+nothing to point at.
+
 **Three things a new check does by default**, each of which caught something on
 its first outing. **Prove a cost or import claim by RUNNING it** — reading that
 `@/env` uses lazy getters is the assumption a dependency bump breaks in
