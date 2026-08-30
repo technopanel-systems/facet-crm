@@ -164,6 +164,19 @@ negative guards on a non-empty read** first. A check nobody has seen fail has
 not been shown to work: feed it the defect and watch it go red, the way `§23`
 was fed the two shapes its own slice removed.
 
+**Three things a new check does by default**, each of which caught something on
+its first outing. **Prove a cost or import claim by RUNNING it** — reading that
+`@/env` uses lazy getters is the assumption a dependency bump breaks in
+silence, so import with the variables absent and run the script with the
+dependency broken to see *where* it fails. **Report setup apart from the
+claim** — a precondition that fails prints `SETUP FAILED at <step>` and
+abandons the section as NOT MEASURED rather than asserting on a broken fixture;
+this caught a page rendering three forms where one was expected, before it
+posted the wrong one. **Measure a cleanup path instead of assuming it** — *"a
+second deactivation is a no-op"* is a guess until its status is on screen, and
+a cleanup that throws inside a `finally` masks the failure it was meant to
+survive.
+
 **A database tool that reports success may have changed nothing.** Three
 sightings, one class. `drizzle-kit migrate` exits 1 with no message at all on
 a connection error. A trailing carriage return in an inline `DATABASE_URL`

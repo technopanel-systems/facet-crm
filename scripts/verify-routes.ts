@@ -7410,7 +7410,10 @@ async function main(): Promise<void> {
        * `getSession` ran for the manager.
        *
        * Both are kept, in this order: the row is the cause, the redirect is
-       * the outcome a person experiences.
+       * the outcome a person experiences. **Do not collapse them into one
+       * assertion, and do not reorder them** — each half was watched going
+       * green on a live defect, so either half alone is a false green, and the
+       * row read after the redirect is a third.
        */
       const left = await query("re-read the sessions table", () =>
         db
