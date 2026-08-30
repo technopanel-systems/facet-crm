@@ -5779,20 +5779,141 @@ async function main(): Promise<void> {
           ranked.every((rank, i) => i === 0 || rank >= ranked[i - 1]),
         `order was ${order.join(",") || "nothing rendered"}`,
       );
-      // `D24` — a group header states its count, and it is the whole scope's.
-      // The card's own total is `D70`'s *states its total*, already asserted
-      // elsewhere; here the two must agree, which is what catches a header
-      // reading a PAGE's count.
-      const cardTotal = Number(
-        list.body.match(/data-slot="list-card"[^>]*data-total="(\d+)"/)?.[1] ??
-          "-1",
+      /*
+       * `D24` — a group header states its count, and the count is the whole
+       * SCOPE's, never the page's.
+       *
+       * **This asserted the wrong thing until `S45-1`.** It summed ONE page's
+       * headers against the card's own total and required equality — which
+       * only holds while every pile fits on page one. A pile with no row on
+       * this page renders no header at all (`dispatches/page.tsx`, `D70`), so
+       * at 25 rows a page over a scope of 179 the readable headers were
+       * `coordinator + rep = 60` against a card reading `179`, and the check
+       * went red on a screen that was already correct — the counts had been
+       * whole-scope SQL aggregates all along (`dispatches.ts`, one statement,
+       * before the `limit`). That is the tenth wrong-reason sighting in
+       * `CLAUDE.md` and the first of the MIRROR shape: a check that FAILS for
+       * the wrong reason rather than passing for one. It cost a founder
+       * decision to rewrite working code.
+       *
+       * So the claim is asserted ACROSS the pages. **Cost, chosen and not
+       * overlooked:** one GET per page per locale — 8 at today's 179 rows —
+       * and it grows with verify residue. Summing one page is the thing this
+       * replaced; only the whole walk proves the sum, and the sum is the claim.
+       *
+       * `D70` is deliberately no longer cited here: its *cap and state its
+       * total* governs a block on a DETAIL page, and this list card's footer
+       * total is `D24`'s *pagination in the footer*.
+       */
+      const pageSize = Number(
+        readFileSync("src/lib/dispatches.ts", "utf8").match(
+          /const PAGE_SIZE = (\d+);/,
+        )?.[1] ?? "0",
       );
-      const summed = headers.reduce((n, [, , count]) => n + Number(count), 0);
-      check(
-        `${locale}: *** the pile counts sum to the card's own total *** [D24], [D70]`,
-        cardTotal >= 0 && summed === cardTotal,
-        `piles summed ${summed}, card says ${cardTotal}`,
-      );
+      const cardTotalOf = (body: string) =>
+        Number(
+          body.match(/data-slot="list-card"[^>]*data-total="(\d+)"/)?.[1] ??
+            "-1",
+        );
+      const cardTotal = cardTotalOf(list.body);
+
+      // **Setup is reported apart from the claim** `CLAUDE.md`. A scope that
+      // fits on one page cannot show the difference between a scope count and
+      // a page count, so it is NOT MEASURED — never a quiet `ok`, which is the
+      // failure this whole section was rewritten out of.
+      if (!pageSize || cardTotal < 0) {
+        console.log(
+          `  SETUP FAILED at ${
+            !pageSize ? "PAGE_SIZE in src/lib/dispatches.ts" : "data-total"
+          } — ${locale}: the pile counts are NOT MEASURED`,
+        );
+      } else if (cardTotal <= pageSize) {
+        console.log(
+          `  --    ${locale}: one page of ${cardTotal} at ${pageSize}/page — scope-vs-page NOT MEASURED`,
+        );
+      } else {
+        const lastPage = Math.ceil(cardTotal / pageSize);
+        const seen = new Map<string, Set<number>>();
+        const totals = new Set<number>();
+        let rowsWalked = 0;
+        let outran = "";
+        for (let p = 1; p <= lastPage; p++) {
+          const body =
+            p === 1
+              ? list.body
+              : (await get(jar, `/${locale}/dispatches?page=${p}`)).body;
+          totals.add(cardTotalOf(body));
+          const pageRows = tags(body, "dispatch-row").map((tag) =>
+            attr(tag, "data-group"),
+          );
+          rowsWalked += pageRows.length;
+          for (const tag of tags(body, "dispatch-group")) {
+            const group = attr(tag, "data-group");
+            const count = Number(attr(tag, "data-count"));
+            const counts = seen.get(group) ?? new Set<number>();
+            counts.add(count);
+            seen.set(group, counts);
+            const run = pageRows.filter((g) => g === group).length;
+            if (!outran && count > run) {
+              outran = `${group} read ${count} over a run of ${run} on page ${p}`;
+            }
+          }
+        }
+        const read = [...seen]
+          .map(([group, counts]) => `${group} ${[...counts].join("|")}`)
+          .join(" · ");
+        const summed = [...seen.values()].reduce(
+          (n, counts) => n + Math.max(...counts),
+          0,
+        );
+
+        /*
+         * **The read goes in the LABEL, not the detail** — `check()` prints
+         * `detail` only on failure, so a number parked there is invisible on
+         * the pass and the green line says nothing a reader can re-derive.
+         * `CLAUDE.md`: *an assertion prints what it read*. The first cut of
+         * this block put all four numbers in `detail` and every one of them
+         * vanished into `ok`.
+         */
+
+        // The walk read what it says it read. The three below guard on this
+        // rather than on an empty page.
+        check(
+          `${locale}: the walk read every row of the scope — walked ${rowsWalked} of ${cardTotal} over ${lastPage} pages [D24]`,
+          seen.size > 0 && rowsWalked === cardTotal,
+          `${seen.size} piles`,
+        );
+        // **The positive control.** A page-local count is `count === run` on
+        // every page and can never outrun its own page; a scope count does, the
+        // moment a pile is cut by the page boundary. This is what the old sum
+        // was reaching for, and it fires on page one.
+        check(
+          `${locale}: *** a header outruns its page — the count is the SCOPE's, not the page's — saw ${
+            outran || "nothing outran its page"
+          } *** [D24]`,
+          rowsWalked > 0 && outran !== "",
+          `over ${lastPage} pages`,
+        );
+        check(
+          `${locale}: *** a pile's count is the same on every page it appears on — saw ${
+            read || "no pile header rendered"
+          } *** [D24]`,
+          seen.size > 0 && [...seen.values()].every((c) => c.size === 1),
+          `over ${lastPage} pages`,
+        );
+        check(
+          `${locale}: *** the pile counts sum to the card's own total, over the whole scope — saw ${read} = ${summed} of ${cardTotal} *** [D24]`,
+          seen.size > 0 && summed === cardTotal,
+          `over ${lastPage} pages`,
+        );
+        check(
+          `${locale}: the card's own total does not move between pages — saw ${[
+            ...totals,
+          ].join("|")} over ${lastPage} pages [D24]`,
+          totals.size === 1,
+          `${seen.size} piles`,
+        );
+      }
       // The pile a row landed in is the pile the row says it is in. One map
       // orders the SQL and labels the row `[dispatchGroup]`; this is what
       // catches them drifting apart.
