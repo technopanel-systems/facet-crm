@@ -7734,6 +7734,235 @@ async function main(): Promise<void> {
     }
   }
 
+  /* ── 31 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n31. /follow-ups — a chip's count is the list it lands on, under a SEARCH [D59], [D33]",
+  );
+  {
+    /*
+     * **Driven on a FILTERED state, because the defect was invisible on the
+     * default tab** — which is exactly why it survived `S45-5`. `counts` came
+     * from the unfiltered `followUpScope` while the list was narrowed by `q`,
+     * so a rep searching saw badges summing to 67 over a list of 6.
+     *
+     * **Nothing checked this before.** No script had ever sent `?q=` to
+     * `/follow-ups`; the nearest assertion (`§19`) reads the DASHBOARD tile and
+     * fetches `?group=` with no search, so it was green over this defect for
+     * its whole life and stays green under the injection that catches it.
+     *
+     * **It needs neither the pager nor the search box**, both of which drop
+     * `group` (`S45-6`, open). Proved rather than assumed: the page reads `q`,
+     * `page` and `group` independently and passes all three to `followUps`, so
+     * a hand-built URL filters correctly; and `data-total` is the whole
+     * FILTERED total in one number, so nothing here pages. The state it drives
+     * is one a person reaches by searching and then clicking a chip, which
+     * carries the search `D59`.
+     */
+    const setup = (step: string, ok: boolean, detail = ""): boolean => {
+      checks += 1;
+      if (ok) {
+        console.log(`  setup ${step}`);
+        return true;
+      }
+      failures += 1;
+      console.log(`  SETUP FAILED at ${step}${detail ? ` — ${detail}` : ""}`);
+      return false;
+    };
+
+    // The groups are read from `src/lib/enums.ts`, not typed here — `§24`'s
+    // device, for its reason: a copy of a list in an assertion goes stale in
+    // silence.
+    const groups = (
+      readFileSync("src/lib/enums.ts", "utf8").match(
+        /export const FOLLOW_UP_GROUPS = \{([\s\S]*?)\n\} as const/,
+      )?.[1] ?? ""
+    )
+      .split("\n")
+      .map((line) => line.match(/^\s{2}(\w+):/)?.[1])
+      .filter((name): name is string => Boolean(name));
+    setup(
+      `the four groups were read from enums.ts, not copied into this script`,
+      groups.length === 4,
+      `${groups.length} found: ${groups.join(",")}`,
+    );
+
+    /* Parsed by element, never by attribute ORDER `§24`. */
+    const anchors = (body: string) =>
+      [...body.matchAll(/<a\b[^>]*>/g)].map((m) => m[0]);
+    const attrOf = (tag: string, name: string) =>
+      tag.match(new RegExp(`${name}="([^"]*)"`))?.[1];
+    const chipsOf = (body: string): Map<string, number> => {
+      const found = new Map<string, number>();
+      for (const tag of anchors(body)) {
+        const value = attrOf(tag, "data-chip");
+        const countValue = attrOf(tag, "data-count");
+        if (value === undefined || countValue === undefined) continue;
+        found.set(value, Number(countValue));
+      }
+      return found;
+    };
+    /**
+     * The filtered total, or 0 when the screen says it is empty.
+     *
+     * **The empty state carries a marker for this reason** — with no rows there
+     * is no `list-card` and no `data-total`, and without a marker a group of
+     * nothing is indistinguishable from a broken page. `-1` means neither was
+     * present, which is a failure and never a zero.
+     */
+    const totalOf = (body: string): number => {
+      const m = body.match(/data-slot="list-card"[^>]*data-total="(\d+)"/);
+      if (m) return Number(m[1]);
+      return body.includes('data-slot="follow-ups-empty"') ? 0 : -1;
+    };
+
+    for (const locale of ["en", "ar"] as const) {
+      // The rep, because this is the screen a rep works down `D34`.
+      const jar = jars["rep-a@example.test"];
+      const base = await get(jar, `/${locale}/follow-ups`);
+      if (
+        !setup(
+          `${locale}: /follow-ups answers 200`,
+          base.status === 200,
+          `saw ${base.status}`,
+        )
+      )
+        continue;
+
+      const unfilteredTotal = totalOf(base.body);
+      const unfilteredChips = chipsOf(base.body);
+      if (
+        !setup(
+          `${locale}: the chips and the total are readable`,
+          unfilteredTotal >= 0 && unfilteredChips.size >= groups.length,
+          `total ${unfilteredTotal}, ${unfilteredChips.size} chip(s) with counts`,
+        )
+      )
+        continue;
+
+      /* A term harvested from the rows themselves, never invented — the ids
+         harvest `§2` and `§17` already own, applied to a name. */
+      const names = [
+        ...base.body.matchAll(/<td[^>]*data-phone="name"[^>]*>([\s\S]*?)<\/td>/g),
+      ]
+        .map((m) => m[1].replace(/<[^>]*>/g, "").trim())
+        .filter(Boolean);
+      const candidates = [
+        ...new Set(
+          names.map((n) => n.split(/\s+/)[0]).filter((t) => t.length >= 3),
+        ),
+      ];
+
+      let term = "";
+      let searchedTotal = -1;
+      for (const candidate of candidates) {
+        const probe = await get(
+          jar,
+          `/${locale}/follow-ups?q=${encodeURIComponent(candidate)}`,
+        );
+        const found = totalOf(probe.body);
+        if (found > 0 && found < unfilteredTotal) {
+          term = candidate;
+          searchedTotal = found;
+          break;
+        }
+      }
+
+      /* **NOT MEASURED, never `ok`.** A run that only ever sees the default tab
+         proves nothing about this defect — that is the whole finding. */
+      if (!term) {
+        console.log(
+          `  --    ${locale}: no search narrows a scope of ${unfilteredTotal} ` +
+            `over ${candidates.length} harvested term(s) — the chip counts are NOT MEASURED`,
+        );
+        continue;
+      }
+
+      const searched = await get(
+        jar,
+        `/${locale}/follow-ups?q=${encodeURIComponent(term)}`,
+      );
+      const chips = chipsOf(searched.body);
+
+      check(
+        `${locale}: the search narrows the scope — saw ${searchedTotal} of ${unfilteredTotal} for "${term}" [D59]`,
+        searchedTotal > 0 && searchedTotal < unfilteredTotal,
+        `${candidates.length} candidates`,
+      );
+
+      /* **The claim.** Each chip's badge against the list that chip's own href
+         lands on — the search it carries, the group it sets. */
+      const pairs: string[] = [];
+      let agreed = true;
+      for (const group of groups) {
+        const landed = await get(
+          jar,
+          `/${locale}/follow-ups?q=${encodeURIComponent(term)}&group=${group}`,
+        );
+        const listed = totalOf(landed.body);
+        const badge = chips.get(group);
+        pairs.push(`${group} ${badge ?? "?"}/${listed}`);
+        if (badge === undefined || listed < 0 || badge !== listed) agreed = false;
+      }
+      check(
+        `${locale}: *** every chip's count is the list it lands on — saw ${pairs.join(" · ")} (badge/list) *** [D59], [D33]`,
+        agreed,
+        `term "${term}"`,
+      );
+
+      const summed = groups.reduce((n, g) => n + (chips.get(g) ?? 0), 0);
+      check(
+        `${locale}: *** the chips sum to the searched total — saw ${summed} of ${searchedTotal} *** [D59]`,
+        chips.size > 0 && summed === searchedTotal,
+        `term "${term}"`,
+      );
+
+      /* **The count ignores the filter the chip REPLACES.** Clicking a chip
+         swaps the group, so a count inside the active group would read 0 on
+         every chip but the live one — each kind belongs to exactly one group. */
+      const inGroup = await get(
+        jar,
+        `/${locale}/follow-ups?q=${encodeURIComponent(term)}&group=${groups[0]}`,
+      );
+      const inGroupChips = chipsOf(inGroup.body);
+      const sameUnderGroup = groups.every(
+        (g) => inGroupChips.get(g) === chips.get(g),
+      );
+      check(
+        `${locale}: *** the counts ignore the filter the chip replaces — saw ${groups
+          .map((g) => `${g} ${inGroupChips.get(g) ?? "?"}`)
+          .join(" · ")} under ?group=${groups[0]} *** [D59]`,
+        inGroupChips.size > 0 && sameUnderGroup,
+        `against ${groups.map((g) => `${g} ${chips.get(g) ?? "?"}`).join(" · ")}`,
+      );
+
+      /* The unfiltered path is what the rail badge and `D33`'s tiles read
+         through `shellCounts()`, and it must not have moved. */
+      const unfilteredSum = groups.reduce(
+        (n, g) => n + (unfilteredChips.get(g) ?? 0),
+        0,
+      );
+      check(
+        `${locale}: the unfiltered chips still sum to the unfiltered total — saw ${unfilteredSum} of ${unfilteredTotal} [D33]`,
+        unfilteredSum === unfilteredTotal,
+        "the dashboard reads this same fold",
+      );
+
+      /* `CLAUDE.md`'s logical-margin trap, fourth sighting: the count carries
+         `dir="ltr"`, so an `ms-*` on it resolves against ITS direction and lands
+         outside the number in Arabic. The chip is a flex row with a gap. */
+      const countSpans = [
+        ...searched.body.matchAll(/<span class="num[^"]*"[^>]*dir="ltr"/g),
+      ].map((m) => m[0]);
+      check(
+        `${locale}: no chip count carries a logical margin — saw ${countSpans.length} count span(s) [D57]`,
+        countSpans.length > 0 &&
+          countSpans.every((span) => !/\b(ms|me)-/.test(span)),
+        countSpans.find((span) => /\b(ms|me)-/.test(span)) ?? "",
+      );
+    }
+  }
+
   /* ── 23 ──────────────────────────────────────────────────────────────── */
 
   console.log(

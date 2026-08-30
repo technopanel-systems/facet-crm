@@ -1149,6 +1149,16 @@ const EMPTY_COUNTS = (): Record<FollowUpKind, number> =>
     number
   >;
 
+/**
+ * The one place kinds are folded into counts — `followUpScope` over everything,
+ * `followUps` over what a search left `S45-5`.
+ */
+function tally(rows: FollowUpRow[]): Record<FollowUpKind, number> {
+  const counts = EMPTY_COUNTS();
+  for (const row of rows) counts[row.kind] += 1;
+  return counts;
+}
+
 export type FollowUpScope = {
   /** **Every** open follow-up this identity may see, oldest first. */
   rows: FollowUpRow[];
@@ -1178,23 +1188,24 @@ export async function followUpScope(
   const thresholds = await getFollowUpThresholds();
   const rows = await gather(session, thresholds);
 
-  const counts = EMPTY_COUNTS();
-  for (const row of rows) counts[row.kind] += 1;
-
-  return { rows, total: rows.length, counts, thresholds };
+  return { rows, total: rows.length, counts: tally(rows), thresholds };
 }
 
 /**
  * Every open follow-up the caller may see, oldest first — filtered and paged.
  *
- * `counts` is over the whole scope, not the page, so the kind filter can show
- * what it would reveal before it is applied.
+ * **`counts` is over the scope a chip's click would produce** `D59` — the
+ * search it carries, without the group it replaces. Never over the page.
  */
 export async function followUps(
   session: AuthSession,
   options: FollowUpOptions = {},
 ): Promise<FollowUpResult> {
-  const { rows: all, counts, thresholds } = await followUpScope(session);
+  const {
+    rows: all,
+    counts: scopeCounts,
+    thresholds,
+  } = await followUpScope(session);
 
   // `D33`'s grouping is resolved against the kinds the group names, so a tile
   // showing 9 lands on a list of 9. `gather` has already produced every row —
@@ -1203,10 +1214,38 @@ export async function followUps(
     ? new Set<FollowUpKind>(FOLLOW_UP_GROUPS[options.group])
     : null;
 
-  const filtered = all
+  /*
+   * **`q` is the one filter a chip does NOT drop** `S45-5`. `FilterNav` builds
+   * every href from an empty `URLSearchParams`, setting the search first and
+   * its own parameter second `D59`, so clicking a chip from `?q=foo&group=X`
+   * lands on `?q=foo&group=Y` — the search survives, the group is replaced.
+   * The count must therefore be the searched scope, and must ignore `group`
+   * and `kind`: a kind belongs to exactly one group, so a count inside the
+   * active group would read **0 on every chip but the live one**.
+   *
+   * The docblock above used to say only *"not the page"*, and that reasoning —
+   * show what the filter would reveal before it is applied — was right for the
+   * group, which the click removes, and had simply never been applied to `q`,
+   * which the click keeps. Badges summed to 67 over a list of 6.
+   *
+   * **One array, not two queries sharing a `where`.** `filtered` is derived
+   * FROM `searched`, so there is nothing to keep in step and nothing a later
+   * tidy-up can edit out of step; two counts built side by side over the same
+   * condition drift the moment somebody changes one of them. That property is
+   * the point, and it is why this is not a second pass.
+   *
+   * With no search the fold is skipped and `scopeCounts` is returned unchanged,
+   * so the rail badge, `D33`'s tiles and the *needs you* line — which reach
+   * `followUpScope` through `shellCounts()` and cannot filter — are untouched.
+   */
+  const searched = options.q
+    ? all.filter((row) => matchesSearch(row, options.q))
+    : all;
+  const counts = options.q ? tally(searched) : scopeCounts;
+
+  const filtered = searched
     .filter((row) => !inGroup || inGroup.has(row.kind))
-    .filter((row) => !options.kind || row.kind === options.kind)
-    .filter((row) => matchesSearch(row, options.q));
+    .filter((row) => !options.kind || row.kind === options.kind);
 
   const page = Math.max(1, options.page ?? 1);
   const start = (page - 1) * FOLLOW_UP_PAGE_SIZE;

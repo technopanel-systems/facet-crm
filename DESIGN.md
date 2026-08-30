@@ -1188,7 +1188,11 @@ for later; none is argued for now, and each would breach D21.
 
 **D59.** A filter chip carries the current search. A chip linking to a bare
 `?type=…` throws the query away and the list silently returns the wrong rows.
-This broke three lists.
+This broke three lists. **And a chip's count is over the scope its own click
+would produce** — respecting the search it carries and ignoring the filter it
+replaces — because a count over the whole scope promises rows the click does not
+deliver, while a count inside the active filter would read zero on every chip but
+the live one.
 
 **D60.** The empty state sits outside the list card, not inside it. D52 decides
 what it says; this decides where. Inside a card with a pagination footer, an

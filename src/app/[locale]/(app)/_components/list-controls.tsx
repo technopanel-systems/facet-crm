@@ -124,10 +124,32 @@ export async function FilterNav({
             size="xs"
             variant={on ? "secondary" : "ghost"}
           >
-            <Link href={href(option.value)} aria-current={on ? "true" : undefined}>
+            {/* **`data-chip`, never `data-slot`** — `Button` sets
+                `data-slot="button"` and spreads props after it, so a `data-slot`
+                passed here would silently REPLACE the component's own marker
+                rather than joining it (`WORKFLOW §5`, and the same trap
+                `/follow-ups`' age cell already carries a comment about). The
+                count is on the chip rather than on its span so one read gets
+                the href, the value and the number together `S45-5`. */}
+            <Link
+              href={href(option.value)}
+              aria-current={on ? "true" : undefined}
+              data-chip={option.value ?? ""}
+              data-count={
+                option.count !== undefined ? String(option.count) : undefined
+              }
+            >
               {option.label}
               {option.count !== undefined ? (
-                <span className="num ms-1.5 opacity-70" dir="ltr">
+                /* **No `ms-*` here.** The chip is `inline-flex` with `gap-1`
+                   from `size="xs"`, and a logical margin resolves against this
+                   span's OWN `dir="ltr"` — so `ms-1.5` compiled to
+                   `margin-left` and in Arabic put its space on the count's
+                   outer edge while the number ran into the label. The gap was
+                   already there; the margin was the bug. Fourth sighting of
+                   `CLAUDE.md`'s rule, after the rail, `/companies` and the
+                   board `D57`. */
+                <span className="num opacity-70" dir="ltr">
                   {option.count}
                 </span>
               ) : null}

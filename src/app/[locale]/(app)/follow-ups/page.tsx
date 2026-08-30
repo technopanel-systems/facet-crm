@@ -129,7 +129,17 @@ export default async function FollowUpsPage({
       />
 
       {rows.length === 0 ? (
-        <p className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
+        // **Marked, like every other list's empty state** — `/companies` and
+        // `/dispatches` both carry one and this screen was the only list
+        // without. Without it a filtered group of nothing renders no
+        // `list-card`, no `data-total` and no marker at all, so a check cannot
+        // tell an empty group from a broken page — and a chip reading 0 has to
+        // be readable as 0 `S45-5`.
+        <p
+          data-slot="follow-ups-empty"
+          data-filtered={q || activeGroup ? "true" : "false"}
+          className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm"
+        >
           {q || activeGroup
             ? t("followUps.emptyFiltered")
             : t("followUps.empty")}
