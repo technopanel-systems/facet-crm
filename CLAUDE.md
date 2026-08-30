@@ -161,7 +161,7 @@ shaped like `<namespace>.<key>` — that asserts no lookup silently failed.
 exactly the wrapping defects a laptop shows.
 
 **A check can be wrong in the direction that matters, and this has happened
-eleven times.** Three shapes. **A wrong assertion:** `§17` once asserted the
+twelve times.** Four shapes. **A wrong assertion:** `§17` once asserted the
 *inverse* of `D20` on its own markers, so it went green over the thing the rule
 forbids. **An assertion that reads nothing:** four page-one reads with no total
 guard, three of them negatives, all correct only because the fixture rows
@@ -171,9 +171,18 @@ an equality that stops holding the moment a pile falls off page one, and went
 red on a screen that had been correct all along. A wrong red burns the suite's
 credibility exactly as a false green does, and it is the shape that gets a
 correct screen "fixed": `S45-1` opened with a founder decision to rewrite
-working code. So — **an assertion prints what it read** (`saw N of TOTAL`), **a
-negative guards on a non-empty read** first, and **a check spanning a paginated
-list asserts across the pages**, never on page one.
+working code. **And the fourth — a check whose two sides come from ONE
+computation, so it balances by construction:** `§25` asserted that `D45`'s three
+kinds sum to the stream's own total, but `streamKindOf` folds five of the six
+event kinds into `observed`, so both sides moved together; it stayed **green**
+under an injection that removed 127 events and turned two other assertions red.
+It could never have seen a whole source disappear. That is the converse of the
+stands-alone rule below: that one keeps a cross-check apart so a disagreement
+names which side moved, and this one says the two sides must have **independent
+origins** at all, or there is nothing that can disagree. So — **an assertion
+prints what it read** (`saw N of TOTAL`), **a negative guards on a non-empty
+read** first, and **a check spanning a paginated list asserts across the pages**,
+never on page one.
 
 **And it prints the read on the GREEN line.** `check()` shows `detail` only on
 failure, so a number parked there is invisible exactly when the check claims to
