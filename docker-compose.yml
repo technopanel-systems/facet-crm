@@ -44,7 +44,15 @@ services:
       # to the tunnel hostname on the office PC; it falls back to localhost here.
       AUTH_URL: ${PUBLIC_URL:-http://localhost:3000}
     ports:
-      - "3000:3000"
+      # Bound to loopback, for the same reason db is. `cloudflared` runs on the
+      # Windows host — it is not a service in this file and never has been — so
+      # it reaches the container over localhost and loses nothing here. What a
+      # LAN-published port adds is a SECOND way in that Cloudflare Access does
+      # not cover: Access sits in front of the tunnel, and a laptop on the
+      # office network that types the machine's address on 3000 has gone round
+      # it. Measured in `0b815db` before this changed — the app answered on the
+      # Wi-Fi address. Do not change this to "3000:3000".
+      - "127.0.0.1:3000:3000"
     healthcheck:
       test:
         ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/api/health || exit 1"]

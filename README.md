@@ -254,9 +254,23 @@ Runs on a company Windows PC behind a Cloudflare Tunnel. Per
 
 - **PostgreSQL is bound to `127.0.0.1`** in `docker-compose.yml`. Only the app
   container and local tools reach it. Never publish it as `5432:5432`.
-- Only the app is public, through the tunnel. `cloudflared` is configured on
-  the Windows host, not in this compose file.
+- **The app is bound to `127.0.0.1` too**, since `0b815db`'s review. It used to
+  publish `3000:3000`, which binds `0.0.0.0`: the app answered on the machine's
+  Wi-Fi address, measured rather than supposed. Only the tunnel is public.
+  `cloudflared` runs on the Windows host — it is not a service in this compose
+  file — so it reaches the container over loopback and nothing is lost.
 - Both services are `restart: always`, so `docker compose up -d` once is enough.
+
+**Put Cloudflare Access in front of the tunnel, and understand what it does not
+cover.** Access is free up to 50 users and Technopanel has about fourteen. An
+employee types their work email and pastes a six-digit code Cloudflare emails
+them — no second account and no second password. Set the session duration to
+**one month**, so it is once per device per month rather than once a day.
+
+**Access protects the tunnel and NOT port 3000.** That is the whole reason the
+app is now loopback-bound, and the two facts belong together: re-publish the
+port on `0.0.0.0` and every Access policy is one LAN address away from being
+skipped. A door on the tunnel with the window open is half a door.
 
 Before real users, on the host machine:
 
@@ -266,6 +280,24 @@ Before real users, on the host machine:
 - [ ] `.wslconfig` memory cap so WSL cannot take the whole 8 GB
 - [ ] Machine on the UPS
 - [ ] Backups — the checklist under **Backups** below
+- [ ] **Confirm `cloudflared`'s ingress points at `http://localhost:3000`.** The
+      app no longer answers on the LAN address, so an ingress naming the
+      machine's IP instead of localhost stops working the moment the port is
+      loopback-bound. This is the one way that change breaks the office PC, and
+      it is a one-line check in the tunnel's own config
+- [ ] **Set `PUBLIC_URL` in `.env`** to the tunnel hostname, with `https://`.
+      `docker-compose.yml` feeds it to `AUTH_URL`, and Auth.js marks the session
+      cookie `Secure` — and prefixes it `__Secure-` — only when that URL is
+      https. Proved by measurement, not assumed: with `AUTH_URL` http the login
+      sets `authjs.session-token; HttpOnly; SameSite=Lax` and **no `Secure`**;
+      with it https the same login sets `__Secure-authjs.session-token;
+      HttpOnly; Secure; SameSite=Lax`. **Forgetting it is silent** — login
+      works, screens render, and a session token crosses a public tunnel
+      without the flag that keeps it off plain HTTP
+- [ ] **Cloudflare Access, with a test code first.** Send one to a
+      `technopanel.com` address and confirm it arrives and is not filed as spam
+      — the mail is cPanel-hosted, so this is worth knowing before fourteen
+      people depend on it
 - [ ] **Pull the plug and confirm it comes back unattended**
 
 RAID is not a backup.
