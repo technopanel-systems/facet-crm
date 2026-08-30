@@ -65,3 +65,8 @@ next-env.d.ts
 .claude-flow/data/
 .claude-flow/logs/
 .claude-flow/sessions/
+
+# database dumps — `npm run backup` writes here by default (BACKUP_DIR moves it).
+# A dump holds every row and every password hash. It is exactly as sensitive as
+# the database, and must never be committed.
+/backups/

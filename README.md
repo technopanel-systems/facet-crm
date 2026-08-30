@@ -265,10 +265,124 @@ Before real users, on the host machine:
 - [ ] Docker Desktop: start on boot
 - [ ] `.wslconfig` memory cap so WSL cannot take the whole 8 GB
 - [ ] Machine on the UPS
-- [ ] Nightly `pg_dump` to the Synology NAS, plus Active Backup for Business
+- [ ] Backups — the checklist under **Backups** below
 - [ ] **Pull the plug and confirm it comes back unattended**
 
 RAID is not a backup.
+
+### Backups
+
+```bash
+npm run backup          # one consistent dump into BACKUP_DIR
+npm run backup:verify   # restore the newest dump twice and prove it matches
+npm run restore -- <dump-file> --to <database> [--force]
+```
+
+**The Synology NAS does not cover the database.** It already sweeps every
+company PC at file level, and that is genuinely a backup of the *files* — but
+PostgreSQL's data directory is being written while it is copied, so what reaches
+the NAS is a torn copy that may not restore. This is *"RAID is not a backup"*
+applied to the backup that already exists. `npm run backup` is the missing
+piece: one **consistent** dump, written into a folder the NAS is already
+sweeping. Nothing here replaces the NAS; it gives the NAS something restorable
+to sweep.
+
+**`pg_dump` runs inside the `db` container, deliberately.** The Windows host has
+no Postgres client tools, and a host `pg_dump` that is not exactly server 17's
+fails in ways that read like corruption rather than like a version error. Inside
+the container the client is always the server's own. `backup:verify` reads the
+image off the running container for the same reason.
+
+**A dump holds every row and every password hash. It is exactly as sensitive as
+the database itself.** The folder it lands in needs the access control the
+database has. `BACKUP_DIR` is set in `.env` and never committed; `/backups/` is
+git-ignored; and no script here prints `POSTGRES_PASSWORD`, puts it in a
+filename, or passes it on a command line where it would land in shell history —
+the value is read from the container's own environment.
+
+**`npm run backup:verify` is what makes a dump a backup.** It restores the
+newest dump twice — into a scratch database beside the live one, and into a
+throwaway `postgres:17-alpine` on an empty volume — and compares every table's
+exact row count against the live database, printing `schema.table: N = N` for
+each, plus the migration ledger's last row on both sides. It fails on a
+mismatch, on a table present on one side only, and on a comparison that read
+nothing (0 = 0 across empty tables is green and proves nothing). It leaves the
+scratch database `facet_restore_check` behind so it can be inspected; the next
+run drops and recreates it.
+
+#### Host-side steps — these cannot be scripted from here
+
+**1. Choose the folder the NAS already sweeps.** On the office PC, find the
+directory Active Backup for Business (or the Synology Drive client) is watching.
+Make a subfolder in it for the dumps, e.g. `D:\NAS\facet-backups`.
+
+**2. Point `BACKUP_DIR` at it.** In `.env` on the office PC, uncomment and set:
+
+```
+BACKUP_DIR=D:\NAS\facet-backups
+```
+
+Nothing else changes — the same script writes to `./backups` on a laptop and to
+the NAS-swept folder here. Then run `npm run backup` once by hand and confirm a
+`facet-<date>.dump` appears in that folder, and that the NAS picks it up.
+
+**3. Schedule it nightly in Windows Task Scheduler.** Task Scheduler →
+**Create Task** (not *Create Basic Task*):
+
+- **General** → Name: `FACET nightly backup`. Select **Run whether user is
+  logged on or not**, and tick **Run with highest privileges**. The account must
+  be the one Docker Desktop runs under, or `docker` will not be found.
+- **Triggers** → New → Daily, start `02:00:00`, recur every 1 day.
+- **Actions** → New → *Start a program*:
+  - **Program/script:** `cmd.exe`
+  - **Add arguments:** `/c npm run backup >> logs\backup.log 2>&1`
+  - **Start in:** `C:\Projects\facet-crm` — the repository root. Required:
+    `docker compose` finds `docker-compose.yml` relative to it.
+- **Conditions** → untick *Start the task only if the computer is on AC power*.
+- **Settings** → tick *Run task as soon as possible after a scheduled start is
+  missed*, so a machine that was off at 02:00 still backs up.
+
+Create `logs\` first (`mkdir logs`). After the first scheduled run, check
+`logs\backup.log` says `wrote … KB, starts with PGDMP`, and check Task
+Scheduler's **Last Run Result** is `0x0`. A failed backup exits non-zero and
+Task Scheduler will show it.
+
+**4. Prove the restore on a second machine.** This is the step that makes the
+backup real, and it is the open half of `WORKFLOW.md` §4 row 43. On a *different*
+PC that has Docker Desktop and this repository:
+
+```bash
+git clone <this repo> facet-crm
+cd facet-crm
+cp .env.example .env          # then fill in POSTGRES_* — any password will do
+docker compose up -d db       # just the database, not the app
+npm install
+npm run restore -- C:\path\to\facet-2026-08-30-020000.dump --to facet_restore_check
+```
+
+Copy one real dump across from the NAS first. Then **look at these four things**
+to know it worked:
+
+- The command printed `Restored … into facet_restore_check.` and exited without
+  an error.
+- The row counts match the office PC. Run:
+  ```bash
+  docker compose exec db psql -U facet -d facet_restore_check -c "SELECT (SELECT count(*) FROM users) AS users, (SELECT count(*) FROM companies) AS companies, (SELECT count(*) FROM dispatches) AS dispatches"
+  ```
+  and compare against the same query run on the office PC against `facet`.
+- The migration ledger came across, so the restored copy can still be migrated:
+  ```bash
+  docker compose exec db psql -U facet -d facet_restore_check -c "SELECT count(*), max(created_at) FROM drizzle.__drizzle_migrations"
+  ```
+  The count must equal the number of `.sql` files in `drizzle/`.
+- A real record reads correctly, Arabic included — pick any company name:
+  ```bash
+  docker compose exec db psql -U facet -d facet_restore_check -c "SELECT name_en, name_ar FROM companies LIMIT 5"
+  ```
+
+If all four hold, the restore is proved and row 43 can be closed. Record the
+date you did it — an untested backup goes stale, so this is worth repeating
+after any Postgres major-version change.
 
 ---
 
