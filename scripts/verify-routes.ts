@@ -246,7 +246,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
  * before this was written. `@/db` never reaches `src/auth/index.ts`, so no
  * secret is demanded. What is spent is the property, not startup behaviour.
  */
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { closeDatabase, db } from "@/db";
 import { sessions, users } from "@/db/schema";
@@ -8707,6 +8707,341 @@ async function main(): Promise<void> {
     }
   }
 
+
+  /* ── 35 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n35. The team table — one row per measured rep, and absent without the flag [D39], [D64], [D32]",
+  );
+  {
+    const setup = (step: string, ok: boolean, detail = ""): boolean => {
+      checks += 1;
+      if (ok) {
+        console.log(`  setup ${step}`);
+        return true;
+      }
+      failures += 1;
+      console.log(`  SETUP FAILED at ${step}${detail ? ` — ${detail}` : ""}`);
+      return false;
+    };
+
+    /** The `<tr data-slot="team-row">` opening tags, in render order. */
+    const rowTags = (body: string) =>
+      [...body.matchAll(/<tr\b[^>]*>/g)]
+        .map((m) => m[0])
+        .filter((tag) => tag.includes('data-slot="team-row"'));
+    const attr = (tag: string, name: string) =>
+      tag.match(new RegExp(`${name}="([^"]*)"`))?.[1] ?? "";
+    /** A rendered whole-metre figure as a number — `formatSqm` groups by
+     *  thousands, and the comparison below is arithmetic, not string shape. */
+    const metres = (shown: string) => Number(shown.replace(/,/g, ""));
+    /**
+     * The block, bounded from its card marker to its footer marker, so a
+     * marker anywhere else on the dashboard can never be read as one inside it.
+     */
+    const blockOf = (body: string): string => {
+      const at = body.indexOf('data-slot="today-team"');
+      const end = body.indexOf('data-slot="today-team-footer"', at);
+      if (at === -1 || end === -1) return "";
+      return body.slice(body.lastIndexOf("<div", at), end);
+    };
+    /** `/follow-ups`' whole-scope total, §31's reader. `-1` is neither marker
+     *  present, which is a failure and never a zero. */
+    const followTotal = (body: string): number => {
+      const m = body.match(/data-slot="list-card"[^>]*data-total="(\d+)"/);
+      if (m) return Number(m[1]);
+      return body.includes('data-slot="follow-ups-empty"') ? 0 : -1;
+    };
+
+    /*
+     * **Absence is half the claim, and it is asserted as a biconditional** —
+     * §19's shape. `D64` says a block that does not qualify is *absent, not
+     * disabled and not empty* `D53`, so a run that only ever looked at the
+     * manager would prove nothing about the flag: a block rendered for
+     * everybody satisfies every other assertion in this section.
+     */
+    for (const who of [
+      { email: "manager@example.test", team: true },
+      { email: "rep-a@example.test", team: false },
+    ] as const) {
+      const label = who.email.split("@")[0];
+      for (const locale of ["en", "ar"] as const) {
+        const { body } = await get(jars[who.email], `/${locale}`);
+        const seen = rowTags(body).length;
+        check(
+          `${label} ${locale}: *** the team table ${
+            who.team ? "renders" : "is ABSENT"
+          } — saw ${seen} team row(s) *** [D64] [D39]`,
+          body.includes('data-slot="today-team"') === who.team &&
+            (who.team ? seen > 0 : seen === 0),
+        );
+      }
+    }
+
+    /*
+     * **The records, read once, and the credit-split guard that licenses the
+     * comparison.**
+     *
+     * The cross-check below compares the table's m² against the dispatch rows
+     * themselves. The two are genuinely different computations — the table
+     * apportions through `creditForDispatches`, the records are summed raw —
+     * and **where a credit split exists they are SUPPOSED to differ**.
+     * Asserting equality anyway would be a check that goes red on a correct
+     * screen, which is exactly `S45-1`: that assertion went red on a fold that
+     * was right and opened a slice to rewrite code with no defect in it. A
+     * wrong red burns this suite exactly as a false green does.
+     *
+     * **So do not remove this guard as over-caution.** It is what keeps the
+     * comparison from being right for the wrong reason in the other direction.
+     */
+    const period = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Riyadh",
+      dateStyle: "short",
+    }).format(new Date());
+    const monthStart = `${period.slice(0, 7)}-01`;
+
+    let splitRows = -1;
+    let repAId = "";
+    const recorded = new Map<string, number>();
+    try {
+      const [rep] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, "rep-a@example.test"))
+        .limit(1);
+      repAId = rep?.id ?? "";
+
+      const splits = (await db.execute(sql`
+        select count(*)::int as n
+        from project_credit_splits s
+        where exists (
+          select 1 from dispatches d
+          where d.project_id = s.project_id
+            and d.status = 'approved'
+            and d.dispatch_date >= ${monthStart}::date
+            and d.dispatch_date < (${monthStart}::date + interval '1 month')
+        )
+      `)) as unknown as { n: number }[];
+      splitRows = Number(splits[0]?.n ?? -1);
+
+      /*
+       * **The record's own figure**: `sum(dispatch_lines.sqm)` per credited rep
+       * `S78`, approved only, inside the period — the three facts
+       * `dispatchesInPeriod` selects on and nothing of the apportionment that
+       * follows it. `round()` on a numeric is half-away-from-zero in Postgres,
+       * which is `roundSqm`'s rule, so the two sides round the same way rather
+       * than agreeing by luck. **The casts are outright** because a value
+       * interpolated into a `sql` template arrives as a bound `text` parameter
+       * and the comparison would die with `42883` (`CLAUDE.md`).
+       */
+      const sums = (await db.execute(sql`
+        select d.user_id::text as user_id,
+               round(coalesce(sum(l.sqm), 0))::int as sqm
+        from dispatches d
+        join dispatch_lines l on l.dispatch_id = d.id
+        where d.status = 'approved'
+          and d.dispatch_date >= ${monthStart}::date
+          and d.dispatch_date < (${monthStart}::date + interval '1 month')
+        group by d.user_id
+      `)) as unknown as { user_id: string; sqm: number }[];
+      for (const row of sums) recorded.set(row.user_id, Number(row.sqm));
+    } catch (error) {
+      splitRows = -1;
+      console.log(`  --    the dispatch records could not be read — ${String(error)}`);
+    }
+
+    for (const locale of ["en", "ar"] as const) {
+      const page = await get(jars["manager@example.test"], `/${locale}`);
+      if (
+        !setup(
+          `${locale}: the manager's dashboard answers 200`,
+          page.status === 200,
+          `saw ${page.status}`,
+        )
+      )
+        continue;
+      const block = blockOf(page.body);
+      if (
+        !setup(
+          `${locale}: the team block and its footer both render`,
+          block !== "",
+          "today-team or today-team-footer is missing",
+        )
+      )
+        continue;
+
+      const rows = rowTags(block);
+      const withFigures = rows.filter((tag) => attr(tag, "data-target") !== "");
+
+      /*
+       * **NOT MEASURED, never `ok`.** One row cannot show that a TABLE is
+       * right: every per-row claim below is satisfied trivially by a single
+       * row, and the fold that puts each figure on the correct rep is exactly
+       * what a one-row fixture cannot tell apart from a fold that puts every
+       * figure on the first rep. Two is the floor.
+       */
+      if (withFigures.length < 2) {
+        console.log(
+          `  --    ${locale}: ${withFigures.length} row(s) with figures of ${rows.length} rendered —` +
+            " a one-row table proves nothing about a table, so it is NOT MEASURED",
+        );
+        continue;
+      }
+
+      /* 1. The row set is `D64`'s first block, read wider `D38`. */
+      check(
+        `${locale}: *** every team row carries a target — the row set is D64's first block read wider — saw ${withFigures.length} of ${rows.length} *** [D39] [D64] [D32]`,
+        rows.length > 0 && withFigures.length === rows.length,
+        `${rows.length - withFigures.length} row(s) with no target`,
+      );
+
+      /*
+       * 2. **One tick for the whole screen, against arithmetic this script does
+       *    itself.** The second side is deliberately NOT the page's own number:
+       *    it is working days counted here from today's Riyadh date, Friday and
+       *    Saturday off and today counted `D32`. Two origins, so a disagreement
+       *    names which side moved. The panel's own figure is printed beside it
+       *    as a third reading rather than asserted as a second.
+       */
+      const [yr, mo, dayOfMonth] = period.split("-").map(Number);
+      let worked = 0;
+      let inMonth = 0;
+      for (let d = 1; d <= new Date(Date.UTC(yr, mo, 0)).getUTCDate(); d += 1) {
+        const weekday = new Date(Date.UTC(yr, mo - 1, d)).getUTCDay();
+        if (weekday === 5 || weekday === 6) continue;
+        inMonth += 1;
+        if (d <= dayOfMonth) worked += 1;
+      }
+      const expected = Math.round((worked / inMonth) * 100);
+      const paces = new Set(
+        [...block.matchAll(/<div\b[^>]*data-slot="team-bar"[^>]*>/g)].map((m) =>
+          attr(m[0], "data-pace"),
+        ),
+      );
+      check(
+        `${locale}: *** every row's tick is one pace and it is this script's own ${expected}% (${worked} of ${inMonth} working days) — saw [${[
+          ...paces,
+        ].join("|")}] over ${rows.length} rows, panel says ${
+          attrOf(page.body, "today-pace", "data-pct") ?? "no panel"
+        } *** [D32] [D39]`,
+        paces.size === 1 && Number([...paces][0]) === expected,
+        `${paces.size} distinct pace value(s)`,
+      );
+
+      /*
+       * 3. **The table's m² against THE RECORDS**, and it stands alone. Merged
+       *    with the assertions above a disagreement would have nothing to point
+       *    at; kept apart, it names which side moved. Guarded by the split
+       *    count read before the loop — see the note there, and `S45-1`.
+       */
+      if (splitRows < 0) {
+        console.log(
+          `  --    ${locale}: the dispatch records were not read — the m² cross-check is NOT MEASURED`,
+        );
+      } else if (splitRows > 0) {
+        console.log(
+          `  --    ${locale}: ${splitRows} credit split(s) fall in ${monthStart.slice(0, 7)} — the table` +
+            " apportions where the records do not, so the two may legitimately differ:" +
+            " the m² cross-check is NOT MEASURED",
+        );
+      } else {
+        const read: string[] = [];
+        const disagreed: string[] = [];
+        for (const tag of withFigures) {
+          const shown = metres(attr(tag, "data-sqm"));
+          const fromRecords = recorded.get(attr(tag, "data-user")) ?? 0;
+          read.push(`${shown}=${fromRecords}`);
+          if (shown !== fromRecords)
+            disagreed.push(`${attr(tag, "data-user")}: ${shown} vs ${fromRecords}`);
+        }
+        check(
+          `${locale}: *** each rep's m² is what the dispatch records themselves say — saw ${read.join(
+            " · ",
+          )} over ${withFigures.length} rows *** [D39] [S78] [S85]`,
+          withFigures.length > 0 && disagreed.length === 0,
+          disagreed.join(" · "),
+        );
+      }
+
+      /*
+       * 4. **rep-a's two counts fold inside rep-a's own waiting list.** Two
+       *    origins: the manager's fold of one company-wide `followUpScope`, and
+       *    the rep's own `/follow-ups` total read over HTTP as himself.
+       *
+       *    **`<=`, not `=`, and that is a property of the data rather than
+       *    slack.** The rep's own scope also holds rows on companies SHARED to
+       *    him, which the fold puts on the owner's row, and rows on a project
+       *    with no live company link, which the fold puts on nobody. Equality is
+       *    therefore not an invariant and asserting it would be a wrong red.
+       *    Exceeding it is impossible under any correct fold, and an
+       *    over-counting fold — a row landing on every rep — is the likeliest
+       *    defect this column has.
+       */
+      const repRow = withFigures.find((tag) => attr(tag, "data-user") === repAId);
+      const repScope = followTotal(
+        (await get(jars["rep-a@example.test"], `/${locale}/follow-ups`)).body,
+      );
+      if (!repAId || !repRow || repScope < 0) {
+        console.log(
+          `  --    ${locale}: rep-a ${
+            repScope < 0 ? "has no readable /follow-ups total" : "has no row in the team table"
+          } — the waiting fold is NOT MEASURED`,
+        );
+      } else {
+        const overdue = Number(attr(repRow, "data-overdue"));
+        const dueSoon = Number(attr(repRow, "data-due-soon"));
+        check(
+          `${locale}: *** rep-a's two counts fold inside his own waiting list — saw ${overdue}+${dueSoon}=${
+            overdue + dueSoon
+          } of a scope of ${repScope} *** [D39] [D34]`,
+          repScope > 0 && overdue + dueSoon <= repScope,
+          `overdue ${overdue} + due soon ${dueSoon} against ${repScope}`,
+        );
+      }
+
+      /*
+       * 5. **No total and no ranking** — `D39`'s last clause, asserted rather
+       *    than assumed. Activity and target sit side by side and are NEVER
+       *    combined into a score, and a footer row is how a table grows one
+       *    without anybody deciding to: `/activity?view=by-rep` holds the only
+       *    `<TableFooter>` in the product, so its absence here is a real
+       *    distinction rather than a tautology.
+       */
+      const cellCounts = rows.map((tag) => {
+        const from = block.indexOf(tag) + tag.length;
+        const to = block.indexOf("</tr>", from);
+        return (block.slice(from, to).match(/<td\b/g) ?? []).length;
+      });
+      check(
+        `${locale}: *** no totals row, and every row is D39's six columns — saw [${cellCounts.join(
+          "|",
+        )}] over ${rows.length} rows *** [D39]`,
+        !block.includes("<tfoot") &&
+          cellCounts.length > 0 &&
+          cellCounts.every((n) => n === 6),
+        block.includes("<tfoot") ? "a tfoot is rendered" : "a row is not six cells",
+      );
+
+      /*
+       * 6. **The marker displacement is deliberate — confirmed from the BUILT
+       *    HTML, not from the source.** `table.tsx` spreads props over its own
+       *    `data-slot`, so `data-slot="team-row"` REPLACES `table-row`; that is
+       *    the `dispatch-row` idiom and it is chosen here. `WORKFLOW §5` records
+       *    a case where the identical displacement was a SLIP that silently took
+       *    an asserted marker off a cell, and a deliberate displacement and a
+       *    slip look the same in the markup. What separates them is this: the
+       *    only `table-row` surviving inside this block is the header's one, and
+       *    every body row carries `team-row` instead.
+       */
+      const survivingTableRows = (block.match(/data-slot="table-row"/g) ?? [])
+        .length;
+      check(
+        `${locale}: the displacement of TableRow's marker is deliberate — saw ${survivingTableRows} table-row (the header's) and ${rows.length} team-row [D24]`,
+        survivingTableRows === 1 && rows.length >= 2,
+        `${survivingTableRows} table-row inside the block`,
+      );
+    }
+  }
 
   /* ── 23 ──────────────────────────────────────────────────────────────── */
 

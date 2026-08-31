@@ -42,11 +42,12 @@
  *
  * Diagnostic only. Nothing is written and nothing is penalised `[07 D6]`.
  */
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
   companies,
+  companyReps,
   quotationThreads,
   repReports,
 } from "@/db/schema";
@@ -210,6 +211,78 @@ export function companySilence(thresholds: QuietThresholds) {
     .leftJoin(qualified, eq(qualified.companyId, companies.id))
     .leftJoin(onHold, eq(onHold.companyId, companies.id))
     .as("silence");
+}
+
+/* ------------------------------------------------------------------ *
+ * Quiet, per rep — `D39`'s fifth column
+ * ------------------------------------------------------------------ */
+
+/**
+ * How many of each rep's companies are quiet — **one grouped query, never one
+ * per rep**.
+ *
+ * `D39`'s team table needs this figure for every row at once, and the honest
+ * way to get it is to group the derivation that already exists rather than to
+ * ask it N times. `companySilence` takes no session precisely so it can be
+ * joined like this; `listCompanies` joins the same subquery for `/companies`'
+ * own quiet count, so the two screens cannot disagree about what quiet means.
+ *
+ * **Its `where` is `listCompanies`' own terms minus the visibility filter**, so
+ * a rep reading `/companies` and a manager reading that rep's row are counting
+ * the same set. Nothing about archived or merged companies is added here for
+ * the same reason: `listCompanies` does not exclude them, and a second opinion
+ * about the scope is how two numbers describing one thing start to differ.
+ *
+ * **`follow-ups.ts`'s `companyQuiet` is deliberately NOT the reader.** It is
+ * the third copy of this derivation and `WORKFLOW §5` records that it has
+ * already drifted from this one once — 100 companies against 36 on one rep. A
+ * manager-facing figure does not come off the copy known to disagree.
+ *
+ * **No session, and the roster is the gate.** The same contract
+ * `dispatchesInPeriod` documents: this function answers about whoever it is
+ * asked about, and its one caller has already run `visibleMeasuredUsersFilter`
+ * to decide who that may be. A visibility filter here would be a second answer
+ * to a question `authz` has already answered.
+ *
+ * **Membership, not visibility** — live `company_reps` rows. That is
+ * `FollowUpRow.owners`' own reading, *every live rep who could act on it*, so
+ * a company shared TO somebody counts on its owner's row and not on the
+ * recipient's, and a company with two reps counts on **both**. The columns of
+ * `D39`'s table therefore do not sum to a company total, which is consistent
+ * with that rule forbidding a total rather than a defect in this count.
+ */
+export async function quietCountsByRep(
+  userIds: string[],
+): Promise<Map<string, number>> {
+  if (userIds.length === 0) return new Map();
+
+  const thresholds = await getQuietThresholds();
+  const silence = companySilence(thresholds);
+
+  const rows = await db
+    .select({
+      userId: companyReps.userId,
+      // `${silence.isQuiet}` renders bare as `"silence_is_quiet"`, which is
+      // safe because every alias in that subquery is prefixed — see the note
+      // on `companySilence`. No cast: it is already boolean, not a bound
+      // parameter.
+      quiet: sql<number>`count(*) filter (where ${silence.isQuiet})`,
+    })
+    .from(companyReps)
+    .innerJoin(companies, eq(companies.id, companyReps.companyId))
+    .innerJoin(silence, eq(silence.companyId, companies.id))
+    .where(
+      and(
+        isNull(companyReps.removedAt),
+        inArray(companyReps.userId, userIds),
+      ),
+    )
+    .groupBy(companyReps.userId);
+
+  // `count()` comes back as a string from the driver, exactly as
+  // `listCompanies` treats its own. A rep with no companies has no row at all,
+  // so the caller reads a missing key as zero rather than this inventing one.
+  return new Map(rows.map((row) => [row.userId, Number(row.quiet)]));
 }
 
 /* ------------------------------------------------------------------ *

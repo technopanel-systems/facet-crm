@@ -31,8 +31,10 @@ import {
 import { cn } from "@/lib/utils";
 import { isWorkingDay, riyadhDayOf } from "@/lib/working-days";
 
+import { paceGeometry } from "./_components/pace";
 import { RequestsBlock } from "./_components/requests-block";
 import { shellCounts } from "./_components/shell-counts";
+import { TeamTable } from "./_components/team-table";
 import { WaitingList } from "./_components/waiting-list";
 
 export const dynamic = "force-dynamic";
@@ -96,6 +98,22 @@ export default async function TodayPage({
   // whether the block exists at all before it costs two queries.
   const mayIssue = session.user.role.canApproveQuotation;
   const mayDecide = session.user.role.canDispatch;
+
+  /*
+   * `D32`'s expected-to-date, computed ONCE for the whole screen.
+   *
+   * It is a property of today, never of a person — working days done this month
+   * over the working days in it — so the panel below and every row of `D39`'s
+   * team table read the same number. Hoisted here when the team table arrived:
+   * two callers deriving it separately is how one tick drifts from another on
+   * the same screen, and a reader comparing a rep's bar against the company's
+   * would have no way to tell which had moved.
+   */
+  const { worked: daysWorked, total: daysInMonth } = monthWorked(
+    riyadhDayOf(new Date()),
+  );
+  // Two plain integers, so the same helper answers at scale 0.
+  const pacePct = percentOf(String(daysWorked), String(daysInMonth), 0);
 
   // `sees_all_reps` gets every measured rep back; everyone else gets exactly
   // their own row. Either way the panel is about the person reading it.
@@ -193,6 +211,9 @@ export default async function TodayPage({
           measured={measured}
           lastMonth={lastMonth}
           quoted={quoted}
+          pacePct={pacePct}
+          daysWorked={daysWorked}
+          daysInMonth={daysInMonth}
           month={format.dateTime(new Date(`${period}T00:00:00Z`), {
             month: "long",
             timeZone: "UTC",
@@ -202,8 +223,8 @@ export default async function TodayPage({
 
       {/* `D64`'s second block, between the target and the waiting list.
           **Absent**, not empty and not disabled `D53`, for anyone holding
-          neither flag — which today is every rep *and* the manager, whose own
-          blocks `D39`-`D41` are not built. */}
+          neither flag — which today is every rep *and* the manager, whose
+          remaining blocks `D40` and `D41` are not built. */}
       {mayIssue || mayDecide ? (
         <RequestsBlock session={session} limit={REQUEST_ROWS} locale={locale} />
       ) : null}
@@ -213,6 +234,22 @@ export default async function TodayPage({
       {/* `D34` takes the **whole** scope: its planned section holds the rows
           that sort last, so a page of the queue would show it empty. */}
       <WaitingList rows={follow.rows} slippingLimit={SLIPPING_ROWS} />
+
+      {/* `D64`'s fourth block, after the waiting list in that rule's fixed
+          order. **Gated before it fetches**, the `RequestsBlock` shape above:
+          a block that does not qualify is absent `D53`, and absent should also
+          cost nothing on the commonest read in the application. `attainment`
+          and `follow` are already derived for the two blocks above, so for a
+          `sees_all_reps` identity this adds two calls and for everyone else it
+          adds none. */}
+      {session.user.role.seesAllReps ? (
+        <TeamTable
+          session={session}
+          attainment={attainment}
+          follow={follow}
+          pacePct={pacePct}
+        />
+      ) : null}
     </div>
   );
 }
@@ -337,19 +374,26 @@ async function TargetPanel({
   lastMonth,
   quoted,
   month,
+  pacePct,
+  daysWorked,
+  daysInMonth,
 }: {
   measured: AchievementRow;
   lastMonth: AchievementRow | undefined;
   quoted: number;
   month: string;
+  /** Computed once by the page, so `D39`'s table cannot draw a different
+   *  tick from this panel's. */
+  pacePct: number;
+  daysWorked: number;
+  daysInMonth: number;
 }) {
   const t = await getTranslations();
 
   const target = measured.targetSqm ?? "0";
-  const { worked, total } = monthWorked(riyadhDayOf(new Date()));
+  const worked = daysWorked;
+  const total = daysInMonth;
 
-  // Two plain integers, so the same helper answers at scale 0.
-  const pacePct = percentOf(String(worked), String(total), 0);
   const achievementPct = percentOf(measured.achievedSqm, target, SQM_SCALE);
 
   // The target's share of the month, rounded to whole metres exactly as the
@@ -527,14 +571,14 @@ function Progress({
   pacePct: number;
   target: string;
 }) {
+  // **The geometry is `paceGeometry`'s and not restated here** — `D39`'s team
+  // table draws the same bar at a smaller size, and a second copy of the
+  // rescale is how the two start disagreeing about where the target sits.
   const reached = Math.max(0, achievementPct);
-  // 100 means "the target"; anything beyond it stretches the track instead of
-  // being thrown away.
-  const scale = Math.max(100, reached);
-  const fillPct = (Math.min(100, reached) / scale) * 100;
-  const overPct = (Math.max(0, reached - 100) / scale) * 100;
-  const tickPct = (pacePct / scale) * 100;
-  const tickOnFill = Math.min(100, reached) >= pacePct;
+  const { scale, fillPct, overPct, tickPct, tickOnFill } = paceGeometry(
+    achievementPct,
+    pacePct,
+  );
 
   return (
     <div className="flex flex-col gap-1.5">

@@ -121,3 +121,26 @@ export function shiftWorkingDays(day: string, workingDays: number): string {
   }
   return new Date(time).toISOString().slice(0, 10);
 }
+
+/**
+ * The Sunday of the week `day` falls in — the start of *this week*.
+ *
+ * **Derived, not chosen.** `S93` makes Friday and Saturday the weekend for
+ * everyone and `WEEKEND_DAYS` above is that rule in code; a week whose weekend
+ * is Friday and Saturday begins on Sunday. So this is arithmetic over a rule
+ * that already exists rather than a boundary somebody picked, which matters —
+ * a week nobody chose becomes the number everyone believes in six months later.
+ *
+ * `D39`'s *logged this week* is the one reader. A Sunday returns itself, and a
+ * Friday or Saturday returns the Sunday that opened the week they close — the
+ * weekend belongs to the week it ends, not the one it precedes, or a Saturday
+ * log would land in a week that has not started.
+ */
+export function weekStart(day: string): string {
+  const time = parse(day);
+  if (Number.isNaN(time)) return day;
+  // `getUTCDay()` is already 0 for Sunday, so the day number IS the offset.
+  return new Date(time - new Date(time).getUTCDay() * MS_PER_DAY)
+    .toISOString()
+    .slice(0, 10);
+}

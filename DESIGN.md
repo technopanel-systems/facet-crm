@@ -534,19 +534,24 @@ case** rather than a design of their own, and `D38`–`D41` are what a flag adds
 This is also what gives Marketing `D67` and the Executive `D68` a sensible
 screen without anyone designing one.
 
-All five flags named above are columns on `roles` today. **Three of the six
+All five flags named above are columns on `roles` today. **Four of the six
 blocks are built** — *My target and pace*, to `D32` entire, including the pace
 tick, both side figures and the overage segment; *Requests waiting on me*, to
-`D65`'s two columns; and *My waiting list*, to `D33` and `D34`. The
-notifications list that stood under `D65`'s heading is gone: it was news `S92`,
-not work, and on a rep's screen it was twenty-five rows of it.
+`D65`'s two columns; *My waiting list*, to `D33` and `D34`; and **the team
+table, to `D39` entire**. The notifications list that stood under `D65`'s
+heading is gone: it was news `S92`, not work, and on a rep's screen it was
+twenty-five rows of it.
 
-**The three that are not built are `D39`, `D40` and `D41`** — the blocks
-`sees_all_reps` and `can_assign` add. A manager therefore gets the target and
-the waiting list and nothing else today, which is the same screen a rep gets;
-that is `D64` behaving correctly on the flags that exist, not a gap in this
-rule. `D65`'s **day count** — *approved · issued · refused* — is the one part of
-a built block still missing, and is a row in `WORKFLOW §5`.
+**The two that are not built are `D40` and `D41`.** A manager gets the target,
+the waiting list and the team table today; the bottleneck card and *Needs a
+decision* are still to come, and `D41` waited on a founder decision about what a
+manager actually decides (`WORKFLOW §5 AD4`, now closed). `D65`'s **day count**
+— *approved · issued · refused* — is the one part of a built block still
+missing, and is a row in `WORKFLOW §5`.
+
+**The team table is where the first block's condition is read across people
+rather than for one**, which is why it needed no rule of its own to decide who
+is in it: `D39` records that, and `D38` is the same move on the panel.
 
 **D69. The dashboard opens with a search field and a Log button, and nothing
 else.** They are the page's **first element**, above the greeting and above this
@@ -784,6 +789,48 @@ plain), logged this week, quiet companies. **The footer says what the table is
 for and is not**: *"Saad logged the most and dispatched the least. That is a
 conversation, not a formula."* Activity and target sit side by side and are
 never combined into a score.
+
+**Which reps are rows: everyone `D64`'s first block would render for, read
+wider.** An active user this identity may read who has a **target row for the
+period** — which is `D64`'s own condition rather than a new predicate, and is
+`D38`'s shape applied per person. **A rep with no target this month does not
+appear at all**: `D32` already says someone unmeasured has no target to be ahead
+or behind of, and two of the five columns have no denominator without one, so a
+blank pace bar would be the empty shell that rule forbids. `S83` makes targets
+independent of role, so a manager who carries one appears in his own table —
+that is the rule behaving correctly and is not special-cased.
+
+**The two counts are the split the waiting list already draws** — overdue is a
+row that has been waiting more than a day and due-soon is a date the rep set for
+today, which is the only way a row on this list reaches zero days `D34`. Nothing
+new is measured. This is **not** `D25`'s missing *due soon*, which asks a
+different question about companies still below their threshold and stays
+`OPEN — not chosen`.
+
+**Logged this week runs from Sunday.** `S93` makes Friday and Saturday the
+weekend, so a week whose weekend is Friday and Saturday begins on Sunday; the
+boundary is derived rather than picked.
+
+**A row's figures follow the book** — the live reps on a company, which is
+already what the waiting list names on each row. Three consequences: a company
+**shared** to a rep counts on its owner's row and not on his; a project with no
+live company link counts for nobody; and a company with two reps counts on
+**both** rows. **So the columns do not sum to a company total — which is this
+rule forbidding a total, not a defect in the counts.** Said here so nobody later
+reads non-summing columns as a bug and corrects them into one.
+
+**The footer carries this rule's meaning and not its example name.** *Saad* above
+illustrates what the footer is FOR; shipping it would put a static claim about a
+named colleague on every manager's screen, false on most days, and **deriving**
+the name instead would be the ranking this rule's last clause forbids. The
+footer is *"Activity and target sit side by side. That is a conversation, not a
+formula"*, beside a line explaining the tick — the one element on the table
+nobody would otherwise read.
+
+**The m² cell links to that rep's dispatches**, which this rule did not ask for:
+`D49`'s Targets table already carries exactly that link from exactly that
+figure, and a second way to reach one set of records is worse than reusing the
+first.
 
 **D40. "Waiting on the coordinator"** — the bottleneck card, because the
 coordinator is one person and **both chains run through her**: the quotation

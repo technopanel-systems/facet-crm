@@ -1172,6 +1172,18 @@
       "dispatches": "To decide",
       "dispatchesEmpty": "No dispatch request is waiting for a decision.",
       "seeAll": "See all"
+    },
+    "team": {
+      "title": "The team · this month",
+      "rep": "Rep",
+      "pace": "Dispatched vs target",
+      "sqm": "m²",
+      "waiting": "Waiting on them",
+      "logged": "Logged",
+      "quiet": "Quiet",
+      "paceOf": "{pct}% of target",
+      "tickNote": "The tick is today's pace.",
+      "notAFormula": "Activity and target sit side by side. That is a conversation, not a formula."
     }
   }
 }

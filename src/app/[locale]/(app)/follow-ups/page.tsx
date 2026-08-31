@@ -224,8 +224,8 @@ export default async function FollowUpsPage({
                     )}
                   </TableCell>
                   <TableCell className="text-start">
-                    {row.ownerNames.length > 0
-                      ? row.ownerNames.join(", ")
+                    {row.owners.length > 0
+                      ? row.owners.map((owner) => owner.name).join(", ")
                       : t("common.none")}
                   </TableCell>
                   <TableCell numeric dir="ltr">

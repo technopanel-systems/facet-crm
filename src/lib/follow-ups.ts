@@ -164,8 +164,15 @@ export type FollowUpRow = {
   /** Null only for a project with no live company link left `[14 §4]`. */
   companyId: string | null;
   companyName: string | null;
-  /** Every live rep who could act on it. A company can have several `[04 Q3]`. */
-  ownerNames: string[];
+  /**
+   * Every live rep who could act on it. A company can have several `[04 Q3]`.
+   *
+   * **The id travels with the name** since `D39`: the team table folds this
+   * scope by rep, and it folds by the answer this field already gives rather
+   * than by a second definition of *whose row is this*. One shape, not two
+   * parallel arrays — `/follow-ups` renders the names off it unchanged.
+   */
+  owners: { id: string; name: string }[];
   /** The calendar day the clock started. */
   since: string;
   /**
@@ -342,7 +349,7 @@ async function quotationNoResponse(
       anchorName: threadLabel(row),
       companyId: row.companyId,
       companyName: row.companyName,
-      ownerNames: [],
+      owners: [],
       since,
       ageDays: calendarDaysBetween(since, now),
       thresholdDays: thresholds.quotationNoResponse,
@@ -482,7 +489,7 @@ async function quotationReturned(
       anchorName: threadLabel(row),
       companyId: row.companyId,
       companyName: row.companyName,
-      ownerNames: [],
+      owners: [],
       since,
       ageDays: calendarDaysBetween(since, now),
       thresholdDays: thresholds.quotationReturned,
@@ -548,7 +555,7 @@ async function catalogueNoResponse(
     anchorName: row.companyName,
     companyId: row.companyId,
     companyName: row.companyName,
-    ownerNames: [],
+    owners: [],
     since: row.sentOn,
     ageDays: calendarDaysBetween(row.sentOn, now),
     thresholdDays: thresholds.catalogueNoResponse,
@@ -646,7 +653,7 @@ async function projectStageUnchanged(
       anchorName: row.projectName,
       companyId: company?.id ?? null,
       companyName: company?.name ?? null,
-      ownerNames: [],
+      owners: [],
       since,
       ageDays: calendarDaysBetween(since, now),
       thresholdDays: thresholds.projectStageUnchanged,
@@ -743,7 +750,7 @@ async function companyQuiet(
       anchorName: row.companyName,
       companyId: row.companyId,
       companyName: row.companyName,
-      ownerNames: [],
+      owners: [],
       since,
       ageDays: calendarDaysBetween(since, now),
       thresholdDays: row.qualifiedId
@@ -845,11 +852,11 @@ async function manualDateDue(session: AuthSession): Promise<FollowUpRow[]> {
 
   /** Every row is due by construction, so the age runs from the date itself. */
   const row = (
-    partial: Omit<FollowUpRow, "kind" | "ownerNames" | "ageDays" | "thresholdDays">,
+    partial: Omit<FollowUpRow, "kind" | "owners" | "ageDays" | "thresholdDays">,
   ): FollowUpRow => ({
     ...partial,
     kind: "date_due",
-    ownerNames: [],
+    owners: [],
     ageDays: calendarDaysBetween(partial.since, now),
     // There is no threshold: the rep's date IS the condition `[25 §18]`.
     thresholdDays: 0,
@@ -1042,13 +1049,21 @@ async function nextFollowUpByAnchor(
 }
 
 /** Live company reps, so a row can say who could act on it. */
-async function repNamesByCompany(
+async function repsByCompany(
   companyIds: string[],
-): Promise<Map<string, string[]>> {
+): Promise<Map<string, { id: string; name: string }[]>> {
   if (companyIds.length === 0) return new Map();
 
   const rows = await db
-    .select({ companyId: companyReps.companyId, name: users.name })
+    .select({
+      companyId: companyReps.companyId,
+      // The id is selected beside the name rather than in a second query:
+      // `/follow-ups` renders the names and `D39`'s team table folds by the
+      // ids, and one column on a query that already runs is cheaper than
+      // either a second query or a second definition of ownership.
+      userId: companyReps.userId,
+      name: users.name,
+    })
     .from(companyReps)
     .innerJoin(users, eq(users.id, companyReps.userId))
     .where(
@@ -1059,10 +1074,10 @@ async function repNamesByCompany(
     )
     .orderBy(asc(users.name));
 
-  const byCompany = new Map<string, string[]>();
+  const byCompany = new Map<string, { id: string; name: string }[]>();
   for (const row of rows) {
     const bucket = byCompany.get(row.companyId) ?? [];
-    bucket.push(row.name);
+    bucket.push({ id: row.userId, name: row.name });
     byCompany.set(row.companyId, bucket);
   }
   return byCompany;
@@ -1090,9 +1105,9 @@ async function gather(
     ...new Set(all.map((row) => row.companyId).filter((id): id is string => !!id)),
   ];
 
-  const [suppressed, repNames, overrides] = await Promise.all([
+  const [suppressed, reps, overrides] = await Promise.all([
     suppressedCompanies(companyIds, thresholds),
-    repNamesByCompany(companyIds),
+    repsByCompany(companyIds),
     nextFollowUpByAnchor(all),
   ]);
 
@@ -1134,7 +1149,7 @@ async function gather(
       )
       .map((row) => ({
         ...row,
-        ownerNames: row.companyId ? (repNames.get(row.companyId) ?? []) : [],
+        owners: row.companyId ? (reps.get(row.companyId) ?? []) : [],
       }))
       // Oldest first: a work queue is ordered by what has waited longest.
       .sort(
