@@ -171,7 +171,7 @@ shaped like `<namespace>.<key>` — that asserts no lookup silently failed.
 exactly the wrapping defects a laptop shows.
 
 **A check can be wrong in the direction that matters, and this has happened
-thirteen times.** Four shapes. **A wrong assertion:** `§17` once asserted the
+fourteen times.** Four shapes. **A wrong assertion:** `§17` once asserted the
 *inverse* of `D20` on its own markers, so it went green over the thing the rule
 forbids. **An assertion that reads nothing:** four page-one reads with no total
 guard, three of them negatives, all correct only because the fixture rows
@@ -182,7 +182,13 @@ red on a screen that had been correct all along. The thirteenth was this shape
 again, met LIVE in session 46: `§40` paired a dashboard tile that `D64`
 removes — with the whole panel — when no target is in force, the month rolled
 over mid-run, and the pairing went red over `tile NaN` on a right screen; a
-section over a conditional block gates on the block's own marker first. A wrong red burns the suite's
+section over a conditional block gates on the block's own marker first. **The
+fourteenth was `§40` AGAIN, hours after its thirteenth**: its parser read the
+tile's number with a regex coupled to the block's exact markup, and session
+47's legitimate move of `dir` onto an inline span inside that block read as
+`tile NaN` on a right screen — caught in-slice, never committed red, and the
+lesson stands anyway: **a check that parses a figure out of markup owns every
+shape that figure may legally take**, and prints what it failed to parse. A wrong red burns the suite's
 credibility exactly as a false green does, and it is the shape that gets a
 correct screen "fixed": `S45-1` opened with a founder decision to rewrite
 working code. **And the fourth — a check whose two sides come from ONE
