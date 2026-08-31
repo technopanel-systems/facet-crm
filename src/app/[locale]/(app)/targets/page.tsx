@@ -5,11 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "@/i18n/navigation";
 import { can, requireSession } from "@/lib/authz";
-import { achievementForPeriod, currentPeriod, periodStart } from "@/lib/targets";
+import {
+  achievementForPeriod,
+  companyAchievementForPeriod,
+  currentPeriod,
+  periodStart,
+} from "@/lib/targets";
 
 import { ListCard } from "../_components/list-controls";
 
 import { AttainmentTable } from "./attainment-table";
+import { CompanyTarget } from "./company-target";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +50,12 @@ function asMonth(period: string): string {
  * **Scoped, never gated** `S83`: a rep reads their own row, `sees_all_reps`
  * reads everyone's, and no permission flag guards the screen. Only the
  * set-target control is gated, by `canSetTargets` `S84`.
+ *
+ * **`S136`'s company target sits above the table**, on the same two conditions
+ * the dashboard applies: `sees_all_reps` to read a company-scope figure at all
+ * `D37` `D38`, and `can_set_company_target` — deliberately narrower than
+ * `canSetTargets` — to set one. It renders when a figure exists **or** the viewer
+ * may set the first one; otherwise it is absent rather than an empty shell `D53`.
  */
 export default async function TargetsPage({
   params,
@@ -65,6 +77,14 @@ export default async function TargetsPage({
 
   const rows = await achievementForPeriod(session, period);
   const maySetTargets = can(session, "canSetTargets");
+
+  // Null for anybody without `sees_all_reps`, so the block below costs one query
+  // for a manager and none for a rep — the gated-before-it-fetches shape the
+  // dashboard already uses for its own flag blocks.
+  const company = await companyAchievementForPeriod(session, period);
+  const maySetCompanyTarget = can(session, "canSetCompanyTarget");
+  const showCompany =
+    company !== null && (company.targetSqm !== null || maySetCompanyTarget);
 
   return (
     <div data-slot="attainment" className="flex flex-col gap-6">
@@ -91,6 +111,14 @@ export default async function TargetsPage({
           {t("common.apply")}
         </Button>
       </form>
+
+      {showCompany && company ? (
+        <CompanyTarget
+          attainment={company}
+          period={period}
+          maySet={maySetCompanyTarget}
+        />
+      ) : null}
 
       {/* No pager: `achievementForPeriod` returns the whole measured set for
           the month, so the footer is a count and nothing else. */}

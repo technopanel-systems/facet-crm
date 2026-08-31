@@ -31,6 +31,14 @@
  *  - can_export: bulk export is super-admin only `[07 B8]`, plus the
  *    executive `[12 §3]`.
  *  - can_impersonate: super admin logs in as a rep `[07 A5 Q5]`.
+ *  - can_set_company_target: **super admin ALONE** `S136`, and it is the one
+ *    flag whose holders are narrower than `can_set_targets`. The Sales Manager
+ *    sets the reps' figures; the figure the whole company — himself included —
+ *    is measured against is not his to set, which is `S82`'s principle one
+ *    register up. The Executive does not hold it either: `S136` was written
+ *    from an answer that said super admin, and narrow is the reversible
+ *    direction. **Widening it is this line and nothing else** — no code reads a
+ *    role name, so a second holder is configuration `S7`, not a deploy.
  *
  * `sees_all_records_readonly` was seeded here until feature slice 6 dropped
  * it: `authz.ts` never consulted it, `25 §28`'s third visibility tier was
@@ -46,6 +54,7 @@ export const ROLE_SEED = [
     canShare: true,
     canExport: true,
     canSetTargets: true,
+    canSetCompanyTarget: true,
     seesAllReps: true,
     canDispatch: true,
     canApproveQuotation: true,
@@ -62,6 +71,7 @@ export const ROLE_SEED = [
     canShare: false,
     canExport: true,
     canSetTargets: true,
+    canSetCompanyTarget: false,
     seesAllReps: true,
     canDispatch: false,
     canApproveQuotation: false,
@@ -78,6 +88,7 @@ export const ROLE_SEED = [
     canShare: true,
     canExport: false,
     canSetTargets: true,
+    canSetCompanyTarget: false,
     seesAllReps: true,
     canDispatch: false,
     canApproveQuotation: false,
@@ -94,6 +105,7 @@ export const ROLE_SEED = [
     canShare: false,
     canExport: false,
     canSetTargets: false,
+    canSetCompanyTarget: false,
     seesAllReps: false,
     canDispatch: true,
     canApproveQuotation: true,
@@ -110,6 +122,7 @@ export const ROLE_SEED = [
     canShare: false,
     canExport: false,
     canSetTargets: false,
+    canSetCompanyTarget: false,
     seesAllReps: false,
     canDispatch: false,
     canApproveQuotation: false,
@@ -126,6 +139,7 @@ export const ROLE_SEED = [
     canShare: false,
     canExport: false,
     canSetTargets: false,
+    canSetCompanyTarget: false,
     seesAllReps: false,
     canDispatch: false,
     canApproveQuotation: false,
@@ -142,6 +156,7 @@ export const ROLE_SEED = [
     canShare: false,
     canExport: false,
     canSetTargets: false,
+    canSetCompanyTarget: false,
     seesAllReps: false,
     canDispatch: false,
     canApproveQuotation: false,

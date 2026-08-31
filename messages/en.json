@@ -747,12 +747,19 @@
     },
     "actions": {
       "setTarget": "Set",
-      "openTarget": "Set a target"
+      "openTarget": "Set a target",
+      "openCompanyTarget": "Set the company target"
     },
     "errors": {
       "setTargetsOnly": "Only a manager or an executive may set targets.",
       "userNotMeasurable": "That person cannot carry a target.",
-      "sqmPositive": "Enter a target above zero."
+      "sqmPositive": "Enter a target above zero.",
+      "setCompanyTargetOnly": "Only a system administrator may set the company target."
+    },
+    "company": {
+      "label": "Company target",
+      "detail": "Set independently of the reps' targets. Neither figure derives from the other.",
+      "achieved": "Dispatched"
     }
   },
   "team": {
@@ -1148,7 +1155,8 @@
       "lastMonth": "Last month",
       "lastMonthOf": "{pct}% of {target} m²",
       "quoted": "Quoted",
-      "quotedUnit": "quotations"
+      "quotedUnit": "quotations",
+      "labelCompany": "{month} company target · dispatched"
     },
     "needsYouZero": "Nothing needs you today",
     "counts": {

@@ -155,6 +155,9 @@ export async function AttainmentTable({
                     action={setTargetAction.bind(null, row.userId)}
                     period={period}
                     currentSqm={row.targetSqm}
+                    label="targets.actions.openTarget"
+                    act="target-edit"
+                    handle="set-target"
                   />
                 </TableCell>
               </TableRow>

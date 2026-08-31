@@ -24,9 +24,9 @@ import {
 import { quotedCount } from "@/lib/quotations";
 import {
   achievementForPeriod,
+  companyAchievementForPeriod,
   currentPeriod,
   previousPeriodStart,
-  type AchievementRow,
 } from "@/lib/targets";
 import { cn } from "@/lib/utils";
 import { isWorkingDay, riyadhDayOf } from "@/lib/working-days";
@@ -115,22 +115,47 @@ export default async function TodayPage({
   // Two plain integers, so the same helper answers at scale 0.
   const pacePct = percentOf(String(daysWorked), String(daysInMonth), 0);
 
-  // `sees_all_reps` gets every measured rep back; everyone else gets exactly
-  // their own row. Either way the panel is about the person reading it.
+  /*
+   * `D64`'s first block, and the one block a flag **widens** rather than reveals.
+   *
+   * **`sees_all_reps` reads it at company scope** `D38` — the whole company's
+   * dispatched square metres against the company target `S136` — and everybody
+   * else reads their own row. It is the same panel either way, not a seventh
+   * block, which is why the branch is over what the panel is HANDED and never
+   * over which component renders.
+   *
+   * **A holder's own row is deliberately not read here.** `S136` says a person
+   * who sells and holds this flag carries no target of their own: their metres
+   * are already inside the company total, so a personal denominator would measure
+   * the same work twice. `/targets` and `D39`'s table are per-person by design and
+   * still show one if it exists.
+   */
+  const company = await companyAchievementForPeriod(session, period);
   const mine = attainment.find((row) => row.userId === session.user.id);
-  // `targetSqm` is null when this identity is not measured this month — never
+  const inScope = company ?? mine;
+  // `targetSqm` is null when nothing is set for this scope this month — never
   // "0" — so the panel is absent rather than showing a target of nothing `D64`.
-  const measured = mine && mine.targetSqm !== null ? mine : undefined;
+  // For a flag holder that means: no company target, no first block at all.
+  const measured = inScope?.targetSqm == null ? undefined : inScope;
 
   // `D32`'s two side figures cost a second attainment derivation and one
   // unpaginated thread read, so they are fetched only when the panel will
   // actually render. A block that does not qualify is absent `D64`, and absent
   // should also cost nothing on the commonest read in the application.
+  //
+  // **`quoted` needs no widening**: `quotedCount` filters through
+  // `visibleQuotationThreadsFilter`, which is unconstrained for `sees_all_reps`,
+  // so a manager's count is already the company's.
+  const previous = previousPeriodStart(period);
   const [lastMonth, quoted] = measured
     ? await Promise.all([
-        achievementForPeriod(session, previousPeriodStart(period)).then(
-          (rows) => rows.find((row) => row.userId === session.user.id),
-        ),
+        company
+          ? companyAchievementForPeriod(session, previous).then(
+              (row) => row ?? undefined,
+            )
+          : achievementForPeriod(session, previous).then((rows) =>
+              rows.find((row) => row.userId === session.user.id),
+            ),
         quotedCount(session),
       ])
     : [undefined, 0];
@@ -211,6 +236,7 @@ export default async function TodayPage({
           measured={measured}
           lastMonth={lastMonth}
           quoted={quoted}
+          scope={company ? "company" : "own"}
           pacePct={pacePct}
           daysWorked={daysWorked}
           daysInMonth={daysInMonth}
@@ -374,14 +400,26 @@ async function TargetPanel({
   lastMonth,
   quoted,
   month,
+  scope,
   pacePct,
   daysWorked,
   daysInMonth,
 }: {
-  measured: AchievementRow;
-  lastMonth: AchievementRow | undefined;
+  /**
+   * **The two fields this panel actually reads, and nothing more.**
+   *
+   * It never touched `userId`, `userName` or the three breakdown figures, so
+   * narrowing the prop from `AchievementRow` is what lets `D38` be literal: one
+   * component serves both scopes, and there is no copy to drift. `AchievementRow`
+   * and `CompanyAttainment` both satisfy it structurally.
+   */
+  measured: PanelFigures;
+  lastMonth: PanelFigures | undefined;
   quoted: number;
   month: string;
+  /** `D38` — which question this panel is answering. A DOM marker rather than a
+   *  tone or a layout change: the panel is the same one either way. */
+  scope: "own" | "company";
   /** Computed once by the page, so `D39`'s table cannot draw a different
    *  tick from this panel's. */
   pacePct: number;
@@ -421,10 +459,21 @@ async function TargetPanel({
       : null;
 
   return (
-    <Card data-slot="today-target">
+    <Card data-slot="today-target" data-scope={scope}>
       <CardHeader>
         <CardTitle className="text-start text-sm">
-          {t("today.target.label", { month })}
+          {/* **The words say which scope this is, and the panel does not
+              otherwise change.** `D38` asks for the same signature panel read
+              wider — that is about the panel, not its title — and a manager who
+              cannot tell whose 5,082 he is reading is exactly the confusion
+              `25a` surfaced: two correct figures answering different questions,
+              indistinguishable on screen. */}
+          {t(
+            scope === "company"
+              ? "today.target.labelCompany"
+              : "today.target.label",
+            { month },
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
@@ -504,6 +553,16 @@ async function TargetPanel({
     </Card>
   );
 }
+
+/**
+ * What `D32`'s panel reads, and the whole of it.
+ *
+ * A person's row `S83` and the company's figure `S136` are different decisions
+ * over different tables, and this is the shape they have in common — which is why
+ * `D38` can be *the same signature panel read wider* rather than a second one.
+ * `null` is *not measured*, never zero `D32`.
+ */
+type PanelFigures = { targetSqm: string | null; achievedSqm: string };
 
 /** `D32`'s two small figures, beneath the bar. `D12`'s section label, then the
  *  figure, then one line of what it is measured against. */

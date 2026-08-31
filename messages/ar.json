@@ -747,12 +747,19 @@
     },
     "actions": {
       "setTarget": "تحديد",
-      "openTarget": "تحديد هدف"
+      "openTarget": "تحديد هدف",
+      "openCompanyTarget": "تحديد هدف الشركة"
     },
     "errors": {
       "setTargetsOnly": "تحديد الأهداف للمدير أو الإدارة التنفيذية فقط.",
       "userNotMeasurable": "هذا الشخص لا يمكن أن يحمل هدفًا.",
-      "sqmPositive": "أدخل هدفًا أكبر من صفر."
+      "sqmPositive": "أدخل هدفًا أكبر من صفر.",
+      "setCompanyTargetOnly": "تحديد هدف الشركة لمدير النظام فقط."
+    },
+    "company": {
+      "label": "هدف الشركة",
+      "detail": "يُحدّد مستقلاً عن أهداف المندوبين. ولا يُشتقّ أي من الرقمين من الآخر.",
+      "achieved": "المُسلَّم"
     }
   },
   "team": {
@@ -1148,7 +1155,8 @@
       "lastMonth": "الشهر الماضي",
       "lastMonthOf": "{pct}% من {target} م²",
       "quoted": "تم التسعير",
-      "quotedUnit": "عرض سعر"
+      "quotedUnit": "عرض سعر",
+      "labelCompany": "هدف الشركة لـ {month} · المُسلَّم"
     },
     "needsYouZero": "لا شيء يحتاج إليك اليوم",
     "counts": {

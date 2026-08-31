@@ -33,7 +33,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { db } from "@/db";
-import { targets, users } from "@/db/schema";
+import { companyTargets, targets, users } from "@/db/schema";
 import { withAudit } from "@/lib/audit";
 import {
   can,
@@ -53,6 +53,18 @@ export type TargetHistoryRow = {
   effectiveFrom: Date;
   setByName: string;
   createdAt: Date;
+};
+
+/**
+ * `S136` — the company's figure for a month, and what was dispatched against it.
+ *
+ * `targetSqm` is null when nobody has set one, exactly as `AchievementRow`'s is:
+ * **not measured is not measured at nothing**, so the panel is absent rather than
+ * showing a target of zero `D32`, `D53`.
+ */
+export type CompanyAttainment = {
+  targetSqm: string | null;
+  achievedSqm: string;
 };
 
 export type AchievementRow = {
@@ -167,6 +179,115 @@ export async function setTarget(
       action: "target.set",
       entityType: "user",
       entityId: userId,
+      after: { period: created.period, sqm: created.sqm },
+    });
+    return created;
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * The company's own target `S136`
+ * ------------------------------------------------------------------ */
+
+/**
+ * The company target in force for a month, or null when nobody has set one.
+ *
+ * **The same supersession as a person's, and it lives here for that reason.**
+ * `S84` and `S110` make a correction a superseding row rather than an edit, so
+ * the row that applies is the greatest `effective_from`, then `created_at` for a
+ * same-instant correction — which is exactly what `achievementForPeriod` step 4
+ * does per person. Two tables, one ordering, one module: written apart, the two
+ * would drift and a screen would show a corrected figure beside a stale one.
+ */
+export async function companyTargetFor(period: string): Promise<string | null> {
+  const [row] = await db
+    .select({ sqm: companyTargets.sqm })
+    .from(companyTargets)
+    .where(eq(companyTargets.period, periodStart(period)))
+    .orderBy(desc(companyTargets.effectiveFrom), desc(companyTargets.createdAt))
+    .limit(1);
+  return row?.sqm ?? null;
+}
+
+/**
+ * `D38` — `D64`'s first block read at company scope, for `sees_all_reps`.
+ *
+ * **Null for anybody else**, so the caller renders nothing: `D37` says nothing on
+ * a rep's dashboard is company-wide, and a block that does not qualify is absent
+ * rather than refused `D53`. This is the read side of the same widening
+ * `visibleMeasuredUsersFilter` expresses for the per-person rows.
+ *
+ * **The achievement is derived over the DISPATCHES, never by summing the
+ * per-person rows, and `S136` says why**: `achievementForPeriod` keeps only shares
+ * whose user is in `measuredIds` — active and visible — so a share credited to a
+ * **deactivated** rep `S111` is dropped from every row it returns, and their sum
+ * would understate the company by exactly the work of anyone who has left. Two
+ * routes to a number that look interchangeable and are not.
+ *
+ * **No new SQL, and that is the point.** A company-wide dispatched sum is exactly
+ * where the qualifier trap lives — a column in a `sql` template losing its table
+ * in a correlated subquery with no join, silently returning the wrong figure
+ * (`CLAUDE.md`, three sightings). `dispatchesInPeriod` already encodes *approved,
+ * inside the period, summed from the lines* `S72` `S116`, and its subquery already
+ * names both tables outright. Reusing it makes the trap unreachable rather than
+ * navigated, and reuses `S72`'s enforcement point instead of copying it.
+ */
+export async function companyAchievementForPeriod(
+  session: AuthSession,
+  period: string,
+): Promise<CompanyAttainment | null> {
+  if (!session.user.role.seesAllReps) return null;
+
+  const start = periodStart(period);
+  const dispatched = await dispatchesInPeriod(start, nextPeriodStart(period));
+
+  let total = ZERO;
+  for (const dispatch of dispatched) {
+    total += toScaled(dispatch.sqm, SQM_SCALE);
+  }
+
+  return {
+    targetSqm: await companyTargetFor(start),
+    achievedSqm: fromScaled(total, SQM_SCALE),
+  };
+}
+
+/**
+ * Set the company target `S136`. **Always an INSERT**, as `setTarget` is — a
+ * same-month correction is a superseding row and nothing here updates or deletes
+ * `S84`, `S110`.
+ *
+ * **Gated on `can_set_company_target`, not on `can_set_targets`.** The Sales
+ * Manager holds the latter, and `S136` deliberately keeps the person who divides
+ * the work across the reps from setting the figure the whole company — himself
+ * included — is measured against.
+ */
+export async function setCompanyTarget(
+  session: AuthSession,
+  period: string,
+  sqm: string,
+): Promise<typeof companyTargets.$inferSelect> {
+  if (!can(session, "canSetCompanyTarget")) {
+    throw new RuleError("targets.errors.setCompanyTargetOnly");
+  }
+
+  if (toScaled(sqm, SQM_SCALE) <= ZERO) {
+    throw new RuleError("targets.errors.sqmPositive", "sqm");
+  }
+
+  return withAudit(session.actor, async (tx, log) => {
+    const [created] = await tx
+      .insert(companyTargets)
+      .values({ period: periodStart(period), sqm, setBy: session.user.id })
+      .returning();
+
+    // `entity_type` is free text on `audit_log`, so the company target names
+    // itself rather than borrowing `user` the way `target.set` does — there is no
+    // person this row hangs on.
+    log({
+      action: "company_target.set",
+      entityType: "company_target",
+      entityId: created.id,
       after: { period: created.period, sqm: created.sqm },
     });
     return created;

@@ -524,9 +524,14 @@ them after. There is **one** dashboard, and six blocks:
 not qualify is absent, not disabled and not empty `D53`.
 
 **The first block is the exception, in two ways.** Its condition is data rather
-than a flag — a target row exists for this person `S83`, `S84` — and it is the
+than a flag — a target row exists for this person `S83`, `S84`, or, for a holder
+of `sees_all_reps`, a **company** target row for the month `S136` — and it is the
 only block a flag *widens* instead of revealing: holding `sees_all_reps` reads
 it at company scope, which is `D38` and not a seventh block.
+
+**The widening ships from `25b`, and the count of six is unchanged by it.** `D38`
+is not a seventh block, so building it moves no block from unbuilt to built: it
+completes the first one's other half. The two still unbuilt are `D40` and `D41`.
 
 **A person holding none of the flags gets the target and the waiting list**,
 which is exactly the rep's screen. So `D32`–`D37` are this rule's **no-flag
@@ -536,7 +541,8 @@ screen without anyone designing one.
 
 All five flags named above are columns on `roles` today. **Four of the six
 blocks are built** — *My target and pace*, to `D32` entire, including the pace
-tick, both side figures and the overage segment; *Requests waiting on me*, to
+tick, both side figures and the overage segment, **and since `25b` at company
+scope for `sees_all_reps` `D38` `S136`**; *Requests waiting on me*, to
 `D65`'s two columns; *My waiting list*, to `D33` and `D34`; and **the team
 table, to `D39` entire**. The notifications list that stood under `D65`'s
 heading is gone: it was news `S92`, not work, and on a rep's screen it was
@@ -783,6 +789,17 @@ the team table `D39`. Nothing here is keyed to the word "rep".
 not a block of its own: it is `D64`'s first block **read wider**, and
 `sees_all_reps` is what widens it.
 
+**What it is measured against is the company target `S136`** — one figure for the
+month, set as a decision of its own by a holder of `can_set_company_target`, and
+**never the reps' targets summed**, which `S136` forbids reading as its total. The
+achievement beside it is every approved dispatch in the month, not the per-person
+rows added up: those count only the people the reader may see, so a share credited
+to a deactivated rep `S111` is missing from all of them. **The title says which
+scope it is** — the panel is the same one, and a figure whose subject a reader
+cannot name is the confusion `25a` surfaced rather than a rule satisfied. With no
+company target set, the block is **absent** `D32` `D53`, and a holder's own target
+row is not read here: `S136` says they carry none.
+
 **D39. The team table**: one row per rep — a small pace bar with the tick, m²
 dispatched of target, waiting-on-them as two counts (overdue in red, due soon
 plain), logged this week, quiet companies. **The footer says what the table is
@@ -1021,6 +1038,14 @@ against on another. The edit control renders **per row** for `can_set_targets`,
 and **not in a cell**: `D58` bans inline cell editing and this rule asks for a
 control on every row, so the row carries a disclosure of its own beneath its
 figures. Merging them is what frees the seventh slot for Activity.
+
+**`S136`'s company target sits ABOVE the table, not as a row in it**, carrying the
+same pairing — the figure and what was dispatched against it — for the one target
+that is nobody's. This rule says *one row per rep* and the table's first column is
+**Person**: as a row a company would make that column a lie. It reuses the per-row
+control rather than copying it, so `D58` is satisfied the same way, and it follows
+two different flags — `sees_all_reps` to see it at all `D38`, and
+`can_set_company_target` to set it, which is narrower.
 
 **The built rail carries seven**, since session `28b` merged the two screens
 and deleted `/performance`. It had carried eight until then, deliberately —

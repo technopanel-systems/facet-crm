@@ -457,6 +457,16 @@ export const roles = pgTable(
     canShare: boolean("can_share").notNull().default(false),
     canExport: boolean("can_export").notNull().default(false),
     canSetTargets: boolean("can_set_targets").notNull().default(false),
+    /**
+     * `S136` — **narrower than `can_set_targets`, deliberately.** That flag sets
+     * a PERSON's figure and the Sales Manager holds it; this one sets the figure
+     * the whole company — the holder included — is measured against, which is
+     * `S82`'s principle one register up. Super Admin alone today, and who holds
+     * it is configuration `S7`, not code.
+     */
+    canSetCompanyTarget: boolean("can_set_company_target")
+      .notNull()
+      .default(false),
     seesAllReps: boolean("sees_all_reps").notNull().default(false),
     canDispatch: boolean("can_dispatch").notNull().default(false),
     canApproveQuotation: boolean("can_approve_quotation")
@@ -643,6 +653,40 @@ export const targets = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("targets_user_period_idx").on(t.userId, t.period)],
+);
+
+/**
+ * `S136` — the company's own target for a month.
+ *
+ * **A separate table rather than a nullable `user_id` on `targets`, and the
+ * reason is the rule.** A company target and a rep target are two independent
+ * decisions — *neither derives from the other* — so they are two independent row
+ * sets, and the schema says so rather than a convention saying it. A nullable FK
+ * meaning *this row is the company* would make `targets.user_id` mean two things,
+ * leave every present and future reader to remember the null, and drop the
+ * company row **silently** from any `innerJoin` onto `users`.
+ *
+ * Otherwise it is `targets` exactly, minus the person: same columns, same absence
+ * of a unique key — a same-month correction is a **superseding insert** `S84`
+ * `S110`, and `effective_from` then `created_at` decides which row applies, which
+ * is the one ordering `lib/targets.ts` owns for both tables.
+ */
+export const companyTargets = pgTable(
+  "company_targets",
+  {
+    id: pk(),
+    /** First day of the month the target is for. */
+    period: date("period").notNull(),
+    sqm: numeric("sqm", SQM).notNull(),
+    effectiveFrom: timestamp("effective_from", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    setBy: uuid("set_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [index("company_targets_period_idx").on(t.period)],
 );
 
 /* ------------------------------------------------------------------ *

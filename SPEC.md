@@ -714,6 +714,38 @@ the split on the project rather than the quotation, so nothing yet decides
 credit at the moment a dispatch is approved. When it does, it writes that same
 dated row and the telling follows it.
 
+**S136.** **A company target is one figure for one month, set as a decision of its
+own.** Square metres, like every target (S83), and a **dated row** like every target
+(S84, S110) — a correction is a superseding row, never an edit.
+
+**It does not derive from the reps' targets, and they do not derive from it.** Six reps
+at 1,000 against a company figure of 6,000 is a coincidence, not an identity: the split
+across people is one decision and the company figure is another, and either may total
+more or less than the other. Nothing sums one into the other, and no screen may present
+one as the other's total.
+
+**It is set by a holder of `can_set_company_target`, which is a NEW permission flag
+introduced by this rule, held by Super Admin alone.** It is new because **no existing
+flag draws this line**. `can_set_targets` sets a person's figure (S83) and is held by
+the Sales Manager, so gating on it would make the person who divides the work across
+the reps also the person who sets the figure the whole company — themselves included —
+is measured against, which is S82's principle one register up. `can_export` and
+`can_impersonate` happen to exclude the right people but mean other acts, and a flag
+that draws a line while meaning something else cannot be audited. Who holds this one is
+configuration (S7), not code: widening it is a seed row, not a deploy.
+
+**A person who sells and holds `sees_all_reps` carries no target of their own.** Their
+square metres are already part of the company total — S78 credits the rep named on the
+dispatch, whoever that is — so a personal target would measure the same work a second
+time against a second denominator. Nothing forbids such a row, because S83 keeps
+targets independent of role; nothing reads one either.
+
+**The company's achievement is derived from dispatches** (S85), over every approved
+dispatch in the month and **not** by summing the per-person rows — **because a share
+credited to a deactivated rep is dropped from every one of those rows** (S111), so
+their sum understates the company by exactly the work of anyone who has left. The two
+routes do not give the same number, and only one of them is this figure.
+
 ---
 
 ## 12. The waiting list — the core loop

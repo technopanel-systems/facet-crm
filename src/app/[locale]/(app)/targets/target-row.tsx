@@ -31,32 +31,47 @@ type Action = (state: FormState, formData: FormData) => Promise<FormState>;
  * another person's input — the same reasoning as the quotation line editors.
  * Setting a target never edits: `setTarget` writes a superseding row `S84`,
  * and the field shows what is in force now.
+ *
+ * **`S136`'s company target reuses this component rather than copying it**, which
+ * is why the label and the two DOM handles are props. It is the same control over
+ * a different decision: a figure, a period, and an INSERT that supersedes. What
+ * it is NOT is a rep row — `D49`'s table is one row per person and a company is
+ * not one — so the caller places it, and only the handles have to differ, because
+ * `verify:routes` §17 finds a form by `data-act` and two forms sharing one would
+ * be ambiguous.
  */
 export function TargetRow({
   action,
   period,
   currentSqm,
+  label,
+  act,
+  handle,
 }: {
   action: Action;
   period: string;
   currentSqm: string | null;
+  /** A literal union rather than `string`: `t()` here is loose enough to accept
+   *  any key, and a typo would ship as visible `targets.actions.…` text that only
+   *  `verify:routes` §12 would catch. */
+  label: "targets.actions.openTarget" | "targets.actions.openCompanyTarget";
+  /** The `<details>` marker. */
+  act: string;
+  /** The form's `data-act` — §17's handle, and it must be unique on the page. */
+  handle: string;
 }) {
   const t = useTranslations();
   const [state, formAction, pending] = useActionState(action, emptyFormState);
   const error = state.error ?? state.fieldErrors?.sqm;
 
   return (
-    <Disclosure
-      label={t("targets.actions.openTarget")}
-      open={rejected(state)}
-      act="target-edit"
-    >
+    <Disclosure label={t(label)} open={rejected(state)} act={act}>
       {/* `data-act` is `verify:routes` §17's handle — a bound action moved
           into a disclosure is exactly the shape that hung, and a translated
           string could not tell this form from another. */}
       <form
         action={formAction}
-        data-act="set-target"
+        data-act={handle}
         className="flex flex-wrap items-center gap-2"
       >
         <input type="hidden" name="period" value={period} />

@@ -102,13 +102,14 @@ import {
 } from "@/lib/quotations";
 import { createReport } from "@/lib/reports";
 import { grantShare } from "@/lib/sharing";
-import { periodStart, setTarget } from "@/lib/targets";
+import { periodStart, setCompanyTarget, setTarget } from "@/lib/targets";
 
 import {
   COMMENTS,
   FOLLOW_UPS,
   REPORTS,
   SHARES,
+  COMPANY_TARGETS,
   TARGETS,
 } from "./seed/demo/activity";
 import {
@@ -274,6 +275,7 @@ const RECORD_TABLES = [
   "duplicate_flags",
   "non_duplicates",
   "targets",
+  "company_targets",
   "attachments",
 ] as const;
 
@@ -1037,6 +1039,15 @@ function planActivity(): void {
     });
   }
 
+  /* `S136` — one figure a month, set independently of the rows above. The
+     current month is set twice, so the supersession `S84` is exercised rather
+     than assumed: 6,000 is in force and 5,500 must appear on no screen. */
+  for (const row of COMPANY_TARGETS) {
+    on(row.day, `company target -${row.period}m`, async () => {
+      await setCompanyTarget(who(row.by), monthsBack(row.period), row.sqm);
+    });
+  }
+
   for (const row of SHARES) {
     on(row.day, `share ${row.type} ${row.target}`, async () => {
       const target =
@@ -1134,6 +1145,7 @@ async function report(): Promise<void> {
     ["  · signals", await countOf("rep_report_signals")],
     ["comments", await countOf("comments")],
     ["targets", await countOf("targets")],
+    ["company targets", await countOf("company_targets")],
     ["shares", await countOf("record_shares")],
     ["credit splits", await countOf("project_credit_splits")],
     ["notifications", await countOf("notifications")],

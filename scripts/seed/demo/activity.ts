@@ -209,8 +209,11 @@ export const REPORTS: readonly ReportEntry[] = [
  * exactly on it, and **Majed carries no target at all** — `D64`'s first block
  * is absent for him rather than empty, which is the rule's own distinction.
  *
- * Abdulrahman carries one and dispatches nothing, which is honest rather than
- * broken: `S83` says targets are optional per person and independent of role.
+ * **Abdulrahman carries none since `S136`.** He held one until session `25b`;
+ * the rule says a person who sells and holds `sees_all_reps` has no target of
+ * their own, because their metres are already in the company total. `S83` is
+ * untouched — a target is still optional per person and independent of role —
+ * and nothing forbids such a row; nothing reads one either.
  *
  * Faisal's current month is set **twice** — `S84` makes a correction a
  * superseding row, never an overwrite, and `/targets` shows both.
@@ -235,7 +238,54 @@ export const TARGETS: readonly TargetEntry[] = [
   { user: "faisal", period: 0, sqm: "800", by: "abdulrahman", day: 16 },
   { user: "saad", period: 0, sqm: "3200", by: "abdulrahman", day: 24 },
   { user: "turki", period: 0, sqm: "1000", by: "abdulrahman", day: 24 },
-  { user: "abdulrahman", period: 0, sqm: "400", by: "khalid", day: 23 },
+  /*
+   * **Abdulrahman carries no row, and that is `S136` rather than an omission.**
+   * He held a personal 400 m² until session `25b`, set by the Executive, and his
+   * dashboard read *0 of 400* beside a team table saying his reps had dispatched
+   * 5,082 — two correct figures answering different questions. `S136` says a
+   * person who sells and holds `sees_all_reps` carries no target of their own:
+   * their metres are already inside the company total, so a personal denominator
+   * would measure the same work twice. **It was not converted into the company
+   * figure either** — the rule makes the two independent decisions, so deriving
+   * one from the other is the very thing it forbids.
+   *
+   * Consequence, so nobody reads it as a defect: `D39`'s team table drops from
+   * four rows to three, because it shows only people with a target row.
+   */
+] as const;
+
+/* ------------------------------------------------------------------ *
+ * The company target `S136` — one figure a month, set independently
+ * ------------------------------------------------------------------ */
+
+/**
+ * **Two rows for the current month, and the pair is the point.** `S84` makes a
+ * correction a superseding row rather than an edit, so a fixture with one row
+ * cannot tell a reader that picks the row in force from one that picks any row.
+ * 5,500 was set first and 6,000 supersedes it: **6,000 is what every screen must
+ * show**, and 5,500 appearing anywhere is the defect.
+ *
+ * **It is NOT the sum of the reps' targets** — those are 800 + 3,200 + 1,000 =
+ * 5,000 for this month, deliberately unequal to 6,000. A fixture where the two
+ * agreed would let a panel that summed the rep rows pass every assertion.
+ *
+ * Set by the super admin, the only holder of `can_set_company_target` `S136`.
+ */
+export type CompanyTargetEntry = {
+  /** Months back from the current one. */
+  period: number;
+  sqm: string;
+  /** Who set it — needs `can_set_company_target` `S136`. */
+  by: PersonKey;
+  /** Days ago the act happened. */
+  day: number;
+};
+
+export const COMPANY_TARGETS: readonly CompanyTargetEntry[] = [
+  { period: 1, sqm: "5000", by: "admin", day: 55 },
+  { period: 0, sqm: "5500", by: "admin", day: 24 },
+  /* the correction `S84` — a second row, never an edit of the first */
+  { period: 0, sqm: "6000", by: "admin", day: 16 },
 ] as const;
 
 /* ------------------------------------------------------------------ *

@@ -9043,6 +9043,394 @@ async function main(): Promise<void> {
     }
   }
 
+  /* ── 36 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n36. The company target — D64's first block read wider, and absent without the flag [D38], [S136], [D64], [D32]",
+  );
+  {
+    /*
+     * **`D38` said what is DISPLAYED and nothing said what it is measured
+     * against, which is why this was unbuilt rather than broken.** `25a` made it
+     * visible: the manager's panel read *0 of 400* — his own personal credit
+     * `S78` — beside a team table saying his reps had dispatched thousands. Both
+     * figures were correct and only one of them was the question `D38` asks.
+     * `S136` is the rule that answers it, and this section is that rule driven.
+     *
+     * **Nothing checked this and nothing could.** `§18` asserts the panel for
+     * **rep-a**, so it is green whatever a manager sees; `§35` reads the team
+     * table and never the panel above it. Neither moves under the defect this
+     * section exists for, which is why it is a section rather than a widening of
+     * one of them.
+     *
+     * **Two flags, two questions, deliberately not the same.** `sees_all_reps`
+     * decides whether a company-scope figure may be READ `D37` `D38`;
+     * `can_set_company_target` — the super admin alone, and narrower than
+     * `can_set_targets`, which the Sales Manager holds — decides whether it may
+     * be SET `S136`. So the manager is the identity that proves read-without-
+     * write, and a third jar is opened HERE rather than in `§2`: added to that
+     * loop it would drive every route twice more in both locales and scatter
+     * this section's cost across the whole run.
+     *
+     * **This m² cross-check needs no credit-split guard and `§35`'s does.** That
+     * one compares a PER-REP figure, which apportions, against records that do
+     * not, so a split makes them legitimately differ and it reports NOT MEASURED
+     * rather than a wrong red `S45-1`. A split only moves metres BETWEEN reps:
+     * it cannot change the company total, which is every approved dispatch in
+     * the month whoever is credited. So this comparison holds under exactly the
+     * condition that suspends `§35`'s — a property of the figure, not an
+     * oversight here.
+     */
+    const setup = (step: string, ok: boolean, detail = ""): boolean => {
+      checks += 1;
+      if (ok) {
+        console.log(`  setup ${step}`);
+        return true;
+      }
+      failures += 1;
+      console.log(`  SETUP FAILED at ${step}${detail ? ` — ${detail}` : ""}`);
+      return false;
+    };
+
+    /** A rendered whole-metre figure as a number — `formatSqm` groups by
+     *  thousands, so the comparison is arithmetic, not string shape. `NaN` is a
+     *  missing marker, which fails every comparison below and is never a zero. */
+    const metres = (shown: string | null) =>
+      shown === null ? Number.NaN : Number(shown.replace(/,/g, ""));
+    const actForm = (body: string, act: string): string | undefined =>
+      body.match(new RegExp(`<form[^>]*data-act="${act}"[\\s\\S]*?</form>`))?.[0];
+    const envelope = (form: string): FormData => {
+      const fields = new FormData();
+      for (const input of form.matchAll(/<input[^>]*>/g)) {
+        const name = input[0].match(/name="([^"]+)"/)?.[1];
+        if (!name?.startsWith("$ACTION")) continue;
+        fields.append(
+          name,
+          unescapeHtml(input[0].match(/value="([^"]*)"/)?.[1] ?? ""),
+        );
+      }
+      return fields;
+    };
+
+    const period = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Riyadh",
+      dateStyle: "short",
+    }).format(new Date());
+    const monthStart = `${period.slice(0, 7)}-01`;
+
+    /*
+     * **Both sides of every claim below come from somewhere the page did not.**
+     * `d66e1a0` is the shape this avoids: an assertion whose two sides are one
+     * computation balances by construction and can watch a whole source vanish
+     * without moving. So the metres are summed in Postgres over `dispatches`
+     * joined to `dispatch_lines` — the three facts `dispatchesInPeriod` selects
+     * on, and none of the arithmetic after it — and the denominator is read from
+     * `company_targets` with its own supersession ordering.
+     *
+     * **Every column is alias-qualified and every interpolation is cast.** A
+     * `sql` template's bare column resolves inside the inner table when nothing
+     * joins, silently returning zero; an interpolated value arrives as a bound
+     * `text` parameter and dies with `42883` (`CLAUDE.md`, four sightings
+     * between them).
+     */
+    let recorded = -1;
+    let inForce = -1;
+    let rowsThisMonth = -1;
+    try {
+      const sums = (await db.execute(sql`
+        select round(coalesce(sum(l.sqm), 0))::int as sqm
+        from dispatches d
+        join dispatch_lines l on l.dispatch_id = d.id
+        where d.status = 'approved'
+          and d.dispatch_date >= ${monthStart}::date
+          and d.dispatch_date < (${monthStart}::date + interval '1 month')
+      `)) as unknown as { sqm: number }[];
+      recorded = Number(sums[0]?.sqm ?? -1);
+
+      const target = (await db.execute(sql`
+        select round(ct.sqm)::int as sqm
+        from company_targets ct
+        where ct.period = ${monthStart}::date
+        order by ct.effective_from desc, ct.created_at desc
+        limit 1
+      `)) as unknown as { sqm: number }[];
+      inForce = target.length === 0 ? 0 : Number(target[0].sqm);
+
+      const many = (await db.execute(sql`
+        select count(*)::int as n from company_targets ct
+        where ct.period = ${monthStart}::date
+      `)) as unknown as { n: number }[];
+      rowsThisMonth = Number(many[0]?.n ?? -1);
+    } catch (error) {
+      recorded = -1;
+      console.log(`  --    the records could not be read — ${String(error)}`);
+    }
+
+    /*
+     * **NOT MEASURED, never `ok`.** With no company target for the month there
+     * is no denominator, `S136`'s panel is correctly absent, and every assertion
+     * below would be vacuous or would assert the wrong thing. A section that
+     * cannot measure says so and runs nothing.
+     */
+    if (recorded < 0 || inForce <= 0 || rowsThisMonth < 1) {
+      console.log(
+        `  --    ${monthStart.slice(0, 7)}: ${rowsThisMonth} company target row(s), ` +
+          `in force ${inForce}, records ${recorded} — no company target is set for the ` +
+          "period, so there is nothing to measure against: NOT MEASURED",
+      );
+    } else {
+      const admin = await login("admin@example.test");
+      const adminHome = await get(admin, "/en");
+      const adminDriven = setup(
+        `the flag holder signed in — /en answers ${adminHome.status}`,
+        adminHome.status === 200,
+      );
+
+      /*
+       * **Presence as a biconditional** — `§35`'s shape, and absence is half the
+       * claim. `D37` says nothing on a rep's dashboard is company-wide, so a
+       * panel rendered at company scope for everybody would satisfy every other
+       * assertion here. The marker is `data-scope`, never a translated title,
+       * and BOTH values are asserted: reading `own` for a rep is the evidence
+       * the panel still exists for him rather than having vanished.
+       */
+      for (const who of [
+        { email: "manager@example.test", scope: "company" },
+        { email: "admin@example.test", scope: "company" },
+        { email: "rep-a@example.test", scope: "own" },
+      ] as const) {
+        const label = who.email.split("@")[0];
+        const jar = who.email === "admin@example.test" ? admin : jars[who.email];
+        for (const locale of ["en", "ar"] as const) {
+          const { body } = await get(jar, `/${locale}`);
+          const scope = attrOf(body, "today-target", "data-scope");
+          check(
+            `${label} ${locale}: *** the panel reads at ${who.scope} scope — saw data-scope="${scope ?? "NO PANEL"}" *** [D38] [D64] [D37]`,
+            scope === who.scope,
+          );
+        }
+      }
+
+      for (const locale of ["en", "ar"] as const) {
+        const page = await get(jars["manager@example.test"], `/${locale}`);
+        if (
+          !setup(
+            // Named for THIS section: §35 prints an identically worded setup
+            // line, and two sections sharing one label makes a label diff
+            // ambiguous about which of them moved.
+            `${locale}: the manager's dashboard answers 200 for the company panel`,
+            page.status === 200,
+            `saw ${page.status}`,
+          )
+        )
+          continue;
+
+        const shownAchieved = metres(
+          attrOf(page.body, "today-achieved", "data-sqm"),
+        );
+        const shownTarget = metres(
+          attrOf(page.body, "today-target-sqm", "data-sqm"),
+        );
+
+        /*
+         * 1. **The company's metres against the dispatch records**, and it
+         *    stands alone. Merged with the denominator claim below, a
+         *    disagreement would have nothing to point at; kept apart, it names
+         *    which side moved.
+         */
+        check(
+          `${locale}: *** the company's m² is what the dispatch records themselves say — saw ${shownAchieved} on the panel against ${recorded} summed from dispatches JOIN dispatch_lines *** [D38] [S136] [S85]`,
+          shownAchieved === recorded,
+          `panel ${shownAchieved} vs records ${recorded}`,
+        );
+
+        /*
+         * 2. **The denominator is the row IN FORCE, out of more than one.** The
+         *    fixture sets this month twice on purpose — `S84` makes a correction
+         *    a superseding row, never an edit — so a reader taking any row
+         *    rather than the newest goes red here instead of passing invisibly.
+         *    With one row the supersession half proves nothing and says so.
+         */
+        if (rowsThisMonth < 2) {
+          console.log(
+            `  --    ${locale}: only ${rowsThisMonth} company target row for ${monthStart.slice(0, 7)} —` +
+              " one row cannot show that the SUPERSEDING one is read, so that half is NOT MEASURED",
+          );
+        }
+        check(
+          `${locale}: *** the denominator is the superseding row — saw ${shownTarget}, in force ${inForce} of ${rowsThisMonth} row(s) for ${monthStart.slice(0, 7)} *** [S136] [S84] [S110]`,
+          shownTarget === inForce,
+          `panel ${shownTarget} vs in force ${inForce}`,
+        );
+
+        /*
+         * 3. **It is NOT the reps' targets summed** — `S136`'s load-bearing
+         *    sentence, asserted rather than trusted. The fixture makes the two
+         *    unequal on purpose; on a dataset where they happened to agree this
+         *    reports NOT MEASURED rather than passing for the wrong reason.
+         */
+        const repTargets = [
+          ...page.body.matchAll(
+            /data-slot="team-row"[^>]*data-target="([^"]+)"/g,
+          ),
+        ].map((m) => metres(m[1]));
+        const summed = repTargets.reduce(
+          (n, m) => n + (Number.isNaN(m) ? 0 : m),
+          0,
+        );
+        if (repTargets.length === 0 || summed === inForce) {
+          console.log(
+            `  --    ${locale}: ${repTargets.length} rep target(s) summing to ${summed} against a company target of ` +
+              `${inForce} — the two agree on this fixture, so the claim that the company figure is NOT their sum` +
+              " is NOT MEASURED",
+          );
+        } else {
+          check(
+            `${locale}: *** the company target is its own decision, not the reps' targets summed — saw ${inForce} against ${repTargets.join("+")}=${summed} over ${repTargets.length} rows *** [S136]`,
+            shownTarget === inForce && shownTarget !== summed,
+            `panel ${shownTarget}, reps sum ${summed}`,
+          );
+        }
+
+        /*
+         * 4. **`/targets` shows the same two figures, and the control follows
+         *    the OTHER flag.** Read and write are different questions `S136`, so
+         *    the manager — who may read and may not set — is what separates
+         *    them: asserted on the holder alone, a control rendered for everyone
+         *    would pass.
+         */
+        const mgrTargets = await get(
+          jars["manager@example.test"],
+          `/${locale}/targets`,
+        );
+        const mgrAchieved = metres(
+          attrOf(mgrTargets.body, "company-achieved", "data-sqm"),
+        );
+        const mgrTarget = metres(
+          attrOf(mgrTargets.body, "company-target-sqm", "data-sqm"),
+        );
+        check(
+          `${locale}: *** /targets shows the company block to sees_all_reps and offers NO control without the set flag — saw ${mgrAchieved} of ${mgrTarget}, against records ${recorded} of ${inForce} *** [D49] [S136]`,
+          mgrTargets.body.includes('data-slot="company-target"') &&
+            mgrAchieved === recorded &&
+            mgrTarget === inForce &&
+            !mgrTargets.body.includes('data-act="set-company-target"'),
+          mgrTargets.body.includes('data-act="set-company-target"')
+            ? "the manager is offered a control he holds no flag for"
+            : "block or figures missing",
+        );
+
+        const repPage = await get(
+          jars["rep-a@example.test"],
+          `/${locale}/targets`,
+        );
+        check(
+          `${locale}: *** a rep gets NO company block on /targets, and his own table still renders — saw ${
+            repPage.body.includes('data-slot="company-target"')
+              ? "the block"
+              : "no block"
+          } and ${repPage.body.includes('data-slot="attainment"') ? "the table" : "NO table"} *** [D37] [D53]`,
+          !repPage.body.includes('data-slot="company-target"') &&
+            repPage.body.includes('data-slot="attainment"'),
+        );
+      }
+
+      /*
+       * **A real POST, a real move on screen, and a MEASURED restore.**
+       *
+       * `§17` drives the per-rep form with an EMPTY `sqm` on purpose — a refusal
+       * that writes nothing — because a real target would move every attainment
+       * figure the run reads afterwards. That reasoning is kept and answered
+       * rather than ignored: this writes a value, proves the panel moved to it,
+       * then writes the original back, so nothing downstream drifts and a second
+       * run starts where the first did.
+       *
+       * **The restore's status is on screen rather than assumed** (`CLAUDE.md`):
+       * a cleanup nobody measured is a guess, and one that fails quietly leaves
+       * the fixture wrong for every later run with nothing to say so. It is a
+       * `check`, deliberately not a `finally` — a cleanup that throws inside one
+       * masks the failure it was meant to survive.
+       *
+       * **`count(*)` is the `S84` claim.** A correction is a superseding INSERT
+       * and never an edit, so two POSTs must leave two more rows: an UPDATE
+       * would move the figure exactly as well and leave the count flat.
+       */
+      const adminTargets = adminDriven
+        ? await get(admin, "/en/targets")
+        : { status: 0, body: "" };
+      const form = actForm(adminTargets.body, "set-company-target");
+      setup(
+        "the flag holder is offered the company control on /targets",
+        form !== undefined,
+        'no form carries data-act="set-company-target"',
+      );
+      if (form === undefined) {
+        console.log(
+          "  --    there is no control to drive, so the write is NOT MEASURED",
+        );
+      } else {
+        const before = rowsThisMonth;
+        const probe = inForce + 600;
+        const send = async (sqm: number): Promise<number> => {
+          const body = envelope(form);
+          body.set("period", monthStart);
+          body.set("sqm", String(sqm));
+          const response = await fetch(`${BASE}/en/targets`, {
+            method: "POST",
+            headers: { cookie: header(admin), origin: BASE },
+            body,
+            redirect: "manual",
+          });
+          store(admin, response);
+          return response.status;
+        };
+        const panelTarget = async (): Promise<number> =>
+          metres(
+            attrOf(
+              (await get(jars["manager@example.test"], "/en")).body,
+              "today-target-sqm",
+              "data-sqm",
+            ),
+          );
+
+        const wrote = await send(probe);
+        const moved = await panelTarget();
+        check(
+          `*** setting the company target answers a raw POST and the panel moves to it — saw ${wrote}, panel now ${moved} against a written ${probe} *** [S136] [WORKFLOW §5]`,
+          wrote === 200 && moved === probe,
+          `status ${wrote}, panel ${moved}`,
+        );
+
+        const restored = await send(inForce);
+        const back = await panelTarget();
+        check(
+          `*** the fixture is put back — restore answered ${restored} and the panel reads ${back}, the ${inForce} it started at *** [S136]`,
+          restored === 200 && back === inForce,
+          `status ${restored}, panel ${back}`,
+        );
+
+        let after = -1;
+        try {
+          const many = (await db.execute(sql`
+            select count(*)::int as n from company_targets ct
+            where ct.period = ${monthStart}::date
+          `)) as unknown as { n: number }[];
+          after = Number(many[0]?.n ?? -1);
+        } catch (error) {
+          console.log(
+            `  --    the row count could not be re-read — ${String(error)}`,
+          );
+        }
+        check(
+          `*** a correction is a superseding INSERT, never an edit — saw ${before} row(s) before and ${after} after two writes *** [S84] [S110] [S136]`,
+          after === before + 2,
+          `expected ${before + 2}`,
+        );
+      }
+    }
+  }
+
+
   /* ── 23 ──────────────────────────────────────────────────────────────── */
 
   console.log(

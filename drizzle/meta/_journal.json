@@ -239,6 +239,13 @@
       "when": 1788220800000,
       "tag": "0033_the_list_is_the_notification",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1788307200000,
+      "tag": "0034_a_company_target_is_its_own_decision",
+      "breakpoints": true
     }
   ]
 }
