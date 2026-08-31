@@ -209,7 +209,13 @@ page size changes what else the run can reach. `§32`'s moved 1700 → 1696 — 
 claims out and six report-detail checks in, a bigger page one exposing more ids
 to the id harvest — and `§33`'s moved 1689 → 1705, eight out and about
 twenty-four in. Diff the labels between the two runs rather than subtracting
-what you expected to lose.
+what you expected to lose. **And the labels that moved may not all belong to
+the section under test** — `§35`'s one-row probe moved 1742 → 1730, a net of
+exactly its own twelve, but the diff held **sixteen** departures and four
+returns, and four of the sixteen were `/activity`'s stream-kind labels changing
+because the fixture had drifted between the two runs. A delta can be right in
+total while being made of the wrong parts, which subtraction cannot see and the
+diff shows on its face.
 
 **A check comparing one computation against a DIFFERENT one stands alone**,
 never merged with assertions over the same computation, so a disagreement names
