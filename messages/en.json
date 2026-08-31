@@ -188,7 +188,7 @@
       "cash_in_office": "Cash in the office",
       "bank_transfer_full": "Bank transfer, full",
       "bank_transfer_downpayment": "Bank transfer, downpayment",
-      "handled_by_finance": "Handled by finance"
+      "handled_by_finance": "Credit or handled by finance"
     },
     "shipmentMethod": {
       "ct": "CT — the customer's own truck",
@@ -1179,7 +1179,13 @@
       "quotationsEmpty": "No quotation is waiting to be issued.",
       "dispatches": "To decide",
       "dispatchesEmpty": "No dispatch request is waiting for a decision.",
-      "seeAll": "See all"
+      "seeAll": "See all",
+      "day": {
+        "heading": "Your day",
+        "approved": "approved",
+        "issued": "issued",
+        "refused": "refused"
+      }
     },
     "team": {
       "title": "The team · this month",
@@ -1192,6 +1198,12 @@
       "paceOf": "{pct}% of target",
       "tickNote": "The tick is today's pace.",
       "notAFormula": "Activity and target sit side by side. That is a conversation, not a formula."
+    },
+    "bottleneck": {
+      "title": "Waiting on the coordinator",
+      "quotations": "To issue",
+      "dispatches": "To decide",
+      "note": "Both chains run through one person."
     }
   }
 }

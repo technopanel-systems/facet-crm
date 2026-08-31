@@ -31,6 +31,7 @@ import {
 import { cn } from "@/lib/utils";
 import { isWorkingDay, riyadhDayOf } from "@/lib/working-days";
 
+import { BottleneckCard } from "./_components/bottleneck-card";
 import { paceGeometry } from "./_components/pace";
 import { RequestsBlock } from "./_components/requests-block";
 import { shellCounts } from "./_components/shell-counts";
@@ -249,8 +250,8 @@ export default async function TodayPage({
 
       {/* `D64`'s second block, between the target and the waiting list.
           **Absent**, not empty and not disabled `D53`, for anyone holding
-          neither flag — which today is every rep *and* the manager, whose
-          remaining blocks `D40` and `D41` are not built. */}
+          neither flag — which today is every rep and the manager, who reads
+          the same two piles as figures instead `D40`. */}
       {mayIssue || mayDecide ? (
         <RequestsBlock session={session} limit={REQUEST_ROWS} locale={locale} />
       ) : null}
@@ -275,6 +276,17 @@ export default async function TodayPage({
           follow={follow}
           pacePct={pacePct}
         />
+      ) : null}
+
+      {/* `D64`'s fifth block, after the team table in that rule's fixed order
+          and on the same flag `D40`. **Gated before it fetches**, and gated on
+          more than the flag: a tile is suppressed where the reader holds that
+          chain's own flag, so an identity holding BOTH gets no card at all
+          rather than a weaker copy of `D65`'s block sitting above it. The
+          manager holds neither and gets both tiles. `D53` — absent, not
+          disabled and not empty. */}
+      {session.user.role.seesAllReps && (!mayIssue || !mayDecide) ? (
+        <BottleneckCard session={session} />
       ) : null}
     </div>
   );

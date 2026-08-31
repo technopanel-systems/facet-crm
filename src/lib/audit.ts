@@ -9,6 +9,8 @@
  * and, when impersonating, the acted-as identity.
  */
 
+import { sql } from "drizzle-orm";
+
 import { db } from "@/db";
 import { auditLog } from "@/db/schema";
 
@@ -58,4 +60,97 @@ export async function withAudit<T>(
     }
     return result;
   });
+}
+
+/* ── Reading it ──────────────────────────────────────────────────────────── */
+
+/**
+ * `D65`'s day count — **the three acts that clear the coordinator's queue**,
+ * named here rather than in the caller so the screen and the query cannot hold
+ * two lists.
+ *
+ * **Two of the three exist nowhere else.** A dispatch approval has
+ * `approved_at` and `approved_by_user_id`, but a **refusal** and a **quotation
+ * issue** have no columns at all: `schema.ts` says so at `refusal_reason`
+ * (*"the audit row that recorded the refusal keeps it"*) and
+ * `quotations.ts:403` says it again for `issued_at`. `TimelineEventKind` has no
+ * refusal kind either, so `tallyDays` and `dailyActivity` cannot see one.
+ *
+ * So all three come from **one source**. Reading `approved` off its column and
+ * the other two off the log would be two definitions of one figure, and the
+ * column is the wrong subject anyway — the `dispatched` stream event keys on
+ * `dispatch_date`, a freely-backdated typed day, and credits
+ * `recorded_by_user_id` rather than whoever approved it `projects.ts:336-347`.
+ */
+export const DECISION_ACTIONS = [
+  "dispatch.approved",
+  "quotation_version.issued",
+  "dispatch.refused",
+] as const;
+
+/** What `D65`'s day count reads. Zero is a measured answer, never absence. */
+export type DecisionsOnDay = {
+  approved: number;
+  issued: number;
+  refused: number;
+};
+
+/**
+ * What one person decided on one **Riyadh calendar day** `D65`.
+ *
+ * **The day, and not "since she last cleared the queue".** `WORKFLOW §5`
+ * offered both; the second needs a cleared-state, which is the persistence
+ * machinery `S91` deleted. `S93`'s weekend does not enter — a day is a day, and
+ * on a Friday this reads zero honestly.
+ *
+ * **The subject is the person, not the company.** `D65`'s heading is *Requests
+ * waiting on you* and this is what that person cleared beneath it. Impersonation
+ * lands on the impersonated identity — `coalesce(acting_as_user_id,
+ * actor_user_id)`, `[07 A6]`'s convention, which is what `session.user.id` was
+ * at the time; the raw actor column compares the wrong side.
+ *
+ * **One statement, three `count(*) filter (…)`** — `requestOriginForPeriod`'s
+ * shape, and no per-row query anywhere.
+ *
+ * **The window is half-open timestamps, not `(created_at at time zone …)::date`**
+ * — that expression is `STABLE`, so it can never use an index, and `timeline.ts`
+ * writes its ranges this way for the same reason. Every interpolated value is
+ * cast: an untyped `sql` parameter arrives as `text` and dies with `42883`
+ * (`CLAUDE.md`).
+ *
+ * **Column names are written out.** There is no join here, so a Drizzle column
+ * in the template would render bare — harmless over one table, and named anyway
+ * so nobody copies the loose form into a correlated subquery, where it is the
+ * silent-zero trap `CLAUDE.md` records three sightings of.
+ */
+export async function decisionsOnDay(
+  userId: string,
+  day: string,
+): Promise<DecisionsOnDay> {
+  const rows = (await db.execute(sql`
+    select
+      count(*) filter (where audit_log.action = 'dispatch.approved')::int
+        as approved,
+      count(*) filter (where audit_log.action = 'quotation_version.issued')::int
+        as issued,
+      count(*) filter (where audit_log.action = 'dispatch.refused')::int
+        as refused
+    from audit_log
+    where audit_log.action in ${sql.raw(
+      `(${DECISION_ACTIONS.map((action) => `'${action}'`).join(", ")})`,
+    )}
+      and coalesce(audit_log.acting_as_user_id, audit_log.actor_user_id)
+            = ${userId}::uuid
+      and audit_log.created_at
+            >= ${day}::date::timestamp at time zone 'Asia/Riyadh'
+      and audit_log.created_at
+            < (${day}::date + 1)::timestamp at time zone 'Asia/Riyadh'
+  `)) as unknown as DecisionsOnDay[];
+
+  const found = rows[0];
+  return {
+    approved: Number(found?.approved ?? 0),
+    issued: Number(found?.issued ?? 0),
+    refused: Number(found?.refused ?? 0),
+  };
 }

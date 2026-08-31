@@ -531,7 +531,7 @@ it at company scope, which is `D38` and not a seventh block.
 
 **The widening ships from `25b`, and the count of six is unchanged by it.** `D38`
 is not a seventh block, so building it moves no block from unbuilt to built: it
-completes the first one's other half. The two still unbuilt are `D40` and `D41`.
+completes the first one's other half.
 
 **A person holding none of the flags gets the target and the waiting list**,
 which is exactly the rep's screen. So `D32`–`D37` are this rule's **no-flag
@@ -539,21 +539,24 @@ case** rather than a design of their own, and `D38`–`D41` are what a flag adds
 This is also what gives Marketing `D67` and the Executive `D68` a sensible
 screen without anyone designing one.
 
-All five flags named above are columns on `roles` today. **Four of the six
+All five flags named above are columns on `roles` today. **Five of the six
 blocks are built** — *My target and pace*, to `D32` entire, including the pace
 tick, both side figures and the overage segment, **and since `25b` at company
-scope for `sees_all_reps` `D38` `S136`**; *Requests waiting on me*, to
-`D65`'s two columns; *My waiting list*, to `D33` and `D34`; and **the team
-table, to `D39` entire**. The notifications list that stood under `D65`'s
-heading is gone: it was news `S92`, not work, and on a rep's screen it was
-twenty-five rows of it.
+scope for `sees_all_reps` `D38` `S136`**; *Requests waiting on me*, to `D65`
+**entire since `25c`**, its two columns and the day count beneath them; *My
+waiting list*, to `D33` and `D34`; **the team table, to `D39` entire**; and
+**Waiting on the coordinator, to `D40`**. The notifications list that stood
+under `D65`'s heading is gone: it was news `S92`, not work, and on a rep's
+screen it was twenty-five rows of it.
 
-**The two that are not built are `D40` and `D41`.** A manager gets the target,
-the waiting list and the team table today; the bottleneck card and *Needs a
-decision* are still to come, and `D41` waited on a founder decision about what a
-manager actually decides (`WORKFLOW §5 AD4`, now closed). `D65`'s **day count**
-— *approved · issued · refused* — is the one part of a built block still
-missing, and is a row in `WORKFLOW §5`.
+**The one that is not built is `D41`, and it waits on two build paths rather
+than on a decision.** A manager gets the target, the waiting list, the team table
+and the bottleneck card today. *Needs a decision* is still to come because both
+objects it names — a duplicate flag `S22` and an archive request `S105` — have no
+writer, no reader and no rows: `S21` says nothing flags a duplicate and `S106`
+says the rep's request is the missing half. `AD4` closed the founder question
+about what a manager decides; what remains is code nobody has written, carried by
+`WORKFLOW §4 25e`.
 
 **The team table is where the first block's condition is read across people
 rather than for one**, which is why it needed no rule of its own to decide who
@@ -855,10 +858,44 @@ chain, and since `S72` and `S124` the dispatch chain too. It is a block on
 `sees_all_reps` `D64`, the same flag as the team table — a manager watching one
 person's queue is the same act as watching the team's.
 
+**It is the aggregate and not the list**, which this rule did not say: the
+identity it appears for holds neither `can_approve_quotation` nor `can_dispatch`,
+so rows carrying Issue and Decide would be rows the reader may not take —
+`D65`'s *a column nobody may act on is worse than no column*, one step out. Two
+counts, each a way in to the pile's own list on `D33`'s tile, and **zero
+renders**: two facts is not the empty shell `D70` refuses, and *the bottleneck
+is clear* is what a watcher came to read.
+
+**The two sets are `D65`'s two columns and no new predicate** — a live version at
+`requested` under a thread with no end state, and a dispatch at `submitted` —
+and deliberately **not** the `coordinator` pile `/quotations` groups by, which
+also holds `readyToShip` and would count one request once in each tile.
+
+**Neither tile carries an age, and that is a refusal rather than an omission.**
+The two piles have no comparable clock: `quotation_versions` has no `issued_at`,
+so the issuing side could offer only the thread's own age — *how old the deal
+is, not how long this position has been owed* — where `submitted_at` is a true
+wait, and two figures meaning two things under one heading is worse than
+neither. The clock that would answer properly is `follow-ups.ts`'s, which is the
+second ladder `D27` pins to one file.
+
+**Each tile is suppressed where the reader holds that chain's own flag** —
+`D65`'s *each column follows its own flag*, read from the other side. A holder of
+both gets no card at all rather than a weaker copy of `D65`'s block sitting
+directly above it, which is `D64`'s *absent, not disabled and not empty*.
+
 **D41. "Needs a decision"** — duplicates (S22) and archive requests (S105). The
 two things the system routes to a manager, on one card, nowhere else. This is
 what makes the manager's version of the waiting list different. It is `D64`'s
 block on `can_assign`.
+
+**It is not built, and what stands in the way is two build paths rather than a
+decision.** Both objects it names have no writer, no reader and no rows: `S21`
+says in its own text that nothing flags a duplicate, and `S106` says the rep's
+request is the only missing half of the archive review. A card reading two empty
+tables would be a reader for something nothing fills — the mirror of
+`CLAUDE.md`'s prohibition on a column without its writer, and `AD4`'s finding one
+register on. `WORKFLOW §4 25e` carries it, with what it waits for.
 
 **D65. The coordinator's dashboard leads with Requests: one heading, two
 columns.** Quotation requests needing issuing on one side, dispatch requests
@@ -867,6 +904,17 @@ other rather than interleaved because they are different work — issuing is a
 task, deciding a dispatch is a judgement — and a single merged queue would ask
 her to switch between the two on every row. Below it, a plain count of her day:
 approved · issued · refused.
+
+**That day is the Riyadh calendar day and those acts are the reader's own**,
+neither of which this rule said. `WORKFLOW §5` offered *since she last cleared
+the queue* as the alternative; it needs a cleared-state, which is the persistence
+machinery `S91` deleted, and a queue worked by ranking never reaches one. `S93`'s
+weekend does not enter — a day is a day, and on a Friday the count reads zero.
+**Each figure follows its column's flag**, this rule's own sentence applied one
+size down: issuing on `can_approve_quotation`, approving and refusing on
+`can_dispatch`. All three are read from the **audit log**, because a refusal and
+an issue have no columns at all `S112`, and taking the third off `approved_at`
+instead would be two definitions of one figure.
 
 **She typically carries no target and no pace line**, because she does not sell.
 Where she does carry one — `S127` lets her raise and approve against her own

@@ -9431,6 +9431,562 @@ async function main(): Promise<void> {
   }
 
 
+  /* ── 37 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n37. Waiting on the coordinator — D40's card, and the three identities it is ABSENT for [D40], [D64], [D53]",
+  );
+  {
+    /*
+     * **`D40` names a card and not its contents, so this section drives the
+     * three decisions the slice made rather than the rule's own sentence.**
+     *
+     * **Presence is a FOUR-identity biconditional and the fourth is the point.**
+     * `D64`'s table says the block appears on `sees_all_reps`, and a check
+     * driving only the manager and a rep would be green over that bare reading.
+     * `D40` renders the piles a reader WATCHES and not the ones they WORK, so
+     * the identity that separates the two rules is the one holding
+     * `sees_all_reps` **and** both queue flags — the super admin, who must get
+     * no card at all rather than a weaker copy of `D65`'s block sitting above
+     * it. He is signed in HERE rather than added to `§2`'s loop, `§36`'s device
+     * and for its reason: that loop drives every route in both locales.
+     *
+     * **Both counts are read from somewhere the screen did not go** `d66e1a0`.
+     * The screen composes `listQuotationThreads({ awaitingIssue: true })` and
+     * `listDispatches({ status: "submitted" })`; this re-derives the FACTS
+     * those two select on — a live version at `requested` under a thread with
+     * no end state, and a dispatch at `submitted` — and none of the folding
+     * after them. Asserted as the **manager**, whose `visibleQuotationThreads`
+     * and `visibleDispatches` filters both return `undefined` for
+     * `sees_all_reps` (`authz.ts:670`, `:728`), so his scope IS the table and a
+     * legitimate scope difference cannot produce a wrong red `S45-1`.
+     *
+     * **Deliberately not cross-checked against the coordinator's own block.**
+     * She reads the same two piles as rows, but her scope is not provably his,
+     * and a check that goes red on two correct screens is the shape that gets a
+     * correct screen "fixed".
+     */
+    const setup = (step: string, ok: boolean, detail = ""): boolean => {
+      checks += 1;
+      if (ok) {
+        console.log(`  setup ${step}`);
+        return true;
+      }
+      failures += 1;
+      console.log(`  SETUP FAILED at ${step}${detail ? ` — ${detail}` : ""}`);
+      return false;
+    };
+
+    /** The tiles, parsed by ELEMENT rather than by attribute order `§24`. */
+    const tilesOf = (body: string): Map<string, number> => {
+      const found = new Map<string, number>();
+      for (const tag of body.matchAll(/<a\b[^>]*>/g)) {
+        if (!tag[0].includes('data-slot="today-bottleneck-count"')) continue;
+        const chain = tag[0].match(/data-chain="([^"]*)"/)?.[1];
+        const count = tag[0].match(/data-count="([^"]*)"/)?.[1];
+        if (chain === undefined || count === undefined) continue;
+        found.set(chain, Number(count));
+      }
+      return found;
+    };
+
+    /*
+     * **Every column alias-qualified and nothing interpolated.** There is no
+     * join to a second table here and no correlated subquery, so the bare-column
+     * trap has no site — the aliases are written anyway so nobody copies the
+     * loose form somewhere it does bite (`CLAUDE.md`, three sightings).
+     */
+    let awaitingIssue = -1;
+    let submitted = -1;
+    try {
+      const issuing = (await db.execute(sql`
+        select count(*)::int as n
+        from quotation_threads qt
+        join quotation_versions qv on qv.thread_id = qt.id
+        where qv.status = 'requested'
+          and qt.end_state is null
+      `)) as unknown as { n: number }[];
+      awaitingIssue = Number(issuing[0]?.n ?? -1);
+
+      const deciding = (await db.execute(sql`
+        select count(*)::int as n
+        from dispatches d
+        where d.status = 'submitted'
+      `)) as unknown as { n: number }[];
+      submitted = Number(deciding[0]?.n ?? -1);
+    } catch (error) {
+      console.log(`  --    the records could not be read — ${String(error)}`);
+    }
+
+    const admin = await login("admin@example.test");
+    const adminHome = await get(admin, "/en");
+    setup(
+      `bottleneck: the flag holder signed in — /en answers ${adminHome.status}`,
+      adminHome.status === 200,
+    );
+
+    /*
+     * `D64` `D53` — **absent, not disabled and not empty**, asserted in both
+     * directions. A card rendered for everybody would satisfy every count
+     * assertion below.
+     */
+    for (const who of [
+      { email: "manager@example.test", card: true },
+      { email: "coordinator@example.test", card: false },
+      { email: "rep-a@example.test", card: false },
+      { email: "admin@example.test", card: false },
+    ] as const) {
+      const label = who.email.split("@")[0];
+      const jar = who.email === "admin@example.test" ? admin : jars[who.email];
+      for (const locale of ["en", "ar"] as const) {
+        const { body } = await get(jar, `/${locale}`);
+        const seen = body.includes('data-slot="today-bottleneck"');
+        check(
+          `bottleneck: ${label} ${locale}: *** the card ${
+            who.card ? "renders" : "is ABSENT"
+          } — saw ${seen ? "the card" : "no card"} beside ${
+            body.includes('data-slot="today-requests"')
+              ? "D65's block"
+              : "no D65 block"
+          } *** [D40] [D64] [D53]`,
+          seen === who.card,
+        );
+      }
+    }
+
+    /*
+     * **NOT MEASURED, never `ok`.** Two piles at zero make every equality below
+     * `0 === 0`, which is green on a screen that can only ever render zero —
+     * `CLAUDE.md`'s *an assertion that reads nothing*. The presence claims above
+     * do not depend on the size and have already run.
+     */
+    if (awaitingIssue < 0 || submitted < 0) {
+      console.log(
+        "  --    bottleneck: the records could not be read, so the counts are NOT MEASURED",
+      );
+    } else if (awaitingIssue === 0 && submitted === 0) {
+      console.log(
+        "  --    bottleneck: both piles are empty in the records, so an equality against them" +
+          " would read nothing: NOT MEASURED",
+      );
+    } else {
+      for (const locale of ["en", "ar"] as const) {
+        const page = await get(jars["manager@example.test"], `/${locale}`);
+        if (
+          !setup(
+            `bottleneck: ${locale}: the manager's dashboard answers 200 for the bottleneck card`,
+            page.status === 200,
+            `saw ${page.status}`,
+          )
+        )
+          continue;
+
+        const tiles = tilesOf(page.body);
+        if (
+          !setup(
+            `bottleneck: ${locale}: both tiles are readable`,
+            tiles.size === 2,
+            `${tiles.size} tile(s): ${[...tiles.keys()].join(",") || "none"}`,
+          )
+        )
+          continue;
+
+        /*
+         * 1. **The issuing pile against the records**, standing alone so a
+         *    disagreement names which side moved.
+         */
+        check(
+          `bottleneck: ${locale}: *** the issuing tile is what the records say — saw ${tiles.get(
+            "quotations",
+          )} on the card against ${awaitingIssue} thread(s) at a requested live version *** [D40] [D65] [S61]`,
+          tiles.get("quotations") === awaitingIssue,
+          `card ${tiles.get("quotations")} vs records ${awaitingIssue}`,
+        );
+
+        /*
+         * 2. **The deciding pile against the records**, apart from the first.
+         *    `S72`'s one status, and `dispatches.ts`' own `GROUP_OF.submitted`.
+         */
+        check(
+          `bottleneck: ${locale}: *** the deciding tile is what the records say — saw ${tiles.get(
+            "dispatches",
+          )} on the card against ${submitted} dispatch(es) at submitted *** [D40] [S72] [S88]`,
+          tiles.get("dispatches") === submitted,
+          `card ${tiles.get("dispatches")} vs records ${submitted}`,
+        );
+
+        /*
+         * 3. **The tile is the way in, and it is the pile's own list** `D33`
+         *    `D25`. Bare `/quotations` and `/dispatches`, because the first
+         *    group on each is this very pile — a `?status=` that no longer
+         *    exists would read as no filter at all and show everything.
+         */
+        const hrefs = [...page.body.matchAll(/<a\b[^>]*>/g)]
+          .map((m) => m[0])
+          .filter((tag) => tag.includes('data-slot="today-bottleneck-count"'))
+          .map((tag) => tag.match(/href="([^"]*)"/)?.[1] ?? "");
+        check(
+          `bottleneck: ${locale}: *** each tile lands on its own pile's list — saw ${hrefs.join(
+            " · ",
+          )} *** [D40] [D25] [D51]`,
+          hrefs.length === 2 &&
+            hrefs[0] === `/${locale}/quotations` &&
+            hrefs[1] === `/${locale}/dispatches`,
+        );
+
+        /*
+         * 4. **No clock on either tile**, which is the decision this slice made
+         *    rather than an omission: the two piles have no comparable one, and
+         *    the quotation side could offer only the thread's age. Asserted so a
+         *    later hand adding a figure has to change this line and read why.
+         */
+        check(
+          `bottleneck: ${locale}: *** neither tile carries an age — the two piles have no comparable clock *** [D40] [D27]`,
+          !page.body.includes("data-slot=\"today-bottleneck-age\""),
+        );
+      }
+    }
+  }
+
+  /* ── 38 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n38. D65's day count — approved · issued · refused, and one real refusal moving it [D65], [D64]",
+  );
+  {
+    /*
+     * **The figures could not be read off anything that already existed.** A
+     * dispatch approval has `approved_at` and `approved_by_user_id`; a
+     * **refusal** and a **quotation issue** have no columns at all, and
+     * `TimelineEventKind` has no refusal kind — so `tallyDays`, `dailyActivity`
+     * and `/activity` are all blind to one of the three. All three come from
+     * the audit log, and this section re-derives them there **with its own
+     * SQL** rather than calling `decisionsOnDay`: the screen's number and this
+     * one have to come from different computations or there is nothing that can
+     * disagree `d66e1a0`.
+     *
+     * **And a cross-check against the same table is not enough on its own.**
+     * On a fixture where the day happens to be empty every equality is
+     * `0 === 0` — green on a screen that can only ever render zero. So this
+     * section **creates the state it measures**: it drives a real refusal over
+     * HTTP and asserts the count moved by exactly one.
+     *
+     * **A refusal, deliberately, and not an approval.** An approval credits a
+     * target and moves every square-metre figure the run reads after it —
+     * `§17`'s reason for driving the target form with an empty value, and
+     * `§36`'s for restoring what it wrote. A refusal moves no metre.
+     *
+     * **Two observations of the one act, kept apart.** The coordinator's
+     * `refused` figure goes up by one, and the MANAGER's `D40` tile for the
+     * same pile goes down by one — two identities, two components, two
+     * derivations (`audit_log` against `dispatches.status`). Merged into one
+     * assertion a disagreement would have nothing to point at.
+     *
+     * **The restore is `S122` working, not a repair.** Revive returns the
+     * request to the rep as a **draft** — it does not go back into her queue —
+     * so the fixture is only whole once rep-a submits it again, and
+     * `submitDispatchRequest` accepts nobody else (`dispatches.ts:1358`). Each
+     * of the three statuses is a `check` on screen and not a `finally`: a
+     * cleanup that throws inside one masks the failure it was meant to survive,
+     * and a cleanup nobody asserted is a cleanup nobody knows happened.
+     *
+     * **What this run leaves behind, stated rather than discovered:** the
+     * refusal raises an `S128` notification, and re-submitting re-stamps
+     * `submitted_at`, so the bell and the queue's ORDER move between runs. That
+     * is the fixture drift that outran the signal two to one in `25b`'s label
+     * diff — read it as drift here rather than as this section's doing.
+     */
+    const setup = (step: string, ok: boolean, detail = ""): boolean => {
+      checks += 1;
+      if (ok) {
+        console.log(`  setup ${step}`);
+        return true;
+      }
+      failures += 1;
+      console.log(`  SETUP FAILED at ${step}${detail ? ` — ${detail}` : ""}`);
+      return false;
+    };
+
+    const actForm = (body: string, act: string): string | undefined =>
+      body.match(new RegExp(`<form[^>]*data-act="${act}"[\\s\\S]*?</form>`))?.[0];
+    const envelope = (form: string): FormData => {
+      const fields = new FormData();
+      for (const input of form.matchAll(/<input[^>]*>/g)) {
+        const name = input[0].match(/name="([^"]+)"/)?.[1];
+        if (!name?.startsWith("$ACTION")) continue;
+        fields.append(
+          name,
+          unescapeHtml(input[0].match(/value="([^"]*)"/)?.[1] ?? ""),
+        );
+      }
+      return fields;
+    };
+    const post = async (
+      jar: Jar,
+      path: string,
+      body: FormData,
+    ): Promise<number> => {
+      const response = await fetch(`${BASE}${path}`, {
+        method: "POST",
+        headers: { cookie: header(jar), origin: BASE },
+        body,
+        redirect: "manual",
+      });
+      store(jar, response);
+      return response.status;
+    };
+
+    /** One `data-kind` figure off the day count, or `-1` when it is absent. */
+    const figureOf = (body: string, kind: string): number => {
+      for (const tag of body.matchAll(/<span\b[^>]*>/g)) {
+        if (!tag[0].includes('data-slot="today-day-count"')) continue;
+        if (tag[0].match(/data-kind="([^"]*)"/)?.[1] !== kind) continue;
+        return Number(tag[0].match(/data-count="([^"]*)"/)?.[1] ?? "-1");
+      }
+      return -1;
+    };
+    const tileOf = (body: string, chain: string): number => {
+      for (const tag of body.matchAll(/<a\b[^>]*>/g)) {
+        if (!tag[0].includes('data-slot="today-bottleneck-count"')) continue;
+        if (tag[0].match(/data-chain="([^"]*)"/)?.[1] !== chain) continue;
+        return Number(tag[0].match(/data-count="([^"]*)"/)?.[1] ?? "-1");
+      }
+      return -1;
+    };
+
+    /* The three action names are read from `src/lib/audit.ts`, never copied —
+       `§24`'s and `§31`'s device, for its reason: a list restated in an
+       assertion goes stale in silence. */
+    const actions = (
+      readFileSync("src/lib/audit.ts", "utf8").match(
+        /export const DECISION_ACTIONS = \[([\s\S]*?)\n\] as const/,
+      )?.[1] ?? ""
+    )
+      .split("\n")
+      .map((line) => line.match(/"([\w.]+)"/)?.[1])
+      .filter((name): name is string => Boolean(name));
+    setup(
+      `day count: the three actions were read from audit.ts, not copied — ${actions.join(" · ") || "none"}`,
+      actions.length === 3,
+      `${actions.length} found`,
+    );
+
+    /**
+     * The same three figures, from this script's own SQL.
+     *
+     * `coalesce(acting_as_user_id, actor_user_id)` is the effective actor
+     * `[07 A6]`, and the window is the same half-open Riyadh day the screen
+     * uses — written out here rather than imported, which is the point.
+     */
+    const fromRecords = async (
+      email: string,
+    ): Promise<{ approved: number; issued: number; refused: number }> => {
+      const day = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Riyadh",
+        dateStyle: "short",
+      }).format(new Date());
+      const rows = (await db.execute(sql`
+        select
+          count(*) filter (where a.action = 'dispatch.approved')::int as approved,
+          count(*) filter (where a.action = 'quotation_version.issued')::int as issued,
+          count(*) filter (where a.action = 'dispatch.refused')::int as refused
+        from audit_log a
+        join users u
+          on u.id = coalesce(a.acting_as_user_id, a.actor_user_id)
+        where u.email = ${email}
+          and a.created_at >= ${day}::date::timestamp at time zone 'Asia/Riyadh'
+          and a.created_at < (${day}::date + 1)::timestamp at time zone 'Asia/Riyadh'
+      `)) as unknown as { approved: number; issued: number; refused: number }[];
+      const found = rows[0];
+      return {
+        approved: Number(found?.approved ?? -1),
+        issued: Number(found?.issued ?? -1),
+        refused: Number(found?.refused ?? -1),
+      };
+    };
+
+    /*
+     * `D64` `D53` — the count is absent wherever the block is, in both
+     * directions. Today the Sales Coordinator is the only role holding either
+     * flag, so she is the positive case and the other two are the negative ones.
+     */
+    for (const who of [
+      { email: "coordinator@example.test", day: true },
+      { email: "manager@example.test", day: false },
+      { email: "rep-a@example.test", day: false },
+    ] as const) {
+      const label = who.email.split("@")[0];
+      for (const locale of ["en", "ar"] as const) {
+        const { body } = await get(jars[who.email], `/${locale}`);
+        const seen = body.includes('data-slot="today-requests-day"');
+        check(
+          `day count: ${label} ${locale}: *** the day count ${
+            who.day ? "renders" : "is ABSENT"
+          } — saw ${seen ? "the count" : "no count"} *** [D65] [D64] [D53]`,
+          seen === who.day,
+        );
+      }
+    }
+
+    const coordinator = jars["coordinator@example.test"];
+    const records = await fromRecords("coordinator@example.test");
+    const home = await get(coordinator, "/en");
+    const shown = {
+      approved: figureOf(home.body, "approved"),
+      issued: figureOf(home.body, "issued"),
+      refused: figureOf(home.body, "refused"),
+    };
+
+    /*
+     * **All three, against a different computation of the same day.** They are
+     * asserted together deliberately — one screen, one query, one window — and
+     * the movement claim below stands apart from them, which is what makes a
+     * red attributable.
+     */
+    check(
+      `day count: *** her day is what the audit log says she did — saw approved ${shown.approved} · issued ${shown.issued} · refused ${shown.refused} on screen against ${records.approved} · ${records.issued} · ${records.refused} in the records *** [D65] [S112]`,
+      shown.approved === records.approved &&
+        shown.issued === records.issued &&
+        shown.refused === records.refused,
+      `screen ${JSON.stringify(shown)} vs records ${JSON.stringify(records)}`,
+    );
+
+    /*
+     * **Each figure follows its column's flag** `D65`. Both flags sit on one
+     * role today, so the half that would show a figure missing has no identity
+     * to be driven as and says so rather than passing vacuously.
+     */
+    console.log(
+      "  --    day count: no role holds one queue flag without the other, so *a figure follows its" +
+        " column's flag* has no identity to be driven as: NOT MEASURED",
+    );
+
+    /*
+     * **The movement, which is what makes this section able to fail at all.**
+     */
+    let target = "";
+    try {
+      const found = (await db.execute(sql`
+        select d.id::text as id
+        from dispatches d
+        join users u on u.id = d.recorded_by_user_id
+        where d.status = 'submitted'
+          and u.email = 'rep-a@example.test'
+        order by d.submitted_at asc nulls last
+        limit 1
+      `)) as unknown as { id: string }[];
+      target = found[0]?.id ?? "";
+    } catch (error) {
+      console.log(`  --    the records could not be read — ${String(error)}`);
+    }
+
+    if (target === "") {
+      console.log(
+        "  --    day count: no submitted dispatch is recorded by rep-a, and only its recorder may" +
+          " re-submit it `S122`, so nothing can be refused and put back: NOT MEASURED",
+      );
+    } else {
+      const before = shown.refused;
+      const beforePile = tileOf(
+        (await get(jars["manager@example.test"], "/en")).body,
+        "dispatches",
+      );
+      const detail = await get(coordinator, `/en/dispatches/${target}`);
+      const refuseForm = actForm(detail.body, "refuse");
+      const drivable = setup(
+        `day count: the coordinator is offered Refuse on ${target.slice(0, 8)} — refused reads ${before}, her pile reads ${beforePile}`,
+        refuseForm !== undefined && before >= 0 && beforePile >= 0,
+        refuseForm === undefined
+          ? 'no form carries data-act="refuse"'
+          : "the figures could not be read",
+      );
+
+      if (!drivable) {
+        console.log(
+          "  --    day count: there is no refusal to drive, so the movement is NOT MEASURED",
+        );
+      } else {
+        const body = envelope(refuseForm as string);
+        body.set(
+          "reason",
+          `verify:routes §38 — refused and revived in the same run, ${new Date().toISOString()}`,
+        );
+        const refused = await post(coordinator, `/en/dispatches/${target}`, body);
+        const afterHome = await get(coordinator, "/en");
+        const after = figureOf(afterHome.body, "refused");
+        check(
+          `day count: *** a real refusal moves her day by exactly one — saw ${before} before and ${after} after a POST answering ${refused} *** [D65] [S124]`,
+          refused === 200 && after === before + 1,
+          `status ${refused}, ${before} → ${after}`,
+        );
+
+        const afterPile = tileOf(
+          (await get(jars["manager@example.test"], "/en")).body,
+          "dispatches",
+        );
+        check(
+          `day count: *** and the manager's bottleneck tile falls by one for the same act — saw ${beforePile} before and ${afterPile} after *** [D40] [S72]`,
+          afterPile === beforePile - 1,
+          `${beforePile} → ${afterPile}`,
+        );
+
+        /* The restore, measured at every step `CLAUDE.md`. */
+        const refusedPage = await get(coordinator, `/en/dispatches/${target}`);
+        const reviveForm = actForm(refusedPage.body, "revive");
+        const revived =
+          reviveForm === undefined
+            ? 0
+            : await post(
+                coordinator,
+                `/en/dispatches/${target}`,
+                envelope(reviveForm),
+              );
+        check(
+          `day count: *** revive returns it to the REP as a draft, which is S122 working and not a failed restore — POST answered ${revived} *** [S122]`,
+          revived === 200,
+          reviveForm === undefined ? "no revive form" : `status ${revived}`,
+        );
+
+        const repPage = await get(
+          jars["rep-a@example.test"],
+          `/en/dispatches/${target}`,
+        );
+        const submitForm = actForm(repPage.body, "submit");
+        const resubmitted =
+          submitForm === undefined
+            ? 0
+            : await post(
+                jars["rep-a@example.test"],
+                `/en/dispatches/${target}`,
+                envelope(submitForm),
+              );
+        const restoredPile = tileOf(
+          (await get(jars["manager@example.test"], "/en")).body,
+          "dispatches",
+        );
+        check(
+          `day count: *** the fixture is put back — rep-a re-submitted (${resubmitted}) and the pile reads ${restoredPile}, the ${beforePile} it started at *** [S122] [S125]`,
+          resubmitted === 200 && restoredPile === beforePile,
+          submitForm === undefined
+            ? "the rep is offered no Submit on the revived draft"
+            : `status ${resubmitted}, pile ${restoredPile}`,
+        );
+
+        /* **The refusal is NOT undone, and that is correct.** Nothing is ever
+           deleted `S107`, so the audit row stands and her day keeps the one it
+           gained — the queue is what was restored, never the record of what
+           happened to it. Said in an assertion so a later reader does not take
+           the surviving figure for a failed cleanup. */
+        const settled = figureOf((await get(coordinator, "/en")).body, "refused");
+        check(
+          `day count: *** the day keeps the refusal after the revival — nothing is ever deleted — saw ${settled} against the ${before} it opened at *** [S107] [S122]`,
+          settled === before + 1,
+          `${before} → ${settled}`,
+        );
+      }
+    }
+  }
+
   /* ── 23 ──────────────────────────────────────────────────────────────── */
 
   console.log(

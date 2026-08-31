@@ -4,6 +4,7 @@ import { RecordRow } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
+import { decisionsOnDay, type DecisionsOnDay } from "@/lib/audit";
 import type { AuthSession } from "@/lib/authz";
 import { listDispatches } from "@/lib/dispatches";
 import { listQuotationThreads } from "@/lib/quotations";
@@ -44,9 +45,9 @@ import { toneClass, turnTone } from "./turn";
  * `listDispatches({ status: "submitted" })`, already ordered oldest first as
  * the queue `S87` says it is.
  *
- * **`D65`'s day count — approved · issued · refused — is not built here.** It
- * is a fourth query and no row of this slice asked for it; it is recorded in
- * `WORKFLOW §5` rather than half-built.
+ * **`D65`'s day count sits below the two columns** — *a plain count of her day:
+ * approved · issued · refused*. It is one query and its source is `audit.ts`;
+ * see `DayCount` below for the day it means and whose acts it counts.
  */
 export async function RequestsBlock({
   session,
@@ -90,13 +91,21 @@ export async function RequestsBlock({
     query: { status: "submitted" },
   });
 
-  const [quotations, dispatches] = await Promise.all([
+  /*
+   * **Her day is the Riyadh calendar day** `D65`, and `riyadhDayOf` is that one
+   * definition — the same call the rows below render their stamps through, so
+   * the count and the queue cannot disagree about which day it is.
+   */
+  const today = riyadhDayOf(new Date());
+
+  const [quotations, dispatches, decisions] = await Promise.all([
     mayIssue
       ? listQuotationThreads(session, { awaitingIssue: true })
       : Promise.resolve(null),
     mayDecide
       ? listDispatches(session, { status: "submitted" })
       : Promise.resolve(null),
+    decisionsOnDay(session.user.id, today),
   ]);
 
   /**
@@ -196,8 +205,121 @@ export async function RequestsBlock({
             </Column>
           ) : null}
         </div>
+
+        <DayCount
+          decisions={decisions}
+          showIssued={mayIssue}
+          showDecided={mayDecide}
+        />
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * `D65` — **a plain count of her day: approved · issued · refused**, below the
+ * two columns.
+ *
+ * **The day is the Riyadh calendar day.** `WORKFLOW §5` left the choice open
+ * between that and *since she last cleared the queue*; the second needs a
+ * cleared-state, which is the persistence machinery `S91` deleted, and there is
+ * nothing on a queue worked by ranking for "cleared" to mean. `S93`'s weekend
+ * does not enter — a day is a day, and on a Friday this reads zero honestly
+ * rather than showing Thursday's work again.
+ *
+ * **The acts are the reader's own.** The heading above says *Requests waiting
+ * on you*, and this is what that person cleared beneath it. It is not the
+ * company's total: today one identity holds both flags, so the two figures
+ * would agree and the difference would never be visible — which is exactly why
+ * it is decided here rather than left to coincide.
+ *
+ * **Each figure follows its column's flag**, `D65`'s own sentence applied to
+ * the count: issuing is a `can_approve_quotation` act, approving and refusing
+ * are `can_dispatch` acts. A figure about work the reader may not do is the
+ * same defect as a column they may not act on, one size down.
+ *
+ * **Absent when the reader holds neither**, which cannot happen — the block
+ * itself is gated on the disjunction — but the component says so rather than
+ * assuming its caller.
+ */
+async function DayCount({
+  decisions,
+  showIssued,
+  showDecided,
+}: {
+  decisions: DecisionsOnDay;
+  showIssued: boolean;
+  showDecided: boolean;
+}) {
+  if (!showIssued && !showDecided) return null;
+  const t = await getTranslations();
+
+  return (
+    <div
+      data-slot="today-requests-day"
+      className="border-line mt-6 flex flex-wrap items-baseline gap-x-8 gap-y-2 border-t pt-3 text-start"
+    >
+      <span className="text-faint text-[10.5px] font-semibold tracking-[.09em] uppercase">
+        {t("today.requests.day.heading")}
+      </span>
+      {showDecided ? (
+        <Figure
+          kind="approved"
+          label={t("today.requests.day.approved")}
+          count={decisions.approved}
+        />
+      ) : null}
+      {showIssued ? (
+        <Figure
+          kind="issued"
+          label={t("today.requests.day.issued")}
+          count={decisions.issued}
+        />
+      ) : null}
+      {showDecided ? (
+        <Figure
+          kind="refused"
+          label={t("today.requests.day.refused")}
+          count={decisions.refused}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * One figure of the three.
+ *
+ * **`dir="auto"` and never `dir="ltr"`** `D73`: the run is *figure · word*, and
+ * the test is whether there is a word in it. Under `dir="ltr"` the Arabic pair
+ * renders with its halves the wrong way round — the `28b` defect the rule was
+ * written from. A digit is neutral, so `auto` resolves off the translated word
+ * and lands correctly in both locales.
+ *
+ * **Spacing is the row's `gap`, never a logical margin here** — this element
+ * sets its own direction, and `ms-*` on one that does compiles against ITS
+ * direction and lands on the wrong side (`CLAUDE.md`, four sightings).
+ */
+function Figure({
+  kind,
+  label,
+  count,
+}: {
+  kind: "approved" | "issued" | "refused";
+  label: string;
+  count: number;
+}) {
+  return (
+    <span
+      data-slot="today-day-count"
+      data-kind={kind}
+      data-count={count}
+      dir="auto"
+      className="text-muted-foreground text-[12.5px]"
+    >
+      <b className="num text-foreground text-[15px] font-semibold">{count}</b>{" "}
+      {label}
+    </span>
   );
 }
 

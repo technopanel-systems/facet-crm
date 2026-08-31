@@ -188,7 +188,7 @@
       "cash_in_office": "نقداً في المكتب",
       "bank_transfer_full": "تحويل بنكي كامل",
       "bank_transfer_downpayment": "تحويل بنكي، دفعة مقدمة",
-      "handled_by_finance": "بعهدة المالية"
+      "handled_by_finance": "آجل أو تُدار من قِبل المالية"
     },
     "shipmentMethod": {
       "ct": "CT — شاحنة العميل",
@@ -1179,7 +1179,13 @@
       "quotationsEmpty": "لا يوجد عرض سعر ينتظر الإصدار.",
       "dispatches": "للبتّ فيها",
       "dispatchesEmpty": "لا يوجد طلب صرف ينتظر قرارًا.",
-      "seeAll": "عرض الكل"
+      "seeAll": "عرض الكل",
+      "day": {
+        "heading": "يومك",
+        "approved": "معتمدة",
+        "issued": "مُصدَرة",
+        "refused": "مرفوضة"
+      }
     },
     "team": {
       "title": "الفريق · هذا الشهر",
@@ -1192,6 +1198,12 @@
       "paceOf": "{pct}% من الهدف",
       "tickNote": "العلامة هي إيقاع اليوم.",
       "notAFormula": "النشاط والهدف يظهران جنبًا إلى جنب. هذا حديث، وليس معادلة."
+    },
+    "bottleneck": {
+      "title": "بانتظار منسقة المبيعات",
+      "quotations": "للإصدار",
+      "dispatches": "للبتّ فيها",
+      "note": "السلسلتان كلتاهما تمران بشخص واحد."
     }
   }
 }
