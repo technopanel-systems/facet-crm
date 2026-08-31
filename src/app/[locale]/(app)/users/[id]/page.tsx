@@ -114,19 +114,17 @@ export default async function UserDetailPage({
                 </Badge>
               )}
             </Fact>
+            {/* Both dates BARE — `dir="ltr"` scrambled their ar form, whose
+                U+200F marks place the segments (A2-1, `98f1e2e`). */}
             {user.deactivatedAt ? (
               <Fact label={t("team.fields.deactivatedAt")}>
-                <span dir="ltr">
-                  {format.dateTime(user.deactivatedAt, {
-                    dateStyle: "medium",
-                  })}
-                </span>
+                {format.dateTime(user.deactivatedAt, {
+                  dateStyle: "medium",
+                })}
               </Fact>
             ) : null}
             <Fact label={t("common.createdAt")}>
-              <span dir="ltr">
-                {format.dateTime(user.createdAt, { dateStyle: "medium" })}
-              </span>
+              {format.dateTime(user.createdAt, { dateStyle: "medium" })}
             </Fact>
           </Facts>
 

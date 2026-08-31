@@ -228,7 +228,11 @@ export default async function FollowUpsPage({
                       ? row.owners.map((owner) => owner.name).join(", ")
                       : t("common.none")}
                   </TableCell>
-                  <TableCell numeric dir="ltr">
+                  {/* No `dir` on a locale-formatted date — the ar output
+                      carries U+200F marks that place its segments, and
+                      `dir="ltr"` scrambled all 25 of these cells (`98f1e2e`'s
+                      mechanism, A2-1's largest sighting). */}
+                  <TableCell numeric>
                     {format.dateTime(new Date(`${row.since}T00:00:00Z`), {
                       dateStyle: "medium",
                       timeZone: "UTC",
@@ -250,9 +254,10 @@ export default async function FollowUpsPage({
                     // **`data-column`, not `data-slot`** — `TableCell` sets its
                     // own `data-slot` and then spreads props over it, so one
                     // passed here would silently replace the component's marker
-                    // (`WORKFLOW §5`). The cell beside this one is a bare date
-                    // and correctly keeps `dir="ltr"`, so `D73` needs a handle
-                    // for THIS cell rather than for every numeric cell.
+                    // (`WORKFLOW §5`). The cell beside this one is a
+                    // locale-formatted date and carries NO `dir` — the
+                    // attribute is what scrambled it (A2-1) — so `D73` needs a
+                    // handle for THIS cell rather than for every numeric cell.
                     data-column="age"
                     className={cn(
                       "font-semibold",

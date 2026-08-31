@@ -278,13 +278,18 @@ export function RecordRow({
         ) : null}
       </span>
       {when ? (
+        // **No `dir` on this slot** — it carried `dir="ltr"`, and that
+        // scrambled every ar-locale date a caller passed through it: `Intl`
+        // embeds U+200F marks that place the date's segments inside an RTL
+        // run, and the forced LTR fought them (`98f1e2e`'s mechanism, seen
+        // here on the requests block). Callers whose content is genuinely
+        // raw-LTR — a typed reference — isolate it themselves.
         <span
           data-when={whenData}
           className={cn(
             "num flex-none text-[11.5px] font-semibold",
             whenClassName ?? "text-faint",
           )}
-          dir="ltr"
         >
           {when}
         </span>

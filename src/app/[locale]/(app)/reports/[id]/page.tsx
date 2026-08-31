@@ -74,8 +74,10 @@ export default async function ReportDetailPage({
         </CardHeader>
         <CardContent className="px-0">
           <Facts>
+            {/* Bare, like the dispatch date `98f1e2e` — `dir="ltr"` is what
+                scrambled ar dates, whose U+200F marks place themselves. */}
             <Fact label={t("reports.fields.reportDate")}>
-              <span dir="ltr">{day(report.reportDate)}</span>
+              {day(report.reportDate)}
             </Fact>
             <Fact label={t("reports.fields.author")}>
               {report.userName}
@@ -122,7 +124,7 @@ export default async function ReportDetailPage({
                 </Fact>
                 {report.onHoldUntil ? (
                   <Fact label={t("reports.fields.onHoldUntil")}>
-                    <span dir="ltr">{day(report.onHoldUntil)}</span>
+                    {day(report.onHoldUntil)}
                   </Fact>
                 ) : null}
               </>
@@ -195,7 +197,18 @@ export default async function ReportDetailPage({
                       {t(`enums.reportSignal.${signal.signal}`)}
                     </Badge>
                   }
-                  when={signal.reference ?? dash}
+                  // A typed reference is raw LTR content and keeps its
+                  // isolation `D73` — it lived on the `RecordRow` slot until
+                  // that attribute was found scrambling every DATE the other
+                  // callers pass, so the protection moved to the one caller
+                  // whose content wants it.
+                  when={
+                    signal.reference ? (
+                      <span dir="ltr">{signal.reference}</span>
+                    ) : (
+                      dash
+                    )
+                  }
                 />
               ))}
             </ul>

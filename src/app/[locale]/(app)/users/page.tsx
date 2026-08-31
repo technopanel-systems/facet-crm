@@ -154,7 +154,9 @@ export default async function UsersPage({
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell numeric dir="ltr">
+                  {/* No `dir` on a locale-formatted date — the attribute is
+                      what scrambled the ar form (A2-1, `98f1e2e`). */}
+                  <TableCell numeric>
                     {format.dateTime(row.createdAt, {
                       dateStyle: "medium",
                     })}

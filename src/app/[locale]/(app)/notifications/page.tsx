@@ -318,7 +318,9 @@ function NotificationEntry({
       ) : null}
 
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-muted-foreground text-start text-xs" dir="ltr">
+        {/* No `dir` — the ar date+time carries U+200F marks that place its
+            own segments, and `dir="ltr"` scrambled them (A2-1, `98f1e2e`). */}
+        <span className="text-muted-foreground text-start text-xs">
           {format.dateTime(row.createdAt, {
             dateStyle: "medium",
             timeStyle: "short",

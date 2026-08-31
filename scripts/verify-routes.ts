@@ -403,6 +403,55 @@ function hasFlag(tag: string, name: string): boolean {
   return new RegExp(`(?:^|\\s)${name}(?=[\\s=>/]|$)`).test(names);
 }
 
+/* ── A2-1's scan: no locale-formatted date inside a forced-LTR run ────────── */
+
+/**
+ * **The defect this hunts cannot be seen in the markup's ORDER — it is seen in
+ * a collision.** `Intl` formats an `ar` date as `29<U+200F>/08<U+200F>/2026`:
+ * the RIGHT-TO-LEFT MARKs place the segments inside an RTL run, and
+ * `dir="ltr"` fights them — the day jumps to the front and the screen shows
+ * `292026/08/` (`98f1e2e`, then nine more screens in `AUDIT 2`, `A2-1`). Bidi
+ * reordering happens at render and this script executes none, so what CAN be
+ * asserted is the collision that causes it: **a U+200F inside an element
+ * carrying `dir="ltr"`**. A raw reference (`Q-9182`) under `dir="ltr"` has no
+ * such mark and never trips this; a formatted ar date has them always, so any
+ * future re-wrapping of a date goes red here without this file naming a
+ * single screen.
+ *
+ * Hooked into `get()` beside the other two scans, so every page the walk
+ * reaches — every screen, both locales, all identities — is covered. Content
+ * is read to the first close of the run's own tag, which includes what a
+ * nested child renders before it: the shapes that shipped were all the
+ * formatter's text directly inside the attributed element or one span down.
+ */
+const forcedLtrDates = new Map<string, { route: string; snippet: string }>();
+let ltrRunsScanned = 0;
+let rlmMarksSeen = 0;
+
+/** Written as an escape, never the literal — the mark is invisible in an
+ *  editor, and an invisible load-bearing character is its own defect. */
+const RLM = "‏";
+
+function scanForcedLtrDates(path: string, body: string): void {
+  if (!body.includes("<html")) return;
+  const route = routeShape(path);
+  rlmMarksSeen += body.split(RLM).length - 1;
+  for (const m of body.matchAll(/<([a-z][a-z0-9]*)\b[^>]*\bdir="ltr"[^>]*>/gi)) {
+    ltrRunsScanned += 1;
+    const start = (m.index ?? 0) + m[0].length;
+    const close = body.indexOf(`</${m[1].toLowerCase()}`, start);
+    const inner = close === -1 ? "" : body.slice(start, close);
+    if (!inner.includes(RLM)) continue;
+    const text = inner.replace(/<[^>]*>/g, "").trim().slice(0, 60);
+    // Keyed by ROUTE: one defective screen is one finding, not one per
+    // rendered date — the injection printed 56 rows for one attribute before
+    // this was narrowed, all of them the same defect on the same element.
+    if (!forcedLtrDates.has(route)) {
+      forcedLtrDates.set(route, { route, snippet: text });
+    }
+  }
+}
+
 function scanOperability(path: string, body: string): void {
   if (!body.includes("<html")) return;
   const route = routeShape(path);
@@ -542,6 +591,7 @@ async function get(
       const body = await followed.text();
       scanForUnresolvedKeys(next, body);
       scanOperability(next, body);
+      scanForcedLtrDates(next, body);
       return { status: followed.status, body, url: next };
     }
   }
@@ -551,6 +601,7 @@ async function get(
   // not announce itself on the screen you thought to check.
   scanForUnresolvedKeys(path, body);
   scanOperability(path, body);
+  scanForcedLtrDates(path, body);
   return { status: response.status, body, url: path };
 }
 
@@ -9985,6 +10036,87 @@ async function main(): Promise<void> {
         );
       }
     }
+  }
+
+  /* ── 39 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n39. No locale-formatted date sits inside a forced-LTR run [D73], [A2-1]",
+  );
+  {
+    /*
+     * Reports on everything every section above fetched — the scan runs in
+     * `get()` beside the operability and key scans, so by now every screen
+     * this walk reached, in both locales as every identity, has been through
+     * it. The defect: `dir="ltr"` around `Intl`'s ar output, whose U+200F
+     * marks the attribute then fights — the scramble `98f1e2e` measured and
+     * `A2-1` found on nine screens.
+     *
+     * **Fed its defect before being believed, inside the run**: a synthetic
+     * page carrying the exact shipped shape (a formatter's RLM-bearing date
+     * under `dir="ltr"`), one shape it must NOT flag (a raw reference under
+     * `dir="ltr"` — that attribute is correct, `D73`), and a second non-flag
+     * (a bare RLM date, which is the fix). §23's device.
+     */
+    const before = {
+      runs: ltrRunsScanned,
+      marks: rlmMarksSeen,
+      findings: forcedLtrDates.size,
+    };
+    const SELF_TEST = "/ar/__forced-ltr__";
+    scanForcedLtrDates(
+      SELF_TEST,
+      `<html><body>` +
+        `<span dir="ltr"><span class="num">06${RLM}/05${RLM}/2026</span></span>` +
+        `<span dir="ltr">Q-9182</span>` +
+        `<span>06${RLM}/05${RLM}/2026</span>` +
+        `</body></html>`,
+    );
+    const caught = [...forcedLtrDates.values()].find(
+      (f) => f.route === "/:locale/__forced-ltr__",
+    );
+    check(
+      "the scan catches an RLM-bearing date under dir=\"ltr\" [D73]",
+      caught !== undefined,
+      caught?.snippet ?? "NOT CAUGHT",
+    );
+    check(
+      "…and flags neither the raw reference nor the bare date — one finding, not three",
+      forcedLtrDates.size === before.findings + 1,
+      `${forcedLtrDates.size - before.findings} finding(s) from the fixture`,
+    );
+    // The fixture out of the report and the counters: the totals below
+    // describe real pages only.
+    for (const [key, f] of forcedLtrDates) {
+      if (f.route === "/:locale/__forced-ltr__") forcedLtrDates.delete(key);
+    }
+    ltrRunsScanned = before.runs;
+    rlmMarksSeen = before.marks;
+
+    // **The negative guards on a non-empty read, twice.** Zero RLM marks
+    // would mean no ar page rendered a locale date at all — a walk that never
+    // met the precondition, not a clean one — and zero ltr runs would mean
+    // the references and form controls vanished too.
+    check(
+      `ar pages rendered locale-formatted dates at all — saw ${rlmMarksSeen} RLM marks over the walk`,
+      rlmMarksSeen > 0,
+    );
+    check(
+      `dir="ltr" still exists where it belongs — saw ${ltrRunsScanned} forced-LTR runs`,
+      ltrRunsScanned > 0,
+    );
+    for (const finding of forcedLtrDates.values()) {
+      check(
+        `*** ${finding.route}: an RLM-bearing date sits under dir="ltr" and renders scrambled *** [D73]`,
+        false,
+        `"${finding.snippet}"`,
+      );
+    }
+    check(
+      `no locale-formatted date sits under dir="ltr" — 0 collisions in ${ltrRunsScanned} runs against ${rlmMarksSeen} marks`,
+      forcedLtrDates.size === 0,
+      `${forcedLtrDates.size} collision(s)`,
+    );
   }
 
   /* ── 23 ──────────────────────────────────────────────────────────────── */

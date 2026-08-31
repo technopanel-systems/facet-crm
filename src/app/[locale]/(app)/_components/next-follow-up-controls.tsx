@@ -56,9 +56,10 @@ export function NextFollowUpControls({
       {view.value ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="flex flex-col text-start">
-            <span className="num text-sm font-medium" dir="ltr">
-              {view.valueLabel}
-            </span>
+            {/* No `dir` — the label is a locale-formatted date whose ar form
+                places itself with U+200F marks; `dir="ltr"` scrambled it
+                (A2-1, `98f1e2e`). */}
+            <span className="num text-sm font-medium">{view.valueLabel}</span>
             {/* One column per record and the last writer wins, so the person
                 whose reminder just changed has to be able to see that it did.
                 It does not prevent the overwrite — either of them may

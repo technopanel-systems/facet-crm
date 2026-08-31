@@ -1286,9 +1286,16 @@ The mini-chain, the silence meter and the pace line are flex rows and need no
 
 **D73. Direction follows the run, and the test is one question: is there a word
 in it?** A run holding a **translated word** takes `dir="auto"`. A run holding a
-**bare figure** — a reference, a decimal, a date, a percentage, a count standing
+**bare figure** — a reference, a decimal, a percentage, a count standing
 alone — takes `dir="ltr"`. Nothing takes `dir="ltr"` merely because it contains
-digits.
+digits. **A locale-formatted date keeps its own direction — never force it.**
+`Intl` embeds U+200F marks in an `ar` date so its segments place themselves
+inside an RTL run, and `dir="ltr"` fights those marks: the day jumps to the
+front and *"2026/08/29"* renders *"292026/08/"*. A formatted date carries **no
+`dir` at all** — the attribute is the defect, proven at `98f1e2e` and again
+across nine screens in `AUDIT 2` (`A2-1`). A **raw** date string nobody
+formatted — a `yyyy-mm-dd` in a form control — is a reference, not a date, and
+keeps `dir="ltr"`.
 
 **The failure is silent and it changes a number.** European digits are *weak* in
 the bidi algorithm, not strong, so `auto` resolves a mixed run off its word and

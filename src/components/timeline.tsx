@@ -206,9 +206,10 @@ export async function TimelineRow({
         ))}
       </span>
       <span className="text-faint flex-none text-[11.5px]">
-        <span className="num" dir="ltr">
-          {day}
-        </span>
+        {/* No `dir` on the date: the ar formatter embeds U+200F marks that
+            place its segments, and `dir="ltr"` fights them — the scramble
+            `98f1e2e` measured on the dispatch date. Bare is the fix `D73`. */}
+        <span className="num">{day}</span>
         {event.actorName ? (
           <span className="ms-2">
             {t("timeline.byWhom", { name: event.actorName })}
@@ -263,9 +264,8 @@ async function CommentRow({
           </span>
         ) : null}
         <span className="text-faint text-[11.5px]">
-          <span className="num" dir="ltr">
-            {day}
-          </span>
+          {/* Bare like the row above — `dir="ltr"` scrambles the ar date. */}
+          <span className="num">{day}</span>
           {event.actorName ? (
             <span className="ms-2">
               {t("timeline.byWhom", { name: event.actorName })}

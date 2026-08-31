@@ -314,8 +314,10 @@ export async function StreamList({
           className="flex flex-col"
         >
           <p className="text-faint mt-3 mb-0.5 flex items-baseline gap-1.5 text-start text-[10.5px] font-semibold">
-            {/* A calendar day in Riyadh, not an instant. */}
-            <span className="num" dir="ltr">
+            {/* A calendar day in Riyadh, not an instant. And BARE — the ar
+                formatter embeds U+200F marks that place the date's segments,
+                and `dir="ltr"` scrambled every day header (A2-1, `98f1e2e`). */}
+            <span className="num">
               {format.dateTime(new Date(`${day}T00:00:00Z`), {
                 dateStyle: "medium",
                 timeZone: "UTC",

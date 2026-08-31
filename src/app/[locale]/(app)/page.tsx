@@ -215,7 +215,9 @@ export default async function TodayPage({
           {t("today.greeting", { name: session.user.name })}
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          <span dir="ltr">
+          {/* No `dir` on the date — its ar form places itself with U+200F
+              marks, and `dir="ltr"` scrambled it (A2-1, `98f1e2e`). */}
+          <span>
             {format.dateTime(new Date(), {
               dateStyle: "full",
               timeZone: "Asia/Riyadh",

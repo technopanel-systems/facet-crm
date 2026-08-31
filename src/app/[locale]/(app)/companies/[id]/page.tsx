@@ -609,8 +609,10 @@ export default async function CompanyDetailPage({
                       {/* The wrapper case `D62`: this line holds a date, a
                           translated outcome, a person and free text, so
                           `dir="auto"` goes on the values that may hold either
-                          script and never on the `<li>`. */}
-                      <span dir="ltr">
+                          script and never on the `<li>`. The date is BARE —
+                          `dir="ltr"` scrambled its ar form, whose U+200F
+                          marks place the segments themselves (A2-1). */}
+                      <span>
                         {format.dateTime(
                           new Date(`${review.decidedAt}T00:00:00Z`),
                           { dateStyle: "medium", timeZone: "UTC" },

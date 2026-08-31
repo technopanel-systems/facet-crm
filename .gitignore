@@ -76,6 +76,8 @@ next-env.d.ts
 # committed; its output is not. `.playwright-cli/` and `.playwright/` are
 # playwright-cli's own artifact and workspace folders.
 /audit-shots/
+# Session 46's copies of the audit's before-shots, kept for A/B comparison.
+/audit-shots-before-s46/
 /.playwright-cli/
 /.playwright/
 /audit-server.log
