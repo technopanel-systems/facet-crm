@@ -210,10 +210,13 @@ claims out and six report-detail checks in, a bigger page one exposing more ids
 to the id harvest — and `§33`'s moved 1689 → 1705, eight out and about
 twenty-four in. Diff the labels between the two runs rather than subtracting
 what you expected to lose. **And the labels that moved may not all belong to
-the section under test** — `§35`'s one-row probe moved 1742 → 1730, a net of
-exactly its own twelve, but the diff held **sixteen** departures and four
-returns, and four of the sixteen were `/activity`'s stream-kind labels changing
-because the fixture had drifted between the two runs. A delta can be right in
+the section under test** — `§36`'s precondition probe moved 1715 → 1698, a net of
+seventeen close enough to plausible that subtraction would have passed
+unchallenged, but the diff held **seventy-two** departures against fifty-five
+arrivals and only **twenty-three** of them were `§36`'s: the rest were
+`/activity`'s totals, the bell, `/follow-ups`' groups, `§35`'s own m² and four
+`§17` forms, every one of them fixture drift between the two runs. **The
+contamination outran the signal two to one.** A delta can be right in
 total while being made of the wrong parts, which subtraction cannot see and the
 diff shows on its face.
 
