@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
-import { formatSqm } from "@/lib/decimal";
+import { formatMoney, formatSqm } from "@/lib/decimal";
 import { can, requireSession } from "@/lib/authz";
 import { chainState } from "@/lib/chain";
 import { listDispatches } from "@/lib/dispatches";
@@ -188,6 +188,16 @@ export default async function QuotationDetailPage({
             line={t(chainTurnKey(chain, isCoordinator), {
               name: thread.raisedByName,
             })}
+            /* A plain fragment anchor `D20` — the panel names an act that
+               lives at the foot of the page, and *here* must be true
+               (`A2-10`). Rendered only while an act exists to point at. */
+            action={
+              thread.endState ? null : (
+                <Button asChild size="xs" variant="outline">
+                  <a href="#thread-actions">{t("common.actions")}</a>
+                </Button>
+              )
+            }
             /* **What the figure actually measures, said truthfully.** This
                read *"Sitting here since 3 August"* from `thread.createdAt` —
                the age of the THREAD — beneath a line naming the position it is
@@ -355,17 +365,20 @@ export default async function QuotationDetailPage({
               </DetailRow>
               <DetailRow label={t("quotations.detail.totalExclVat")}>
                 <span dir="auto">
-                  {live.totalExclVat ?? dash} {t("common.sar")}
+                  {live.totalExclVat ? formatMoney(live.totalExclVat) : dash}{" "}
+                  {t("common.sar")}
                 </span>
               </DetailRow>
               <DetailRow label={t("quotations.detail.totalVat")}>
                 <span dir="auto">
-                  {live.totalVat ?? dash} {t("common.sar")}
+                  {live.totalVat ? formatMoney(live.totalVat) : dash}{" "}
+                  {t("common.sar")}
                 </span>
               </DetailRow>
               <DetailRow label={t("quotations.fields.grandTotal")}>
                 <span dir="auto" className="font-semibold">
-                  {live.grandTotal ?? dash} {t("common.sar")}
+                  {live.grandTotal ? formatMoney(live.grandTotal) : dash}{" "}
+                  {t("common.sar")}
                 </span>
               </DetailRow>
             </dl>
@@ -383,7 +396,7 @@ export default async function QuotationDetailPage({
           do, and a 1fr rail is not where the work goes. `ThreadActions` renders
           nothing at all for a rep on a closed thread, so an identity with no
           act available gets no shell `D70`. */}
-      <Card>
+      <Card id="thread-actions" className="scroll-mt-4">
         <CardHeader>
           <CardTitle className="text-start text-sm">
             {t("common.actions")}
@@ -404,7 +417,7 @@ export default async function QuotationDetailPage({
           **balanced by height** `D70`. The conversation is the long side: on a
           thread it is what this screen exists to replace WhatsApp for. */}
       <div className="grid items-start gap-4 lg:grid-cols-[1.25fr_1fr]">
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           {/* `25 §9` — the thread the rep and the coordinator coordinate in,
               and `25 §13`'s return-for-edit reason lands in this same
               conversation rather than in a field of its own `S62`. */}
@@ -426,7 +439,7 @@ export default async function QuotationDetailPage({
           />
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           {/* `S77` — one quotation produces any number of dispatches. The
               thread had no way to reach any of them: `/dispatches` links here
               and nothing linked back. Every row is the company page's
@@ -510,7 +523,7 @@ export default async function QuotationDetailPage({
                     ].join(" · ")}
                     when={
                       version.grandTotal
-                        ? `${version.grandTotal} ${t("common.sar")}`
+                        ? `${formatMoney(version.grandTotal)} ${t("common.sar")}`
                         : undefined
                     }
                     action={

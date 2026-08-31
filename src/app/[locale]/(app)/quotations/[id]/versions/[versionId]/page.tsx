@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
-import { formatSqm } from "@/lib/decimal";
+import { formatMoney, formatSqm } from "@/lib/decimal";
 import { requireSession } from "@/lib/authz";
 import { getQuotationVersion } from "@/lib/quotations";
 
@@ -209,17 +209,22 @@ export default async function QuotationVersionPage({
               </DetailRow>
               <DetailRow label={t("quotations.detail.totalExclVat")}>
                 <span dir="ltr">
-                  {version.totalExclVat ?? dash} {t("common.sar")}
+                  {version.totalExclVat
+                    ? formatMoney(version.totalExclVat)
+                    : dash}{" "}
+                  {t("common.sar")}
                 </span>
               </DetailRow>
               <DetailRow label={t("quotations.detail.totalVat")}>
                 <span dir="ltr">
-                  {version.totalVat ?? dash} {t("common.sar")}
+                  {version.totalVat ? formatMoney(version.totalVat) : dash}{" "}
+                  {t("common.sar")}
                 </span>
               </DetailRow>
               <DetailRow label={t("quotations.fields.grandTotal")}>
                 <span dir="ltr" className="font-semibold">
-                  {version.grandTotal ?? dash} {t("common.sar")}
+                  {version.grandTotal ? formatMoney(version.grandTotal) : dash}{" "}
+                  {t("common.sar")}
                 </span>
               </DetailRow>
             </dl>

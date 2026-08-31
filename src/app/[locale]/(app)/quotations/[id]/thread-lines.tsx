@@ -1,4 +1,5 @@
 "use client";
+import { formatMoney } from "@/lib/decimal";
 
 import { useActionState } from "react";
 import { useTranslations } from "next-intl";
@@ -111,9 +112,12 @@ type FieldAction = (state: FormState, formData: FormData) => Promise<FormState>;
 
 function Money({ value, sar }: { value: string | null; sar: string }) {
   if (!value) return <span className="text-muted-foreground">—</span>;
+  // `dir="auto"`, not `"ltr"`: the currency is a translated word, so the run
+  // resolves off it and reads figure-first in both scripts (`A2-12`, `D73`).
+  // Grouped for reading, decimals untouched (`A2-16`, `D11`).
   return (
-    <span dir="ltr">
-      <span className="num">{value}</span> {sar}
+    <span dir="auto">
+      <span className="num">{formatMoney(value)}</span> {sar}
     </span>
   );
 }

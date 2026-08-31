@@ -207,9 +207,30 @@ export default async function FollowUpsPage({
                     </Badge>
                   </TableCell>
                   <TableCell phone="name" className="text-start font-medium">
-                    <Link href={anchorHref(row.anchorType, row.anchorId)} className="hover:underline">
-                      <span dir="auto">{row.anchorName}</span>
-                    </Link>
+                    {/* A company-anchored row's record IS the company, and 21
+                        of 25 page-one rows repeated the identical name into
+                        both columns, doubling the table past the card edge at
+                        1366 (`A2-17`). The COMPANY column beside this carries
+                        the same link, so the cell is blank rather than an
+                        echo — `D2`'s name columns already have a blank half
+                        (`§22`'s discipline on `/dispatches`). The test is the
+                        ANCHOR TYPE, not name equality: a thread whose label
+                        falls back to the company's name links somewhere the
+                        company column does not, and must keep its way in. */}
+                    {row.anchorType === "company" ? null : (
+                      <Link href={anchorHref(row.anchorType, row.anchorId)} className="hover:underline">
+                        {/* Capped: under auto table layout one long label
+                            widens every row past the card edge — session 26's
+                            `/quotations` find, met here when the seed gained
+                            its long quiet name. `dir="auto"` on the same
+                            block: a truncating single-value block carries its
+                            own direction so the ellipsis lands on the value's
+                            end (`A2-20`'s rule). */}
+                        <span dir="auto" className="block max-w-64 truncate">
+                          {row.anchorName}
+                        </span>
+                      </Link>
+                    )}
                   </TableCell>
                   <TableCell className="text-start">
                     {row.companyId && row.companyName ? (
@@ -217,7 +238,9 @@ export default async function FollowUpsPage({
                         href={`/companies/${row.companyId}`}
                         className="hover:underline"
                       >
-                        <span dir="auto">{row.companyName}</span>
+                        <span dir="auto" className="block max-w-64 truncate">
+                          {row.companyName}
+                        </span>
                       </Link>
                     ) : (
                       t("common.none")

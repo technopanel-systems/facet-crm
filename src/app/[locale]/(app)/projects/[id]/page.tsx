@@ -280,7 +280,7 @@ export default async function ProjectDetailPage({
           quotations, because *where is this* is what a project is opened to
           answer, and puts the participants and the money rules below. */}
       <div className="grid items-start gap-4 lg:grid-cols-[1.25fr_1fr]">
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           {/* `20 §6` — the project's own history. A report naming this project
               appears here AND on its company's timeline; a direct dispatch has
               no project and appears only on the company's `[07 C6]`. There is
@@ -307,7 +307,7 @@ export default async function ProjectDetailPage({
           />
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           {/* **The threads were unreachable from here until now.** The page
               drew a strip for a project with exactly one live thread and a flag
               for a project with more, and neither listed them or linked to one.

@@ -24,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
-import { formatSqm } from "@/lib/decimal";
+import { formatMoney, formatSqm } from "@/lib/decimal";
 import { can, requireSession } from "@/lib/authz";
 import { getDispatch } from "@/lib/dispatches";
 
@@ -722,19 +722,26 @@ function LineRows({
               <span>{t("dispatches.difference.unpriced")}</span>
             ) : (
               <>
-                <span dir="ltr">
+                {/* `auto`, not `ltr` — label and currency are translated
+                    words, so each run resolves off its words (`A2-12`,
+                    `D73`); money grouped, decimals untouched (`A2-16`). */}
+                <span dir="auto">
                   {t("quotations.detail.unitPrice")}:{" "}
-                  <span className="num">{line.unitPrice}</span>{" "}
+                  <span className="num">{formatMoney(line.unitPrice)}</span>{" "}
                   {t("common.sar")}
                 </span>
-                <span dir="ltr">
+                <span dir="auto">
                   {t("quotations.detail.lineTotal")}:{" "}
-                  <span className="num">{line.lineTotal}</span>{" "}
+                  <span className="num">
+                    {line.lineTotal ? formatMoney(line.lineTotal) : null}
+                  </span>{" "}
                   {t("common.sar")}
                 </span>
-                <span dir="ltr">
+                <span dir="auto">
                   {t("quotations.detail.vatAmount")}:{" "}
-                  <span className="num">{line.vatAmount}</span>{" "}
+                  <span className="num">
+                    {line.vatAmount ? formatMoney(line.vatAmount) : null}
+                  </span>{" "}
                   {t("common.sar")}
                 </span>
               </>

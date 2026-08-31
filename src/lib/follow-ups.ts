@@ -82,7 +82,6 @@ import {
   isNotNull,
   lte,
   notExists,
-  or,
   sql,
 } from "drizzle-orm";
 import { alias, QueryBuilder } from "drizzle-orm/pg-core";
@@ -100,6 +99,7 @@ import {
   users,
 } from "@/db/schema";
 import { withAudit } from "@/lib/audit";
+import { companySilence } from "@/lib/coverage";
 /** `S72`'s one predicate `[dispatches.ts]` — a project moves on an approval. */
 import {
   canViewRecord,
@@ -664,100 +664,53 @@ async function projectStageUnchanged(
 /**
  * `07 D5` — a qualified company quiet for 30 days, an unqualified one for 60.
  *
- * The same condition `coverage()` shows `[20 §7]`, read here as a queue rather
- * than a diagnostic: qualification is derived from a real quotation thread
- * `[10 §1]`, never from an outcome `[20 §3]`, and a company never logged
- * against counts from the day it was created — it is exactly the one that needs
- * the conversation.
- *
- * The threshold is applied in SQL rather than after decoration, because this is
- * a work queue and only the overdue rows are wanted. `coverage()` keeps its own
- * shape: it lists every company with its age, which is a different question.
+ * **The derivation is `companySilence()`'s, joined — not a copy.** This
+ * function held the third copy of the silence arithmetic until session 48;
+ * the first two (coverage and `/companies`) had already drifted a hundred
+ * companies apart before they were merged, and a queue disagreeing with the
+ * screen it sends people to is the same defect with a worse audience. Now
+ * `silence.isQuiet` IS the membership test, resolved in SQL because this is a
+ * work queue and only the overdue rows are wanted — and on-hold companies are
+ * excluded by the same expression `[20 §5]`, which `gather` used to do a step
+ * later; the rows were never shown either way.
  */
 async function companyQuiet(
   session: AuthSession,
   thresholds: FollowUpThresholds,
 ): Promise<FollowUpRow[]> {
-  const now = today();
-  const qualifiedCutoff = shiftDays(now, -thresholds.qualified);
-  const unqualifiedCutoff = shiftDays(now, -thresholds.unqualified);
-
-  // Grouped subqueries joined on, for the reason `riyadhDay` records.
-  const lastInteraction = db
-    .select({
-      companyId: repReports.companyId,
-      at: sql<string | null>`max(${repReports.reportDate})`.as(
-        "last_interaction_at",
-      ),
-    })
-    .from(repReports)
-    .where(eq(repReports.entryType, "interaction"))
-    .groupBy(repReports.companyId)
-    .as("last_interaction");
-
-  // Qualification is derived from a real quotation thread `[10 §1]`, never from
-  // an outcome `[20 §3]` — and never reads `end_state`, because an accepted
-  // thread is internal approval, not a won deal `[16 §5]`.
-  //
-  // The id is re-aliased because it is interpolated into a `sql` template
-  // below, where a bare `"company_id"` would collide with the other subquery's.
-  const qualified = db
-    .selectDistinct({
-      companyId: sql<string>`${quotationThreads.companyId}`.as(
-        "qualified_company_id",
-      ),
-    })
-    .from(quotationThreads)
-    .as("qualified");
-
-  const quietSince = sql<string>`coalesce(
-    ${lastInteraction.at}, (${companies.createdAt} at time zone 'Asia/Riyadh')::date
-  )`;
-  const isQualified = sql<boolean>`${qualified.companyId} is not null`;
+  const silence = companySilence(thresholds);
 
   const rows = await db
     .select({
       companyId: companies.id,
       companyName: companies.name,
-      createdAt: companies.createdAt,
-      lastInteractionAt: lastInteraction.at,
-      qualifiedId: qualified.companyId,
+      quietSince: silence.quietSince,
+      silentDays: silence.silentDays,
+      thresholdDays: silence.thresholdDays,
     })
     .from(companies)
-    .leftJoin(lastInteraction, eq(lastInteraction.companyId, companies.id))
-    .leftJoin(qualified, eq(qualified.companyId, companies.id))
+    .innerJoin(silence, eq(silence.companyId, companies.id))
     .where(
       and(
         visibleCompaniesFilter(session),
         isNull(companies.archivedAt),
         isNull(companies.mergedIntoId),
-        or(
-          and(isQualified, sql`${quietSince} < ${qualifiedCutoff}`),
-          and(
-            sql`${qualified.companyId} is null`,
-            sql`${quietSince} < ${unqualifiedCutoff}`,
-          ),
-        ),
+        sql`${silence.isQuiet}`,
       ),
     );
 
-  return rows.map((row) => {
-    const since = row.lastInteractionAt ?? riyadhDayOf(row.createdAt);
-    return {
-      kind: "company_quiet" as const,
-      anchorType: "company" as const,
-      anchorId: row.companyId,
-      anchorName: row.companyName,
-      companyId: row.companyId,
-      companyName: row.companyName,
-      owners: [],
-      since,
-      ageDays: calendarDaysBetween(since, now),
-      thresholdDays: row.qualifiedId
-        ? thresholds.qualified
-        : thresholds.unqualified,
-    };
-  });
+  return rows.map((row) => ({
+    kind: "company_quiet" as const,
+    anchorType: "company" as const,
+    anchorId: row.companyId,
+    anchorName: row.companyName,
+    companyId: row.companyId,
+    companyName: row.companyName,
+    owners: [],
+    since: row.quietSince,
+    ageDays: row.silentDays,
+    thresholdDays: row.thresholdDays,
+  }));
 }
 
 /**

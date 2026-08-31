@@ -828,6 +828,15 @@ async function main(): Promise<void> {
   console.log("\n5. A tag on somebody who cannot see the record [25 §11]");
 
   const outsiderBefore = await mentionsFor(outsider.user.id);
+  // The ids on page 1 BEFORE the tag, so the assertion below can pin THIS
+  // run's mention rather than whichever mention `find()` meets first — the
+  // withheld payload carries no record id and no stamped body to match on, so
+  // the id difference is the only handle, and it does not lean on the list's
+  // ordering the way first-match did (`B2`, `CLAUDE.md`'s reads-nothing shape:
+  // right only while the fixture rows happen to be newest).
+  const outsiderSeen = new Set(
+    (await listNotifications(outsider, { page: 1 })).rows.map((row) => row.id),
+  );
   await addComment(repA, {
     recordType: "project",
     recordId: project.id,
@@ -841,7 +850,14 @@ async function main(): Promise<void> {
 
   const outsiderRows = await listNotifications(outsider, { page: 1 });
   const outsiderMention = outsiderRows.rows.find(
-    (row) => row.typeKey === NOTIFICATION_TYPES.mentionReceived,
+    (row) =>
+      row.typeKey === NOTIFICATION_TYPES.mentionReceived &&
+      !outsiderSeen.has(row.id),
+  );
+  check(
+    "…and THIS run's mention is the row under test — the id is new to page 1",
+    outsiderMention !== undefined,
+    `page 1 held ${outsiderSeen.size} row(s) before the tag`,
   );
   check(
     "…and the payload withholds the record when they may not read it [20 §8.2]",

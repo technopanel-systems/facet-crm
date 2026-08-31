@@ -4268,6 +4268,31 @@ async function main(): Promise<void> {
       ),
     ];
 
+    /**
+     * The same ids, walked ACROSS the list's pages rather than read off page
+     * one. Page one is 25 rows and every full run writes ~4 threads that
+     * displace it, so a seeded precondition slid off on run 7 and ten checks
+     * went red on residue rather than on code — the six-runs-per-seed budget
+     * `WORKFLOW §5` counted. Walking the pages spends the budget on the whole
+     * scope instead of one page of it. Bounded, so a broken pager cannot loop
+     * for ever: twelve pages is 300 rows against a seed of ~60.
+     */
+    async function* pagedIdsOf(
+      jar: Jar,
+      section: string,
+      locale: string,
+    ): AsyncGenerator<string> {
+      for (let page = 1; page <= 12; page += 1) {
+        const path =
+          page === 1
+            ? `/${locale}/${section}`
+            : `/${locale}/${section}?page=${page}`;
+        const ids = idsOf((await get(jar, path)).body, section, locale);
+        if (ids.length === 0) return;
+        yield* ids;
+      }
+    }
+
     /** Every `$ACTION…` input of one form, unescaped, as a browser sends it. */
     const envelope = (form: string): FormData => {
       const fields = new FormData();
@@ -4372,8 +4397,7 @@ async function main(): Promise<void> {
       // would stop rendering, and this assertion would decay into a silent skip
       // — the way three of `verify-slice3`'s did.
       let participantsDriven = false;
-      const projects = await get(repJar, `/${locale}/projects`);
-      for (const projectId of idsOf(projects.body, "projects", locale)) {
+      for await (const projectId of pagedIdsOf(repJar, "projects", locale)) {
         const path = `/${locale}/projects/${projectId}`;
         const page = await get(repJar, path);
         const add = actForm(page.body, "add-participant");
@@ -4494,8 +4518,7 @@ async function main(): Promise<void> {
       ];
       const driven = new Set<string>();
       let exceptionsChecked = false;
-      const coordThreads = await get(coordJar, `/${locale}/quotations`);
-      for (const threadId of idsOf(coordThreads.body, "quotations", locale)) {
+      for await (const threadId of pagedIdsOf(coordJar, "quotations", locale)) {
         const path = `/${locale}/quotations/${threadId}`;
         const page = await get(coordJar, path);
         for (const [act, fields] of wanted) {

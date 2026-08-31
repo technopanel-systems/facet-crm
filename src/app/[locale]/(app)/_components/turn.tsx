@@ -89,6 +89,7 @@ export function TurnPanel({
   line,
   detail,
   meter,
+  action,
   tone = "soon",
 }: {
   who?: string;
@@ -101,6 +102,12 @@ export function TurnPanel({
    * once.
    */
   meter?: React.ReactNode;
+  /**
+   * A way to the act the line names — an anchor, never a control (`A2-10`:
+   * *"accept it here"* pointed at a button 1.5 folds down, so *here* was a
+   * lie the reader paid for in scrolling). Rendered at the inline end.
+   */
+  action?: React.ReactNode;
   tone?: TurnTone;
 }) {
   const band =
@@ -135,6 +142,7 @@ export function TurnPanel({
         ) : null}
       </span>
       {meter ? <span className="flex-none">{meter}</span> : null}
+      {action ? <span className="flex-none">{action}</span> : null}
     </div>
   );
 }

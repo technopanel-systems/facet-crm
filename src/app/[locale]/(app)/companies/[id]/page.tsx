@@ -323,7 +323,7 @@ export default async function CompanyDetailPage({
           dispatches — and puts the people below it: this is the page a rep
           opens to answer where do we stand with this customer. */}
       <div className="grid items-start gap-4 lg:grid-cols-[1.25fr_1fr]">
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           {/* No Log button here any more `S32` — it is in the page header,
               where an entry point can be reached without scrolling.
 
@@ -340,7 +340,7 @@ export default async function CompanyDetailPage({
           />
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           <RelatedCard
             title={t("quotations.title")}
             total={quotations.total}
@@ -419,6 +419,12 @@ export default async function CompanyDetailPage({
             ))}
           </RelatedCard>
 
+          {/* Absent when empty, not an empty shell `D70` (`A2-21`): unlike
+              Contacts below, whose empty state OFFERS Add contact, nothing
+              here could offer an act — a dispatch is not raised from a
+              company page — so a heading over one sentence was a shell. The
+              card returns with the first dispatch. */}
+          {dispatches.total === 0 ? null : (
           <RelatedCard
             title={t("dispatches.title")}
             total={dispatches.total}
@@ -458,6 +464,7 @@ export default async function CompanyDetailPage({
               />
             ))}
           </RelatedCard>
+          )}
 
           <RelatedCard
             title={t("companies.detail.contacts")}

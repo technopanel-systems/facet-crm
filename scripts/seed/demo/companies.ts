@@ -28,7 +28,8 @@
  * elevated — `verify:schema25` §21 asserts that no live company membership is
  * held by one. Nobody in this dataset can both choose it and keep the company.
  *
- * **Three names are deliberately long**, one Arabic, one English, one contact.
+ * **Four names are deliberately long** — two Arabic (one quiet), one
+ * English, one contact.
  * `S12` gives a company a single name field, so a list's lead cell and a
  * detail heading are exactly where RTL truncation breaks, and nothing else in
  * the base is long enough to find it.
@@ -40,10 +41,12 @@
  * near the *back*. That is intended, not a regression: the sort is kept
  * precisely so these stay one URL away. `verify:routes` §20 drives it.
  *
- * **Known gap, deliberately not closed here:** none of the three is quiet, so
- * the *default* screen — the one a rep actually looks at — exercises no long
- * name at all. Making one of them quiet is a change to this dataset and wants
- * its own decision (`WORKFLOW §5`).
+ * **The gap above closed in session 48, the other way round**: rather than
+ * making a long name quiet — a clock change that would move every count the
+ * suite reads — an already-quiet company (`age: 116`, last logged ~110 days
+ * back in `activity.ts`) took a fourth deliberately-long Arabic name. No date moved, no group count moved,
+ * and the DEFAULT attention order now carries a long name at the top of GONE
+ * QUIET, where a rep actually looks (`WORKFLOW §5`).
  *
  * `region` is never written here: `S15` derives it from the city and the rep
  * is never asked. Country is Saudi unless `country` says otherwise, and a
@@ -119,7 +122,7 @@ export const COMPANIES: readonly CompanyRow[] = [
     note: "عميل عنده واجهة مكاتب إدارية اللون نحاسي يبي توريد وتركيب، الكمية 244 متر",
   },
   {
-    name: "مؤسسة الصرح للمقاولات",
+    name: "مؤسسة الصرح الوطنية للمقاولات العامة والتشييد والصيانة والتشغيل",
     owner: "faisal",
     category: "Contractor",
     city: "Al Kharj",

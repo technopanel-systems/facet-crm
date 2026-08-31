@@ -78,10 +78,9 @@ import { getQuietThresholds, type QuietThresholds } from "@/lib/settings";
  * already feeds the digest, so adopting the other would have changed what
  * lands in every rep's notifications.
  *
- * **`companyQuiet()` still holds a third copy** and is not touched here: it
- * feeds the waiting list and the daily digest, where a silent mistake reaches
- * every rep, so it converges in its own slice behind `verify:followups`
- * (`WORKFLOW §5`).
+ * **`companyQuiet()` converged in session 48**: it joins this subquery and
+ * filters on `isQuiet`, so the queue, the coverage figures and `/companies`
+ * read ONE derivation — the third copy is gone, behind `verify:followups`.
  *
  * ## Why a joined subquery, and what the rendered SQL actually does
  *

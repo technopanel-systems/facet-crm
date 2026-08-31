@@ -95,6 +95,22 @@ export function formatSqm(value: string): string {
  * lose a metre against their own sum, which is `divideEqually`'s argument in
  * `[18 §5]` applied to display rather than to credit.
  */
+/**
+ * A money figure grouped for reading — `D11`, `A2-16`. The stored string
+ * keeps its two decimals untouched (SMAC owns money and FACET mirrors it);
+ * only the integer half gains separators: `389289.42` → `389,289.42`. ASCII
+ * digits and a literal comma in both locales, `formatSqm`'s own policy.
+ */
+export function formatMoney(value: string): string {
+  const [whole, fraction] = value.split(".");
+  const negative = whole.startsWith("-");
+  const digits = negative ? whole.slice(1) : whole;
+  const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `${negative ? "-" : ""}${grouped}${
+    fraction === undefined ? "" : `.${fraction}`
+  }`;
+}
+
 export function formatWholeSqm(whole: bigint): string {
   const negative = whole < ZERO;
   const digits = (negative ? -whole : whole).toString();

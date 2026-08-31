@@ -68,6 +68,42 @@ function Panel({
   );
 }
 
+/**
+ * A Panel for the RARE outcome — reject, cancel — as a native `<details>`,
+ * the codebase's own idiom since `§17`. Two always-open reason textareas
+ * spent a fold of the coordinator's screen before her named act (`A2-10`);
+ * closed, they are one summary line each, and the field is still in the
+ * MARKUP — `§23` reads it, scripts-off opens it, nothing is enabled by
+ * JavaScript `D20`.
+ */
+function RarePanel({
+  title,
+  hint,
+  slot,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  /** The DOM handle `verify:routes` reads, `edit-line`'s shape. */
+  slot: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <details
+      data-slot={slot}
+      className="group/rare border-t py-4"
+    >
+      <summary className="flex cursor-pointer list-none flex-col gap-1 text-start [&::-webkit-details-marker]:hidden">
+        <span className="text-sm font-medium">{title}</span>
+        {hint ? (
+          <span className="text-muted-foreground text-xs">{hint}</span>
+        ) : null}
+      </summary>
+      <div className="mt-2 flex flex-col gap-2">{children}</div>
+    </details>
+  );
+}
+
 /** A one-button action with no fields — accept, revise. */
 function PlainButton({
   action,
@@ -310,9 +346,10 @@ export function ThreadActions({
               quotation was rejected was never told and could not find out.
               The reason becomes a comment on the thread and reaches them. */}
           {open ? (
-            <Panel
+            <RarePanel
               title={t("quotations.actions.reject")}
               hint={t("quotations.actions.rejectHint")}
+              slot="reject-disclosure"
             >
               <ReasonForm
                 action={rejectThreadAction.bind(null, threadId)}
@@ -321,13 +358,14 @@ export function ThreadActions({
                 label={t("quotations.fields.rejectionReason")}
                 submitLabel={t("quotations.actions.reject")}
               />
-            </Panel>
+            </RarePanel>
           ) : null}
 
           {open ? (
-            <Panel
+            <RarePanel
               title={t("quotations.actions.cancel")}
               hint={t("quotations.actions.cancelHint")}
+              slot="cancel-disclosure"
             >
               {/* Required `[10 §8]` — it kills a signed quotation, and the
                   reason is what makes the audit entry worth reading. */}
@@ -337,7 +375,7 @@ export function ThreadActions({
                 field="cancellationReason"
                 submitLabel={t("quotations.actions.cancel")}
               />
-            </Panel>
+            </RarePanel>
           ) : null}
         </section>
       ) : null}

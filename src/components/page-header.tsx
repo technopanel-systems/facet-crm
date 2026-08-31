@@ -259,9 +259,21 @@ export function RecordRow({
   action?: ReactNode;
 }) {
   return (
-    <li className="border-line flex items-center gap-3 border-b py-2.5 last:border-b-0">
+    // **Below `md` the row is two lines** — identity above, figure and
+    // controls below — `D56`'s phone-row shape. One line at 375 crushed the
+    // name to nothing and pushed the action cluster past the card edge
+    // (`A2-2`: the Plan form measured at x=416 inside a clipped row), because
+    // the action slot is `flex-none` and cannot shrink. One DOM, two
+    // arrangements: a grid below `md`, the same flex row above it — the mark
+    // keeps the name's line, the figure and the controls share the second.
+    <li className="border-line flex items-center gap-3 border-b py-2.5 max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)_auto] max-md:gap-y-1.5 last:border-b-0">
       {mark ? <span className="flex-none">{mark}</span> : null}
-      <span className="min-w-0 flex-1 text-start">
+      <span
+        className={cn(
+          "min-w-0 flex-1 text-start",
+          mark ? "max-md:col-span-2" : "max-md:col-span-3",
+        )}
+      >
         <span className="block truncate text-[13.5px] font-semibold">
           {href ? (
             <Link href={href} className="hover:underline">
@@ -288,13 +300,18 @@ export function RecordRow({
           data-when={whenData}
           className={cn(
             "num flex-none text-[11.5px] font-semibold",
+            "max-md:col-start-2 max-md:row-start-2 max-md:self-center",
             whenClassName ?? "text-faint",
           )}
         >
           {when}
         </span>
       ) : null}
-      {action ? <span className="flex-none">{action}</span> : null}
+      {action ? (
+        <span className="flex-none max-md:col-start-3 max-md:row-start-2 max-md:justify-self-end">
+          {action}
+        </span>
+      ) : null}
     </li>
   );
 }

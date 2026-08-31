@@ -56,7 +56,7 @@ export const REPORTS: readonly ReportEntry[] = [
    *      touched. `company_quiet` then falls out of the gaps `S89`. ---- */
   { company: "مصنع سدرة للصناعات المعدنية", contact: true, by: "faisal", day: 117, channel: "visit", outcome: "introduced", text: "زيارة أولى للمصنع، شرحت المنتج والفروقات بين الفئات، مهتم بالكميات الكبيرة" },
   { company: "شركة أنماء للمقاولات", contact: true, project: "P01", by: "faisal", day: 111, channel: "visit", outcome: "introduced", text: "اجتماع في مكتبهم مع مدير المشاريع، عندهم واجهة مكاتب إدارية، اللون نحاسي، طلب عرض" },
-  { company: "مؤسسة الصرح للمقاولات", by: "faisal", day: 110, channel: "call", outcome: "introduced", text: "اتصال تعريفي، طلب كتالوج على الواتساب" },
+  { company: "مؤسسة الصرح الوطنية للمقاولات العامة والتشييد والصيانة والتشغيل", by: "faisal", day: 110, channel: "call", outcome: "introduced", text: "اتصال تعريفي، طلب كتالوج على الواتساب" },
   { company: "مصنع الأفق للألمنيوم", contact: true, by: "faisal", day: 113, channel: "visit", outcome: "introduced", text: "زيارة المصنع، يشتري حالياً من مورد ثاني، فتح الباب لعرض سعر" },
   { company: "Delta Rock Co", contact: true, by: "faisal", day: 109, channel: "meeting", outcome: "catalogue_sent", text: "جاء للمكتب ومعه رسومات المشروع، سلمته الكتالوج وشرحت التفاصيل الفنية" },
   { company: "مكتب المعمار الحديث للاستشارات الهندسية", contact: true, by: "faisal", day: 108, channel: "email", outcome: "documents_sent", text: "أرسلت شهادات مقاومة الحريق والمواصفات الفنية بالإيميل للاعتماد في المواصفة" },
