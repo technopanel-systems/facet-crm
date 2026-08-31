@@ -70,3 +70,12 @@ next-env.d.ts
 # A dump holds every row and every password hash. It is exactly as sensitive as
 # the database, and must never be committed.
 /backups/
+
+# AUDIT 2's capture output — screenshots and manifest, rebuilt any time by
+# `node scripts/audit2/capture.mjs` against a seeded database. The script is
+# committed; its output is not. `.playwright-cli/` and `.playwright/` are
+# playwright-cli's own artifact and workspace folders.
+/audit-shots/
+/.playwright-cli/
+/.playwright/
+/audit-server.log
