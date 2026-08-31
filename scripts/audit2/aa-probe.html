@@ -1,0 +1,73 @@
+<!doctype html>
+<!--
+  A2-15's probe: does `backdrop-filter` change how text is antialiased?
+
+  Two cards per theme, identical text and surface recipe (the app's own
+  card-face values), one WITH the blur and one WITHOUT. Open this file in
+  the browser you actually use, zoom to 400%, and look at the glyph edges
+  on the two cards of your theme. If they look the same, the glass costs
+  nothing on your machine.
+
+  Session 46 measured it on the dev machine (Windows 11, Chrome 152, at
+  125% scaling and again forced to 100%): the OS-level window capture
+  showed grayscale antialiasing on ALL four cards — zero subpixel fringing
+  with or without the filter — while a GDI+ ClearType control lit the same
+  metric up. The audit's proposed mechanism produced no difference there.
+  Method and numbers: WORKFLOW §5 A2-15. Note that Playwright/CDP
+  screenshots re-composite offscreen (CDPScreenshotNewSurface) and cannot
+  see the window's true rasterization — capture the screen, not the page.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>AA probe</title>
+<style>
+  body {
+    margin: 0;
+    background: #f5f2ef url() no-repeat;
+    /* A busy-ish ground so the blur has something to blur. */
+    background-image: radial-gradient(600px 300px at 10% 0%, rgba(200,16,46,.07), transparent 60%),
+                      radial-gradient(500px 250px at 100% 0%, rgba(43,92,168,.06), transparent 55%);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    padding: 40px;
+  }
+  .card {
+    width: 560px;
+    padding: 24px;
+    margin-bottom: 32px;
+    border: 1px solid rgba(26,22,20,.13);
+    border-radius: 14px;
+    background-color: rgba(255,255,255,.78);
+    box-shadow: 0 1px 0 rgba(255,255,255,.8) inset, 0 12px 36px -20px rgba(26,22,20,.35);
+  }
+  #with-filter { backdrop-filter: blur(18px) saturate(1.1); }
+  /* #without-filter deliberately carries none */
+  p { font-size: 14px; color: #1a1614; margin: 0 0 8px; }
+  .small { font-size: 11.5px; color: #6b615c; }
+  .dark-wrap { background: #0f0d0c; padding: 24px; width: 600px; border-radius: 8px; }
+  .dark-wrap .card { background-color: rgba(30,26,24,.72); border-color: rgba(255,255,255,.07); }
+  .dark-wrap p { color: #f3eeeb; }
+  .dark-wrap .small { color: #a69d99; }
+</style>
+</head>
+<body>
+  <div class="card" id="with-filter">
+    <p>Quotation Q-9182 waiting on the coordinator since August 20, 2026.</p>
+    <p class="small">Faisal Al-Harbi logged a visit · 42 days · 2,849 m² quoted</p>
+  </div>
+  <div class="card" id="without-filter">
+    <p>Quotation Q-9182 waiting on the coordinator since August 20, 2026.</p>
+    <p class="small">Faisal Al-Harbi logged a visit · 42 days · 2,849 m² quoted</p>
+  </div>
+  <div class="dark-wrap">
+    <div class="card" id="dark-with" style="backdrop-filter: blur(18px) saturate(1.2)">
+      <p>Quotation Q-9182 waiting on the coordinator since August 20, 2026.</p>
+      <p class="small">Faisal Al-Harbi logged a visit · 42 days · 2,849 m² quoted</p>
+    </div>
+    <div class="card" id="dark-without">
+      <p>Quotation Q-9182 waiting on the coordinator since August 20, 2026.</p>
+      <p class="small">Faisal Al-Harbi logged a visit · 42 days · 2,849 m² quoted</p>
+    </div>
+  </div>
+</body>
+</html>
