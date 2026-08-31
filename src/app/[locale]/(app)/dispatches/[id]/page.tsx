@@ -172,11 +172,12 @@ export default async function DispatchPage({
           </CardHeader>
           <CardContent>
             <p
-              dir="auto"
               className="text-start text-sm whitespace-pre-wrap"
               data-cancellation-reason
             >
-              {dispatch.cancellationReason}
+              {/* `<bdi>`, not `dir` on the block — the block keeps the page's
+                  alignment while the typed run isolates itself `D62` `A2-14`. */}
+              <bdi>{dispatch.cancellationReason}</bdi>
             </p>
           </CardContent>
         </Card>
@@ -197,11 +198,10 @@ export default async function DispatchPage({
           </CardHeader>
           <CardContent>
             <p
-              dir="auto"
               className="text-start text-sm whitespace-pre-wrap"
               data-refusal-reason
             >
-              {dispatch.refusalReason}
+              <bdi>{dispatch.refusalReason}</bdi>
             </p>
           </CardContent>
         </Card>
@@ -379,7 +379,7 @@ export default async function DispatchPage({
                 name="quotedSqm"
                 numeric
               >
-                <span dir="ltr">
+                <span dir="auto">
                   {formatSqm(dispatch.quotedSqm ?? "0")} {t("common.sqm")}
                 </span>
               </Fact>
@@ -388,7 +388,7 @@ export default async function DispatchPage({
                 name="dispatchedAgainstVersion"
                 numeric
               >
-                <span dir="ltr">
+                <span dir="auto">
                   {formatSqm(dispatch.dispatchedAgainstVersionSqm ?? "0")}{" "}
                   {t("common.sqm")}
                 </span>
@@ -398,7 +398,7 @@ export default async function DispatchPage({
                 name="thisDispatchSqm"
                 numeric
               >
-                <span dir="ltr">
+                <span dir="auto">
                   {formatSqm(dispatch.sqm)} {t("common.sqm")}
                 </span>
               </Fact>
@@ -413,9 +413,13 @@ export default async function DispatchPage({
                   the turn panel above already says whose it is. The badge still
                   shows — a rep editing a draft can see they have moved away
                   from the quotation. */}
+              {/* A neutral label on the Fact: the dt used to carry the SAME
+                  string as the badge under it — the label said the claim
+                  twice (`A2-24`). The badge states the fact; the dt names the
+                  slot. */}
               {dispatch.differsFromQuotation === null ? null : (
                 <Fact
-                  label={t("dispatches.difference.flag")}
+                  label={t("dispatches.difference.label")}
                   name="difference"
                   wide
                 >

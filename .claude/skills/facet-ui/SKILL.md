@@ -64,7 +64,7 @@ else is a **defect**, not a flourish `D8`.
 | Token | Where it may be used |
 |---|---|
 | `--canvas-glow` | the two fixed radial gradients on the page background — the only background gradient in the product `D13` |
-| `--surface` + `--blur` + `--line-hi` + `--shadow`/`--shadow-lift` | the card texture, identical on every card; resting and hovered depth `D14` `D8`. It is the **`card-face glass`** utility pair in `globals.css`, worn by `Card`, `ListCard` and the dashboard tiles — a fourth card surface wears that pair, never its own copy |
+| `--surface` + `--blur` + `--line-hi` + `--shadow`/`--shadow-lift` | the card texture, identical on every card; resting and hovered depth `D14` `D8`. It is the **`card-face glass`** utility pair in `globals.css`, worn by `Card`, `ListCard`, the board column and the stream card — the dashboard tiles stopped wearing it when `D33` became one quartered card (`A2-27`); a fifth card surface wears that pair, never its own copy |
 | `--blur` alone | the rail and the header. Nothing else `D8` `D21` — the **`glass`** utility |
 | `--surface-solid` `--surface-2-solid` `--rail-solid` | what each blurred surface becomes under `prefers-reduced-transparency` `D19`. Below 980px the blur is **reduced to 8px, never removed** `D19` |
 | `--brand-grad` | **six uses**: primary button · active rail marker · target bar fill · rail count badge · dispatched segment of a rollup bar `D15` · a row's action button filling on hover `D17` |

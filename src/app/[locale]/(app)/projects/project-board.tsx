@@ -198,7 +198,7 @@ export async function ProjectBoardView({
                         {card.sqmExpected ? (
                           <span
                             className="num text-[11.5px] font-semibold"
-                            dir="ltr"
+                            dir="auto"
                           >
                             {formatSqm(card.sqmExpected)} {t("common.sqm")}
                           </span>

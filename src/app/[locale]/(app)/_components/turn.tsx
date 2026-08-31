@@ -121,7 +121,7 @@ export function TurnPanel({
       {who ? (
         <span
           aria-hidden
-          className="grid size-8.5 flex-none place-items-center rounded-full bg-[linear-gradient(140deg,#31527F,#1B2F4C)] text-xs font-semibold text-white"
+          className="grid size-8.5 flex-none place-items-center rounded-full bg-(image:--avatar-person-grad) text-xs font-semibold text-white"
         >
           {who}
         </span>

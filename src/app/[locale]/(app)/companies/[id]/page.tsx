@@ -370,7 +370,7 @@ export default async function CompanyDetailPage({
                   mark={
                     <span
                       aria-hidden
-                      className="grid size-7 place-items-center rounded-full bg-[linear-gradient(140deg,#31527F,#1B2F4C)] text-[10px] font-semibold text-white"
+                      className="grid size-7 place-items-center rounded-full bg-(image:--avatar-person-grad) text-[10.5px] font-semibold text-white"
                     >
                       {initials(row.raisedByName)}
                     </span>

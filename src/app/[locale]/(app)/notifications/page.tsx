@@ -181,6 +181,7 @@ function NotificationEntry({
             // longer guesses at a record type `AUDIT 1 E2`.
             href={anchorHref(row.anchorType, row.anchorId)}
             className="text-start text-sm hover:underline"
+            dir="auto"
           >
             {row.anchorLabel ?? t("common.view")}
           </Link>
@@ -221,7 +222,10 @@ function NotificationEntry({
             <>
               {row.payload.body ? (
                 <p className="text-start text-sm">
-                  {excerpt(row.payload.body)}
+                  {/* `<bdi>`, not `dir` on the `p`: the block keeps the
+                      page's direction and alignment while the free-text run
+                      isolates its own `D62`. */}
+                  <bdi>{excerpt(row.payload.body)}</bdi>
                 </p>
               ) : null}
               <Link
@@ -257,12 +261,16 @@ function NotificationEntry({
                   `notifications.detail.decisionUnknown.${row.payload.decision}`,
                 )}
           </p>
+          {/* `dir="auto"` came OFF this block — `A2-14`'s sighting: the
+              attribute resolved the paragraph's direction from the VALUE, and
+              `text-start` followed it, so a Latin reason slammed to the far
+              edge of the RTL card, a column from its sentence. The `<bdi>`
+              isolates the run; the block keeps the page's direction. */}
           <p
             className="text-start text-sm whitespace-pre-wrap"
-            dir="auto"
             data-decision-reason
           >
-            {row.payload.reason}
+            <bdi>{row.payload.reason}</bdi>
           </p>
           {row.payload.recordViewable && row.payload.href ? (
             <Link
@@ -298,8 +306,12 @@ function NotificationEntry({
                   percentage: row.payload.percentage,
                 })}
           </p>
-          <p className="text-muted-foreground text-start text-sm" dir="ltr">
-            <span className="num">{row.payload.effectiveFrom}</span>
+          <p className="text-muted-foreground text-start text-sm">
+            {/* A raw `yyyy-mm-dd` is a reference and keeps `ltr` `D73` — on
+                the run, never the block, which would drag its alignment. */}
+            <span className="num" dir="ltr">
+              {row.payload.effectiveFrom}
+            </span>
           </p>
           {row.payload.recordViewable && row.payload.href ? (
             <Link

@@ -95,8 +95,8 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
 
 /**
  * `numeric` is one prop, not two classes remembered separately — the same
- * reasoning `22 §2` used to make `num` a single utility. It carries both
- * halves of `22 §3`'s rule: numeric columns are **end-aligned and mono**.
+ * reasoning that made `num` a single utility `D11`. It carries both halves of
+ * `D24`'s List clause: numeric columns are **end-aligned and mono**.
  *
  * Put it on the `TableHead` as well as the `TableCell`, always. A right-aligned
  * column under a left-aligned heading is the thing the rule exists to stop.
@@ -112,7 +112,7 @@ function TableHead({
     <th
       data-slot="table-head"
       className={cn(
-        "px-4 py-2.5 text-start align-middle text-[10.5px] font-semibold tracking-wider whitespace-nowrap text-faint uppercase [&:has([role=checkbox])]:pe-0",
+        "px-4 py-2.5 text-start align-middle text-[10.5px] font-semibold tracking-[.09em] whitespace-nowrap text-faint uppercase [&:has([role=checkbox])]:pe-0",
         numeric && "text-end",
         className
       )}

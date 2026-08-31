@@ -229,8 +229,12 @@ export default async function ProjectsPage({
                       project reaching a rep through a share is a second owner,
                       and the column then printed his own name down the whole
                       page. `listProjects` carries the measurement. */}
+                  {/* `data-column`, never `data-slot` — a `data-slot` prop
+                      SPREADS over `TableHead`'s own `data-slot="table-head"`
+                      and silently deletes `D24`'s marker from the cell,
+                      session 26's find on the raiser column. */}
                   {list.foreignOwnerCount > 0 ? (
-                    <TableHead data-slot="project-owner" className="text-start">
+                    <TableHead data-column="project-owner" className="text-start">
                       {t("projects.fields.owner")}
                     </TableHead>
                   ) : null}
@@ -247,7 +251,7 @@ export default async function ProjectsPage({
                           className={`num text-[11.5px] font-semibold ${
                             row.chain.stale ? "text-tone-red-fg" : "text-faint"
                           }`}
-                          dir="ltr"
+                          dir="auto"
                         >
                           {t("followUps.fields.days", {
                             count: row.chain.ageDays,

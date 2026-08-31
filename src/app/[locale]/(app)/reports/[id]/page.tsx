@@ -165,11 +165,10 @@ export default async function ReportDetailPage({
           <CardContent>
             {/* The rep's own words, kept as typed, as a quote block `[D47]`. */}
             <blockquote className="border-s-2 ps-4">
-              <p
-                dir="auto"
-                className="text-start text-sm whitespace-pre-wrap"
-              >
-                {report.narrative}
+              {/* `<bdi>`, not `dir` on the block: the quote keeps the page's
+                  alignment; the rep's own words isolate their run `D62`. */}
+              <p className="text-start text-sm whitespace-pre-wrap">
+                <bdi>{report.narrative}</bdi>
               </p>
             </blockquote>
           </CardContent>

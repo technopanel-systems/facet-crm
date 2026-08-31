@@ -5769,7 +5769,7 @@ async function main(): Promise<void> {
 
       check(
         `${locale}: *** rep-a's own list does NOT repeat his name in a column *** [D2]`,
-        !table.body.includes('data-slot="project-owner"'),
+        !table.body.includes('data-column="project-owner"'),
         "the owner column rendered for a single-owner list",
       );
 
@@ -5779,7 +5779,7 @@ async function main(): Promise<void> {
       );
       check(
         `${locale}: …while a reader who sees more than one person's work gets it [D2]`,
-        wide.body.includes('data-slot="project-owner"'),
+        wide.body.includes('data-column="project-owner"'),
       );
 
       /* ── D2: and the cell is BLANK where the reader owns it ───────────
@@ -10149,9 +10149,12 @@ async function main(): Promise<void> {
     const sideOf = (body: string, name: string): number => {
       const at = body.indexOf(`data-side="${name}"`);
       if (at === -1) return Number.NaN;
+      // The figure sits inside an inline `<span dir="ltr">` since session 47
+      // moved `dir` off the block `p` (`A2-13`) — the optional group reads
+      // both shapes, so this parser is not the next `tile NaN` wrong red.
       const value = body
         .slice(at, at + 600)
-        .match(/class="num[^"]*"[^>]*>\s*([\d,]+)\s*</)?.[1];
+        .match(/class="num[^"]*"[^>]*>\s*(?:<span[^>]*>\s*)?([\d,]+)\s*</)?.[1];
       return value === undefined ? Number.NaN : Number(value.replace(/,/g, ""));
     };
 

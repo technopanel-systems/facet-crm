@@ -62,7 +62,7 @@ export function DetailHeader({
       <div className="min-w-0 text-start">
         <h1
           dir="auto"
-          className="text-[25px] leading-tight font-semibold tracking-tight"
+          className="text-2xl leading-tight font-semibold tracking-tight"
         >
           {name}
         </h1>

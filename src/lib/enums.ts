@@ -494,7 +494,8 @@ export function asFollowUpGroup(
   return FOLLOW_UP_GROUP_NAMES.find((name) => name === value);
 }
 
-/** `[20 §12]` — a lobby, not a desk. Applied only to the log form. */
+/** `D74` — the 44px floor a thumb needs, `[20 §12]`'s lobby-not-a-desk.
+ *  Applied only to the log form, `D55`'s phone-first screen. */
 export const TOUCH_INPUT_CLASS = "h-11 text-base";
 
 /**

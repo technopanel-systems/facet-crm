@@ -104,10 +104,11 @@ function ReassignForm({
           name="toUserId"
           defaultValue={state.values?.toUserId ?? ""}
           placeholder={t("common.none")}
+          required
           invalid={Boolean(state.fieldErrors?.toUserId)}
         >
           {reps.map((rep) => (
-            <option key={rep.id} value={rep.id}>
+            <option key={rep.id} value={rep.id} dir="auto">
               {rep.name}
             </option>
           ))}

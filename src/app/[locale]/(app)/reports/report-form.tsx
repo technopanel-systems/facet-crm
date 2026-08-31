@@ -190,7 +190,7 @@ export function ReportForm({
               invalid={!!errors.companyId}
             >
               {companies.map((company) => (
-                <option key={company.id} value={company.id}>
+                <option key={company.id} value={company.id} dir="auto">
                   {company.label}
                 </option>
               ))}
@@ -211,6 +211,7 @@ export function ReportForm({
               name="channel"
               defaultValue={state.values?.channel ?? values.channel}
               placeholder={t("reports.fields.channelPlaceholder")}
+              required
               invalid={!!errors.channel}
             >
               {channels.map((channel) => (
@@ -231,6 +232,7 @@ export function ReportForm({
               name="outcome"
               defaultValue={state.values?.outcome ?? values.outcome}
               placeholder={t("reports.fields.outcomePlaceholder")}
+              required
               invalid={!!errors.outcome}
             >
               {outcomes.map((outcome) => (
@@ -253,6 +255,7 @@ export function ReportForm({
               name="category"
               defaultValue={state.values?.category ?? values.category}
               placeholder={t("reports.fields.categoryPlaceholder")}
+              required
               invalid={!!errors.category}
             >
               {categories.map((category) => (
@@ -348,7 +351,7 @@ export function ReportForm({
             invalid={!!errors.contactId}
           >
             {contacts.map((contact) => (
-              <option key={contact.id} value={contact.id}>
+              <option key={contact.id} value={contact.id} dir="auto">
                 {contact.label}
               </option>
             ))}

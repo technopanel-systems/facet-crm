@@ -196,7 +196,7 @@ function AddLinkForm({
       >
         <option value="">{t("projects.detail.addCompany")}</option>
         {companies.map((company) => (
-          <option key={company.id} value={company.id}>
+          <option key={company.id} value={company.id} dir="auto">
             {company.name}
           </option>
         ))}

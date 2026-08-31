@@ -292,7 +292,7 @@ function CompanyRow({
           <span
             data-slot="company-qualified"
             title={t("common.qualified")}
-            className="border-line text-faint ms-2 inline-block rounded-[6px] border px-1.5 py-0.5 align-middle text-[10px] font-semibold"
+            className="border-line text-faint ms-2 inline-block rounded-[6px] border px-1.5 py-0.5 align-middle text-[10.5px] font-semibold"
           >
             {t("companies.qualifiedMark")}
           </span>

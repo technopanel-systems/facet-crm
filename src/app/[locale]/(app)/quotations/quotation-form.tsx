@@ -148,7 +148,7 @@ export function QuotationForm({
           >
             <option value="">{t("common.none")}</option>
             {companies.map((row) => (
-              <option key={row.id} value={row.id}>
+              <option key={row.id} value={row.id} dir="auto">
                 {row.name}
               </option>
             ))}
@@ -185,7 +185,7 @@ export function QuotationForm({
             >
               <option value="">{t("quotations.fields.projectNew")}</option>
               {projectOptions.map((row) => (
-                <option key={row.id} value={row.id}>
+                <option key={row.id} value={row.id} dir="auto">
                   {row.name}
                 </option>
               ))}
@@ -219,7 +219,7 @@ export function QuotationForm({
           >
             <option value="">{t("common.none")}</option>
             {contactOptions.map((row) => (
-              <option key={row.id} value={row.id}>
+              <option key={row.id} value={row.id} dir="auto">
                 {row.name}
               </option>
             ))}

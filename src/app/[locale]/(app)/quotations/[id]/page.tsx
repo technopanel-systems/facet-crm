@@ -344,24 +344,27 @@ export default async function QuotationDetailPage({
               `[08 D5]`. */}
           <div className="rounded-lg border p-4">
             <dl>
+              {/* `dir="auto"`, not `"ltr"`: the unit is a translated word, so
+                  the run is a WORD run under `D73`'s own test — forced LTR
+                  rendered it unit-first for an Arabic reader (`A2-12`). */}
               <DetailRow label={t("quotations.detail.totalSqm")}>
-                <span dir="ltr">
+                <span dir="auto">
                   {live.totalSqm ? formatSqm(live.totalSqm) : dash}{" "}
                   {t("common.sqm")}
                 </span>
               </DetailRow>
               <DetailRow label={t("quotations.detail.totalExclVat")}>
-                <span dir="ltr">
+                <span dir="auto">
                   {live.totalExclVat ?? dash} {t("common.sar")}
                 </span>
               </DetailRow>
               <DetailRow label={t("quotations.detail.totalVat")}>
-                <span dir="ltr">
+                <span dir="auto">
                   {live.totalVat ?? dash} {t("common.sar")}
                 </span>
               </DetailRow>
               <DetailRow label={t("quotations.fields.grandTotal")}>
-                <span dir="ltr" className="font-semibold">
+                <span dir="auto" className="font-semibold">
                   {live.grandTotal ?? dash} {t("common.sar")}
                 </span>
               </DetailRow>

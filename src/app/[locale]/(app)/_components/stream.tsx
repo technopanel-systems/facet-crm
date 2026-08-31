@@ -94,7 +94,7 @@ export async function StreamFilters({
         <input type="hidden" name="view" value={query.view} />
       ) : null}
 
-      <p className="text-faint text-start text-[10.5px] font-semibold tracking-wider uppercase">
+      <p className="text-faint text-start text-[10.5px] font-semibold tracking-[.09em] uppercase">
         {t("activity.filters.title")}
       </p>
 
@@ -248,7 +248,7 @@ async function SelectField({
     >
       <option value="">{placeholder}</option>
       {options.map((option) => (
-        <option key={option.value} value={option.value}>
+        <option key={option.value} value={option.value} dir="auto">
           {option.label}
         </option>
       ))}

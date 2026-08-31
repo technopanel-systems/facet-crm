@@ -299,7 +299,7 @@ export function DispatchForm({
               invalid={!!errors.quotationThreadId}
             >
               {threads.map((row) => (
-                <option key={row.id} value={row.id}>
+                <option key={row.id} value={row.id} dir="auto">
                   {row.label}
                 </option>
               ))}
@@ -317,9 +317,10 @@ export function DispatchForm({
               hint={t("dispatches.detail.projectFromQuotation")}
             >
               {/* The label above points at this, and a project name may
-                  hold either script `D62`. */}
-              <p id="project" dir="auto" className="text-sm font-medium">
-                {thread.projectLabel}
+                  hold either script `D62` — isolated by `<bdi>` so the block
+                  keeps the form's alignment. */}
+              <p id="project" className="text-sm font-medium">
+                <bdi>{thread.projectLabel}</bdi>
               </p>
             </FormField>
           ) : null}
@@ -344,7 +345,7 @@ export function DispatchForm({
               invalid={!!errors.companyId}
             >
               {companies.map((company) => (
-                <option key={company.id} value={company.id}>
+                <option key={company.id} value={company.id} dir="auto">
                   {company.label}
                 </option>
               ))}
@@ -366,7 +367,7 @@ export function DispatchForm({
                 invalid={!!errors.userId}
               >
                 {reps.map((rep) => (
-                  <option key={rep.id} value={rep.id}>
+                  <option key={rep.id} value={rep.id} dir="auto">
                     {rep.name}
                   </option>
                 ))}
@@ -546,8 +547,8 @@ export function DispatchEditForm({
           label={t("dispatches.fields.project")}
           hint={t("dispatches.detail.projectFromQuotation")}
         >
-          <p id="project" dir="auto" className="text-sm font-medium">
-            {projectLabel}
+          <p id="project" className="text-sm font-medium">
+            <bdi>{projectLabel}</bdi>
           </p>
         </FormField>
       ) : null}

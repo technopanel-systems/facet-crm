@@ -132,13 +132,16 @@ they are inspectable rather than scattered as inline values.
 | `--shadow` / `--shadow-lift` | resting and hovered depth |
 | `--blur` | 18px + saturation, cards and bars only |
 
-**D9. Radius:** 12px cards, 16px large cards, 8–10px controls, 20px pills.
-Nothing sharper, nothing rounder.
+**D9. Radius:** 14px cards (`--radius` 10px, `rounded-xl` computing to 14),
+8–10px controls, and badges are full pills. Nothing sharper, nothing rounder.
 
-**The code is 10px and 14px**, not 12 and 16, and the token slice deliberately
-left it alone — a radius is a component pass, not a token one, and moving it in
-passing would have made `WORKFLOW §5 AD24` unfindable. Controls at 10px are
-already right.
+**Rewritten to what ships, session 47 (`AD24`).** The rule said 12 and 16 —
+the concept's numbers — while every screen has rendered 10 and 14 through
+three audits and every founder review without one report against the radii,
+and `globals.css` carried a standing note refusing to move them in passing. A
+rule and a product that disagree for thirty sessions, with nobody bothered,
+means the rule was describing the drawing rather than the decision. The
+concept file keeps its own values.
 
 ---
 
@@ -776,13 +779,14 @@ first and `S90` gives *parked* as an exit; **that a planned row is shown in a
 section of its own, and that the act on a slipping row is called Plan**, are
 decisions this rule makes. `SPEC.md` has not been asked and does not say them.
 
-**D35. The week strip** on the narrow side: seven days, two bars per day —
-logged (red) and system events on your records (blue). Friday and Saturday
-visibly off. Nothing more; this is what stops the view becoming an attendance
-check.
+**D35. [BUILD]** **The week strip** on the narrow side: seven days, two bars
+per day — logged (red) and system events on your records (blue). Friday and
+Saturday visibly off. Nothing more; this is what stops the view becoming an
+attendance check. No component exists (`A2-24`).
 
-**D36. Recently** below it: the last few events with three kinds of mark —
-✎ typed by a person, ◆ observed by the system, 💬 said between colleagues.
+**D36. [BUILD]** **Recently** below it: the last few events with three kinds
+of mark — ✎ typed by a person, ◆ observed by the system, 💬 said between
+colleagues. No component exists (`A2-24`).
 
 **D37.** Nothing on the rep's dashboard is company-wide. No team figures, no
 other reps, no executive analytics.
@@ -1120,9 +1124,11 @@ control that does nothing is worse than no control.
 
 ## 14. Empty, error and permission states
 
-**D52.** An empty list says what would make it non-empty and offers the action.
-*"Nothing planned for today — plan one from Slipping."* *"No companies yet —
-add the first one, or import from a spreadsheet."*
+**D52. [CHANGE]** An empty list says what would make it non-empty and offers
+the action. *"Nothing planned for today — plan one from Slipping."* *"No
+companies yet — add the first one, or import from a spreadsheet."* **The
+marker is the action half** (`AD21`): all 21 empty states say what, and none
+offers the act. The sweep that writes the strings is its own slice.
 
 **The waiting list as a whole is not one of these.** This rule used to give
 *"Nothing is waiting on you. That is the goal."* as its example, and `D34` now

@@ -217,15 +217,22 @@ export default async function FollowUpsPage({
                         href={`/companies/${row.companyId}`}
                         className="hover:underline"
                       >
-                        {row.companyName}
+                        <span dir="auto">{row.companyName}</span>
                       </Link>
                     ) : (
                       t("common.none")
                     )}
                   </TableCell>
                   <TableCell className="text-start">
+                    {/* Each name isolates itself — a joined string of mixed
+                        scripts scrambles at every boundary `D62`. */}
                     {row.owners.length > 0
-                      ? row.owners.map((owner) => owner.name).join(", ")
+                      ? row.owners.map((owner, index) => (
+                          <span key={owner.name}>
+                            {index > 0 ? ", " : null}
+                            <bdi>{owner.name}</bdi>
+                          </span>
+                        ))
                       : t("common.none")}
                   </TableCell>
                   {/* No `dir` on a locale-formatted date — the ar output

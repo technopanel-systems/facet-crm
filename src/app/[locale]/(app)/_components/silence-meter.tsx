@@ -109,10 +109,13 @@ export async function SilenceMeter({
         />
       </span>
       {/* Never-logged is its own phrase and **never zero** — "Never" and
-          "today" must not read the same (`coverage.ts`). The count is mono and
-          `dir="ltr"`, a figure inside a sentence in either locale `D11`. */}
+          "today" must not read the same (`coverage.ts`). Both runs hold a
+          TRANSLATED word beside the count — `أيام`/`days` — so they take
+          `dir="auto"` and resolve off the word `D73`: the old `dir="ltr"`
+          here read *117 يوماً* backwards on `/companies`, the one screen
+          with real Arabic plurals (`A2-13`). */}
       {inline ? (
-        <span className="num text-[11px] font-semibold opacity-70" dir="ltr">
+        <span className="num text-[11px] font-semibold opacity-70" dir="auto">
           {t("companies.silence.threshold", { count: thresholdDays })}
         </span>
       ) : daysSince === null ? (
@@ -122,7 +125,7 @@ export async function SilenceMeter({
       ) : (
         <span
           className={cn("num text-[11.5px] font-semibold", toneClass(tone))}
-          dir="ltr"
+          dir="auto"
         >
           {t("companies.silence.days", { count: daysSince })}
         </span>

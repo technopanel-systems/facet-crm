@@ -419,10 +419,13 @@ function DispatchRow({
           record — but a dispatch's identity is a quantity, which is what `D26`
           says answers its question. The company keeps its own link below. */}
       <TableCell numeric phone="lead" className="font-medium" data-lead="sqm">
+        {/* `auto`, not `ltr`: the unit inside is a translated word, so the
+            run resolves off it and reads figure-first in both scripts
+            (`A2-12`, `D73`). */}
         <Link
           href={`/dispatches/${row.id}`}
           className="num text-[15px] hover:underline"
-          dir="ltr"
+          dir="auto"
         >
           {formatSqm(row.sqm)}{" "}
           <span className="text-faint text-xs font-normal">

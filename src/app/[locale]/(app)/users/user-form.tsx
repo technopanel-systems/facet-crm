@@ -148,6 +148,7 @@ export function UserForm({
           name="roleId"
           defaultValue={value("roleId")}
           placeholder={t("team.fields.rolePlaceholder")}
+          required
           invalid={Boolean(errors.roleId)}
         >
           {roles.map((row) => (

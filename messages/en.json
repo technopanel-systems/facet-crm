@@ -390,7 +390,7 @@
       "hiddenCompany": "Not visible to you",
       "noCompanies": "No companies linked.",
       "noQuotations": "No quotations on this project yet.",
-      "movedFor": "Last moved {count} days ago"
+      "movedFor": "Last moved {count, plural, one {# day} other {# days}} ago"
     },
     "chain": {
       "title": "Quotation chain",
@@ -475,7 +475,7 @@
       "returnedRounds": "Returned for edit",
       "cancelledBy": "Cancelled by",
       "cancellationReason": "Reason for cancellation",
-      "raisedDaysAgo": "Raised {count} days ago",
+      "raisedDaysAgo": "Raised {count, plural, one {# day} other {# days}} ago",
       "noDispatches": "Nothing dispatched against this quotation yet.",
       "projectNewHint": "Named after the company. Change it if the project has a name of its own."
     },
@@ -617,6 +617,7 @@
     },
     "difference": {
       "flag": "Differs from the quotation",
+      "label": "Difference",
       "title": "Against the quotation",
       "matches": "Every line matches the quotation this was raised from.",
       "byRep": "The rep changed it before submitting.",
@@ -1045,7 +1046,7 @@
       "since": "Since",
       "age": "Waiting",
       "allKinds": "All follow-ups",
-      "days": "{count} days",
+      "days": "{count, plural, one {# day} other {# days}}",
       "dueToday": "Due today"
     },
     "detail": {

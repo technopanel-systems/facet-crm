@@ -129,11 +129,14 @@ export default async function UsersPage({
                       href={`/users/${row.id}`}
                       className="hover:underline"
                     >
-                      {row.name}
+                      <span dir="auto">{row.name}</span>
                     </Link>
                   </TableCell>
-                  <TableCell className="num text-start" dir="ltr">
-                    {row.email}
+                  <TableCell className="num text-start">
+                    {/* An email is raw LTR content and keeps `ltr` `D73` — on
+                        the run: on the CELL it dragged `text-start` to the
+                        wrong edge and the column sat misaligned in Arabic. */}
+                    <span dir="ltr">{row.email}</span>
                   </TableCell>
                   <TableCell className="text-start">
                     {lookupName({ nameEn: row.roleNameEn, nameAr: row.roleNameAr }, locale)}

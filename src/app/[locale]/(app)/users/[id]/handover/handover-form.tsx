@@ -131,9 +131,10 @@ export function HandoverForm({
           name="toUserId"
           placeholder={t("team.handover.reassignToPlaceholder")}
           invalid={Boolean(errors.toUserId)}
+          required
         >
           {colleagues.map((colleague) => (
-            <option key={colleague.id} value={colleague.id}>
+            <option key={colleague.id} value={colleague.id} dir="auto">
               {colleague.name}
             </option>
           ))}

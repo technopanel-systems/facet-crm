@@ -168,10 +168,11 @@ function GrantForm({
           name="sharedWithUserId"
           defaultValue={state.values?.sharedWithUserId ?? ""}
           placeholder={t("common.none")}
+          required
           invalid={Boolean(state.fieldErrors?.sharedWithUserId)}
         >
           {people.map((person) => (
-            <option key={person.id} value={person.id}>
+            <option key={person.id} value={person.id} dir="auto">
               {person.name}
             </option>
           ))}

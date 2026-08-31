@@ -127,13 +127,18 @@ export async function AttainmentTable({
                   rounding all three independently can gain or lose a metre, and
                   a breakdown that does not add up to the figure two columns to
                   its left is a defect nobody would think to look for. */}
-              <TableCell numeric className="text-xs" dir="ltr">
-                {t("targets.fields.linkedShort")} {formatSqm(row.linkedSqm)}
-                {" · "}
-                {t("targets.fields.directShort")}{" "}
-                {formatWholeSqm(
-                  roundSqm(row.achievedSqm) - roundSqm(row.linkedSqm),
-                )}
+              <TableCell numeric className="text-xs">
+                {/* Two translated words and two figures — a WORD run `D73`, so
+                    `dir="auto"` on the run; forced LTR on the CELL read the
+                    pairs backwards in Arabic (`A2-12`). */}
+                <span dir="auto">
+                  {t("targets.fields.linkedShort")} {formatSqm(row.linkedSqm)}
+                  {" · "}
+                  {t("targets.fields.directShort")}{" "}
+                  {formatWholeSqm(
+                    roundSqm(row.achievedSqm) - roundSqm(row.linkedSqm),
+                  )}
+                </span>
               </TableCell>
               {/* `percentOf`, not `Number(a) / Number(b)`: the dashboard panel
                   shows this same percentage `D32`, and two derivations of it is

@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -52,8 +51,6 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -212,6 +209,13 @@
   --brand-glow:
     0 0 0 1px rgba(200, 16, 46, 0.25), 0 8px 24px -8px rgba(200, 16, 46, 0.4);
 
+  /* Identity gradients — the app mark and the two avatar treatments. Tokens
+     because no hex lives in a component (`facet-ui`, `AD28`); identical in
+     both themes, so declared once and inherited by `.dark`. */
+  --mark-grad: linear-gradient(140deg, var(--red-500), #7a1020);
+  --avatar-user-grad: linear-gradient(140deg, #8a3244, #4a1622);
+  --avatar-person-grad: linear-gradient(140deg, #31527f, #1b2f4c);
+
   --a-red-bg: rgba(200, 16, 46, 0.09);
   --a-red-fg: #c8102e;
   --a-blue-bg: rgba(43, 92, 168, 0.09);
@@ -259,8 +263,6 @@
      this is a foreground red, and the *-foreground pair is near-unused. */
   --destructive: var(--a-red-fg);
   --destructive-foreground: var(--brand-ink);
-  --success: var(--a-green-fg);
-  --success-foreground: var(--brand-ink);
   --border: var(--line);
   --input: var(--line);
   --ring: var(--brand);
@@ -470,6 +472,12 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* `D12` — base 14px / 1.5, set ONCE here: before this line existed the
+       base was a per-component achievement and an element nobody sized
+       rendered at the browser's 16px. Components still step sizes with
+       `text-*`; this is the ground they step from. */
+    font-size: 0.875rem;
+    line-height: 1.5;
     /* `D13` — the canvas carries the atmosphere, and this is the only place a
        background gradient appears. It sits on <body> rather than on the (app)
        shell so a card's translucency has something to be translucent over on

@@ -234,7 +234,7 @@ export function AppRail({
     >
       <div className="hidden items-center gap-2.5 px-2 pt-1 pb-4 md:flex">
         <div
-          className="grid size-8 flex-none place-items-center rounded-lg bg-[linear-gradient(140deg,var(--red-500),#7A1020)] text-sm font-bold text-white"
+          className="grid size-8 flex-none place-items-center rounded-lg bg-(image:--mark-grad) text-sm font-bold text-white"
           aria-hidden
         >
           {t("brandMark")}
@@ -261,7 +261,7 @@ export function AppRail({
           )}
         >
           <span
-            className="grid size-8 flex-none place-items-center rounded-lg bg-[linear-gradient(140deg,var(--red-500),#7A1020)] text-sm font-bold text-white"
+            className="grid size-8 flex-none place-items-center rounded-lg bg-(image:--mark-grad) text-sm font-bold text-white"
             aria-hidden
           >
             {t("brandMark")}
@@ -300,7 +300,7 @@ export function AppRail({
           if (groupItems.length === 0) return null;
           return (
             <div key={group.key} className="space-y-0.5 pt-2">
-              <p className="text-rail-text px-2.5 pt-2 pb-1.5 text-[10.5px] font-semibold tracking-widest uppercase opacity-45">
+              <p className="text-rail-text px-2.5 pt-2 pb-1.5 text-[10.5px] font-semibold tracking-[.09em] uppercase opacity-45">
                 {t(group.key)}
               </p>
               {groupItems.map((item) => link(item.href, t(item.key), item.Icon))}
@@ -331,16 +331,27 @@ export function AppRail({
         )}
       >
         <div
-          className="grid size-8 flex-none place-items-center rounded-full bg-[linear-gradient(140deg,#8A3244,#4A1622)] text-xs font-semibold text-white"
+          className="grid size-8 flex-none place-items-center rounded-full bg-(image:--avatar-user-grad) text-xs font-semibold text-white"
           aria-hidden
         >
           {initials(userName)}
         </div>
         <div className="min-w-0 flex-1 text-start">
-          <span className="text-rail-strong block truncate text-[13px] font-semibold">
+          {/* `dir="auto"` on a TRUNCATING single-value block is the one block
+              carrier that is correct: the ellipsis lands on the line's END
+              edge, which must be the VALUE's own end — without it, an English
+              name on an Arabic rail clipped from the front, `l Al-Harbi`
+              (`A2-20`). */}
+          <span
+            className="text-rail-strong block truncate text-[13px] font-semibold"
+            dir="auto"
+          >
             {userName}
           </span>
-          <span className="text-rail-text block truncate text-[11px] opacity-80">
+          <span
+            className="text-rail-text block truncate text-[11px] opacity-80"
+            dir="auto"
+          >
             {roleLabel}
           </span>
         </div>

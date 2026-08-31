@@ -71,11 +71,12 @@ export function ContactForm({
           name="companyId"
           defaultValue={value("companyId")}
           placeholder={t("common.none")}
+          required
           disabled={companies.length === 0}
           invalid={Boolean(errors.companyId)}
         >
           {companies.map((company) => (
-            <option key={company.id} value={company.id}>
+            <option key={company.id} value={company.id} dir="auto">
               {company.name}
             </option>
           ))}

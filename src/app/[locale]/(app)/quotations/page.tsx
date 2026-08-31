@@ -393,7 +393,7 @@ function QuotationRow({
           {named ? (
             <span
               aria-hidden
-              className="grid size-7 flex-none place-items-center rounded-full bg-[linear-gradient(140deg,#31527F,#1B2F4C)] text-[10px] font-semibold text-white"
+              className="grid size-7 flex-none place-items-center rounded-full bg-(image:--avatar-person-grad) text-[10.5px] font-semibold text-white"
             >
               {initials(row.raisedByName)}
             </span>
@@ -448,10 +448,15 @@ function QuotationRow({
       {/* `S59` — service-line metres are excluded, deliberately: targets
           measure cladding, not fabrication. `S68` forbids SUMMING quotations,
           which is why no total appears under this column and never will. */}
-      <TableCell numeric dir="ltr">
-        {row.totalSqm
-          ? `${formatSqm(row.totalSqm)} ${t("common.sqm")}`
-          : t("common.none")}
+      <TableCell numeric>
+        {/* The unit is a translated word, so this is a WORD run and takes
+            `dir="auto"` on the run — `dir="ltr"` on the CELL rendered it
+            unit-first in Arabic (`A2-12`), and a `dir` never sits on a cell. */}
+        <span dir="auto">
+          {row.totalSqm
+            ? `${formatSqm(row.totalSqm)} ${t("common.sqm")}`
+            : t("common.none")}
+        </span>
       </TableCell>
       <TableCell className="text-start">
         {/* This carried no `dir` at all until session 26. One name field since

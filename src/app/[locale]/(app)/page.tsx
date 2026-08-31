@@ -342,11 +342,12 @@ async function CountsStrip({
               <p className="text-faint text-[10.5px] font-semibold tracking-[.09em] uppercase">
                 {t(`today.counts.${group}`)}
               </p>
-              <p
-                className="num mt-1.5 text-2xl font-semibold tracking-tight"
-                dir="ltr"
-              >
-                {total}
+              {/* `dir` on the inline run, never the block `p` — a block's
+                  `text-align: start` resolves against its OWN direction, so
+                  the number pinned to the tile's LEFT edge in Arabic, a tile's
+                  width from its label (`A2-13`). */}
+              <p className="num mt-1.5 text-2xl font-semibold tracking-tight">
+                <span dir="ltr">{total}</span>
               </p>
             </Link>
           );
@@ -602,8 +603,10 @@ function SideFigure({
       <p className="text-faint text-[10.5px] font-semibold tracking-[.09em] uppercase">
         {label}
       </p>
-      <p className="num mt-1 text-[17px] font-semibold" dir="ltr">
-        {value}
+      {/* Same as the counts strip: the `dir` isolates the figure inline, so
+          the block keeps the page's alignment (`A2-13`). */}
+      <p className="num mt-1 text-[17px] font-semibold">
+        <span dir="ltr">{value}</span>
       </p>
       {detail ? (
         <p className="text-muted-foreground text-[11.5px]">{detail}</p>
@@ -708,10 +711,16 @@ function Progress({
           end is the TARGET, always** — that is what the axis means, and the
           overage is the segment drawn past it. Reading the achievement there
           made the bar say 963 of 963, which is every rep exactly on target. */}
-      <div className="num text-faint flex justify-between text-[11px]" dir="ltr">
-        <span>0</span>
-        <span>{achievementPct}%</span>
-        <span data-slot="today-legend-end">{target}</span>
+      {/* No `dir` on the container — it lays out three children, and forcing
+          it LTR ran the axis against its own bar in Arabic (`A2-11`): the fill
+          anchors at inline-start, so the legend must read from the same edge.
+          Each figure isolates itself instead. */}
+      <div className="num text-faint flex justify-between text-[11px]">
+        <span dir="ltr">0</span>
+        <span dir="ltr">{achievementPct}%</span>
+        <span data-slot="today-legend-end" dir="ltr">
+          {target}
+        </span>
       </div>
     </div>
   );
