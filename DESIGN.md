@@ -65,12 +65,12 @@ are the only thing `D19`'s reduced-transparency path substitutes.
 | Token | Dark | Light |
 |---|---|---|
 | `--canvas` | `#0F0D0C` | `#F5F2EF` |
-| `--surface` | `rgba(30,26,24,.72)` | `rgba(255,255,255,.78)` |
-| `--surface-2` | `rgba(40,35,32,.6)` | `rgba(255,255,255,.55)` |
+| `--surface` | `rgba(30,26,24,.72)` | `rgba(255,255,255,.85)` |
+| `--surface-2` | `rgba(40,35,32,.6)` | `rgba(26,22,20,.05)` |
 | `--surface-solid` | `#1B1816` | `#FFFFFF` |
 | `--surface-2-solid` | `#232120` | `#F3EFEB` |
-| `--line` | `rgba(255,255,255,.07)` | `rgba(26,22,20,.07)` |
-| `--line-strong` | `rgba(255,255,255,.12)` | `rgba(26,22,20,.13)` |
+| `--line` | `rgba(255,255,255,.07)` | `rgba(26,22,20,.13)` |
+| `--line-strong` | `rgba(255,255,255,.12)` | `rgba(26,22,20,.24)` |
 | `--text` | `#F3EEEB` | `#1A1614` |
 | `--text-muted` | `#A69D99` | `#6B615C` |
 | `--text-faint` | `#786F6B` | `#9A908A` |
@@ -82,13 +82,21 @@ are the only thing `D19`'s reduced-transparency path substitutes.
 | `--brand` | `#F2566B` | `#C8102E` |
 | `--a-red-bg` / `-fg` | `rgba(242,86,107,.14)` / `#FF8FA0` | `rgba(200,16,46,.09)` / `#C8102E` |
 | `--a-blue-bg` / `-fg` | `rgba(127,173,238,.14)` / `#8FB8F0` | `rgba(43,92,168,.09)` / `#2B5CA8` |
-| `--a-amber-bg` / `-fg` | `rgba(227,166,62,.14)` / `#EBB35A` | `rgba(180,83,9,.1)` / `#B45309` |
+| `--a-amber-bg` / `-fg` | `rgba(227,166,62,.14)` / `#EBB35A` | `rgba(138,90,0,.11)` / `#8A5A00` |
 | `--a-green-bg` / `-fg` | `rgba(87,197,126,.14)` / `#6FD08F` | `rgba(21,128,61,.09)` / `#15803D` |
 
-These are `docs/design/facet-concept-v5-premium.html`'s values. The table held
-concept v4's opaque hexes until the token slice, which is why nothing made
-`D8` or `D13`–`D19` true (`WORKFLOW §5 AD3`). `--surface-3` is gone: it was
-v4's, and neither v5 nor the stylesheet ever had one.
+These are `docs/design/facet-concept-v5-premium.html`'s values, **except the
+light column's five revised by session 46** — the concept's light values had
+never been rendered on a screen until `AUDIT 2`, and four of its five light
+failures were tokens from this table (`A2-4`): `--line` at 7% of ink on white
+read as disabled controls, `--surface-2` was white over white and arithmetic
+made it invisible, the card edge composited to 1.06:1 of the canvas, and
+light amber sat a hue-step from the brand red, collapsing `D6`'s axis. The
+revised values were chosen by rendering and looking, checked numerically
+(`#8A5A00` holds 5.8:1 on the card, the same weight as the red). The table
+held concept v4's opaque hexes until the token slice, which is why nothing
+made `D8` or `D13`–`D19` true (`WORKFLOW §5 AD3`). `--surface-3` is gone: it
+was v4's, and neither v5 nor the stylesheet ever had one.
 
 The full mapping onto shadcn's semantic tokens is already in code and stays,
 with one exception. **`--popover` takes `--surface-solid`**: a popup is neither

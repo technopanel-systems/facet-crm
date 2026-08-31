@@ -166,12 +166,22 @@
      dark, never the positions. */
   --glow-x-red: 8%;
   --glow-x-blue: 100%;
+  /* Strengthened from .07/.06 — at half of dark's presence the wash read as
+     a faint pink stain rather than an atmosphere (`A2-4` (5), P2's
+     question, answered by looking at both). */
   --canvas-glow:
-    radial-gradient(1200px 600px at var(--glow-x-red) -10%, rgba(200, 16, 46, 0.07), transparent 60%),
-    radial-gradient(900px 500px at var(--glow-x-blue) 0%, rgba(43, 92, 168, 0.06), transparent 55%);
+    radial-gradient(1200px 600px at var(--glow-x-red) -10%, rgba(200, 16, 46, 0.1), transparent 60%),
+    radial-gradient(900px 500px at var(--glow-x-blue) 0%, rgba(43, 92, 168, 0.08), transparent 55%);
 
-  --surface: rgba(255, 255, 255, 0.78);
-  --surface-2: rgba(255, 255, 255, 0.55);
+  /* `AUDIT 2` (`A2-4`) was the first time light rendered on a screen, and
+     four of its five failures were these tokens. The card lifts to 85% so it
+     reads as a white sheet against the warm canvas; `--surface-2` was
+     white-at-55% OVER white — invisible by arithmetic — and becomes a dark
+     tint, which shows over any lighter ground; the two lines double, because
+     7% of ink on white composites to a hairline nobody can see and every
+     outline control on `/users` read as disabled. */
+  --surface: rgba(255, 255, 255, 0.85);
+  --surface-2: rgba(26, 22, 20, 0.05);
   /* `D19`'s reduced-transparency counterparts. `--surface-2-solid` is a
      deliberate step away from `--surface-solid`: the composited value lands
      within three digits of it, and two surfaces that resolve to one colour
@@ -179,8 +189,8 @@
   --surface-solid: #ffffff;
   --surface-2-solid: #f3efeb;
 
-  --line: rgba(26, 22, 20, 0.07);
-  --line-strong: rgba(26, 22, 20, 0.13);
+  --line: rgba(26, 22, 20, 0.13);
+  --line-strong: rgba(26, 22, 20, 0.24);
   --line-hi: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.9), transparent);
 
   --text: #1a1614;
@@ -206,17 +216,24 @@
   --a-red-fg: #c8102e;
   --a-blue-bg: rgba(43, 92, 168, 0.09);
   --a-blue-fg: #2b5ca8;
-  --a-amber-bg: rgba(180, 83, 9, 0.1);
-  --a-amber-fg: #b45309;
+  /* Amber is GOLD, not brown-red: `#B45309` sat a hue-step from the brand
+     red and `D6`'s waited-longest axis collapsed on the light board
+     (`A2-4`). `#8A5A00` carries the same weight on white (5.8:1 vs the
+     red's 5.8:1) with an unmistakably different hue. */
+  --a-amber-bg: rgba(138, 90, 0, 0.11);
+  --a-amber-fg: #8a5a00;
   --a-green-bg: rgba(21, 128, 61, 0.09);
   --a-green-fg: #15803d;
 
+  /* A touch deeper than the audit found it — the light card's edge composited
+     to 1.06:1 of the canvas and the shadow was carrying nothing (`A2-4` (3));
+     with the border doubled this finishes the edge. */
   --shadow:
     0 1px 0 rgba(255, 255, 255, 0.8) inset,
-    0 12px 36px -20px rgba(26, 22, 20, 0.35);
+    0 12px 36px -18px rgba(26, 22, 20, 0.42);
   --shadow-lift:
     0 1px 0 rgba(255, 255, 255, 0.9) inset,
-    0 20px 50px -22px rgba(26, 22, 20, 0.4);
+    0 20px 50px -20px rgba(26, 22, 20, 0.48);
   --blur: blur(18px) saturate(1.1);
 
   --background: var(--canvas);
