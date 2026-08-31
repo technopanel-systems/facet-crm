@@ -544,8 +544,12 @@ async function TargetPanel({
           className="border-line mt-1 flex flex-wrap gap-x-10 gap-y-3 border-t pt-3 text-start"
         >
           {/* A COUNT, never a sum `S68` — one project quoted three times at
-              2,000 m² is the same 2,000 counted three times. */}
+              2,000 m² is the same 2,000 counted three times. `name` gives
+              `verify:routes` §40 the handle it pairs against `/quotations`'
+              own rows — the tile was dispatch-blind once (`A2-5`) and nothing
+              could read it. */}
           <SideFigure
+            name="quoted"
             label={t("today.target.quoted")}
             value={String(quoted)}
             detail={t("today.target.quotedUnit")}
@@ -581,16 +585,20 @@ type PanelFigures = { targetSqm: string | null; achievedSqm: string };
 /** `D32`'s two small figures, beneath the bar. `D12`'s section label, then the
  *  figure, then one line of what it is measured against. */
 function SideFigure({
+  name,
   label,
   value,
   detail,
 }: {
+  /** A stable DOM handle (`data-side`) — the label is translated and cannot
+   *  identify the figure to a script; `Fact`'s `name` is the same device. */
+  name?: string;
   label: string;
   value: string;
   detail?: string;
 }) {
   return (
-    <div>
+    <div data-side={name}>
       <p className="text-faint text-[10.5px] font-semibold tracking-[.09em] uppercase">
         {label}
       </p>

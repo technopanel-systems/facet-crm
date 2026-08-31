@@ -81,3 +81,4 @@ next-env.d.ts
 /.playwright-cli/
 /.playwright/
 /audit-server.log
+/server-3100.log

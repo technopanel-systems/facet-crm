@@ -637,6 +637,13 @@ export async function quotedCount(
     .select({
       versionStatus: quotationVersions.status,
       endState: quotationThreads.endState,
+      // **Both flags, or the fold lies** (`A2-5`). Without them a thread whose
+      // dispatch is submitted or approved still reads *quoted* — `chainState`
+      // stops at the rung the caller can see, by design — so the tile said 9
+      // where `/quotations` said 8, the exact divergence session 26 fixed on
+      // the list. Same two predicates, so the two screens cannot disagree.
+      hasDispatch: threadHasApprovedDispatch(),
+      hasSubmittedDispatch: threadHasSubmittedDispatch(),
     })
     .from(quotationThreads)
     .innerJoin(

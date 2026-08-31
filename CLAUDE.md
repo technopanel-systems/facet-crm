@@ -161,14 +161,18 @@ shaped like `<namespace>.<key>` — that asserts no lookup silently failed.
 exactly the wrapping defects a laptop shows.
 
 **A check can be wrong in the direction that matters, and this has happened
-twelve times.** Four shapes. **A wrong assertion:** `§17` once asserted the
+thirteen times.** Four shapes. **A wrong assertion:** `§17` once asserted the
 *inverse* of `D20` on its own markers, so it went green over the thing the rule
 forbids. **An assertion that reads nothing:** four page-one reads with no total
 guard, three of them negatives, all correct only because the fixture rows
 happened to be newest. **And the mirror — a check that FAILS for the wrong
 reason:** `§24` summed one page's group headers against the whole scope's total,
 an equality that stops holding the moment a pile falls off page one, and went
-red on a screen that had been correct all along. A wrong red burns the suite's
+red on a screen that had been correct all along. The thirteenth was this shape
+again, met LIVE in session 46: `§40` paired a dashboard tile that `D64`
+removes — with the whole panel — when no target is in force, the month rolled
+over mid-run, and the pairing went red over `tile NaN` on a right screen; a
+section over a conditional block gates on the block's own marker first. A wrong red burns the suite's
 credibility exactly as a false green does, and it is the shape that gets a
 correct screen "fixed": `S45-1` opened with a founder decision to rewrite
 working code. **And the fourth — a check whose two sides come from ONE

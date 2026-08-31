@@ -10119,6 +10119,132 @@ async function main(): Promise<void> {
     );
   }
 
+  /* ── 40 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n40. The Quoted tile — the list it links to, and the records themselves [S132], [D32], [A2-5]",
+  );
+  {
+    /*
+     * **The tile was dispatch-blind and NOTHING could see it** (`A2-5`):
+     * `quotedCount` folded `chainState` without the two dispatch flags, so a
+     * thread whose dispatch sat submitted still counted as *Quoted* — the rep
+     * read 9 for a true 8, the manager 15 for 12 — while `/quotations`, whose
+     * fold passes both flags, said otherwise on the same screen's link. §8
+     * pairs list↔detail; nothing paired the tile. Found by the audit's
+     * independent SQL, which is why the SQL side below exists.
+     *
+     * **Two claims, deliberately apart** (`S45-3`'s lesson): the PAIRING says
+     * the tile agrees with the list's own rendered rows — one ladder, two
+     * screens — and the SQL says the tile agrees with the RECORDS, re-derived
+     * from `S132`'s rules over Postgres with no `chainState` in the path. A
+     * red names which side moved. The SQL runs as the MANAGER, whose
+     * `sees_all_reps` scope is unconstrained (`authz.ts`), so no visibility
+     * fold has to be restated in SQL and a scope difference cannot produce a
+     * wrong red — `§36`'s device.
+     *
+     * The pairing walks EVERY page of `/quotations` — a count asserted on
+     * page one alone holds only while the fixture is small (`CLAUDE.md`).
+     */
+    const sideOf = (body: string, name: string): number => {
+      const at = body.indexOf(`data-side="${name}"`);
+      if (at === -1) return Number.NaN;
+      const value = body
+        .slice(at, at + 600)
+        .match(/class="num[^"]*"[^>]*>\s*([\d,]+)\s*</)?.[1];
+      return value === undefined ? Number.NaN : Number(value.replace(/,/g, ""));
+    };
+
+    for (const email of ["rep-a@example.test", "manager@example.test"]) {
+      const jar = jars[email];
+      const who = email.split("@")[0];
+      const home = (await get(jar, "/en")).body;
+      /*
+       * **No target this period → no panel at all** (`D64`), and the tile's
+       * absence is then correct, not a defect. This is not hypothetical: the
+       * month rolled over DURING this section's first clean run, the seeded
+       * targets became last month's, and the equality below went red on a
+       * screen that was right — `S45-1`'s wrong-red shape, met live. The
+       * panel's own marker is the gate: absent panel → NOT MEASURED; panel
+       * present with no quoted handle → a real failure, asserted below.
+       */
+      if (!home.includes('data-slot="today-side"')) {
+        console.log(
+          `  --    ${who}: no D32 panel this period (no target in force), so there is no tile to pair: NOT MEASURED`,
+        );
+        continue;
+      }
+      const tile = sideOf(home, "quoted");
+
+      let quotedRows = 0;
+      let rowsSeen = 0;
+      let pages = 0;
+      for (let page = 1; page <= 40; page += 1) {
+        const list = await get(jar, `/en/quotations?page=${page}`);
+        const positions = [
+          ...list.body.matchAll(
+            /data-slot="quotation-row"[^>]*data-position="([a-zA-Z]+)"/g,
+          ),
+        ].map((m) => m[1]);
+        if (positions.length === 0) break;
+        pages += 1;
+        rowsSeen += positions.length;
+        quotedRows += positions.filter((p) => p === "quoted").length;
+      }
+
+      if (rowsSeen === 0) {
+        // A walk that met no rows proves nothing about the tile — say so
+        // rather than asserting equality over an empty read.
+        check(
+          `${who}: NOT MEASURED — /quotations rendered no rows to pair the tile against`,
+          false,
+          `tile read ${tile}`,
+        );
+        continue;
+      }
+      check(
+        `${who}: *** the Quoted tile is the list's own quoted rows — saw tile ${tile} against ${quotedRows} quoted of ${rowsSeen} rows over ${pages} page(s) *** [S132] [D32]`,
+        Number.isFinite(tile) && tile === quotedRows,
+        `tile ${tile}, list ${quotedRows}`,
+      );
+    }
+
+    /*
+     * **The records themselves, standing alone.** `S132` read backwards:
+     * *quoted* is a live (non-superseded) version at `issued`, an open thread
+     * (`end_state` null — `accepted` moves on to the customer, the other two
+     * close it), and NO dispatch at `submitted` or `approved`. Every column
+     * is alias-qualified; nothing is interpolated, so nothing needs a cast
+     * (`CLAUDE.md`'s two `sql`-template traps, both avoided by construction).
+     */
+    const derived = (await db.execute(sql`
+      select count(*)::int as quoted
+      from quotation_threads t
+      join quotation_versions v
+        on v.thread_id = t.id and v.status <> 'superseded'
+      where t.end_state is null
+        and v.status = 'issued'
+        and not exists (
+          select 1 from dispatches d
+          where d.quotation_thread_id = t.id
+            and d.status in ('submitted', 'approved'))
+    `)) as unknown as { quoted: number }[];
+    const records = Number(derived[0]?.quoted ?? Number.NaN);
+    const managerHome = (await get(jars["manager@example.test"], "/en")).body;
+    if (!managerHome.includes('data-slot="today-side"')) {
+      console.log(
+        "  --    manager: no D32 panel this period, so the records have no tile to check: NOT MEASURED",
+      );
+    } else {
+      const managerTile = sideOf(managerHome, "quoted");
+      check(
+        `manager: *** …and the tile is what the records themselves hold — saw tile ${managerTile} against ${records} derived from S132 over Postgres *** [S132] [A2-5]`,
+        Number.isFinite(managerTile) && records > 0 && managerTile === records,
+        `tile ${managerTile}, records ${records}`,
+      );
+    }
+  }
+
   /* ── 23 ──────────────────────────────────────────────────────────────── */
 
   console.log(
