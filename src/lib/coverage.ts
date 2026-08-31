@@ -188,8 +188,14 @@ export function companySilence(thresholds: QuietThresholds) {
        *  `daysBetween` helper duplicated it in TypeScript until `28b`: it lost
        *  its last production caller with `coverage()` and stayed alive only
        *  because a verify assertion tested it, which is a function kept by its
-       *  own test. */
-      silentDays: sql<number>`current_date - coalesce(
+       *  own test.
+       *
+       *  **Today is Riyadh's day, never `current_date`** — that reads the
+       *  server's UTC day, one behind Riyadh between midnight and 03:00, so
+       *  every silence figure read a day low for the first three hours of
+       *  every day and a threshold crossing arrived three hours late. Both
+       *  sides of the subtraction name the same calendar now. `S46-1`. */
+      silentDays: sql<number>`(now() at time zone 'Asia/Riyadh')::date - coalesce(
         ${lastInteraction.at},
         (${companies.createdAt} at time zone 'Asia/Riyadh')::date
       )`.as("silence_days"),
@@ -197,7 +203,7 @@ export function companySilence(thresholds: QuietThresholds) {
        *  suppressed, so the row is calm however long it has been. */
       isQuiet: sql<boolean>`(
         ${onHold.until} is null
-        and current_date - coalesce(
+        and (now() at time zone 'Asia/Riyadh')::date - coalesce(
           ${lastInteraction.at},
           (${companies.createdAt} at time zone 'Asia/Riyadh')::date
         ) > case

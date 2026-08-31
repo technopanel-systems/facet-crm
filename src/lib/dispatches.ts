@@ -2834,8 +2834,17 @@ export async function requestOriginForPeriod(
   // `currentPeriod` already reads the month in Riyadh; this is the same claim
   // at the other end. Cast explicitly — an untyped bound parameter is where
   // date arithmetic goes wrong quietly.
-  const from = sql`${periodStart}::date at time zone 'Asia/Riyadh'`;
-  const to = sql`${nextPeriodStart}::date at time zone 'Asia/Riyadh'`;
+  //
+  // **The `::timestamp` is load-bearing** — `AT TIME ZONE` runs in two
+  // directions and a bare `date` takes the wrong one: it is lifted to
+  // midnight-UTC `timestamptz` first, so `AT TIME ZONE` STRIPS the zone
+  // instead of applying it, hands back a naive `03:00:00`, and the comparison
+  // re-reads that as UTC — the month then starts six Riyadh hours late, and
+  // every act in the first six hours of day 1 counts as the previous month.
+  // `S46-1`: three verify scripts red on any day-1-of-month seed, silent the
+  // other twenty-nine days.
+  const from = sql`${periodStart}::date::timestamp at time zone 'Asia/Riyadh'`;
+  const to = sql`${nextPeriodStart}::date::timestamp at time zone 'Asia/Riyadh'`;
 
   // 2. The three counts, grouped in SQL before anything is read `CLAUDE.md`.
   //

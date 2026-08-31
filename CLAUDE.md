@@ -132,6 +132,16 @@ build task. `SPEC.md` supersedes all of them.
   - **An untyped join column drops rows rather than failing.** `audit_log`'s
     `entity_id` is text; INNER JOINed against a uuid it silently returns
     nothing, and the queue reading it is empty for ever with no error.
+- **The app's "today" is Riyadh's, and SQL has two ways to lose that silently**
+  — `S46-1`, three verify scripts red only on a small-hours run. `current_date`
+  is the SERVER's UTC day, one behind Riyadh until 03:00: write
+  `(now() at time zone 'Asia/Riyadh')::date` instead. And **`AT TIME ZONE` runs
+  in two directions** — on a bare `date` it lifts to midnight-UTC `timestamptz`
+  first and STRIPS the zone rather than applying it, returning a naive
+  timestamp a comparison re-reads as UTC, so the Riyadh month started six hours
+  late. The safe shapes: `(col at time zone 'Asia/Riyadh')::date` to get a
+  Riyadh day from a `timestamptz`, `${day}::date::timestamp at time zone
+  'Asia/Riyadh'` to get the instant a Riyadh day begins.
 
 The screen and form conventions live in the **`facet-ui`** skill. Load it for
 any work under `src/app` or `src/components`. The verify-script shape is the
