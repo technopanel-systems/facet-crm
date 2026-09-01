@@ -304,9 +304,11 @@ export async function quietCountsByRep(
  * `quietCountsByRep`'s twin over the same `companySilence` subquery, with the
  * filter it already exposes: `lastInteractionAt` is `max(report_date)` over
  * interactions for the company, so null IS *nobody has ever talked to this
- * customer* — the anchor `S138` gives a company with no contact. Archived
- * companies and merge tombstones are already outside the subquery. A missing
- * key reads as zero, as above.
+ * customer* — the anchor `S138` gives a company with no contact. **Archived
+ * companies and merge tombstones are excluded HERE** — `companySilence` runs
+ * over every company and does not exclude them itself (read, not assumed),
+ * and a customer somebody archived is not one anybody is being asked to
+ * contact. A missing key reads as zero, as above.
  */
 export async function neverContactedByRep(
   userIds: string[],
@@ -327,6 +329,8 @@ export async function neverContactedByRep(
     .where(
       and(
         isNull(companyReps.removedAt),
+        isNull(companies.archivedAt),
+        isNull(companies.mergedIntoId),
         inArray(companyReps.userId, userIds),
       ),
     )

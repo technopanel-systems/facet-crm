@@ -319,25 +319,38 @@ export async function StuckBlock({
               </p>
             ) : (
               <>
+                {/* `D40` — each count is a way in to the pile's own list.
+                    Bare `/quotations` and `/dispatches`, because `D25`'s
+                    first group on each IS this pile. `D73` — each run holds
+                    a figure and translated words, so it resolves off its own
+                    words. */}
                 <p className="mt-1.5 text-[15px]">
-                  {quotations && dispatchList ? (
-                    // `D73` — figures and translated words in one run resolve
-                    // off the words; each figure is already isolated by the
-                    // message's own shape.
-                    <span dir="auto">
-                      {t("today.stuck.counts", {
-                        issue: quotations.total,
-                        dispatch: dispatchList.total,
-                      })}
-                    </span>
-                  ) : quotations ? (
-                    <span dir="auto">
-                      {`${t("today.requests.quotations")}: ${quotations.total}`}
-                    </span>
-                  ) : dispatchList ? (
-                    <span dir="auto">
-                      {`${t("today.requests.dispatches")}: ${dispatchList.total}`}
-                    </span>
+                  {quotations ? (
+                    <Link
+                      href="/quotations"
+                      data-slot="stuck-way-in"
+                      data-chain="quotations"
+                      className="hover:underline"
+                    >
+                      <span dir="auto">
+                        {t("today.stuck.toIssue", { count: quotations.total })}
+                      </span>
+                    </Link>
+                  ) : null}
+                  {quotations && dispatchList ? " · " : null}
+                  {dispatchList ? (
+                    <Link
+                      href="/dispatches"
+                      data-slot="stuck-way-in"
+                      data-chain="dispatches"
+                      className="hover:underline"
+                    >
+                      <span dir="auto">
+                        {t("today.stuck.requests", {
+                          count: dispatchList.total,
+                        })}
+                      </span>
+                    </Link>
                   ) : null}
                 </p>
                 {oldestDays !== null ? (
@@ -531,7 +544,16 @@ export async function AttentionBlock({
   const shown = rows.slice(0, ATTENTION_ROWS);
 
   return (
-    <Card data-slot="today-attention" data-rows={rows.length}>
+    <Card
+      data-slot="today-attention"
+      data-rows={rows.length}
+      // Per-condition tallies, so `verify:routes` §41 can hold each kind to
+      // its own SQL without re-deriving the cap — rendered rows stop at six
+      // while these count the whole set.
+      data-silent={silent.length}
+      data-behind={behindRaw.length}
+      data-never={never.length}
+    >
       <CardHeader>
         <CardTitle className="text-start text-sm">
           {t("today.attention.title")}

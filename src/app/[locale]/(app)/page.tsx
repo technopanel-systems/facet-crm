@@ -140,7 +140,7 @@ export default async function TodayPage({
       <div className="flex flex-col gap-6">
         <Shortcuts locale={locale} />
 
-        <div className="text-start">
+        <div className="text-start" data-slot="today-greeting">
           <h1 className="text-2xl font-semibold tracking-tight">
             {t("today.greeting", { name: session.user.name })}
           </h1>

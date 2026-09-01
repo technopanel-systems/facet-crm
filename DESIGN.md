@@ -573,11 +573,11 @@ them after. There is **one** dashboard, its blocks grouped into tabs by
 |---|---|---|
 | My target and pace | a target row exists for this person | `D32` |
 | Requests waiting on me | `can_approve_quotation` or `can_dispatch` | `D65` |
-| My waiting list | holds a company book (`S9`'s four) **[CHANGE]** | `D33` `D34` |
-| The company band — target and Yesterday | `sees_all_reps` **[BUILD]** | `D38` `D77` |
-| Stuck | `sees_all_reps` **[BUILD]** | `D78`, `D40` and `D41` inside |
-| Who needs attention | `sees_all_reps`, and someone qualifies **[BUILD]** | `D79` |
-| Big deals in play | `sees_all_reps`, and an open deal exists **[BUILD]** | `D80` |
+| My waiting list | holds a company book (`S9`'s four) | `D33` `D34` |
+| The company band — target and Yesterday | `sees_all_reps` | `D38` `D77` |
+| Stuck | `sees_all_reps` | `D78`, `D40` and `D41` inside |
+| Who needs attention | `sees_all_reps`, and someone qualifies | `D79` |
+| Big deals in play | `sees_all_reps`, and an open deal exists | `D80` |
 | The team table | `sees_all_reps` — behind the Team tab `D76` | `D39` |
 
 **The order is fixed** and does not vary by who is looking. A block that does
@@ -598,13 +598,13 @@ His words: *"a manager or executive CAN hold customers as a rep does — that
 stays possible and nothing should block it. But their dashboard is for
 overseeing, not for their own queue. If a manager has personal customers, he
 sees them where a rep sees them — on the Companies and Follow-ups screens —
-not on his dashboard."* An overseer's dashboard is the oversight blocks his
-flags already produce — the team table, the bottleneck card, the company
-panel. **What an overseer's dashboard should exactly show is the open
-dashboard conversation** (SPEC §16), and nothing new is built here until it
-is had. The `[CHANGE]` on the table row is this narrowing: today every
-identity renders the list, and *"132 things need you today"* greets people
-whose things they are not (`A2-8`).
+not on his dashboard."* An overseer's dashboard is the overseer surface
+above — the band, Stuck, attention, big deals, the Team tab. **The
+conversation was had** (session 51, `docs/archive/30-overseer-answers.md`)
+and the narrowing shipped with it: the waiting list, the counts strip and
+the greeting render for the book-holder partition alone, and `A2-8`'s
+*"132 things need you today"* no longer greets people whose things they
+are not.
 
 **The first block is the exception, in two ways.** Its condition is data rather
 than a flag — a target row exists for this person `S83`, `S84`, or, for a holder
@@ -622,18 +622,17 @@ case** rather than a design of their own, and `D38`–`D41` are what a flag adds
 This is also what gives Marketing `D67` and the Executive `D68` a sensible
 screen without anyone designing one.
 
-All flags named above are columns on `roles` today. **The book-holder half is
-built** — *My target and pace*, to `D32` entire, including the pace tick,
-both side figures and the overage segment, **and since `25b` at company
-scope for `sees_all_reps` `D38` `S136`**; *Requests waiting on me*, to `D65`
-**entire since `25c`**, its two columns and the day count beneath them; *My
-waiting list*, to `D33` and `D34`. The notifications list that stood under
-`D65`'s heading is gone: it was news `S92`, not work, and on a rep's screen
-it was twenty-five rows of it. **The overseer half carries the `[BUILD]`
-markers above** — today a manager still gets the old shape (his own waiting
-list and counts strip among them, which the narrowing below ends), the team
-table renders on the page rather than behind a tab, and `D40` is a card of
-its own.
+All flags named above are columns on `roles` today. **Both halves are
+built.** The book-holder half: *My target and pace*, to `D32` entire,
+including the pace tick, both side figures and the overage segment, **and
+since `25b` at company scope for `sees_all_reps` `D38` `S136`**; *Requests
+waiting on me*, to `D65` **entire since `25c`**, its two columns and the day
+count beneath them; *My waiting list*, to `D33` and `D34`. The notifications
+list that stood under `D65`'s heading is gone: it was news `S92`, not work,
+and on a rep's screen it was twenty-five rows of it. The overseer half
+shipped in session 51 to the approved drawings — the band, Stuck, attention
+and big deals, with the team table behind the Team tab `D76` (its `D39`
+rework to the dash rows is the Team session's, `§4` row 58).
 
 **`D41` waits on two build paths rather than on a decision, and inside Stuck
 it stays absent** — not zero, not explained. Both objects it names — a
@@ -941,13 +940,12 @@ nobody would otherwise read.
 figure, and a second way to reach one set of records is worse than reusing the
 first.
 
-**D40. [CHANGE] "With the coordinator"** — the bottleneck reading, because the
+**D40. "With the coordinator"** — the bottleneck reading, because the
 coordinator is one person and **both chains run through her**: the quotation
 chain, and since `S72` and `S124` the dispatch chain too. It is on
 `sees_all_reps` `D64`, the same flag as the team table — a manager watching one
 person's queue is the same act as watching the team's. **It renders as the
-first section of Stuck (`D78`), not as a card of its own** — that move is
-the marker; today it is still its own card.
+first section of Stuck (`D78`), not as a card of its own.**
 
 **It is the aggregate and not the list**, which this rule did not say: the
 identity it appears for holds neither `can_approve_quotation` nor `can_dispatch`,
@@ -1066,7 +1064,7 @@ written before the flag model existed. The bottleneck question is answered:
 `D40`'s aggregate lives inside Stuck (`D78`) and the Executive reads it
 there.
 
-**D76. [BUILD] The dashboard's blocks group into tabs — Today · Reports ·
+**D76. The dashboard's blocks group into tabs — Today · Reports ·
 Team — and the strip renders only when more than one group qualifies.** A
 tab is a group of `D64`'s flag-qualified blocks, never a route of its own:
 the strip is URL state (`?tab=`) on the one dashboard, plain GET links, no
@@ -1081,7 +1079,7 @@ rail until the Team tab absorbs it** (`28b`'s precedent — moving the rail
 item first hides attainment from everyone who could reach it); the slice
 that ships Team takes the rail item and amends `D49`.
 
-**D77. [BUILD] Yesterday — the previous working day's movement, beside the
+**D77. Yesterday — the previous working day's movement, beside the
 company target in one band.** Four figures: dispatched m², approvals,
 quotations issued, reports logged — a sum and three counts over the previous
 working day (`S93`'s week, so on a Sunday that is Thursday). **Plus
@@ -1099,7 +1097,7 @@ issue have no columns (`D65`'s reasoning) — and dispatched m² is **the same
 derivation as the month figure beside it, over one day**, so the band cannot
 disagree with itself.
 
-**D78. [BUILD] Stuck — one full-width block: the things sitting that should
+**D78. Stuck — one full-width block: the things sitting that should
 be moving.** Three sections, in order. **With the coordinator** — `D40`'s
 two counts with its *oldest N days* line; at zero it reads *the bottleneck
 is clear*, which is what a watcher came to read. **Needs a decision** —
@@ -1116,7 +1114,7 @@ own plan, not something stuck, and is not counted. At zero the section
 renders one line — *nothing has been sitting long enough to count* — rather
 than a large zero. The block itself renders whenever `sees_all_reps` does.
 
-**D79. [BUILD] Who needs attention — the people a manager should ask about
+**D79. Who needs attention — the people a manager should ask about
 today, at most six rows.** A row is a person, a one-line reason, and the way
 in — **Open**, the person's own stream (`/activity?who=`), the one door
 every `sees_all_reps` holder may open; `/users/[id]` is `can_manage_users`'
@@ -1133,7 +1131,7 @@ count first); the block caps at six with *and N more* as plain text, so it
 cannot push the page down without limit, and **when nobody qualifies the
 block is absent** (`D70`).
 
-**D80. [BUILD] Big deals in play — the biggest five open deals by expected
+**D80. Big deals in play — the biggest five open deals by expected
 size.** The founder's answer 4: the top five, never a threshold — the real
 spread runs 3,100 down to 2,400 m², so any fixed line would show all or
 none. A deal is a live project: not lost, its position short of Won
@@ -1146,7 +1144,7 @@ and its owner. Five rows or fewer; **with no open deal the block is absent**
 a sum of forecasts reads as a pipeline value, which is the thing `S68`
 exists to stop being invented.
 
-**D81. [BUILD] The first-run screen — while the system has never recorded
+**D81. The first-run screen — while the system has never recorded
 any work, the overseer's Today says what to do first instead of a row of
 zeros.** The condition is three empty tables, read at query time: no report,
 no quotation thread and no dispatch has ever existed. Zeros on day one look

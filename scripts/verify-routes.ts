@@ -159,6 +159,23 @@
  *      that second half, and it is why the two fixes beside it — the checkbox
  *      primitive and the city field — had to land in the same slice.
  *
+ *  41. **The overseer surface** `D76`–`D81` `S141` `S138` — the tab strip as
+ *      a four-identity biconditional with no Reports pill `D51`; Yesterday's
+ *      four figures against this script's own SQL over the script's own
+ *      previous-working-day walk, and the Saturday section held to *renders
+ *      exactly when a Saturday sits between and moved*; Stuck's untouched
+ *      breakdown against `/follow-ups`' own chips (one ladder, two surfaces);
+ *      needs-a-decision asserted to render NOTHING `D41`; the attention
+ *      block's silent and never-contacted tallies against the records at the
+ *      settings row's threshold and the 10-floor, the cap-and-overflow
+ *      biconditional; the big deals against the records' own top five in rank
+ *      order, never wearing Won; and the first-run screen ABSENT on a
+ *      database that has work — its present half is proven by eye on a
+ *      scratch database (`audit-shots/today-firstrun/`). §19 carries `D64`'s
+ *      narrowing biconditional; §35 the team table behind `?tab=team`; §37
+ *      `D40`'s counts as `stuck-coordinator`'s attributes with the oldest
+ *      submitted request's own age.
+ *
  * Section 18 — `D69`'s two controls and `D32`'s panel — is in the code and was
  * never in this list either; 19 is listed the day it is written. Sections 20
  * and 21 — the companies list and the company detail — are the same omission;
@@ -738,19 +755,18 @@ function firstId(body: string, section: string): string | null {
  * more.
  */
 const MARKERS: Record<string, readonly string[]> = {
-  // `D69`'s row renders for everyone whatever flags they hold, so the marker
-  // identity is a valid prober for it. The target panel is NOT here: it appears
-  // only where a target row exists `D64`, and section 18 asserts it as the rep.
-  // `D69`'s row, `D33`'s strip and `D34`'s list all render for everyone
-  // whatever flags they hold, so the marker identity is a valid prober for
-  // each. `today-queue` and `today-waiting` were the flat queue and the
-  // notifications card `D64` called out; both are gone. `today-requests` is
-  // deliberately NOT here — `D65`'s block is flag-gated, and section 19
-  // asserts it appears for exactly one of the three identities.
+  // The marker identity is the MANAGER, an overseer since the Today tab:
+  // `D69`'s row renders for everyone, and the overseer surface puts the tab
+  // strip `D76`, the band `D77` and Stuck `D78` on his `/`. `D33`'s strip and
+  // `D34`'s list are book-holder blocks now (`D64`'s narrowing) — §41 asserts
+  // them PRESENT for the rep and the coordinator and ABSENT here, as a
+  // biconditional a bare marker list cannot carry. `today-requests` stays
+  // deliberately absent — flag-gated, §19's to assert.
   "/": [
-    'data-slot="today-counts"',
-    'data-slot="today-waiting-list"',
     'data-slot="today-shortcuts"',
+    'data-slot="today-tabs"',
+    'data-slot="today-band"',
+    'data-slot="today-stuck"',
   ],
   "/companies": ['data-slot="list-card"', 'data-slot="table-head"'],
   // `D25` — grouped, never flat, and `D26`'s lead cell. `quotation-group` is
@@ -4931,16 +4947,20 @@ async function main(): Promise<void> {
   );
   {
     /**
-     * **The two changes that are about who sees what are walked as all three
-     * identities**, because a flag-gated block is only ever wrong for the
-     * identity nobody drove. `can_approve_quotation` and `can_dispatch` are
-     * held by the Sales Coordinator alone today, so she is the positive case
-     * and the rep and the manager are the negative ones.
+     * **Walked as all three identities**, because a flag-gated block is only
+     * ever wrong for the identity nobody drove. `can_approve_quotation` and
+     * `can_dispatch` are held by the Sales Coordinator alone, so she is the
+     * requests-positive case. **`book` is `D64`'s session-50 narrowing**, live
+     * since the overseer surface: the waiting list, the counts strip and the
+     * greeting render for the book-holder partition — the rep and the
+     * coordinator — and the MANAGER is the negative case for all three, which
+     * is the biconditional the founder's *"their dashboard is for overseeing,
+     * not for their own queue"* asks for.
      */
     const IDENTITIES = [
-      { email: "rep-a@example.test", requests: false },
-      { email: "coordinator@example.test", requests: true },
-      { email: "manager@example.test", requests: false },
+      { email: "rep-a@example.test", requests: false, book: true },
+      { email: "coordinator@example.test", requests: true, book: true },
+      { email: "manager@example.test", requests: false, book: false },
     ] as const;
 
     for (const who of IDENTITIES) {
@@ -4950,46 +4970,61 @@ async function main(): Promise<void> {
       for (const locale of ["en", "ar"] as const) {
         const { body } = await get(jar, `/${locale}`);
 
+        /* `D64`'s narrowing — the three personal pieces, as biconditionals. */
+        for (const slot of [
+          "today-counts",
+          "today-waiting-list",
+          "today-greeting",
+        ] as const) {
+          check(
+            `${label} ${locale}: ${slot} ${
+              who.book ? "renders" : "is ABSENT for the overseer"
+            } [D64]`,
+            body.includes(`data-slot="${slot}"`) === who.book,
+          );
+        }
+
         /* `D33` — four tiles over six conditions, inside ONE card. */
         const tiles = [
           ...body.matchAll(/<a[^>]*data-slot="today-count"[^>]*>/g),
         ].map((m) => m[0]);
-        check(
-          `${label} ${locale}: the counts strip is four tiles, not six [D33] [D21]`,
-          tiles.length === 4,
-          `${tiles.length} tiles`,
-        );
-        check(
-          `${label} ${locale}: they sit inside one card, not four [D33]`,
-          (body.match(/data-slot="today-counts"/g) ?? []).length === 1,
-        );
-        // **`?group=`, never `?kind=`** — two of the four cover two kinds, so
-        // a tile showing 9 that linked by kind would land on a shorter list.
-        check(
-          `${label} ${locale}: every tile links into the list by GROUP [D33]`,
-          tiles.length === 4 &&
-            tiles.every((tile) =>
-              /href="\/(?:en|ar)\/follow-ups\?group=\w+"/.test(tile),
-            ),
-        );
-
-        /* `D34` — two sections, and both of them always. */
-        for (const slot of ["today-planned", "today-slipping"] as const) {
+        if (who.book) {
           check(
-            `${label} ${locale}: ${slot} renders [D34]`,
-            body.includes(`data-slot="${slot}"`),
+            `${label} ${locale}: the counts strip is four tiles, not six [D33] [D21]`,
+            tiles.length === 4,
+            `${tiles.length} tiles`,
+          );
+          // **`?group=`, never `?kind=`** — two of the four cover two kinds,
+          // so a tile showing 9 that linked by kind would land on a shorter
+          // list.
+          check(
+            `${label} ${locale}: every tile links into the list by GROUP [D33]`,
+            tiles.length === 4 &&
+              tiles.every((tile) =>
+                /href="\/(?:en|ar)\/follow-ups\?group=\w+"/.test(tile),
+              ),
+          );
+
+          /* `D34` — two sections, and both of them always. */
+          for (const slot of ["today-planned", "today-slipping"] as const) {
+            check(
+              `${label} ${locale}: ${slot} renders [D34]`,
+              body.includes(`data-slot="${slot}"`),
+            );
+          }
+
+          /* `D34` — the mark is C, P or Q. `D` waits for `S86`'s anchor. */
+          const marks = [
+            ...body.matchAll(
+              /data-slot="waiting-mark"[^>]*data-mark="([^"]*)"/g,
+            ),
+          ].map((m) => m[1]);
+          check(
+            `${label} ${locale}: every row's kind mark is one of C P Q [D34]`,
+            marks.every((mark) => ["C", "P", "Q"].includes(mark)),
+            [...new Set(marks)].join(",") || "no rows",
           );
         }
-
-        /* `D34` — the mark is C, P or Q. `D` waits for `S86`'s anchor. */
-        const marks = [
-          ...body.matchAll(/data-slot="waiting-mark"[^>]*data-mark="([^"]*)"/g),
-        ].map((m) => m[1]);
-        check(
-          `${label} ${locale}: every row's kind mark is one of C P Q [D34]`,
-          marks.every((mark) => ["C", "P", "Q"].includes(mark)),
-          [...new Set(marks)].join(",") || "no rows",
-        );
 
         /* `D6` — **colour is elapsed time, and zero has not elapsed.** The
            three-tone scale gives `soon` at zero, not `late`: a date that
@@ -8992,7 +9027,7 @@ async function main(): Promise<void> {
   /* ── 35 ──────────────────────────────────────────────────────────────── */
 
   console.log(
-    "\n35. The team table — one row per measured rep, and absent without the flag [D39], [D64], [D32]",
+    "\n35. The team table — one row per measured rep, behind the Team tab and absent without the flag [D39], [D76], [D64], [D32]",
   );
   {
     const setup = (step: string, ok: boolean, detail = ""): boolean => {
@@ -9041,18 +9076,26 @@ async function main(): Promise<void> {
      * manager would prove nothing about the flag: a block rendered for
      * everybody satisfies every other assertion in this section.
      */
+    /*
+     * `D76` sharpened the biconditional: the table lives behind the Team tab
+     * now, so the manager's TODAY tab must not carry it either, and a rep
+     * typing `?tab=team` by hand still gets none — the tab is a grouping of
+     * `D64`'s flag-qualified blocks, never a door past the flags.
+     */
     for (const who of [
-      { email: "manager@example.test", team: true },
-      { email: "rep-a@example.test", team: false },
+      { email: "manager@example.test", path: "?tab=team", team: true },
+      { email: "manager@example.test", path: "", team: false },
+      { email: "rep-a@example.test", path: "", team: false },
+      { email: "rep-a@example.test", path: "?tab=team", team: false },
     ] as const) {
       const label = who.email.split("@")[0];
       for (const locale of ["en", "ar"] as const) {
-        const { body } = await get(jars[who.email], `/${locale}`);
+        const { body } = await get(jars[who.email], `/${locale}${who.path}`);
         const seen = rowTags(body).length;
         check(
-          `${label} ${locale}: *** the team table ${
+          `${label} ${locale} /${who.path}: *** the team table ${
             who.team ? "renders" : "is ABSENT"
-          } — saw ${seen} team row(s) *** [D64] [D39]`,
+          } — saw ${seen} team row(s) *** [D64] [D76] [D39]`,
           body.includes('data-slot="today-team"') === who.team &&
             (who.team ? seen > 0 : seen === 0),
         );
@@ -9132,10 +9175,13 @@ async function main(): Promise<void> {
     }
 
     for (const locale of ["en", "ar"] as const) {
-      const page = await get(jars["manager@example.test"], `/${locale}`);
+      const page = await get(
+        jars["manager@example.test"],
+        `/${locale}?tab=team`,
+      );
       if (
         !setup(
-          `${locale}: the manager's dashboard answers 200`,
+          `${locale}: the manager's Team tab answers 200`,
           page.status === 200,
           `saw ${page.status}`,
         )
@@ -9715,37 +9761,37 @@ async function main(): Promise<void> {
   /* ── 37 ──────────────────────────────────────────────────────────────── */
 
   console.log(
-    "\n37. Waiting on the coordinator — D40's card, and the three identities it is ABSENT for [D40], [D64], [D53]",
+    "\n37. With the coordinator — D40's aggregate inside Stuck, and who it is ABSENT for [D40], [D78], [D64], [D53]",
   );
   {
     /*
-     * **`D40` names a card and not its contents, so this section drives the
-     * three decisions the slice made rather than the rule's own sentence.**
+     * **`D40` renders as Stuck's first section since the overseer surface**
+     * `D78` — the two counts are attributes on `stuck-coordinator`, each a
+     * way-in link, with the *oldest* line beneath (the dispatch pile's clock
+     * alone, `submitted_at` — the one true wait).
      *
      * **Presence is a FOUR-identity biconditional and the fourth is the point.**
-     * `D64`'s table says the block appears on `sees_all_reps`, and a check
-     * driving only the manager and a rep would be green over that bare reading.
-     * `D40` renders the piles a reader WATCHES and not the ones they WORK, so
-     * the identity that separates the two rules is the one holding
-     * `sees_all_reps` **and** both queue flags — the super admin, who must get
-     * no card at all rather than a weaker copy of `D65`'s block sitting above
-     * it. He is signed in HERE rather than added to `§2`'s loop, `§36`'s device
-     * and for its reason: that loop drives every route in both locales.
+     * `D64` puts Stuck on `sees_all_reps`, and a check driving only the
+     * manager and a rep would be green over that bare reading. The
+     * coordinator section renders the piles a reader WATCHES and not the ones
+     * they WORK, so the identity that separates the two rules is the one
+     * holding `sees_all_reps` **and** both queue flags — the super admin, who
+     * gets Stuck WITHOUT the coordinator section rather than a weaker copy of
+     * `D65`'s block above it. He is signed in HERE rather than added to `§2`'s
+     * loop, `§36`'s device and for its reason.
      *
      * **Both counts are read from somewhere the screen did not go** `d66e1a0`.
      * The screen composes `listQuotationThreads({ awaitingIssue: true })` and
      * `listDispatches({ status: "submitted" })`; this re-derives the FACTS
-     * those two select on — a live version at `requested` under a thread with
-     * no end state, and a dispatch at `submitted` — and none of the folding
-     * after them. Asserted as the **manager**, whose `visibleQuotationThreads`
-     * and `visibleDispatches` filters both return `undefined` for
-     * `sees_all_reps` (`authz.ts:670`, `:728`), so his scope IS the table and a
-     * legitimate scope difference cannot produce a wrong red `S45-1`.
+     * those two select on and none of the folding after them. Asserted as the
+     * **manager**, whose visibility filters return `undefined` for
+     * `sees_all_reps` (`authz.ts:670`, `:728`), so his scope IS the table and
+     * a legitimate scope difference cannot produce a wrong red `S45-1`.
      *
      * **Deliberately not cross-checked against the coordinator's own block.**
      * She reads the same two piles as rows, but her scope is not provably his,
-     * and a check that goes red on two correct screens is the shape that gets a
-     * correct screen "fixed".
+     * and a check that goes red on two correct screens is the shape that gets
+     * a correct screen "fixed".
      */
     const setup = (step: string, ok: boolean, detail = ""): boolean => {
       checks += 1;
@@ -9758,16 +9804,20 @@ async function main(): Promise<void> {
       return false;
     };
 
-    /** The tiles, parsed by ELEMENT rather than by attribute order `§24`. */
+    /** The section's two counts, parsed by ELEMENT so attribute order can
+     *  never read a neighbouring marker as one of these `§24`. */
     const tilesOf = (body: string): Map<string, number> => {
       const found = new Map<string, number>();
-      for (const tag of body.matchAll(/<a\b[^>]*>/g)) {
-        if (!tag[0].includes('data-slot="today-bottleneck-count"')) continue;
-        const chain = tag[0].match(/data-chain="([^"]*)"/)?.[1];
-        const count = tag[0].match(/data-count="([^"]*)"/)?.[1];
-        if (chain === undefined || count === undefined) continue;
-        found.set(chain, Number(count));
-      }
+      const section = body.match(
+        /<div\b[^>]*data-slot="stuck-coordinator"[^>]*>/,
+      )?.[0];
+      if (!section) return found;
+      const issue = section.match(/data-issue="([^"]*)"/)?.[1];
+      const dispatch = section.match(/data-dispatch="([^"]*)"/)?.[1];
+      if (issue !== undefined && issue !== "")
+        found.set("quotations", Number(issue));
+      if (dispatch !== undefined && dispatch !== "")
+        found.set("dispatches", Number(dispatch));
       return found;
     };
 
@@ -9779,6 +9829,7 @@ async function main(): Promise<void> {
      */
     let awaitingIssue = -1;
     let submitted = -1;
+    let oldestDays = -1;
     try {
       const issuing = (await db.execute(sql`
         select count(*)::int as n
@@ -9795,6 +9846,20 @@ async function main(): Promise<void> {
         where d.status = 'submitted'
       `)) as unknown as { n: number }[];
       submitted = Number(deciding[0]?.n ?? -1);
+
+      /*
+       * The *oldest* line's own figure `D40` — calendar days from the oldest
+       * `submitted_at`'s Riyadh day to today's, as a date difference, which
+       * is `calendarDaysBetween`'s arithmetic re-derived rather than called.
+       */
+      const oldest = (await db.execute(sql`
+        select ((now() at time zone 'Asia/Riyadh')::date
+                - (min(d.submitted_at) at time zone 'Asia/Riyadh')::date)::int
+                as days
+        from dispatches d
+        where d.status = 'submitted'
+      `)) as unknown as { days: number | null }[];
+      oldestDays = oldest[0]?.days == null ? -1 : Number(oldest[0].days);
     } catch (error) {
       console.log(`  --    the records could not be read — ${String(error)}`);
     }
@@ -9812,25 +9877,29 @@ async function main(): Promise<void> {
      * assertion below.
      */
     for (const who of [
-      { email: "manager@example.test", card: true },
-      { email: "coordinator@example.test", card: false },
-      { email: "rep-a@example.test", card: false },
-      { email: "admin@example.test", card: false },
+      // The manager: Stuck renders WITH its coordinator section.
+      { email: "manager@example.test", stuck: true, coordinator: true },
+      // Not `sees_all_reps` — no Stuck at all, whatever else they hold.
+      { email: "coordinator@example.test", stuck: false, coordinator: false },
+      { email: "rep-a@example.test", stuck: false, coordinator: false },
+      // The fourth identity — both queue flags, so Stuck WITHOUT the section.
+      { email: "admin@example.test", stuck: true, coordinator: false },
     ] as const) {
       const label = who.email.split("@")[0];
       const jar = who.email === "admin@example.test" ? admin : jars[who.email];
       for (const locale of ["en", "ar"] as const) {
         const { body } = await get(jar, `/${locale}`);
-        const seen = body.includes('data-slot="today-bottleneck"');
+        const stuckSeen = body.includes('data-slot="today-stuck"');
+        const sectionSeen = body.includes('data-slot="stuck-coordinator"');
         check(
-          `bottleneck: ${label} ${locale}: *** the card ${
-            who.card ? "renders" : "is ABSENT"
-          } — saw ${seen ? "the card" : "no card"} beside ${
-            body.includes('data-slot="today-requests"')
-              ? "D65's block"
-              : "no D65 block"
-          } *** [D40] [D64] [D53]`,
-          seen === who.card,
+          `bottleneck: ${label} ${locale}: *** Stuck ${
+            who.stuck ? "renders" : "is ABSENT"
+          } and the coordinator section ${
+            who.coordinator ? "renders" : "is ABSENT"
+          } — saw ${stuckSeen ? "Stuck" : "no Stuck"}, ${
+            sectionSeen ? "the section" : "no section"
+          } *** [D40] [D78] [D64] [D53]`,
+          stuckSeen === who.stuck && sectionSeen === who.coordinator,
         );
       }
     }
@@ -9897,17 +9966,17 @@ async function main(): Promise<void> {
         );
 
         /*
-         * 3. **The tile is the way in, and it is the pile's own list** `D33`
+         * 3. **Each count is a way in, and it is the pile's own list** `D40`
          *    `D25`. Bare `/quotations` and `/dispatches`, because the first
          *    group on each is this very pile — a `?status=` that no longer
          *    exists would read as no filter at all and show everything.
          */
         const hrefs = [...page.body.matchAll(/<a\b[^>]*>/g)]
           .map((m) => m[0])
-          .filter((tag) => tag.includes('data-slot="today-bottleneck-count"'))
+          .filter((tag) => tag.includes('data-slot="stuck-way-in"'))
           .map((tag) => tag.match(/href="([^"]*)"/)?.[1] ?? "");
         check(
-          `bottleneck: ${locale}: *** each tile lands on its own pile's list — saw ${hrefs.join(
+          `bottleneck: ${locale}: *** each count lands on its own pile's list — saw ${hrefs.join(
             " · ",
           )} *** [D40] [D25] [D51]`,
           hrefs.length === 2 &&
@@ -9916,14 +9985,20 @@ async function main(): Promise<void> {
         );
 
         /*
-         * 4. **No clock on either tile**, which is the decision this slice made
-         *    rather than an omission: the two piles have no comparable one, and
-         *    the quotation side could offer only the thread's age. Asserted so a
-         *    later hand adding a figure has to change this line and read why.
+         * 4. **The one age is the dispatch pile's clock alone** `D40` — the
+         *    oldest `submitted_at`, the one true wait, against this script's
+         *    own date arithmetic. The quotation side still offers none, and a
+         *    later hand adding one has to change this line and read why.
          */
+        const shownOldest = page.body.match(
+          /<div\b[^>]*data-slot="stuck-coordinator"[^>]*>/,
+        )?.[0]?.match(/data-oldest="([^"]*)"/)?.[1];
         check(
-          `bottleneck: ${locale}: *** neither tile carries an age — the two piles have no comparable clock *** [D40] [D27]`,
-          !page.body.includes("data-slot=\"today-bottleneck-age\""),
+          `bottleneck: ${locale}: *** the oldest line is the oldest submitted request's own age — saw ${shownOldest ?? "none"} against ${oldestDays} day(s) in the records *** [D40] [S87]`,
+          submitted > 0
+            ? Number(shownOldest) === oldestDays
+            : (shownOldest ?? "") === "",
+          `card ${shownOldest ?? "none"} vs records ${oldestDays}`,
         );
       }
     }
@@ -10027,12 +10102,16 @@ async function main(): Promise<void> {
       return -1;
     };
     const tileOf = (body: string, chain: string): number => {
-      for (const tag of body.matchAll(/<a\b[^>]*>/g)) {
-        if (!tag[0].includes('data-slot="today-bottleneck-count"')) continue;
-        if (tag[0].match(/data-chain="([^"]*)"/)?.[1] !== chain) continue;
-        return Number(tag[0].match(/data-count="([^"]*)"/)?.[1] ?? "-1");
-      }
-      return -1;
+      // `D40` lives inside Stuck since the overseer surface `D78`: the two
+      // counts are attributes on the one `stuck-coordinator` section rather
+      // than two tile links.
+      const section = body.match(
+        /<div\b[^>]*data-slot="stuck-coordinator"[^>]*>/,
+      )?.[0];
+      if (!section) return -1;
+      const name = chain === "dispatches" ? "data-dispatch" : "data-issue";
+      const value = section.match(new RegExp(`${name}="([^"]*)"`))?.[1];
+      return value === undefined || value === "" ? -1 : Number(value);
     };
 
     /* The three action names are read from `src/lib/audit.ts`, never copied —
@@ -10474,6 +10553,496 @@ async function main(): Promise<void> {
         `manager: *** …and the tile is what the records themselves hold — saw tile ${managerTile} against ${records} derived from S132 over Postgres *** [S132] [A2-5]`,
         Number.isFinite(managerTile) && records > 0 && managerTile === records,
         `tile ${managerTile}, records ${records}`,
+      );
+    }
+  }
+
+  /* ── 41 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n41. The overseer surface — tabs, the band, Stuck's breakdown, attention, big deals, first-run [D76]–[D81], [S141], [S138]",
+  );
+  {
+    const setup = (step: string, ok: boolean, detail = ""): boolean => {
+      checks += 1;
+      if (ok) {
+        console.log(`  setup ${step}`);
+        return true;
+      }
+      failures += 1;
+      console.log(`  SETUP FAILED at ${step}${detail ? ` — ${detail}` : ""}`);
+      return false;
+    };
+    const openTag = (body: string, slot: string): string =>
+      body.match(
+        new RegExp(`<[a-z]+\\b[^>]*data-slot="${slot}"[^>]*>`),
+      )?.[0] ?? "";
+    const tagAttr = (tag: string, name: string): string =>
+      tag.match(new RegExp(`${name}="([^"]*)"`))?.[1] ?? "";
+
+    const admin41 = await login("admin@example.test");
+
+    /*
+     * `D76` — **the strip renders exactly when more than one group
+     * qualifies, and carries no Reports pill.** Four identities × both
+     * locales: the two book holders see none (a strip of one is noise, and
+     * the coordinator's day is the queue, not the trend), the two overseers
+     * see Today and Team and nothing third (`D51` — a control with nothing
+     * behind it).
+     */
+    for (const who of [
+      { label: "manager", jar: jars["manager@example.test"], strip: true },
+      { label: "admin", jar: admin41, strip: true },
+      { label: "rep-a", jar: jars["rep-a@example.test"], strip: false },
+      {
+        label: "coordinator",
+        jar: jars["coordinator@example.test"],
+        strip: false,
+      },
+    ] as const) {
+      for (const locale of ["en", "ar"] as const) {
+        const { body } = await get(who.jar, `/${locale}`);
+        const strip = body.includes('data-slot="today-tabs"');
+        const tabs = [
+          ...body.matchAll(/data-slot="today-tabs"[\s\S]*?<\/nav>/g),
+        ][0]?.[0];
+        const named = tabs
+          ? [...tabs.matchAll(/data-tab="([^"]*)"/g)].map((m) => m[1])
+          : [];
+        check(
+          `${who.label} ${locale}: *** the tab strip ${
+            who.strip ? "renders as Today · Team, nothing third" : "is ABSENT"
+          } — saw [${named.join(" · ") || "none"}] *** [D76] [D51] [D64]`,
+          who.strip
+            ? strip && named.join(",") === "today,team"
+            : !strip && named.length === 0,
+        );
+      }
+    }
+
+    /*
+     * `D77` — **Yesterday's four figures against this script's own SQL.** The
+     * day is re-derived here (walk back from Riyadh-today over Friday and
+     * Saturday), dispatched m² is summed from the lines over `dispatch_date`
+     * — the month figure's own clock — approvals and issues come off the
+     * audit log's half-open Riyadh window, and reports off `report_date`.
+     * Four figures, four independent origins from the screen's calls.
+     */
+    const riyadhToday = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Riyadh",
+      dateStyle: "short",
+    }).format(new Date());
+    const dayBefore = (day: string): string => {
+      let cursor = new Date(`${day}T00:00:00Z`);
+      do {
+        cursor = new Date(cursor.getTime() - 86_400_000);
+      } while ([5, 6].includes(cursor.getUTCDay()));
+      return cursor.toISOString().slice(0, 10);
+    };
+    const workday = dayBefore(riyadhToday);
+
+    let expected: {
+      sqm: number;
+      approvals: number;
+      issued: number;
+      reports: number;
+    } | null = null;
+    try {
+      const figures = (await db.execute(sql`
+        select
+          (select round(coalesce(sum(l.sqm), 0))::int
+             from dispatches d
+             join dispatch_lines l on l.dispatch_id = d.id
+             where d.status = 'approved'
+               and d.dispatch_date = ${workday}::date) as sqm,
+          (select count(*)::int from audit_log a
+             where a.action = 'dispatch.approved'
+               and a.created_at >= ${workday}::date::timestamp at time zone 'Asia/Riyadh'
+               and a.created_at < (${workday}::date + 1)::timestamp at time zone 'Asia/Riyadh') as approvals,
+          (select count(*)::int from audit_log a
+             where a.action = 'quotation_version.issued'
+               and a.created_at >= ${workday}::date::timestamp at time zone 'Asia/Riyadh'
+               and a.created_at < (${workday}::date + 1)::timestamp at time zone 'Asia/Riyadh') as issued,
+          (select count(*)::int from rep_reports r
+             where r.report_date = ${workday}::date) as reports
+      `)) as unknown as {
+        sqm: number;
+        approvals: number;
+        issued: number;
+        reports: number;
+      }[];
+      expected = figures[0] ?? null;
+    } catch (error) {
+      console.log(`  --    the day's records could not be read — ${String(error)}`);
+    }
+
+    for (const locale of ["en", "ar"] as const) {
+      const { body } = await get(jars["manager@example.test"], `/${locale}`);
+      const panel = openTag(body, "today-yesterday");
+      if (
+        !setup(
+          `${locale}: the Yesterday panel renders and names its day — saw ${
+            tagAttr(panel, "data-day") || "none"
+          } against ${workday}`,
+          panel !== "" && tagAttr(panel, "data-day") === workday,
+        )
+      )
+        continue;
+      if (expected === null) {
+        console.log(
+          "  --    Yesterday: the records could not be read, so the figures are NOT MEASURED",
+        );
+        continue;
+      }
+      const section = body.slice(
+        body.indexOf('data-slot="today-yesterday"'),
+        body.indexOf('data-slot="today-stuck"') === -1
+          ? undefined
+          : body.indexOf('data-slot="today-stuck"'),
+      );
+      const figure = (name: string): string => {
+        const tag = section.match(
+          new RegExp(`<div\\b[^>]*data-figure="${name}"[^>]*>`),
+        )?.[0];
+        return tag?.match(/data-value="([^"]*)"/)?.[1] ?? "";
+      };
+      const sqmShown = Number(figure("dispatched").replace(/,/g, ""));
+      check(
+        `${locale}: *** Yesterday (${workday}) reads ${figure("dispatched")} m² · ${figure(
+          "approvals",
+        )} approvals · ${figure("issued")} issued · ${figure(
+          "reports",
+        )} reports — the records say ${expected.sqm} · ${expected.approvals} · ${expected.issued} · ${expected.reports} *** [D77] [S93]`,
+        sqmShown === expected.sqm &&
+          Number(figure("approvals")) === expected.approvals &&
+          Number(figure("issued")) === expected.issued &&
+          Number(figure("reports")) === expected.reports,
+        `screen ${sqmShown}/${figure("approvals")}/${figure("issued")}/${figure(
+          "reports",
+        )} vs records ${expected.sqm}/${expected.approvals}/${expected.issued}/${expected.reports}`,
+      );
+      /*
+       * The Saturday section is a biconditional on the calendar and the
+       * records together: it may exist only when today is Sunday AND the
+       * Saturday between moved. On every other day this asserts absence —
+       * *an empty Saturday section never renders* is the founder's own
+       * sentence (answer 7).
+       */
+      const isSunday =
+        new Date(`${riyadhToday}T00:00:00Z`).getUTCDay() === 0;
+      let saturdayMoved = false;
+      if (isSunday) {
+        const sat = (await db.execute(sql`
+          select ((select round(coalesce(sum(l.sqm), 0))::int
+                    from dispatches d join dispatch_lines l on l.dispatch_id = d.id
+                    where d.status = 'approved'
+                      and d.dispatch_date = (${riyadhToday}::date - 1)) > 0
+              or (select count(*) from audit_log a
+                    where a.action in ('dispatch.approved', 'quotation_version.issued')
+                      and a.created_at >= (${riyadhToday}::date - 1)::timestamp at time zone 'Asia/Riyadh'
+                      and a.created_at < ${riyadhToday}::date::timestamp at time zone 'Asia/Riyadh') > 0
+              or (select count(*) from rep_reports r
+                    where r.report_date = (${riyadhToday}::date - 1)) > 0) as moved
+        `)) as unknown as { moved: boolean }[];
+        saturdayMoved = Boolean(sat[0]?.moved);
+      }
+      check(
+        `${locale}: *** the Saturday section renders exactly when a Saturday sits between and moved — today is${
+          isSunday ? "" : " not"
+        } a Sunday, the records say ${saturdayMoved} *** [D77]`,
+        section.includes('data-slot="yesterday-saturday"') ===
+          (isSunday && saturdayMoved),
+      );
+    }
+
+    /*
+     * `D78` — **the untouched figure and its breakdown, against the waiting
+     * list's own surface.** Both read `followUpScope`'s ladder — this is a
+     * cross-SURFACE check that the two renderings of one derivation agree
+     * (the ladder itself is held by `verify:followups` and §26/§27), scoped
+     * identically because both are the manager's. `/follow-ups`' chips carry
+     * `data-count` per group over the whole scope.
+     */
+    {
+      const home = await get(jars["manager@example.test"], "/en");
+      const stuck = openTag(home.body, "stuck-untouched");
+      const chips = await get(jars["manager@example.test"], "/en/follow-ups");
+      const chipCount = (group: string): number => {
+        const tag = [...chips.body.matchAll(/<a\b[^>]*data-chip\b[^>]*>/g)]
+          .map((m) => m[0])
+          .find((t) => t.includes(`group=${group}`));
+        return Number(tag?.match(/data-count="(\d+)"/)?.[1] ?? "-1");
+      };
+      const quiet = chipCount("quiet");
+      const notMoved = chipCount("notMoved");
+      const quotations = chipCount("quotations");
+      if (
+        setup(
+          `Stuck: the untouched section and the three chips are readable — chips ${quiet}/${notMoved}/${quotations}`,
+          stuck !== "" && quiet >= 0 && notMoved >= 0 && quotations >= 0,
+        )
+      ) {
+        check(
+          `*** untouched-too-long carries its breakdown and each anchor is the waiting list's own count — saw ${tagAttr(
+            stuck,
+            "data-companies",
+          )} · ${tagAttr(stuck, "data-projects")} · ${tagAttr(
+            stuck,
+            "data-quotations",
+          )} of ${tagAttr(stuck, "data-total")} against chips ${quiet} · ${notMoved} · ${quotations} *** [D78] [S89]`,
+          Number(tagAttr(stuck, "data-companies")) === quiet &&
+            Number(tagAttr(stuck, "data-projects")) === notMoved &&
+            Number(tagAttr(stuck, "data-quotations")) === quotations &&
+            Number(tagAttr(stuck, "data-total")) ===
+              quiet + notMoved + quotations,
+        );
+        /* `D41` `D78` — needs-a-decision is ABSENT, and nothing explains it. */
+        check(
+          "*** needs-a-decision renders NOTHING inside Stuck — no marker, no explaining sentence *** [D41] [D78] [D70]",
+          !home.body.includes('data-slot="stuck-decisions"'),
+        );
+      }
+    }
+
+    /*
+     * `S141` `S138` `D79` — **who needs attention, each condition against
+     * this script's own SQL.** The threshold is read from the settings row —
+     * the same row the screen reads, asserted to exist first, so the two
+     * cannot silently diverge onto fallbacks.
+     */
+    {
+      let silentDays = -1;
+      const silentByRep = new Map<string, number | null>();
+      const neverByRep = new Map<string, number>();
+      try {
+        const settingRows = (await db.execute(sql`
+          select value::text as v from settings
+          where key = 'attention.silent_days'
+        `)) as unknown as { v: string }[];
+        silentDays = Number(settingRows[0]?.v ?? "-1");
+
+        const people = (await db.execute(sql`
+          select u.id::text as id,
+                 ((now() at time zone 'Asia/Riyadh')::date - max(r.report_date))::int as days,
+                 (max(r.report_date) is null) as never_logged
+          from users u
+          join roles ro on ro.id = u.role_id
+          left join rep_reports r on r.user_id = u.id
+          where u.is_active = true
+            and ro.sees_all_reps = false
+            and exists (select 1 from company_reps cr
+                        where cr.user_id = u.id and cr.removed_at is null)
+          group by u.id
+        `)) as unknown as {
+          id: string;
+          days: number | null;
+          never_logged: boolean;
+        }[];
+        for (const row of people) {
+          if (row.never_logged) silentByRep.set(row.id, null);
+          else if (row.days !== null && Number(row.days) >= silentDays)
+            silentByRep.set(row.id, Number(row.days));
+        }
+
+        const nevers = (await db.execute(sql`
+          select cr.user_id::text as id, count(*)::int as never
+          from company_reps cr
+          join companies c on c.id = cr.company_id
+          join users u on u.id = cr.user_id
+          join roles ro on ro.id = u.role_id
+          where cr.removed_at is null
+            and u.is_active = true
+            and ro.sees_all_reps = false
+            and c.archived_at is null
+            and c.merged_into_id is null
+            and not exists (select 1 from rep_reports r
+                            where r.company_id = c.id
+                              and r.entry_type = 'interaction')
+          group by cr.user_id
+          having count(*) >= 10
+        `)) as unknown as { id: string; never: number }[];
+        for (const row of nevers) neverByRep.set(row.id, Number(row.never));
+      } catch (error) {
+        silentDays = -1;
+        console.log(`  --    the attention records could not be read — ${String(error)}`);
+      }
+
+      check(
+        `*** S141's threshold is a seeded settings row — attention.silent_days reads ${silentDays} *** [S141]`,
+        Number.isInteger(silentDays) && silentDays > 0,
+        `read ${silentDays}`,
+      );
+
+      if (silentDays <= 0) {
+        console.log(
+          "  --    attention: without the threshold the silent set cannot be derived: NOT MEASURED",
+        );
+      } else {
+        const { body } = await get(jars["manager@example.test"], "/en");
+        const card = openTag(body, "today-attention");
+        if (card === "") {
+          if (silentByRep.size > 0 || neverByRep.size > 0) {
+            check(
+              `*** the attention block is ABSENT while the records name ${silentByRep.size} silent and ${neverByRep.size} bulk-dumped rep(s) *** [D79]`,
+              false,
+              "the block should render",
+            );
+          } else {
+            // Silent and never are empty; whether a behind-pace row should
+            // have summoned the block needs `D32`'s arithmetic, which §35
+            // holds — deriving it a second time here would be the two-copies
+            // trap. Absence agrees with the two sets this section owns.
+            console.log(
+              "  --    attention: the block is absent and the silent/never records agree; the behind set is §35's derivation, NOT MEASURED here",
+            );
+          }
+        } else {
+          const rows = [
+            ...body.matchAll(/<div\b[^>]*data-slot="attention-row"[^>]*>/g),
+          ].map((m) => m[0]);
+          const silentRows = rows.filter(
+            (tag) => tagAttr(tag, "data-kind") === "silent",
+          );
+          const neverRows = rows.filter(
+            (tag) => tagAttr(tag, "data-kind") === "never",
+          );
+          check(
+            `*** the silent tally is the records' own — the card claims ${tagAttr(
+              card,
+              "data-silent",
+            )} against ${silentByRep.size} rep(s) past ${silentDays} day(s) *** [S141] [D79]`,
+            Number(tagAttr(card, "data-silent")) === silentByRep.size,
+            `card ${tagAttr(card, "data-silent")} vs records ${silentByRep.size}`,
+          );
+          check(
+            `*** the never-contacted tally is the records' own at the floor of 10 — the card claims ${tagAttr(
+              card,
+              "data-never",
+            )} against ${neverByRep.size} *** [S138] [D79]`,
+            Number(tagAttr(card, "data-never")) === neverByRep.size,
+            `card ${tagAttr(card, "data-never")} vs records ${neverByRep.size}`,
+          );
+          check(
+            `*** every rendered silent row names a rep the records call silent, with the records' own day count — ${silentRows.length} row(s) rendered *** [S141]`,
+            silentRows.every((tag) => {
+              const days = tagAttr(tag, "data-days");
+              const inRecords = silentByRep.has(tagAttr(tag, "data-user"));
+              return (
+                inRecords &&
+                (days === "never"
+                  ? silentByRep.get(tagAttr(tag, "data-user")) === null
+                  : Number(days) ===
+                    silentByRep.get(tagAttr(tag, "data-user")))
+              );
+            }),
+          );
+          check(
+            `*** every rendered never row carries the records' own count — ${neverRows.length} row(s) rendered *** [S138]`,
+            neverRows.every(
+              (tag) =>
+                neverByRep.get(tagAttr(tag, "data-user")) ===
+                Number(tagAttr(tag, "data-count")),
+            ),
+          );
+          /* `D32`'s arithmetic holds the behind rows; here only the shape:
+             a behind row names a rep with a target row for the month. */
+          const monthStart41 = `${riyadhToday.slice(0, 7)}-01`;
+          const targeted = (await db.execute(sql`
+            select distinct t.user_id::text as id from targets t
+            where t.period = ${monthStart41}::date
+          `)) as unknown as { id: string }[];
+          const targetedIds = new Set(targeted.map((row) => row.id));
+          check(
+            `*** every behind-pace row names a rep with a target row this month *** [D79] [D32]`,
+            rows
+              .filter((tag) => tagAttr(tag, "data-kind") === "behind")
+              .every((tag) => targetedIds.has(tagAttr(tag, "data-user"))),
+          );
+          /* The cap and its overflow line, as a biconditional `D79`. */
+          const total = Number(tagAttr(card, "data-rows"));
+          check(
+            `*** the block caps at six with an overflow line exactly when there is overflow — ${rows.length} rendered of ${total} *** [D79]`,
+            rows.length === Math.min(6, total) &&
+              body.includes('data-slot="attention-more"') === total > 6,
+          );
+        }
+      }
+    }
+
+    /*
+     * `D80` — **the biggest five open deals against this script's own SQL**:
+     * expected size ranked, not lost, no approved dispatch, and never a Won
+     * position on a pill.
+     */
+    {
+      let deals: { id: string; sqm: number }[] = [];
+      let readable = false;
+      try {
+        deals = (
+          (await db.execute(sql`
+            select p.id::text as id, round(p.sqm_expected)::int as sqm
+            from projects p
+            where p.end_state is null
+              and p.sqm_expected is not null
+              and not exists (select 1 from dispatches d
+                              where d.project_id = p.id
+                                and d.status = 'approved')
+            order by p.sqm_expected desc
+            limit 5
+          `)) as unknown as { id: string; sqm: number }[]
+        ).map((row) => ({ id: row.id, sqm: Number(row.sqm) }));
+        readable = true;
+      } catch (error) {
+        console.log(`  --    the deal records could not be read — ${String(error)}`);
+      }
+
+      if (!readable) {
+        console.log("  --    big deals: NOT MEASURED");
+      } else if (deals.length === 0) {
+        const { body } = await get(jars["manager@example.test"], "/en");
+        check(
+          "*** with no open deal the block is ABSENT *** [D80] [D70]",
+          !body.includes('data-slot="today-deals"'),
+        );
+      } else {
+        const { body } = await get(jars["manager@example.test"], "/en");
+        const rows = [
+          ...body.matchAll(/<div\b[^>]*data-slot="deal-row"[^>]*>/g),
+        ].map((m) => m[0]);
+        check(
+          `*** the big deals are the records' own top ${deals.length}, in rank order — saw [${rows
+            .map((tag) => tagAttr(tag, "data-sqm"))
+            .join(" · ")}] against [${deals
+            .map((row) => row.sqm)
+            .join(" · ")}] *** [D80] [S132]`,
+          rows.length === deals.length &&
+            rows.every(
+              (tag, index) =>
+                tagAttr(tag, "data-id") === deals[index].id &&
+                Number(tagAttr(tag, "data-sqm").replace(/,/g, "")) ===
+                  deals[index].sqm,
+            ),
+        );
+        check(
+          "*** no deal in play wears a Won pill — the query excludes won and the pill must agree *** [D80] [S132]",
+          rows.every((tag) => tagAttr(tag, "data-position") !== "won"),
+        );
+      }
+    }
+
+    /*
+     * `D81` — **the seeded database HAS work, so the first-run screen is
+     * ABSENT and the real blocks stand.** The present half is proven by eye
+     * against a scratch database with three empty tables (the shots in
+     * `audit-shots/today-firstrun/`); it cannot be driven here without a
+     * second database behind the same server.
+     */
+    {
+      const { body } = await get(jars["manager@example.test"], "/en");
+      check(
+        "*** the first-run screen is ABSENT on a database that has recorded work, and the band stands in its place *** [D81]",
+        !body.includes('data-slot="today-firstrun"') &&
+          body.includes('data-slot="today-band"'),
       );
     }
   }

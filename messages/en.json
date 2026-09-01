@@ -1217,7 +1217,8 @@
     "stuck": {
       "title": "Stuck",
       "coordinator": "With the coordinator",
-      "counts": "{issue} to issue · {dispatch, plural, one {# dispatch request} other {# dispatch requests}}",
+      "toIssue": "{count} to issue",
+      "requests": "{count, plural, one {# dispatch request} other {# dispatch requests}}",
       "oldest": "oldest {count, plural, one {# day} other {# days}}",
       "clear": "The bottleneck is clear.",
       "untouched": "Untouched too long",
