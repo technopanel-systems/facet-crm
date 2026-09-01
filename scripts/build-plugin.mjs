@@ -81,11 +81,15 @@ const generated = {
 };
 
 let drift = 0;
+// Compare with \r stripped: git's autocrlf rewrites line endings on checkout,
+// and a fresh Windows clone must not read as drift — found by feeding the
+// check its defect and watching the RESTORE stay red (session 50, Phase 6).
+const norm = (s) => s.replace(/\r/g, "");
 function put(rel, content) {
   const dest = path.join(OUT, rel);
   if (CHECK) {
     const current = fs.existsSync(dest) ? fs.readFileSync(dest, "utf8") : null;
-    if (current !== content) {
+    if (current === null || norm(current) !== norm(content)) {
       console.error(`DRIFT: facet-plugin/${rel}`);
       drift++;
     }

@@ -1027,25 +1027,23 @@ the previous version of this table was carried forward until nearly every row
 disagreed with the repository, one of them a corrupted cell sitting beside a
 number people trust.
 
-Taken from `main` at commit `58820b3`, 29 Aug 2026 — the whole table re-measured
-rather than patched, which is what the paragraph above asks for.
+Taken from `main` in session 50 (THE FIXATION), 1 Sep 2026 — the whole table
+re-measured rather than patched, which is what the paragraph above asks for.
 
 | | |
 |---|---|
-| Branch | `main`, clean, no uncommitted work |
-| Authority files | `CLAUDE.md` 151 lines · `SPEC.md` 1,069 · `DESIGN.md` 1,198 · `WORKFLOW.md` 807 · `README.md` 285, all at root |
-| Rules | **136 `S` numbers · 74 `D` numbers**, both contiguous — no gaps, and `D18` is a tombstone rather than a hole |
-| Docs | `docs/archive/` holds 27 numbered documents plus `INVENTORY.md`. `docs/design/` holds v5 at the top level with v2, v3 and v4 under `archive/`. **`superseded/` no longer exists** — earlier tables called it present and empty |
-| Skills | `facet-ui`, `facet-verify` — nothing else |
-| claude-flow | fully removed, no remnants in the tree |
-| Routes | **37** — 36 under `(app)`, plus `(auth)/login`. `/reports`, `/performance` and the coverage screen are gone. **`/follow-ups` and `/notifications` STAY**, and the clause saying they leave in session 24 was wrong: the first is where `D33`'s tiles point and what `D49` calls *the waiting list, filtered*, the second is `S92`'s only bell surface. Session 24 narrowed them; it deleted no route |
-| Migrations | **34** — `0000` through `0033`. (This row read *32 — `0000` through `0031`* and was already stale by one when session 24 opened it: `0032` had landed. Re-taken by counting `drizzle/*.sql`, not by adding to the old figure) |
-| Tables | **42**, of which **5 have no reference anywhere in `src/` or `scripts/`**: `delete_requests`, `product_specifications`, `duplicate_flags`, `non_duplicates`, `attachments`. All five were examined by the `0027` sweep and deliberately kept, each with the rule that still asks for it (`SPEC §15`). `accounts` is referenced and stays — the adapter's TYPE requires it |
-| Code | `src/lib` 19,138 · `src/app` 20,046 · `src/db` 2,591 · `src/components` 1,957 · `scripts` 30,693 |
-| Largest under `src` | `dispatches.ts` 2,920 · `schema.ts` 2,525 · `quotations.ts` 2,283 · `authz.ts` 1,652 · `projects.ts` 1,603 |
-| Largest under `scripts` | `verify-routes.ts` 7,333 · `verify-slice3.ts` 4,487 · `verify-schema25.ts` 3,192 · `verify-phase9.ts` 1,770 · `verify-phase10a.ts` 1,502 |
-| Open markers | **9 `[CHANGE]`, 24 `[BUILD]` — 33 open.** Session 24 closed three, all of them shipped rather than reworded: `S91`, `S92` and `S122`. `npm run status` is the reading, never a grep. See §9 for what a rise means |
-| Blocking | **nothing.** The Docker build was this row for the life of the file and was fixed in `d7a7e7a` + `c00bcc9`, before `WORKFLOW.md` existed. `SPEC §15` still lists it under *Blocking anything else* and is the last place that claim survives |
+| Branch | `main`, clean at each of the session's six pushed commits |
+| Authority files | `CLAUDE.md` **125** lines (was 332 — it is an INDEX now) · `SPEC.md` 1,162 · `DESIGN.md` 1,487 · `WORKFLOW.md` 1,126 · `README.md` 285 (the entry document) |
+| Rules | **138 `S` numbers · 75 `D` numbers**, contiguous. Tombstones: `D18` `S115` `S135` `D35` `D36` `D71` — deleted rules keep their numbers, never reused |
+| The layers | `.claude/rules/` six path-scoped files (proven to load on-path and not off) · skills `facet-ui` `facet-verify` `facet-audit` `facet-register` · agents `classifier` `conformance-sweeper` `shot-looker` · hooks H1–H11 + permissions P1–P7 (each fed its defect) · `facet-plugin/` the generated mirror (`build-plugin.mjs --check` holds it) |
+| Docs | `docs/archive/` holds 27 numbered documents plus `INVENTORY.md`, `28-fixation/` (this rebuild's record) and `29-closed-register.md` (§5's 124 closed rows, moved verbatim) |
+| claude-flow | fully removed — and hook-blocked by name (H11) |
+| Routes | **37** — 36 under `(app)`, plus `(auth)/login` |
+| Migrations | **35** `.sql` files under `drizzle/` |
+| Tables | **43** exported `pgTable`s. Two lost their keeper rule in session 50 and are sweep drop candidates: `attachments` (S115 deleted) and `product_specifications` (§16 closed) |
+| Register | **~90 open rows in §5** (prose context lines included in the count); 124 closed rows in `docs/archive/29` |
+| Open markers | **10 `[CHANGE]`, 24 `[BUILD]` — 34 open.** Session 50 added `S137` (+1 CHANGE) and swapped `S135` for `S138` in BUILD; a rise is only wrong when no rule was added, and three were. `npm run status` is the reading |
+| Blocking | **nothing.** The stale SPEC §15 Docker line is deleted; bulk import (34) is the pilot's precondition |
 
 **How the code figures were measured.** `wc -l` over every `.ts` and `.tsx`
 file. **`npm run status`'s own `SIZE` line is a different number** — 41,157

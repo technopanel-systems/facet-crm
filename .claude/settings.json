@@ -10,7 +10,6 @@
     "ask": [
       "Read(./legacy/**)",
       "Edit(./legacy/**)",
-      "Write(./legacy/**)",
       "Bash(npm install *)",
       "Bash(npm i *)",
       "Bash(npm uninstall *)",
