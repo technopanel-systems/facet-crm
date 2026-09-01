@@ -1,83 +1,157 @@
 # FACET
 
-Internal operations platform for **Technopanel**. Sales CRM first, then
-production, warehouse and marketing.
-
-It does **not** cover finance, invoicing or tax — those stay in SMAC, the
-existing ERP.
-
-Project rules are in [CLAUDE.md](CLAUDE.md); the decisions behind them are in
-[docs/](docs/). `docs/archive/03-stack.md` is the settled technical record.
+**The entry document.** Readable by a person, loadable by an agent: what
+FACET is, how the business works, how the system is built, how sessions run,
+why the discipline exists, and where everything lives. The operational
+reference (run, database, deploy, backups) follows the narrative. If you
+read only one file, read this one; the rules themselves live in
+[CLAUDE.md](CLAUDE.md), [SPEC.md](SPEC.md) and [DESIGN.md](DESIGN.md).
 
 ---
 
-## Stack
+## What FACET is
 
-Next.js 16 (App Router) · TypeScript · PostgreSQL 17 · Drizzle · Tailwind v4 ·
-shadcn/ui · next-intl (en/ar with RTL) · Docker
+Technopanel is a Saudi supplier of cladding and aluminium composite panel —
+about fourteen people, most of them sales reps on laptops at 1366px, some on
+phones in a customer's lobby. FACET is their internal operations platform:
+the system of record for **work** — who owns which customer relationship,
+what stage each deal is at, what was promised, what actually moved.
+
+It is deliberately **not** the system of record for money. Quotations are
+priced, invoiced and taxed in **SMAC**, the company's existing ERP, which is
+staying. FACET mirrors SMAC's reference numbers, typed by humans, and
+assumes they can be wrong. FACET grows **sideways** into new departments
+(production, warehouse, marketing are planned) and never down into finance.
+
+## How the business works
+
+A **rep** finds and owns companies. Everything downstream depends on reps
+bothering to record things, so the main entry point is a **Log button**
+built for a phone: three taps and a text box records a visit, a call, a
+WhatsApp. From those recorded events FACET **derives** everything it can —
+who has gone quiet, what is stuck, whose move it is — and only ever asks a
+human for what genuinely lives in someone's head.
+
+Deals live on **projects** (a building, a contract — several companies can
+participate). A rep raises a **quotation** against a project; the **sales
+coordinator** — one person, both chains run through her — builds the real
+quotation in SMAC, types the number back, and manages issue / return /
+accept / reject. "Accepted" means internal signatures only; **a deal is won
+when a dispatch is approved**, a real event that cannot be manufactured. The
+rep requests a **dispatch**; the coordinator checks it, records how the
+customer pays, and approves — the only event that credits a rep's monthly
+**target, measured in square metres**, never currency. Approval is final:
+wrong afterwards means cancelled, never un-approved, and a cancelled
+dispatch un-wins its project and takes back the credit.
+
+Colour on screen means one thing: **how long something has waited** — never
+how good the outcome is. The tool's one question, asked of every screen:
+*does this help a person finish what is waiting on them?*
+
+## How the system is built
+
+Next.js (App Router) + TypeScript · PostgreSQL + Drizzle · Auth.js
+(credentials, database sessions) · Tailwind v4 + shadcn/ui · next-intl —
+**every user-facing string ships in English and Arabic, and the whole layout
+is RTL-safe by construction** (logical utilities only, hook-enforced).
+Server-rendered HTML with JavaScript as enhancement, never enablement: every
+screen works with scripts off, which is also what makes the whole product
+testable over plain HTTP. It runs in Docker on one Windows PC behind a
+Cloudflare Tunnel with Cloudflare Access in front; PostgreSQL and the app
+are loopback-bound so the tunnel is the only way in.
+
+The data layer (`src/lib`) is the one authorization layer and the one place
+derivations live — quiet thresholds, chain positions, credit — resolved in
+SQL before pagination. The audit log is written by the data layer, not by
+features. Derived figures are never stored where they can drift: *won* is
+computed from dispatches at read time, square metres are generated columns,
+and no screen restates a derivation that already has a home.
+
+## How sessions run
+
+Development is founder + AI: Jerom (founder, semi-beginner developer)
+directs; Claude Code builds; a planning chat reviews. The loop, every
+session (`WORKFLOW.md` §3): one task · plan mode for anything structural,
+the plan reviewed before approval · build · run the gates — `typecheck`,
+`lint`, `build`, `check:messages`, then the verify scripts · update SPEC or
+DESIGN so the spec stays a living file · commit and push · record anything
+found-but-not-fixed as a register row (§5) · paste the status block.
+
+Rules are **cited by number** (`S74`, `D28`) in every plan, comment and
+commit — an uncited commit is hook-blocked. There is **no test harness**;
+verification is ten kept scripts plus `verify:routes`, ~1,800 checks driven
+over HTTP in both locales against a built server, and every new check is fed
+its own defect before it is believed (the `facet-verify` skill carries that
+whole discipline).
+
+## Why the discipline exists
+
+FACET is a second attempt. v1 died of invented logic (an approval gate
+nobody asked for, a `branches` table nothing used) and of documentation that
+grew on its own until nobody could audit it — twenty-seven planning
+documents, later joined by a third-party agent framework installed twice by
+accident, whose memory store loaded guidance into twenty sessions from
+outside the repository before anyone noticed.
+
+The answer is layered, and became deterministic in session 50:
+
+- **Authority is two files** — SPEC.md (what) and DESIGN.md (how it looks),
+  every rule numbered, present tense, contradictions hunted by scheduled
+  audits and a standing rule review (`WORKFLOW §6b`) that can rewrite or
+  delete rules, because a rule that is merely accumulated is a ratchet.
+- **Prohibitions that can be enforced ARE** — Claude Code hooks and
+  permissions deny the forbidden thing at the tool call (writes outside the
+  repo, physical CSS utilities, uncited commits, the two SQL shapes that
+  lose Riyadh's clock…). A rule that stays prose says so, because a
+  sentence is a hope.
+- **Everything derived, nothing asked twice, nothing unused** — a column
+  without a writer is a lie about what the system does, and the
+  dead-structure sweeps delete it.
+- **Checks are guilty until fed their defect** — the project's wrong-red
+  ledger records fifteen checks that were wrong in the direction that
+  matters; the discipline that found them is the crown jewel.
+
+## Where everything lives
+
+| Where | What |
+|---|---|
+| [CLAUDE.md](CLAUDE.md) | the always-loaded index: judgment rules, the layer map |
+| [SPEC.md](SPEC.md) / [DESIGN.md](DESIGN.md) | the authority — every numbered rule |
+| [WORKFLOW.md](WORKFLOW.md) | the session plan (§4), the OPEN register (§5), audits (§6, §6b) |
+| [.claude/rules/](.claude/rules/) | path-scoped rules that load when their files are touched |
+| [.claude/skills/](.claude/skills/) | procedures: `facet-ui`, `facet-verify`, `facet-audit`, `facet-register` |
+| [.claude/agents/](.claude/agents/) | mechanical workers: `classifier`, `conformance-sweeper`, `shot-looker` |
+| [.claude/hooks/](.claude/hooks/) + [.claude/settings.json](.claude/settings.json) | the deterministic guardrails (H1–H11, P1–P7) |
+| [facet-plugin/](facet-plugin/) | the same setup packaged as a Claude Code plugin, for carrying to other projects |
+| [docs/archive/](docs/archive/) | history — how decisions were reached; never authority. `28-fixation/` is the session-50 rebuild record; `29-closed-register.md` is §5's closed history |
+| [docs/design/](docs/design/) | the visual concept (v5 is the target, not authority) |
+| [legacy/](legacy/) | the failed v1 — access-gated, real names inside |
 
 ---
+
+# Operational reference
 
 ## First run
 
-Requires Docker Desktop, and Node 24 if you want to develop outside the
-container.
+Requires Docker Desktop, and Node 24 to develop outside the container.
 
 ```bash
 cp .env.example .env      # then edit POSTGRES_PASSWORD
 docker compose up --build -d
 ```
 
-Open <http://localhost:3000>. It redirects to `/en` and then to the sign-in
-screen; once you are signed in, `/` is **Today** — the follow-ups that are past
-their threshold, the notifications waiting on you, and your target for the
-month. `/ar` shows the same screen mirrored right-to-left.
-
-The interface is **dark by default**; the toggle in the header persists your
-choice in a cookie and is read on the server, so there is no flash of the wrong
-palette. `DESIGN.md` is the authority for the palette and type; `docs/archive/22-design-language.md` records how it was reached.
-
-Check it from the command line:
+Open <http://localhost:3000>. It redirects to `/en` and the sign-in screen;
+signed in, `/` is **Today**. `/ar` is the same product mirrored
+right-to-left. Dark is the default theme; the toggle persists in a cookie
+read on the server, so there is no flash of the wrong palette.
 
 ```bash
 curl http://localhost:3000/api/health
-# {"ok":true,"app":"up","db":"up","checkedAt":"..."}
+# {"ok":true,"app":"up","db":"up","checkedAt":"..."}   (503 when the db is down)
 ```
-
-Returns **503** with `"db":"down"` when PostgreSQL is unreachable.
 
 > The Docker build downloads fonts from Google Fonts, so the **build** needs
 > internet access. The running container does not.
-
----
-
-## Agent skills
-
-Two project skills are **committed** and need no setup: `facet-ui` (the screen
-conventions) and `facet-verify` (the verify-script shape), both under
-`.claude/skills/`.
-
-Three more are **installed dependencies and are not committed** — they arrive
-as symlinks into `.agents/`, and a symlink does not survive a clone onto
-another machine. Reinstall them instead of copying them:
-
-| Skill | Source |
-|---|---|
-| `find-skills` | `vercel-labs/skills` |
-| `frontend-design` | `anthropics/skills` |
-| `grill-me` | `mattpocock/skills` |
-
-```bash
-npx skills add vercel-labs/skills@find-skills
-npx skills add anthropics/skills@frontend-design
-npx skills add mattpocock/skills@grill-me
-```
-
-Nothing in the application depends on them; they assist whoever is working on
-the code. `skills-lock.json` is generated by the installer and is likewise not
-committed.
-
----
 
 ## Two ways to run
 
@@ -86,223 +160,92 @@ committed.
 | **Container** | `docker compose up --build -d` | What actually runs on the office PC. Verify here before deploying. |
 | **Host** | `docker compose up -d db` then `npm install && npm run dev` | Day-to-day work. Hot reload, same database. |
 
-Both talk to the same PostgreSQL. `DATABASE_URL` in `.env` points at
-`localhost` for host-side work; `docker-compose.yml` overrides it to the `db`
-service for the container. You never need to edit it when switching.
+Both talk to the same PostgreSQL; `docker-compose.yml` overrides
+`DATABASE_URL` for the container, so `.env` never needs editing when
+switching.
 
-Other commands:
+Checks: `npm run lint` · `typecheck` · `build` · `check:messages`, verify
+scripts per `package.json` (`verify:routes` needs `npm run build && npm run
+start` — never `next dev` — and the app **container stopped**, or its
+loopback-published port shadows the server under test).
 
-```bash
-npm run lint         # ESLint
-npm run typecheck    # tsc --noEmit
-npm run build        # production build
-```
-
-> **Next.js 16 differs from Next 13–15 in ways that catch out both people and
-> AI assistants** — `params` is a Promise, `middleware.ts` is now `proxy.ts`.
-> Version-correct docs ship with the package at `node_modules/next/dist/docs/`.
-> Read those rather than trusting memory or an older tutorial.
->
-> `next dev` wants to append a note about this to `CLAUDE.md` on every start.
-> That is disabled with `agentRules: false` in `next.config.ts`, because
-> `CLAUDE.md` is a hand-written rules file, not a generated one.
-
----
+> **Next.js 16 differs from 13–15** — `params` is a Promise, `middleware.ts`
+> is `proxy.ts`. Version-correct docs ship at `node_modules/next/dist/docs/`;
+> read those rather than memory. (`next dev`'s wish to append notes to
+> CLAUDE.md is disabled via `agentRules: false` — that file is hand-written.)
 
 ## Database
 
-The schema lives in `src/db/schema.ts`; the phase it belongs to is in
-`WORKFLOW.md` §4.
+Schema in `src/db/schema.ts`; the phase it belongs to is `WORKFLOW.md` §4.
 
 ```bash
 npm run db:generate   # write a migration from schema.ts changes
 npm run db:migrate    # apply pending migrations
 npm run db:seed       # roles, lookups, settings, notification types
 npm run db:studio     # browse data
-npm run db:push       # push schema without a migration — local scratch only
+npm run db:push       # local scratch only — never against a real database
 npm run db:reset      # development only — destroy the volume and rebuild
 npm run seed:demo     # development only — a realistic dataset to look at
 ```
 
-Migrations under `drizzle/` **are committed**. They are the record of how
-production reached its current shape. Never use `db:push` against the office
-PC's database.
+Migrations under `drizzle/` are committed — the record of how production
+reached its shape. The migration traps (silent failures, the enum-CHECK
+rebuild, confirming from `information_schema`) load automatically from
+[.claude/rules/migrations.md](.claude/rules/migrations.md) when those files
+are touched.
 
-`drizzle-kit migrate` prints nothing when a migration fails — it just exits 1.
-To see the actual Postgres error, pipe the migration's .sql through psql
-directly. The transaction rolls back atomically either way, ledger included,
-so a failed migration leaves nothing half-applied.
-
-**Removing an enum value that a CHECK constraint mentions needs two extra
-statements drizzle-kit does not generate.** Postgres has no `ALTER TYPE … DROP
-VALUE`, so the type is rebuilt by casting the column to `text` and back — but a
-CHECK stores its literals already resolved to the old type, and the cast then
-fails with `operator does not exist: text = <the enum>`. Drop the constraint
-before the swap and add it back after, while the column is an enum again.
-Migration `0024` is the worked example.
-
-
-### Getting a clean database
-
-**Nothing in FACET deletes** (`docs/archive/12-closing-open-items.md` §7), and the
-verify scripts are held to the same rule. `verify:slice2`, `verify:slice3`,
-`verify:phase9`, `verify:phase11` and `verify:phase10a` all **leave their rows
-behind by design** — they are not fixtures that tear themselves down, and they
-are not meant to be. Three of them go further and create their own reps on
-every run, because achievement, coverage and the daily activity view are
-whole-database totals over a date range: re-using the shared `dev:fixtures`
-accounts made the second run count the first run's square metres.
-
-So a dev database only ever grows, and assertions that quietly depend on how
-much is in it drift as it does. (`verify:slice3` §12 looked for two dispatches
-on page one of a list that pages at 25; it "failed" once a database had
-accumulated enough runs, while working perfectly.)
-
-`npm run db:reset` is how a clean one is obtained:
-
-```bash
-npm run db:reset      # asks for confirmation; --yes to skip
-npm run dev:fixtures  # the test accounts the verify scripts drive
-```
-
-### A database worth looking at
-
-`npm run seed:demo` builds one, and it is the answer to residue rather than a
-second way of making it. It clears the record tables, removes the fixture
-accounts and fixture roles the verify scripts leave behind — anything at
-`@example.test` that is not one of its own eight — and then replays about 650
-acts **through the real writers in `src/lib`**, oldest first, so nothing lands
-in a state the application cannot itself produce. Roughly 120 companies, 70
-contacts, 49 projects, 60 quotation threads and 48 dispatches, with Arabic
-company names and rep-written notes, spread across the last 120 days.
-
-```bash
-npm run seed:demo     # development only; needs DEV_FIXTURE_PASSWORD in .env
-```
-
-It needs one existing `can_manage_users` holder to create its eight accounts
-with, because `S10` says that is how a user comes to exist — `bootstrap:admin`
-is that holder, and it is never touched. It is idempotent: two runs produce the
-same counts.
-
-**It is also how `verify:routes` §17 is reset.** §17 consumes its own
-preconditions (`WORKFLOW §5`): one seed buys **six clean runs**, and the
-seventh fails ten checks that are about the data rather than the diff. Re-seed
-rather than diagnose.
-
-The one thing it does that a writer does not is move each batch's `created_at`
-and audit rows backwards, so a record can be four months old. Every column on
-both sides of that line is named in `scripts/seed/demo/clock.ts`.
-
-It runs `docker compose down -v`, `docker compose up -d`, waits for the `db`
-container's own healthcheck, then `db:migrate`, `db:seed` and
-`bootstrap:admin`.
-
-- **Development only.** It refuses unless `NODE_ENV` is exactly `development`,
-  the same guard as `dev:fixtures` (`docs/archive/15-lookup-decisions.md` §7).
-- **It also confirms**, because that guard cannot tell a laptop from the office
-  PC — both copy the same `.env.example`. Type the database name back, or pass
-  `--yes` (required when there is no terminal).
-- **Put the `BOOTSTRAP_ADMIN_*` lines back in `.env` first.** They are checked
-  before anything is destroyed: the chain ends by creating the first super
-  admin, and a reset that cannot do that leaves a database with no way in.
-- `docker compose up -d` starts the app container too, which means an image
-  build on a checkout that has never made one — and that build needs the
-  internet for fonts.
-
----
+**A dev database only ever grows** — verify scripts leave rows by design
+(FACET deletes nothing, its scaffolding included). `npm run db:reset` then
+`npm run dev:fixtures` gets a clean one; `npm run seed:demo` builds a
+realistic one (~120 companies, Arabic names, 120 days of history, replayed
+through the real writers so nothing is in a state the app cannot produce).
+It needs `BOOTSTRAP_ADMIN_*` in `.env` before it destroys anything, refuses
+outside development, and is idempotent.
 
 ## Bilingual and RTL
 
-Every user-facing string goes through the translation layer from the first
-screen (`docs/archive/07-phase4-answers.md` E3). Retrofitting this means touching every
-file, so there is no "add it later".
-
 - Strings live in [messages/en.json](messages/en.json) and
-  [messages/ar.json](messages/ar.json). Both files must carry the same key tree.
-- Never hardcode a user-facing string in a component. Use `useTranslations` in
-  client components, `getTranslations` in server components.
-- Import `Link`, `redirect`, `usePathname` and `useRouter` from
-  [src/i18n/navigation.ts](src/i18n/navigation.ts) — **not** from `next/link` or
-  `next/navigation`. The raw versions drop the locale prefix.
-- Adding a locale means editing [src/i18n/routing.ts](src/i18n/routing.ts) and
-  adding a messages file. Nothing else.
+  [messages/ar.json](messages/ar.json) — the same key tree, enforced by
+  `check:messages`. Never hardcode a user-facing string.
+- Import `Link`, `redirect`, `usePathname`, `useRouter` from
+  [src/i18n/navigation.ts](src/i18n/navigation.ts), never `next/link` or
+  `next/navigation` — the raw versions drop the locale prefix
+  (hook-enforced).
+- **Logical Tailwind utilities only** — `ms-*` not `ml-*`, `text-start` not
+  `text-left` (hook-enforced; the full table and the direction rules load
+  from [.claude/rules/ui.md](.claude/rules/ui.md)). Arabic then needs no
+  `rtl:` variants; check `/ar` before calling a screen done.
+- Radix components read `DirectionProvider` from the locale layout.
+- Adding a locale: edit [src/i18n/routing.ts](src/i18n/routing.ts), add a
+  messages file. Nothing else.
 
-**Layout rule — use logical Tailwind utilities, never physical ones:**
+## Deployment
 
-| Use | Not |
-|---|---|
-| `ms-*` `me-*` | `ml-*` `mr-*` |
-| `ps-*` `pe-*` | `pl-*` `pr-*` |
-| `text-start` `text-end` | `text-left` `text-right` |
-| `start-*` `end-*` | `left-*` `right-*` |
-| `border-s` `border-e` | `border-l` `border-r` |
-
-Logical utilities flip automatically from `<html dir>`, so Arabic needs no
-`rtl:` variants. A physical utility is a layout bug in Arabic — check `/ar`
-before considering a screen done.
-
-Radix components get direction from `DirectionProvider` in the locale layout,
-which handles keyboard and popover behaviour that CSS alone does not.
-
----
-
-## Deployment notes
-
-Runs on a company Windows PC behind a Cloudflare Tunnel. Per
-`docs/archive/03-stack.md`:
-
-- **PostgreSQL is bound to `127.0.0.1`** in `docker-compose.yml`. Only the app
-  container and local tools reach it. Never publish it as `5432:5432`.
-- **The app is bound to `127.0.0.1` too**, since `0b815db`'s review. It used to
-  publish `3000:3000`, which binds `0.0.0.0`: the app answered on the machine's
-  Wi-Fi address, measured rather than supposed. Only the tunnel is public.
-  `cloudflared` runs on the Windows host — it is not a service in this compose
-  file — so it reaches the container over loopback and nothing is lost.
-- Both services are `restart: always`, so `docker compose up -d` once is enough.
-
-**Put Cloudflare Access in front of the tunnel, and understand what it does not
-cover.** Access is free up to 50 users and Technopanel has about fourteen. An
-employee types their work email and pastes a six-digit code Cloudflare emails
-them — no second account and no second password. Set the session duration to
-**one month**, so it is once per device per month rather than once a day.
-
-**Access protects the tunnel and NOT port 3000.** That is the whole reason the
-app is now loopback-bound, and the two facts belong together: re-publish the
-port on `0.0.0.0` and every Access policy is one LAN address away from being
-skipped. A door on the tunnel with the window open is half a door.
+One Windows PC, Docker, Cloudflare Tunnel; `cloudflared` runs on the host,
+not in compose. **Both containers are loopback-bound** (`127.0.0.1:3000`,
+`127.0.0.1:5432`) — only the tunnel is public, and Cloudflare Access
+(free ≤50 users; session duration one month) fronts the tunnel. **Access
+protects the tunnel and NOT a re-published port** — that is why loopback
+binding matters; the two facts belong together.
 
 Before real users, on the host machine:
 
-- [ ] BIOS: power on automatically after AC loss
-- [ ] Windows Update: no automatic restart
-- [ ] Docker Desktop: start on boot
-- [ ] `.wslconfig` memory cap so WSL cannot take the whole 8 GB
-- [ ] Machine on the UPS
-- [ ] Backups — the checklist under **Backups** below
-- [ ] **Confirm `cloudflared`'s ingress points at `http://localhost:3000`.** The
-      app no longer answers on the LAN address, so an ingress naming the
-      machine's IP instead of localhost stops working the moment the port is
-      loopback-bound. This is the one way that change breaks the office PC, and
-      it is a one-line check in the tunnel's own config
-- [ ] **Set `PUBLIC_URL` in `.env`** to the tunnel hostname, with `https://`.
-      `docker-compose.yml` feeds it to `AUTH_URL`, and Auth.js marks the session
-      cookie `Secure` — and prefixes it `__Secure-` — only when that URL is
-      https. Proved by measurement, not assumed: with `AUTH_URL` http the login
-      sets `authjs.session-token; HttpOnly; SameSite=Lax` and **no `Secure`**;
-      with it https the same login sets `__Secure-authjs.session-token;
-      HttpOnly; Secure; SameSite=Lax`. **Forgetting it is silent** — login
-      works, screens render, and a session token crosses a public tunnel
-      without the flag that keeps it off plain HTTP
-- [ ] **Cloudflare Access, with a test code first.** Send one to a
-      `technopanel.com` address and confirm it arrives and is not filed as spam
-      — the mail is cPanel-hosted, so this is worth knowing before fourteen
-      people depend on it
-- [ ] **Pull the plug and confirm it comes back unattended**
+- [ ] BIOS: power on after AC loss · Windows Update: no auto-restart ·
+      Docker Desktop on boot · `.wslconfig` memory cap · UPS
+- [ ] **`cloudflared` ingress points at `http://localhost:3000`** — the app
+      no longer answers on the LAN address, so an ingress naming the
+      machine's IP stops working
+- [ ] **`PUBLIC_URL` set** to the https tunnel hostname — it is what makes
+      the session cookie `Secure`, and forgetting it is **silent** (login
+      works, the token crosses the tunnel unprotected)
+- [ ] Cloudflare Access with a test code to a `technopanel.com` address
+      first (cPanel mail — confirm it is not filed as spam)
+- [ ] Backups configured (below), then **pull the plug and confirm it comes
+      back unattended**
 
 RAID is not a backup.
 
-### Backups
+## Backups
 
 ```bash
 npm run backup          # one consistent dump into BACKUP_DIR
@@ -310,123 +253,33 @@ npm run backup:verify   # restore the newest dump twice and prove it matches
 npm run restore -- <dump-file> --to <database> [--force]
 ```
 
-**The Synology NAS does not cover the database.** It already sweeps every
-company PC at file level, and that is genuinely a backup of the *files* — but
-PostgreSQL's data directory is being written while it is copied, so what reaches
-the NAS is a torn copy that may not restore. This is *"RAID is not a backup"*
-applied to the backup that already exists. `npm run backup` is the missing
-piece: one **consistent** dump, written into a folder the NAS is already
-sweeping. Nothing here replaces the NAS; it gives the NAS something restorable
-to sweep.
+The Synology NAS sweeps files, but PostgreSQL's data directory is written
+while it is copied — a torn copy that may not restore. `npm run backup`
+writes one **consistent** dump into a folder the NAS already sweeps
+(`BACKUP_DIR` in `.env`); `backup:verify` restores it twice (a scratch
+database beside the live one, and a throwaway container on an empty volume)
+and compares every table's exact row count, failing on a mismatch or on a
+comparison that read nothing. `pg_dump` runs **inside** the `db` container
+so the client always matches the server.
 
-**`pg_dump` runs inside the `db` container, deliberately.** The Windows host has
-no Postgres client tools, and a host `pg_dump` that is not exactly server 17's
-fails in ways that read like corruption rather than like a version error. Inside
-the container the client is always the server's own. `backup:verify` reads the
-image off the running container for the same reason.
+**A dump holds every row and every password hash — it is exactly as
+sensitive as the database.** The folder needs the database's access control;
+nothing prints or shell-passes `POSTGRES_PASSWORD`.
 
-**A dump holds every row and every password hash. It is exactly as sensitive as
-the database itself.** The folder it lands in needs the access control the
-database has. `BACKUP_DIR` is set in `.env` and never committed; `/backups/` is
-git-ignored; and no script here prints `POSTGRES_PASSWORD`, puts it in a
-filename, or passes it on a command line where it would land in shell history —
-the value is read from the container's own environment.
-
-**`npm run backup:verify` is what makes a dump a backup.** It restores the
-newest dump twice — into a scratch database beside the live one, and into a
-throwaway `postgres:17-alpine` on an empty volume — and compares every table's
-exact row count against the live database, printing `schema.table: N = N` for
-each, plus the migration ledger's last row on both sides. It fails on a
-mismatch, on a table present on one side only, and on a comparison that read
-nothing (0 = 0 across empty tables is green and proves nothing). It leaves the
-scratch database `facet_restore_check` behind so it can be inspected; the next
-run drops and recreates it.
-
-#### Host-side steps — these cannot be scripted from here
-
-**1. Choose the folder the NAS already sweeps.** On the office PC, find the
-directory Active Backup for Business (or the Synology Drive client) is watching.
-Make a subfolder in it for the dumps, e.g. `D:\NAS\facet-backups`.
-
-**2. Point `BACKUP_DIR` at it.** In `.env` on the office PC, uncomment and set:
-
-```
-BACKUP_DIR=D:\NAS\facet-backups
-```
-
-Nothing else changes — the same script writes to `./backups` on a laptop and to
-the NAS-swept folder here. Then run `npm run backup` once by hand and confirm a
-`facet-<date>.dump` appears in that folder, and that the NAS picks it up.
-
-**3. Schedule it nightly in Windows Task Scheduler.** Task Scheduler →
-**Create Task** (not *Create Basic Task*):
-
-- **General** → Name: `FACET nightly backup`. Select **Run whether user is
-  logged on or not**, and tick **Run with highest privileges**. The account must
-  be the one Docker Desktop runs under, or `docker` will not be found.
-- **Triggers** → New → Daily, start `02:00:00`, recur every 1 day.
-- **Actions** → New → *Start a program*:
-  - **Program/script:** `cmd.exe`
-  - **Add arguments:** `/c npm run backup >> logs\backup.log 2>&1`
-  - **Start in:** `C:\Projects\facet-crm` — the repository root. Required:
-    `docker compose` finds `docker-compose.yml` relative to it.
-- **Conditions** → untick *Start the task only if the computer is on AC power*.
-- **Settings** → tick *Run task as soon as possible after a scheduled start is
-  missed*, so a machine that was off at 02:00 still backs up.
-
-Create `logs\` first (`mkdir logs`). After the first scheduled run, check
-`logs\backup.log` says `wrote … KB, starts with PGDMP`, and check Task
-Scheduler's **Last Run Result** is `0x0`. A failed backup exits non-zero and
-Task Scheduler will show it.
-
-**4. Prove the restore on a second machine.** This is the step that makes the
-backup real, and it is the open half of `WORKFLOW.md` §4 row 43. On a *different*
-PC that has Docker Desktop and this repository:
-
-```bash
-git clone <this repo> facet-crm
-cd facet-crm
-cp .env.example .env          # then fill in POSTGRES_* — any password will do
-docker compose up -d db       # just the database, not the app
-npm install
-npm run restore -- C:\path\to\facet-2026-08-30-020000.dump --to facet_restore_check
-```
-
-Copy one real dump across from the NAS first. Then **look at these four things**
-to know it worked:
-
-- The command printed `Restored … into facet_restore_check.` and exited without
-  an error.
-- The row counts match the office PC. Run:
-  ```bash
-  docker compose exec db psql -U facet -d facet_restore_check -c "SELECT (SELECT count(*) FROM users) AS users, (SELECT count(*) FROM companies) AS companies, (SELECT count(*) FROM dispatches) AS dispatches"
-  ```
-  and compare against the same query run on the office PC against `facet`.
-- The migration ledger came across, so the restored copy can still be migrated:
-  ```bash
-  docker compose exec db psql -U facet -d facet_restore_check -c "SELECT count(*), max(created_at) FROM drizzle.__drizzle_migrations"
-  ```
-  The count must equal the number of `.sql` files in `drizzle/`.
-- A real record reads correctly, Arabic included — pick any company name:
-  ```bash
-  docker compose exec db psql -U facet -d facet_restore_check -c "SELECT name_en, name_ar FROM companies LIMIT 5"
-  ```
-
-If all four hold, the restore is proved and row 43 can be closed. Record the
-date you did it — an untested backup goes stale, so this is worth repeating
-after any Postgres major-version change.
-
----
+Host-side steps that cannot be scripted from here — choosing the NAS-swept
+folder, the Task Scheduler entry (02:00 nightly, `Run whether user is
+logged on or not`, start-in the repo root, log to `logs\backup.log`), and
+**proving the restore on a second machine** (copy a dump, `docker compose
+up -d db`, `npm run restore`, compare row counts + the migration ledger + an
+Arabic company name) — are recorded in `WORKFLOW §4` row 43; the row closes
+when the second machine has restored one.
 
 ## Known advisory
 
-`npm audit` reports a moderate esbuild advisory reached through `drizzle-kit`.
-It affects esbuild's development server only, `drizzle-kit` is a
-devDependency, and it is not present in the production image. `npm audit fix
---force` would downgrade drizzle-kit to 0.18.1, which is a breaking change.
-Left as is deliberately; revisit when drizzle-kit updates its dependency.
+`npm audit` reports a moderate esbuild advisory via `drizzle-kit` — dev-only,
+not in the production image; `npm audit fix --force` would downgrade
+drizzle-kit breakingly. Left deliberately; revisit when drizzle-kit updates.
 
-Anything in `.env` that names the site's own address — `AUTH_URL` — is right for
-the host and wrong for the container. `docker-compose.yml` overrides it from
-`PUBLIC_URL`, which is unset locally and set to the tunnel hostname in
-production.
+`AUTH_URL` in `.env` is right for the host and wrong for the container;
+`docker-compose.yml` overrides it from `PUBLIC_URL`, unset locally and set
+to the tunnel hostname in production.

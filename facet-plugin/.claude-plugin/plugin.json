@@ -1,0 +1,9 @@
+{
+  "name": "facet",
+  "description": "FACET's working discipline as a portable unit: deterministic guard hooks, the four project skills, the three mechanical agents, path-scoped rules and the status command. Chosen as a Claude Code plugin over the cross-vendor Agent Plugins 1.0 standard deliberately: that standard carries skills and MCP servers but NOT hooks, and hooks are the enforcement that makes this work.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Technopanel / FACET"
+  },
+  "repository": "https://github.com/technopanel-systems/facet-crm"
+}
