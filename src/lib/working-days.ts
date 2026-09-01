@@ -123,6 +123,20 @@ export function shiftWorkingDays(day: string, workingDays: number): string {
 }
 
 /**
+ * The working day before `day` — `D77`'s *yesterday*.
+ *
+ * On a Sunday that is Thursday, never the literal weekend: `S93` makes Friday
+ * and Saturday the weekend for everyone, and *previous working day* is the
+ * question the Yesterday band asks. Walked backwards like `shiftWorkingDays`
+ * above, and for the same reason: the shortcut is where an off-by-one lives.
+ */
+export function previousWorkingDay(day: string): string {
+  let cursor = shiftDays(day, -1);
+  while (!isWorkingDay(cursor)) cursor = shiftDays(cursor, -1);
+  return cursor;
+}
+
+/**
  * The Sunday of the week `day` falls in — the start of *this week*.
  *
  * **Derived, not chosen.** `S93` makes Friday and Saturday the weekend for

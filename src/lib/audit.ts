@@ -154,3 +154,40 @@ export async function decisionsOnDay(
     refused: Number(found?.refused ?? 0),
   };
 }
+
+/** What `D77`'s Yesterday band reads — the day's movement, whoever made it. */
+export type MovementOnDay = { approved: number; issued: number };
+
+/**
+ * The approvals and quotation issues of one **Riyadh calendar day**, across
+ * every actor — `decisionsOnDay` with the person term removed, because `D77`
+ * asks what moved yesterday, not who moved it. A refusal is not movement and
+ * is deliberately not here.
+ *
+ * Read from the audit log for `decisionsOnDay`'s own reason: a quotation
+ * issue has no column at all, and reading approvals off `approved_at` while
+ * issues come off the log would be two definitions under one heading. The
+ * window and the casts are the same as above, and the columns are written out
+ * for the same reason.
+ */
+export async function movementOnDay(day: string): Promise<MovementOnDay> {
+  const rows = (await db.execute(sql`
+    select
+      count(*) filter (where audit_log.action = 'dispatch.approved')::int
+        as approved,
+      count(*) filter (where audit_log.action = 'quotation_version.issued')::int
+        as issued
+    from audit_log
+    where audit_log.action in ('dispatch.approved', 'quotation_version.issued')
+      and audit_log.created_at
+            >= ${day}::date::timestamp at time zone 'Asia/Riyadh'
+      and audit_log.created_at
+            < (${day}::date + 1)::timestamp at time zone 'Asia/Riyadh'
+  `)) as unknown as MovementOnDay[];
+
+  const found = rows[0];
+  return {
+    approved: Number(found?.approved ?? 0),
+    issued: Number(found?.issued ?? 0),
+  };
+}

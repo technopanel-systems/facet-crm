@@ -42,7 +42,7 @@
  *
  * Diagnostic only. Nothing is written and nothing is penalised `[07 D6]`.
  */
-import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, exists, gte, inArray, isNull, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -50,8 +50,15 @@ import {
   companyReps,
   quotationThreads,
   repReports,
+  roles,
+  users,
 } from "@/db/schema";
-import { visibleCompaniesFilter, type AuthSession } from "@/lib/authz";
+import {
+  companyBookHolderFilter,
+  visibleCompaniesFilter,
+  visibleMeasuredUsersFilter,
+  type AuthSession,
+} from "@/lib/authz";
 import { ON_HOLD_OUTCOME } from "@/lib/enums";
 import { today } from "@/lib/reports";
 import { getQuietThresholds, type QuietThresholds } from "@/lib/settings";
@@ -288,6 +295,82 @@ export async function quietCountsByRep(
   // `listCompanies` treats its own. A rep with no companies has no row at all,
   // so the caller reads a missing key as zero rather than this inventing one.
   return new Map(rows.map((row) => [row.userId, Number(row.quiet)]));
+}
+
+/**
+ * `S138`'s manager count — how many of each person's held companies have
+ * **never** been contacted at all.
+ *
+ * `quietCountsByRep`'s twin over the same `companySilence` subquery, with the
+ * filter it already exposes: `lastInteractionAt` is `max(report_date)` over
+ * interactions for the company, so null IS *nobody has ever talked to this
+ * customer* — the anchor `S138` gives a company with no contact. Archived
+ * companies and merge tombstones are already outside the subquery. A missing
+ * key reads as zero, as above.
+ */
+export async function neverContactedByRep(
+  userIds: string[],
+): Promise<Map<string, number>> {
+  if (userIds.length === 0) return new Map();
+
+  const thresholds = await getQuietThresholds();
+  const silence = companySilence(thresholds);
+
+  const rows = await db
+    .select({
+      userId: companyReps.userId,
+      never: sql<number>`count(*) filter (where ${silence.lastInteractionAt} is null)`,
+    })
+    .from(companyReps)
+    .innerJoin(companies, eq(companies.id, companyReps.companyId))
+    .innerJoin(silence, eq(silence.companyId, companies.id))
+    .where(
+      and(
+        isNull(companyReps.removedAt),
+        inArray(companyReps.userId, userIds),
+      ),
+    )
+    .groupBy(companyReps.userId);
+
+  return new Map(rows.map((row) => [row.userId, Number(row.never)]));
+}
+
+/**
+ * The people *Who needs attention* reads — `D79`: the active book-holders
+ * this identity may see who hold at least one live company.
+ *
+ * `companyBookHolderFilter` is the partition (`S9`'s four holding roles, the
+ * proxy `authz` documents), `visibleMeasuredUsersFilter` is whose numbers the
+ * reader may read, and the `exists` keeps out a holder with an empty book —
+ * a coordinator holding nothing cannot have neglected anything, so a silent
+ * one is not a row. Ordered by name so ties inside one condition are stable.
+ */
+export async function attentionPeople(
+  session: AuthSession,
+): Promise<{ id: string; name: string }[]> {
+  return db
+    .select({ id: users.id, name: users.name })
+    .from(users)
+    .innerJoin(roles, eq(roles.id, users.roleId))
+    .where(
+      and(
+        eq(users.isActive, true),
+        companyBookHolderFilter(),
+        visibleMeasuredUsersFilter(session),
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(companyReps)
+            .where(
+              and(
+                eq(companyReps.userId, users.id),
+                isNull(companyReps.removedAt),
+              ),
+            ),
+        ),
+      ),
+    )
+    .orderBy(asc(users.name));
 }
 
 /* ------------------------------------------------------------------ *

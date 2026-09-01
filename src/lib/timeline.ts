@@ -1277,6 +1277,23 @@ export async function streamEvents(
   return (await filteredStream(session, filters)).events;
 }
 
+/**
+ * `D81` — has FACET ever recorded any work at all: one report, one quotation
+ * thread or one dispatch. Three `limit 1` reads at query time, stored nowhere
+ * `S108`; the moment any of the three tables holds a row, the overseer's
+ * first-run screen yields to the real blocks. Deliberately **unfiltered by
+ * viewer**: the question is about the system, and the one screen that asks it
+ * renders only for `sees_all_reps`.
+ */
+export async function systemHasWork(): Promise<boolean> {
+  const [report, thread, dispatch] = await Promise.all([
+    db.select({ one: sql`1` }).from(repReports).limit(1),
+    db.select({ one: sql`1` }).from(quotationThreads).limit(1),
+    db.select({ one: sql`1` }).from(dispatches).limit(1),
+  ]);
+  return report.length > 0 || thread.length > 0 || dispatch.length > 0;
+}
+
 /** Names for a set of actors, for a screen that groups by person. */
 export async function actorNames(
   userIds: string[],

@@ -731,3 +731,45 @@ export async function onHoldByCompany(
       .map((row) => [row.companyId, row.until]),
   );
 }
+
+/**
+ * How many reports landed on one Riyadh calendar day — `D77`'s fourth figure.
+ *
+ * `report_date` is the day the rep SAYS the work happened, which is what
+ * *yesterday's movement* means to the person reading it; the same choice the
+ * stream's day headers make. **Unfiltered by viewer**, like `movementOnDay`
+ * beside it: the band renders only for `sees_all_reps`, whose report filter
+ * is unconstrained anyway, and a count of a day's work is not anybody's note
+ * half `S38` — the note stays as private as it ever was.
+ */
+export async function reportsOnDay(day: string): Promise<number> {
+  const [row] = await db
+    .select({ logged: sql<number>`count(*)::int` })
+    .from(repReports)
+    .where(eq(repReports.reportDate, day));
+  return Number(row?.logged ?? 0);
+}
+
+/**
+ * The last day each of these people logged anything — `S141`'s question,
+ * asked per person. A field note counts: *gone silent* is about the rep
+ * typing, not about any one customer, so every `rep_reports` row is logging.
+ * Null (absent from the map) means they have never logged at all, which is
+ * the silent case at its oldest.
+ */
+export async function lastReportDayByRep(
+  userIds: string[],
+): Promise<Map<string, string>> {
+  if (userIds.length === 0) return new Map();
+
+  const rows = await db
+    .select({
+      userId: repReports.userId,
+      last: sql<string>`max(${repReports.reportDate})`,
+    })
+    .from(repReports)
+    .where(inArray(repReports.userId, userIds))
+    .groupBy(repReports.userId);
+
+  return new Map(rows.map((row) => [row.userId, row.last]));
+}

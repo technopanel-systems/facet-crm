@@ -41,6 +41,7 @@ import {
   isNotNull,
   isNull,
   ne,
+  not,
   sql,
   sum,
   type SQL,
@@ -819,6 +820,88 @@ export async function listProjects(
     page,
     foreignOwnerCount: totals?.foreignOwners ?? 0,
   };
+}
+
+/** One of `D80`'s rows — a deal still in play, and how big it claims to be. */
+export type BigDeal = {
+  id: string;
+  name: string;
+  ownerName: string;
+  sqmExpected: string;
+  /** `YYYY-MM-DD` — `projectMovement`, `/projects`' own clock `D26`. */
+  lastMovedOn: string;
+  /** `S132`'s position, short of Won by construction. */
+  position: ChainColumn;
+  liveThreads: number;
+};
+
+/**
+ * `D80` — **the biggest open deals by expected size, top five and never a
+ * threshold** (the founder's answer 4: the real spread runs 3,100 down to
+ * 2,400 m², so any fixed line would show all or none).
+ *
+ * *Open* is `S132`'s chain short of Won: not lost (`projectScopeWhere`'s
+ * `onBoard`, the board's own term for the same exclusion `D29`) and no
+ * approved dispatch (`projectIsWon`, negated **in SQL, before the LIMIT** —
+ * filtering a fetched five would silently show four, which is `CLAUDE.md`'s
+ * pagination trap). A project with no expected size cannot be ranked by it
+ * and is not a row `S29`.
+ *
+ * The position comes from `chainByProject`, the one ladder `D27`; the won map
+ * is empty because a won project cannot reach this query at all.
+ */
+export async function biggestOpenDeals(
+  session: AuthSession,
+  limit = 5,
+): Promise<BigDeal[]> {
+  const moved = projectMovement();
+
+  const found = await db
+    .select({
+      id: projects.id,
+      name: projects.name,
+      ownerName: users.name,
+      sqmExpected: projects.sqmExpected,
+      lastMovedOn: moved.at,
+      readyToShip: projectHasSubmittedDispatch(),
+    })
+    .from(projects)
+    .innerJoin(users, eq(projects.ownerUserId, users.id))
+    .leftJoin(moved.threadEvents, eq(moved.threadEvents.projectId, projects.id))
+    .leftJoin(
+      moved.dispatchEvents,
+      eq(moved.dispatchEvents.projectId, projects.id),
+    )
+    .where(
+      and(
+        projectScopeWhere(session, { onBoard: true }),
+        isNotNull(projects.sqmExpected),
+        not(projectIsWon()),
+      ),
+    )
+    .orderBy(desc(projects.sqmExpected), asc(moved.at))
+    .limit(limit);
+
+  const chain = await chainByProject(
+    found.map((row) => row.id),
+    new Map(),
+    new Map(found.map((row) => [row.id, row.readyToShip])),
+  );
+
+  return found.map((row) => {
+    const position = chain.get(row.id);
+    return {
+      id: row.id,
+      name: row.name,
+      ownerName: row.ownerName,
+      // `isNotNull` above makes the null unreachable; the fallback satisfies
+      // the type without inventing a figure a reader could see.
+      sqmExpected: row.sqmExpected ?? "0",
+      lastMovedOn: row.lastMovedOn,
+      position: position?.position ?? "new",
+      liveThreads: position?.liveThreads ?? 0,
+    };
+  });
 }
 
 /** One card on the board `D29`. */

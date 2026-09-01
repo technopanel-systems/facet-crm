@@ -1201,11 +1201,53 @@
       "tickNote": "The tick is today's pace.",
       "notAFormula": "Activity and target sit side by side. That is a conversation, not a formula."
     },
-    "bottleneck": {
-      "title": "Waiting on the coordinator",
-      "quotations": "To issue",
-      "dispatches": "To decide",
-      "note": "Both chains run through one person."
+    "tabs": {
+      "today": "Today",
+      "team": "Team"
+    },
+    "yesterday": {
+      "title": "Yesterday",
+      "subtitle": "previous working day",
+      "saturday": "Saturday",
+      "dispatched": "Dispatched",
+      "approvals": "Approvals",
+      "issued": "Issued",
+      "reports": "Reports"
+    },
+    "stuck": {
+      "title": "Stuck",
+      "coordinator": "With the coordinator",
+      "counts": "{issue} to issue · {dispatch, plural, one {# dispatch request} other {# dispatch requests}}",
+      "oldest": "oldest {count, plural, one {# day} other {# days}}",
+      "clear": "The bottleneck is clear.",
+      "untouched": "Untouched too long",
+      "untouchedBreakdown": "{companies, plural, one {# company} other {# companies}} · {projects, plural, one {# project} other {# projects}} · {quotations, plural, one {# quotation} other {# quotations}}",
+      "untouchedNone": "Nothing has been sitting long enough to count."
+    },
+    "attention": {
+      "title": "Who needs attention",
+      "silent": "nothing logged in {count, plural, one {# day} other {# days}}",
+      "silentNever": "nothing ever logged",
+      "behind": "behind pace by {sqm} m² — {pct}% against {expected}%",
+      "never": "{count, plural, one {# company} other {# companies}} added and never contacted",
+      "open": "Open",
+      "more": "and {count} more"
+    },
+    "deals": {
+      "title": "Big deals in play",
+      "expected": "{sqm} m² expected",
+      "sitting": "{count, plural, one {# day} other {# days}}"
+    },
+    "teamEmpty": "Nobody carries a target this month — set one on Targets.",
+    "firstRun": {
+      "title": "Nothing here yet",
+      "lede": "This screen fills itself from real work — companies, interactions, quotations, dispatches. Nothing has been recorded yet, so there is nothing to measure. Here is where to start.",
+      "companies": "Add your companies",
+      "companiesNote": "Every visit, quotation and dispatch hangs on one.",
+      "log": "Log the first interaction",
+      "logNote": "Everything in FACET is downstream of a rep recording something.",
+      "target": "Set the month's target",
+      "targetNote": "The pace bar has nothing to measure against until one exists."
     }
   }
 }
