@@ -171,7 +171,7 @@ shaped like `<namespace>.<key>` — that asserts no lookup silently failed.
 exactly the wrapping defects a laptop shows.
 
 **A check can be wrong in the direction that matters, and this has happened
-fourteen times.** Four shapes. **A wrong assertion:** `§17` once asserted the
+fifteen times.** Four shapes. **A wrong assertion:** `§17` once asserted the
 *inverse* of `D20` on its own markers, so it went green over the thing the rule
 forbids. **An assertion that reads nothing:** four page-one reads with no total
 guard, three of them negatives, all correct only because the fixture rows
@@ -188,7 +188,13 @@ tile's number with a regex coupled to the block's exact markup, and session
 47's legitimate move of `dir` onto an inline span inside that block read as
 `tile NaN` on a right screen — caught in-slice, never committed red, and the
 lesson stands anyway: **a check that parses a figure out of markup owns every
-shape that figure may legally take**, and prints what it failed to parse. A wrong red burns the suite's
+shape that figure may legally take**, and prints what it failed to parse. **The
+fifteenth was that same lesson, one session later, in its purest form**:
+`verify:routes` §26 asserted a **verbatim class string** —
+`'<span class="num text-faint text-xs font-semibold" dir="auto">'` — for a
+claim that was only ever about the `dir`, and `D12`'s 12.5px floor turned it red
+in both locales on a screen that was right. Markup is not a marker: assert on
+the `data-slot`, and let the class be free to change. A wrong red burns the suite's
 credibility exactly as a false green does, and it is the shape that gets a
 correct screen "fixed": `S45-1` opened with a founder decision to rewrite
 working code. **And the fourth — a check whose two sides come from ONE
@@ -297,6 +303,25 @@ it inserts the row it then watches disappear.
   worse address, because it cannot be audited or read back; so a session that
   says it recorded something **names the file it wrote to**, and *"recorded
   it"* is not a location.
+- **That bans third-party frameworks, not Claude Code's own subagents.** The
+  ban is about `claude-flow`, installed twice, removed twice, and leaving a
+  memory store outside `git` that loaded into every session for twenty of
+  them. Subagents are a tool this project has already used well: session 46's
+  twelve-agent pass over 162 `dir` occurrences found the thirteen live sites
+  and caught a stale path in the register.
+- **Split mechanical work; never split the reading.** Work that is parallel,
+  verifiable and mechanical — grep classification, a file-by-file conformance
+  sweep, re-capturing shots, counting a token's consumers — goes to subagents
+  on a cheaper model. Judgment, and anything needing a WIDE read, stays with
+  the session's own model. Every real defect here came from reading widely and
+  noticing a contradiction: the UTC clock behind three failing suites, the
+  `dir="ltr"` inversion, `D15`'s six-uses-that-are-two, the memory store found
+  in a phrase. Split that reading across workers and whoever holds the easy
+  slice cannot see the pattern — tokens saved, findings lost.
+- **A subagent reports what it FOUND, never what it concluded.** The parent
+  decides.
+- **Do not orchestrate a small slice.** Coordination costs more than it saves
+  below roughly a whole-tree sweep.
 
 ## Stack
 

@@ -337,9 +337,10 @@ export default async function ProjectDetailPage({
               <RecordRow
                 key={row.id}
                 href={`/quotations/${row.id}`}
-                // `D26`'s lead cell for a quotation is an avatar and whose move
-                // it is. The avatar is decorative; the name is in the meta line
-                // where a screen reader reaches it.
+                // `D26`'s lead cell for a quotation is the days waited, with the
+                // avatar only when the move is the rep's. The avatar is
+                // decorative; the name is in the meta line where a screen
+                // reader reaches it.
                 mark={
                   <span
                     aria-hidden

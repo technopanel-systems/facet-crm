@@ -185,7 +185,7 @@ export async function ProjectBoardView({
                       {card.companyName ? (
                         <p
                           title={card.companyName}
-                          className="text-muted-foreground mt-0.5 truncate text-[11.5px]"
+                          className="text-muted-foreground mt-0.5 truncate text-[12.5px]"
                           dir="auto"
                         >
                           {card.companyName}
@@ -197,7 +197,7 @@ export async function ProjectBoardView({
                             absent rather than zero when there is none `D70`. */}
                         {card.sqmExpected ? (
                           <span
-                            className="num text-[11.5px] font-semibold"
+                            className="num text-[12.5px] font-semibold"
                             dir="auto"
                           >
                             {formatSqm(card.sqmExpected)} {t("common.sqm")}
@@ -211,7 +211,7 @@ export async function ProjectBoardView({
                         {card.liveThreads > 1 ? (
                           <span
                             data-slot="board-threads"
-                            className="text-tone-amber-fg text-[11px] font-semibold"
+                            className="text-tone-amber-fg text-[12.5px] font-semibold"
                           >
                             {t("projects.board.threads", {
                               count: card.liveThreads,
@@ -232,7 +232,7 @@ export async function ProjectBoardView({
                       </p>
 
                       {showOwner && card.ownerUserId !== viewerUserId ? (
-                        <p className="text-faint mt-1 text-[11px]" dir="auto">
+                        <p className="text-faint mt-1 text-[12.5px]" dir="auto">
                           {card.ownerName}
                         </p>
                       ) : null}

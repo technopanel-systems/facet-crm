@@ -135,7 +135,7 @@ export async function WaitingList({
         aria-label={t("followUps.actions.planFor")}
         // `D74` on `D55`'s own phone-first screen — this was `h-7` at 11.5px,
         // a 28px target under the 16px iOS zooms below. The laptop keeps both.
-        className="border-line bg-surface-2 num rounded-[10px] border px-2 max-md:min-h-11 max-md:text-base h-7 text-[11.5px]"
+        className="border-line bg-surface-2 num rounded-[10px] border px-2 max-md:min-h-11 max-md:text-base h-7 text-[12.5px]"
       />
       <Button type="submit" size="xs" variant="outline">
         {t("followUps.actions.plan")}

@@ -320,7 +320,7 @@ function MiniBar({
           }}
         />
       ) : null}
-      {/* A 2px bar, never a glow — `D16`'s six are spoken for. Its colour is
+      {/* A 2px bar, never a glow — `D16`'s one is spoken for. Its colour is
           chosen by side, not by outcome, so `D21` stands. */}
       <div
         data-slot="team-tick"
@@ -352,7 +352,7 @@ function WaitingBadge({
       data-slot={overdue ? "team-overdue" : "team-due-soon"}
       dir="ltr"
       className={cn(
-        "num rounded-[5px] border px-1.5 py-px text-[11px] font-semibold",
+        "num rounded-[5px] border px-1.5 py-px text-[12.5px] font-semibold",
         overdue
           ? "bg-tone-red text-tone-red-fg border-tone-red-fg/30"
           : "bg-surface-2 border-line-strong",

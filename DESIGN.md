@@ -154,10 +154,29 @@ Roboto, never a system stack.
 **D11.** **Every number is mono with tabular figures** — quantities, square
 metres, money, references, dates, counts. One utility class, `num`.
 
-**D12.** Scale: base 14px / 1.5. Page title 24px / 600 / `-.025em`. Card heading
-14px / 600. Section labels 10.5px / 600 / `.09em` / uppercase. **Nothing is
-smaller than 10.5px.** Not everything is bold; weight 600 is for names and
-headings, 500 for emphasis, 400 for everything else.
+**D12.** Scale: base 14px / 1.5, **set once on `body`** — the ground, not a
+per-component achievement; an unsized element must never render 16px. Page
+title 24px / 600 / `-.025em`, and there is ONE page-title size — `PageHeader`
+and `DetailHeader` share it. Card heading 14px / 600. Section labels 10.5px /
+600 / `.09em` / uppercase — **and that tier is for repeated structural labels
+only: a value unique to a row — a date, a name, money, a day count — never
+renders below 12.5px.** A reader must READ a value; a label is recognised by
+shape. Nothing is smaller than 10.5px, ornaments and avatars included. **And a
+size floor is not enough: no text tier renders under 4.5:1 contrast against the
+surface it sits on, in either theme.** The floor binds the TOKEN —
+`--text-faint` is the tier this catches — checked where the token is defined,
+because faint text under contrast does not read as hierarchy, it reads as a
+rendering defect: *"shadowed"* was this tier, not the glass (`A2-15`). Weight
+600 for names and headings, 500 for emphasis, 400 for everything else.
+
+**Rewritten by `§6b`'s first rule review, session 49 (`A2-3`).** The old rule
+constrained a floor and was silent about everything that mattered near it: the
+10.5–12px faint tier carried row-unique VALUES — stream day headers, bylines,
+quotation line pricing — and `--text-faint` computed **3.07:1 light / 3.66:1
+dark** on the card, under WCAG AA in both themes. That tier, not `D14`'s glass,
+is what *"text looks shadowed"* was reading; `A2-15` had already refuted the
+glass at OS pixel level. The token now measures **5.08:1 light / 4.94:1 dark**
+on the card and clears 4.5:1 on every ground it lands on.
 
 ---
 
@@ -186,27 +205,51 @@ own tokens and `[dir="rtl"]` swaps them.
 (`--line-hi`), and a deep soft shadow with an inner top light. That combination
 is the product's texture and it is used on every card, identically.
 
-**D15. The brand gradient has exactly six uses.** `--brand-grad` appears on:
-the primary button, the active rail marker, the target bar's fill, the rail
-count badge, the dispatched segment of a rollup bar, and **a row's action button
-filling on hover** `D17`. Nowhere else. Not on text, not on pills, not on
-borders. The count said five while `D17` already named the sixth
-(`WORKFLOW §5 AD11`).
+**D15. The brand gradient has exactly two uses.** `--brand-grad` on the
+primary button, and on the target bar's fill — the dashboard panel and `D39`'s
+team-table bars are the one fill, and the overage segment at reduced opacity is
+that fill continued, not a third use. Nowhere else: not on text, not on pills,
+not on borders, not on the rail. The rule named six from the concept; four
+never shipped, and every session that met one chose the quieter option at the
+screen — the active rail marker is a 5% wash, the count badge flat red — until
+the list described nothing. A new use is added by amending this rule first,
+never by citing it.
 
-**D16. Glow has exactly six uses.** `--brand-glow` on the primary button; the
-app mark; a soft ring on the pace badge; a ring on today's cell in the week
-strip; the target fill's bloom; and **the current chain dot's soft ring**
-`D27`, which already ships. Nothing else glows. A glow is emphasis, and
-everything emphasised is nothing emphasised. The count said five over a list
-that read as four or six depending on how its first item was split, and `D27`
-had been adding to it unannounced (`WORKFLOW §5 AD12`, `AD29`).
+**D16. Glow has exactly one use.** `--brand-glow` on the primary button.
+Nothing else glows: the chain dot rings `tone-amber` `D27`, the pace figure is
+plain text, and the target fill's bloom was considered at the screen and
+refused. A glow is emphasis, and everything emphasised is nothing emphasised —
+one glow means the act a screen most wants taken is the one thing that ever
+carries it. A new use is added by amending this rule first.
 
-**D17. Motion is small, fast and explains something.** A view change fades and
-rises 6px over 350ms. A count tile lifts 2px on hover. A row's action button
-fills with the brand gradient on hover. That is the complete list. No page
-transitions, no scroll reveals, no skeleton shimmer, no counting numbers, no
-bouncing. `prefers-reduced-motion` is respected and is the path that gets
-tested.
+**`D15` and `D16` rewritten together by `§6b`'s first rule review, session 49
+(`A2-22`).** Both counts were the concept's, never the product's: the gradient
+measured **two** consumers against six, the glow **one** against six. Every
+divergence was a session choosing the quieter option at the screen and saying
+so in a comment — the bloom was refused in writing — which is evidence about
+what the design wants. `D8`'s list-form discipline only works with honest
+lists.
+
+**D17. FACET is still.** No page transitions, no view fades, no scroll
+reveals, no skeleton shimmer, no counting numbers, no hover lifts — stillness
+is the work tool's temperament `D1`, and it was chosen at the screen: every
+session that could have added motion did not, and nobody has missed it. What
+may move: **colour and brightness over a short transition** on interactive
+controls, and the **one-pixel press-down** on an active button — feedback that
+a press landed, never decoration. A card's hover shadow swaps states without a
+transition `D8` `D14`. That is the complete list, and `D21`'s last clause holds
+anything beyond it to this rule. With no motion larger than a pixel there is
+nothing for `prefers-reduced-motion` to gate — the design is its own
+reduced-motion path. `D19`'s `prefers-reduced-transparency` handling is
+separate, real, and stays.
+
+**Rewritten by `§6b`'s first rule review, session 49 (`A2-23`) — the
+deviates-GOOD case.** The rule named three motions that never existed, written
+from the v5 concept before anything was built: zero `@keyframes` in `src`, zero
+`prefers-reduced-motion` rules in the compiled stylesheet, and four audits in
+nobody had missed them. `button.tsx` was already citing `D17` to REFUSE a hover
+translate while shipping a press translate the rule did not name. A rule
+describing the drawing rather than the product is a fossil `§6b`.
 
 **D18.** *Deleted.* It gave the opposite instruction to `D19` for the same
 breakpoint — fall back with no filter, against reduce the radius — and `D19`
@@ -407,10 +450,21 @@ lead cell.
 | Object | Lead cell | The question it answers |
 |---|---|---|
 | **Company** | a **silence meter** — a small bar and a day count, coloured by lateness | have I neglected this? |
-| **Project** | a **six-dot mini-chain** showing chain position, plus a quoted-vs-dispatched bar | where is this? |
-| **Quotation** | an **avatar and whose move it is** — "Rawan · signatures", "You · confirm payment" | who does this wait on? |
+| **Project** | **days since it last moved**, mono, red once `S89` calls it stale | is this stuck? |
+| **Quotation** | the days waited, with the rep's avatar **when the move is theirs** — the `D25` pile header names the move, so the row never repeats it | who does this wait on, and how long? |
 | **Dispatch** | the square metres, mono, large | how much went out? A **draft** owes the rep who raised it (S125); a **submitted request** owes the coordinator (S72); an **approved**, **refused** (S122) or **cancelled** (S73) dispatch owes nobody. |
-| **Contact** | name and position | who is this? |
+| **Contact** | the name | who is this? |
+
+The first writing of this table promised a six-dot mini-chain and a
+quoted-vs-dispatched bar for projects, and a named coordinator for quotations.
+**Three slices met those clauses and each declined them for a reason that
+held**: `S68` refuses the bar's numerator, no thread names one coordinator,
+`S133` deleted the act the example named. A lead cell drawn from data the model
+cannot produce is fiction; this table now states only what a row can know.
+
+**Rewritten by `§6b`'s first rule review, session 49 — the `§6b` trigger case,
+argued past three times.** The contact row loses *position*, which is its own
+column. The dispatch clause is `AD33`'s and stands unchanged below.
 
 **The dispatch clause answered for two states and the screen renders five**
 `AD33`. It named a submitted request and an approved dispatch, and had nothing
@@ -1311,12 +1365,29 @@ across nine screens in `AUDIT 2` (`A2-1`). A **raw** date string nobody
 formatted — a `yyyy-mm-dd` in a form control — is a reference, not a date, and
 keeps `dir="ltr"`.
 
+**A `dir` sits on an inline run holding one value — never on an element that
+lays anything out.** A flex or grid container carrying `dir` reorders its
+CHILDREN — the pace-bar axis read against its own bar. A block element carrying
+`dir` drags `text-align: start` to its own edge — the KPI number pinned a
+tile's width from its label. The legitimate carriers are a `<span>` or `<bdi>`
+around one figure or reference, and a form control's own value. And a
+number+unit run FACET composes — *948.3 م²* — is a WORD run under this rule's
+own test: the unit is translated text, so the run takes `dir="auto"`, never
+`dir` on the cell (`A2-12`).
+
 **The failure is silent and it changes a number.** European digits are *weak* in
 the bidi algorithm, not strong, so `auto` resolves a mixed run off its word and
 gets Arabic right. Forcing `dir="ltr"` over *figure · word · figure* reverses
 the two figures for an RTL reader: *4 of 13* renders as *13 of 4*. Nothing
 throws, nothing fails a check, and the page looks composed. Session `28b`
 shipped it.
+
+**Widened by `§6b`'s first rule review, session 49 (`A2-14`).** The
+one-question test above approved both placements that broke: the pace-bar
+legend is three bare figures, but the `dir="ltr"` sat on a flex CONTAINER; the
+KPI tile number is a bare figure, but the `dir="ltr"` sat on a BLOCK. The
+question was never wrong — it was answering about the run while the attribute
+sat on the layout.
 
 **`D62` is the same instinct about a stored value** that may hold either script;
 this is the rule for a run FACET **composes** out of a translated string and a
@@ -1357,8 +1428,19 @@ the cells.
 is entered or displayed — direction is a property of the value, not of the
 page. Since S12 and S19 a company or contact name is one field written in
 English or Arabic, so an Arabic name must read correctly on an English page.
-This is the converse of the `dir="ltr"` rule, which only ever covered LTR
-content — references, decimals, dates — inside Arabic.
+**`dir="auto"` goes on the inline run holding the value — never on a block.**
+On a block it does two things at once: it resolves the block's direction from
+the value and drags `text-start` with it, so a Latin value inside an RTL card
+slams to the card's far edge, a column away from its label (`A2-14`). Wrap the
+value — `<span dir="auto">` or `<bdi>` — inside a block that keeps the page's
+direction. This is the converse of `D73`, the rule for runs FACET composes and
+for raw LTR content — references, decimals — inside Arabic.
+
+**Widened by `§6b`'s first rule review, session 49, and it closes `AD18` in the
+same breath.** The rule was right and under-specified in the one direction that
+breaks; `/notifications` was its third sighting. `AD18` filed that the last
+sentence cited *"the `dir="ltr"` rule"* which `DESIGN.md` did not then contain —
+`D73` exists now and is named.
 
 **D63.** A **repeating entry row** — quotation lines, report signals, handover
 buckets — is the one place a form is not a single column `D24`. Its fields are

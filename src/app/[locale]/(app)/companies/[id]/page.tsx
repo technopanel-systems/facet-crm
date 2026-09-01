@@ -364,9 +364,10 @@ export default async function CompanyDetailPage({
                 <RecordRow
                   key={row.id}
                   href={`/quotations/${row.id}`}
-                  // `D26`'s lead cell for a quotation is an avatar and whose
-                  // move it is. The avatar is decorative; the name is in the
-                  // meta line where a screen reader reaches it.
+                  // `D26`'s lead cell for a quotation is the days waited, with
+                  // the avatar only when the move is the rep's. The avatar is
+                  // decorative; the name is in the meta line where a screen
+                  // reader reaches it.
                   mark={
                     <span
                       aria-hidden
@@ -485,7 +486,8 @@ export default async function CompanyDetailPage({
                 // `S19` — one name field, either script, so `dir="auto"` sits
                 // on the name and not on the row `D62`.
                 title={<span dir="auto">{contact.name}</span>}
-                // `D26` asks for name and position. **Not one contact in this
+                // `D26` asks for the name; position is its own column on
+                // `/contacts`. **Not one contact in this
                 // database has a position** — nor an email — so the meta line
                 // renders whatever is actually there and NOTHING when neither
                 // is: an em dash under every contact name on every company is

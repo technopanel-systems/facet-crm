@@ -443,7 +443,15 @@ function DispatchRow({
               word. `dir="ltr"` here rendered *5 يوم* as *يوم 5* for an Arabic
               reader: digits are weak, the word is strong, and forcing LTR puts
               them the wrong way round. */}
-        <span className="num text-faint text-xs font-semibold" dir="auto">
+        {/* `data-slot` so `verify:routes` §26 can find this figure by what it
+            IS rather than by the class string it happens to carry: the check
+            matched `text-xs` verbatim and went red the moment `D12`'s 12.5px
+            floor moved the size, on a run that was correct. */}
+        <span
+          data-slot="dispatch-elapsed"
+          className="num text-faint text-[12.5px] font-semibold"
+          dir="auto"
+        >
           {t("followUps.fields.days", { count: daysSince(row.lastMovedAt) })}
         </span>
       </TableCell>

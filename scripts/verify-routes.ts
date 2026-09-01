@@ -6996,12 +6996,27 @@ async function main(): Promise<void> {
           holds(between(quotations.body, "turn", "quotation-row").slice(0, 400)),
         );
 
+        // Found by its own handle, never by its class string. This asserted a
+        // verbatim `class="num text-faint text-xs font-semibold"` and went RED
+        // on a correct screen the moment `D12`'s 12.5px floor changed the size
+        // — `CLAUDE.md`'s *a check that parses a figure out of markup owns
+        // every shape that figure may legally take*, met for the fifteenth
+        // time and caught in-slice. The `dir` is the marker `D73` is about;
+        // the size is not this check's business.
         const dispatches = await get(manager, `/${locale}/dispatches`);
-        check(
-          `${locale}: /dispatches' elapsed figure does too [D73]`,
-          dispatches.body.includes(
-            '<span class="num text-faint text-xs font-semibold" dir="auto">',
+        const elapsed = [
+          ...dispatches.body.matchAll(
+            /<span[^>]*data-slot="dispatch-elapsed"[^>]*>/g,
           ),
+        ].map((span) => span[0]);
+        check(
+          `${locale}: /dispatches' elapsed figure does too — saw ${
+            elapsed.filter(holds).length
+          } of ${elapsed.length} figure(s) resolving off their own word [D73]`,
+          elapsed.length > 0 && elapsed.every(holds),
+          elapsed.length === 0
+            ? "no data-slot=\"dispatch-elapsed\" in the page at all"
+            : `first offender: ${elapsed.find((one) => !holds(one)) ?? "none"}`,
         );
 
         // Scoped to the age cell by its own handle: the cell beside it holds a

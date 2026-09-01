@@ -21,8 +21,9 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // The primary button is `D15`'s first gradient use and `D16`'s first
-        // glow. No translate on hover — `D17`'s motion list does not name one,
+        // The primary button is one of `D15`'s two gradient uses and `D16`'s
+        // only glow. No translate on hover — `D17`'s motion list does not name
+        // one,
         // and `D21` forbids any effect it does not name.
         default:
           "bg-(image:--brand-grad) text-primary-foreground shadow-(--brand-glow) hover:brightness-110",

@@ -94,7 +94,7 @@ async function CardFooterCount({
   const t = await getTranslations();
   return (
     <div className="border-line flex items-center justify-between gap-3 border-t px-4 pt-3">
-      <span className="text-faint num text-[11.5px]" dir="ltr">
+      <span className="text-faint num text-[12.5px]" dir="ltr">
         {t("common.ofTotal", { shown, total })}
       </span>
       <Button asChild size="xs" variant="ghost">

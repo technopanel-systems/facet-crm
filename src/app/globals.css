@@ -192,7 +192,16 @@
 
   --text: #1a1614;
   --text-muted: #6b615c;
-  --text-faint: #9a908a;
+  /* `D12`'s contrast floor: no text tier renders under 4.5:1 against the
+     surface it sits on, in EITHER theme. This token was the tier that caught
+     it — measured #9a908a at 3.07:1 on the card and 2.77:1 on `--surface-2`,
+     which is what the founder was reading as *"text looks shadowed"* once
+     `A2-15` had acquitted the glass at OS pixel level. Lifted along the same
+     warm ramp `D4` to the FAINTEST value that clears the floor on every
+     ground it lands on: canvas 4.63 · card 5.08 · `--surface-2` 4.59 ·
+     `--surface-solid` 5.16. Faint under contrast does not read as hierarchy,
+     it reads as a rendering defect. */
+  --text-faint: #736c67;
 
   /* The rail is dark in BOTH themes: it recedes, it is not a surface. */
   --rail: rgba(23, 19, 17, 0.94);
@@ -203,9 +212,13 @@
 
   --brand: #c8102e;
   --brand-ink: #ffffff;
-  /* `D15` — six uses, named there and in `D17`. Nowhere else. */
+  /* `D15` — TWO uses, both named there: this button and the target bar's
+     fill. Nowhere else. The count was six until `§6b`'s first rule review
+     measured what actually consumes it (session 49). */
   --brand-grad: linear-gradient(135deg, #c8102e, #e5502f);
-  /* `D16` — six uses, named there and in `D27`. Nothing else glows. */
+  /* `D16` — ONE use, the primary button. Nothing else glows: the chain dot
+     rings `tone-amber` `D27`, and the target fill's bloom was refused at the
+     screen. Six until session 49's rule review. */
   --brand-glow:
     0 0 0 1px rgba(200, 16, 46, 0.25), 0 8px 24px -8px rgba(200, 16, 46, 0.4);
 
@@ -287,7 +300,10 @@
 
   --text: #f3eeeb;
   --text-muted: #a69d99;
-  --text-faint: #786f6b;
+  /* `D12`'s contrast floor, dark half — #786f6b measured 3.66:1 on the card
+     and 3.37:1 on `--surface-2`. Lifted to canvas 5.34 · card 4.94 ·
+     `--surface-2` 4.55 · `--surface-solid` 4.86. */
+  --text-faint: #8f8480;
 
   /* Deeper than the canvas, so the rail reads as behind the page. */
   --rail: rgba(9, 8, 7, 0.85);

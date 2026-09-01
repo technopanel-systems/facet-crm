@@ -115,16 +115,16 @@ export async function SilenceMeter({
           here read *117 يوماً* backwards on `/companies`, the one screen
           with real Arabic plurals (`A2-13`). */}
       {inline ? (
-        <span className="num text-[11px] font-semibold opacity-70" dir="auto">
+        <span className="num text-[12.5px] font-semibold opacity-70" dir="auto">
           {t("companies.silence.threshold", { count: thresholdDays })}
         </span>
       ) : daysSince === null ? (
-        <span className={cn("text-[11.5px] font-semibold", toneClass(tone))}>
+        <span className={cn("text-[12.5px] font-semibold", toneClass(tone))}>
           {t("companies.silence.never")}
         </span>
       ) : (
         <span
-          className={cn("num text-[11.5px] font-semibold", toneClass(tone))}
+          className={cn("num text-[12.5px] font-semibold", toneClass(tone))}
           dir="auto"
         >
           {t("companies.silence.days", { count: daysSince })}

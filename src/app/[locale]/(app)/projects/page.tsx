@@ -248,7 +248,7 @@ export default async function ProjectsPage({
                         <span
                           data-slot="project-moved"
                           data-stale={row.chain.stale ? "true" : "false"}
-                          className={`num text-[11.5px] font-semibold ${
+                          className={`num text-[12.5px] font-semibold ${
                             row.chain.stale ? "text-tone-red-fg" : "text-faint"
                           }`}
                           dir="auto"

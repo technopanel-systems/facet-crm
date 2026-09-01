@@ -127,7 +127,7 @@ export async function AttainmentTable({
                   rounding all three independently can gain or lose a metre, and
                   a breakdown that does not add up to the figure two columns to
                   its left is a defect nobody would think to look for. */}
-              <TableCell numeric className="text-xs">
+              <TableCell numeric className="text-[12.5px]">
                 {/* Two translated words and two figures — a WORD run `D73`, so
                     `dir="auto"` on the run; forced LTR on the CELL read the
                     pairs backwards in Arabic (`A2-12`). */}

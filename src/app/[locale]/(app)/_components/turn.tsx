@@ -69,7 +69,7 @@ export function Turn({
         // number and a translated word, so the run resolves off the word. A
         // bare figure would land on LTR through `auto` anyway: with no strong
         // character the algorithm falls back to it.
-        <span className={cn("num text-xs font-semibold", TONE[tone])} dir="auto">
+        <span className={cn("num text-[12.5px] font-semibold", TONE[tone])} dir="auto">
           {elapsed}
         </span>
       ) : null}

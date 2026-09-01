@@ -717,7 +717,7 @@ function LineRows({
 
           {/* No rate beside the amount: VAT is fixed at 15% and never
               editable `S57`, so only the figure varies. */}
-          <div className="text-muted-foreground flex flex-wrap gap-x-6 gap-y-1 text-start text-xs">
+          <div className="text-muted-foreground flex flex-wrap gap-x-6 gap-y-1 text-start text-[12.5px]">
             {line.unitPrice === null ? (
               <span>{t("dispatches.difference.unpriced")}</span>
             ) : (

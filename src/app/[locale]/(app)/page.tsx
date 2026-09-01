@@ -618,11 +618,12 @@ function SideFigure({
 /**
  * The attainment bar and `D32`'s pace tick.
  *
- * **8px, `--radius-lg` ends, `--brand-grad` fill** — `D15`'s third use, in the
- * `bg-(image:…)` form the primary button already uses. No bloom: `D16` permits
- * one on this fill and nothing requires it.
+ * **8px, `--radius-lg` ends, `--brand-grad` fill** — `D15`'s SECOND and last
+ * use, in the `bg-(image:…)` form the primary button already uses. No bloom:
+ * the refusal recorded here is now `D16` itself, which has one use and this is
+ * not it.
  *
- * **The tick is a 2px bar, never a glow** — `D16`'s six are spoken for. It
+ * **The tick is a 2px bar, never a glow** — `D16`'s one is spoken for. It
  * takes `--text` on the empty track and `--canvas` inside the fill, because one
  * colour cannot read against both a translucent inset and a saturated
  * red-orange gradient in both themes. That is one ternary off a comparison the
@@ -636,7 +637,7 @@ function SideFigure({
  * **The track's scale is the target until achievement passes it**, and then it
  * is the achievement. The solid fill runs to where the target sits; the excess
  * continues past it in the same `--brand-grad` at lower opacity. That is not a
- * seventh use of the gradient `D15` — it is the target bar's fill, continued,
+ * third use of the gradient `D15` — it is the target bar's fill, continued,
  * and the opacity step is what marks where the target was.
  *
  * **The tick divides by the same scale**, or the pace mark would drift off the

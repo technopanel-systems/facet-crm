@@ -355,6 +355,14 @@ let states = declareStates(ids);
 /** Targeted re-run: AUDIT_ONLY / AUDIT_IDENTITIES append to the manifest. */
 const only = process.env.AUDIT_ONLY?.split(",").filter(Boolean);
 const onlyWho = process.env.AUDIT_IDENTITIES?.split(",").filter(Boolean);
+/** `AUDIT_WIDTHS=1366` — a targeted re-shoot after a type or token change does
+    not need all three, and `CLAUDE.md` says read the laptop width first. */
+const onlyWidths = process.env.AUDIT_WIDTHS?.split(",").map(Number).filter(Boolean);
+if (onlyWidths?.length) {
+  const kept = WIDTHS.filter((size) => onlyWidths.includes(size.w));
+  WIDTHS.length = 0;
+  WIDTHS.push(...kept);
+}
 if (only?.length) states = states.filter((s) => only.includes(s.name));
 if (onlyWho?.length)
   states = states

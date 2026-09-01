@@ -284,7 +284,7 @@ export function RecordRow({
           )}
         </span>
         {meta ? (
-          <span className="text-muted-foreground mt-0.5 block truncate text-xs">
+          <span className="text-muted-foreground mt-0.5 block truncate text-[12.5px]">
             {meta}
           </span>
         ) : null}
@@ -299,7 +299,7 @@ export function RecordRow({
         <span
           data-when={whenData}
           className={cn(
-            "num flex-none text-[11.5px] font-semibold",
+            "num flex-none text-[12.5px] font-semibold",
             "max-md:col-start-2 max-md:row-start-2 max-md:self-center",
             whenClassName ?? "text-faint",
           )}

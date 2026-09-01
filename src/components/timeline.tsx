@@ -205,7 +205,7 @@ export async function TimelineRow({
           </Badge>
         ))}
       </span>
-      <span className="text-faint flex-none text-[11.5px]">
+      <span className="text-faint flex-none text-[12.5px]">
         {/* No `dir` on the date: the ar formatter embeds U+200F marks that
             place its segments, and `dir="ltr"` fights them — the scramble
             `98f1e2e` measured on the dispatch date. Bare is the fix `D73`. */}
@@ -263,7 +263,7 @@ async function CommentRow({
             {subject}
           </span>
         ) : null}
-        <span className="text-faint text-[11.5px]">
+        <span className="text-faint text-[12.5px]">
           {/* Bare like the row above — `dir="ltr"` scrambles the ar date. */}
           <span className="num">{day}</span>
           {event.actorName ? (
@@ -285,7 +285,7 @@ async function CommentRow({
       </p>
 
       {comment.mentions.length > 0 ? (
-        <p className="text-faint text-start text-[11.5px]">
+        <p className="text-faint text-start text-[12.5px]">
           {t("comments.taggedPeople", {
             names: comment.mentions.map((person) => person.name).join(", "),
           })}

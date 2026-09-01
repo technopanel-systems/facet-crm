@@ -177,7 +177,7 @@ function ProductLine({
             </span>
           ))}
         </p>
-        <p className="text-muted-foreground text-start text-xs" dir="ltr">
+        <p className="text-muted-foreground text-start text-[12.5px]" dir="ltr">
           <span className="num">{line.quantityPcs}</span> ×{" "}
           <span className="num">{line.widthM}</span> ×{" "}
           <span className="num">{line.lengthM}</span> ={" "}
@@ -185,7 +185,7 @@ function ProductLine({
         </p>
       </div>
 
-      <div className="text-muted-foreground flex flex-wrap gap-x-6 gap-y-1 text-start text-xs">
+      <div className="text-muted-foreground flex flex-wrap gap-x-6 gap-y-1 text-start text-[12.5px]">
         <span>
           {t("quotations.detail.unitPrice")}:{" "}
           <Money value={line.unitPrice} sar={t("common.sar")} />
@@ -294,12 +294,12 @@ function ServiceLine({
             ? service.serviceNameAr || service.serviceNameEn
             : service.serviceNameEn}
         </p>
-        <p className="text-muted-foreground text-start text-xs" dir="ltr">
+        <p className="text-muted-foreground text-start text-[12.5px]" dir="ltr">
           <span className="num">{service.quantity}</span> {t("common.sqm")}
         </p>
       </div>
 
-      <div className="text-muted-foreground flex flex-wrap gap-x-6 gap-y-1 text-start text-xs">
+      <div className="text-muted-foreground flex flex-wrap gap-x-6 gap-y-1 text-start text-[12.5px]">
         <span>
           {t("quotations.detail.unitPrice")}:{" "}
           <Money value={service.unitPrice} sar={t("common.sar")} />
