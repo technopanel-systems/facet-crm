@@ -57,9 +57,14 @@ role is configuration.
 | Executive | the CEOs — sees everything, sets targets, no operational entry |
 | Super Admin | everything, plus impersonation and system configuration |
 
-**S8. [CHANGE]** Export, delete approval and duplicate resolution are held by
-**Executive, Sales Manager and Super Admin**, and in practice the Sales Manager
-uses them. All three flags must be read by the code; today none are.
+**S8. [CHANGE]** **Export is held by Super Admin alone** — customer data
+leaving FACET is a super-admin act; a manager or CEO who needs a file asks and
+it is handed over, and widening it later is one seed line if the pilot shows
+the need (decided session 50 — narrower than both this rule's old text and the
+seed). **Delete approval and duplicate resolution are held by Executive, Sales
+Manager and Super Admin** — the founder's words: *"start with the person whose
+job it is; if the pilot shows he's not keeping up, or the decisions look
+wrong, it moves."* All three flags must be read by the code; today none are.
 
 **S9.** Marketing assigns a company to a **rep, a desk rep, marketing, or the
 coordinator**. **Marketing holds companies exactly as a rep does, and assigns
@@ -124,7 +129,12 @@ Nothing blocks the rep. True today, because nothing flags a duplicate at all
 
 **S22. [BUILD]** A suspected duplicate raises a **flag to the Sales Manager**,
 who resolves it three ways: **false duplicate** · **who continues** · **shared
-between both reps**.
+between both reps**. **Shared means access to the customer, never ownership of
+the deals** (the founder's correction, session 50): both reps hold the
+company, and each keeps his own projects and his own quotations with it — S30
+already keeps a project its owner's, and a dispatch still credits the rep
+whose project and quotation it came from (S78), split only by the credit-split
+rule itself (S80), never by the sharing.
 
 **S23. [BUILD]** **Phone is the primary matching key.** With one name field
 (S12) and a mandatory phone (S13), cross-script name matching is no longer the
@@ -301,32 +311,12 @@ quotation exists, never because someone ticked a box.
 **S37.** Outcome **on hold requires a date**. Until it passes, that company
 raises nothing.
 
-**S135. [BUILD]** **An outcome is a mark, never a position.** S35's ten are
-unordered, repeatable, and several may be true at once — a catalogue and samples
-can both be out, and **either can happen with no quotation at all**. So they are
-not piles on a board (S132) and never become one. A record carries them as
-**marks, read from the reports the rep already logged**; nothing new is asked of
-anybody (S108).
-
-**Four earn a mark**, and they are one family — *something is out with them and
-we are waiting*:
-
-- **catalogue sent** · **samples sent** · **documents sent** ·
-  **technical submitting**
-
-**Six do not, each for its own reason.** *Introduced* is true of every company
-that has a report at all, so it distinguishes nothing. *Discussed pricing* is
-what the quotation itself records — S36's argument, that a state is read from a
-real record and not from a ticked box. *No answer* is the silence meter's
-subject already (S89). *Not interested* is a signal or a loss reason (S43, S44),
-which is a vocabulary of its own. *On hold* already parks the company (S37) and
-a mark would be a second answer to a question that has one. *Other* carries
-nothing to mark.
-
-**A mark reaches a project only through a report that names that project.** S33
-makes the project optional on an interaction, so most reports name a company
-alone. Reading a project's marks through its company would put an unrelated
-project's catalogue on this project's card, and that is not done.
+**S135.** *Deleted, session 50, by founder decision — together with `D71`.*
+The outcome marks on cards (catalogue sent · samples sent · documents sent ·
+technical submitting) are not wanted; if the overseer-dashboard conversation
+(§16) later shows the gap, they return as a new rule. The reasoning about
+which outcomes could never be marks survives in git history and
+`docs/archive/28-fixation/`. The number is kept and never reused.
 
 **S38.** A report has **two halves, with different visibility**:
 
@@ -544,10 +534,12 @@ of this rule that lets a rep name one has nothing behind it yet.
 are part of the dispatch. The name-only restriction is removed. This is a
 role-level exception to **S30**, which is unchanged: a project is still visible
 only to its owner or someone explicitly shared on it, and seeing a company still
-reveals none of its projects. The coordinator sees them; she may not edit
-either. Her edit right under **S62** reaches a submitted dispatch request's own
-fields — lines, stock, shipment, payment — and never the project or contact
-records it names.
+reveals none of its projects. The coordinator sees them; she may not edit **a
+project or contact she does not own** — she holds companies like any rep (S9,
+S127), and her own records are her own to edit, which is what the code has
+always done and this sentence had not said. Her edit right under **S62**
+reaches a submitted dispatch request's own fields — lines, stock, shipment,
+payment — and never the project or contact records it names.
 
 **S77.** One quotation produces **any number of dispatches**. What was quoted
 and what was actually dispatched are **deliberately compared** — the gap is the
@@ -753,6 +745,15 @@ routes do not give the same number, and only one of them is this figure.
 This replaces coverage, the follow-up queue, the notification bell and the
 dashboard. It is one idea, and it is the heart of the system.
 
+**PARKED, session 50, by founder decision — decide at the pilot.** The
+dashboard now does much of this job (D33's tiles and D34's sections over the
+same derivations, linking into the filtered list). His words: *"Don't retire
+the one-list idea and don't build toward it. Park it, and let the first month
+of real use decide. If reps navigate fine, it's dropped."* The rules below
+stay because the anchors, states and exits they define are built and live;
+only S87's single-list destination is parked, and no session aims at it until
+the pilot rules.
+
 **S86. [BUILD]** Every company, project, quotation **and dispatch request** is
 in exactly one of three states: **moving**, **waiting on a named person**, or
 **closed with a reason**. No other state is legal. All four anchors exist now:
@@ -820,13 +821,47 @@ that ever carried work; it left with the machinery S91 deletes.
 **S93.** **Friday and Saturday are the weekend for everyone.** Saturday work is
 recorded and never required.
 
-**S94. [BUILD]** A **holiday calendar** exists. When Eid or a national holiday is
-announced it is entered as a date range and skipped.
+**S94. [BUILD]** A **calendar of non-working time** exists, in two kinds
+(widened session 50, the founder's words). **Public holidays** — Eid, national
+days — entered as a date range, affecting everyone. **Personal leave** —
+annual leave, sick leave, any absence — entered per person. Both are skipped
+by the pace bar and by the reminders: *"if a rep is off for two weeks, his
+pace bar and his reminders should know it, otherwise he comes back to a
+screen telling him he's behind and neglecting customers he couldn't have
+called."* Public affects everyone; leave affects one person; both must be
+enterable.
 
 **S95. [BUILD]** Clearing your own queue is what you get back for typing. A rep
 logs; the coordinator approves or refuses. Same list, different act. Both acts
 exist today — the rep logs, and the coordinator approves and refuses (S72).
 What does not is the single list they clear, which is S87's.
+
+**S137. [CHANGE]** **A submitted dispatch request pauses the chase on its
+quotation thread.** The no-response reminder says the customer has not
+replied; a dispatch raised against the thread IS the reply — the founder's
+words: *"they said yes. The reminder isn't a judgment call, it's just
+wrong."* While a request on the thread sits at `submitted`, the thread raises
+no quotation-chase row. **Refused or cancelled, the chase comes back. Approved,
+the quotation is won and the chase is finished, not resumed** (S31 already
+ends it). This suppresses the QUOTATION chase only — the company-quiet
+reminder (S89) asks a different question, staying in touch, and is untouched.
+**No regular-customer distinction exists** (decided in the same breath):
+pausing while processing removed the need for one; if FACET ever
+distinguishes a regular customer, it is **bought more than once, derived from
+dispatches** — never a rep-maintained flag, because *"a rep-maintained flag
+goes stale the moment someone forgets."*
+
+**S138. [BUILD]** **A company added and never contacted joins the reminder
+list.** Every S89 condition anchors to an event that happened; a company with
+no contact at all anchors to its own creation. Some days after being added
+with nothing logged — a settings row beside S89's thresholds, starting value
+`OPEN — not chosen` (14 proposed) — it joins its rep's own list. **Grouped or
+capped** so forty companies added in a day do not drown the real reminders:
+*"if dumping 40 companies puts 40 reminders on your own list, dumping stops
+being free."* **And the manager reads a per-rep never-contacted count** where
+he reads the team — *"the manager count lets you see whether it worked"* —
+its exact placement decided with the overseer-dashboard conversation (§16).
+Both halves decided session 50.
 
 ---
 
@@ -863,7 +898,9 @@ their work, so nobody mistakes it for the new rep's.
 
 **S105. [BUILD]** A rep who judges a customer has no potential **requests its
 removal, with a reason**. The manager reviews and decides: **archive** · **keep**
-· **reassign**.
+· **reassign**. **The press is a request, never an action** — nothing leaves
+the rep's list until the manager rules — **and the reason is required: "the
+reason is the point"** (decided session 50).
 
 **S106. [BUILD]** That is the same review, the same three outcomes and the same
 record as a company going quiet. The only difference is what raises it — the
@@ -939,9 +976,10 @@ migration cleared them (WORKFLOW §7).
 Comments ship. The unread-comment surfacing does not — it needs the waiting
 list (S87).
 
-**S115.** **File attachments are Super Admin only** — a logo or general image.
-Rep file uploads are a possible later addition. There is no attachment feature
-yet, so this restricts nothing today.
+**S115.** *Deleted, session 50, by founder decision.* File attachments are not
+wanted; the `attachments` table loses the rule that kept it and becomes a drop
+candidate for the next dead-structure sweep. The number is kept and never
+reused, so no citation shifts.
 
 **S123.** **Who created a record is a measure.** The normal case is the
 rep creating their own companies, contacts, projects, quotations and dispatch
@@ -1006,9 +1044,9 @@ Ordered by what unblocks what.
 
 **Blocking anything else**
 
-1. Fix the Docker build — the app does not currently build in its own container,
-   so it cannot be deployed
-2. Bulk import — fourteen people cannot hand-type the existing customer base
+1. Bulk import — fourteen people cannot hand-type the existing customer base.
+   (The Docker build was this list's first item; it was fixed before
+   WORKFLOW.md existed and this line was the claim's last survivor.)
 
 **The model changes**
 
@@ -1022,7 +1060,8 @@ Ordered by what unblocks what.
 **The big rebuild**
 
 10. The waiting list — replacing coverage, follow-ups, notifications and the
-    dashboard. This is a large deletion as much as a build
+    dashboard. This is a large deletion as much as a build. **PARKED — §12:
+    decided at the pilot, built toward by nobody until then**
 
 **Then**
 
@@ -1075,27 +1114,49 @@ before this file existed. `has_credit_terms` above was not an anomaly.
   `audit_log_actor_idx`, the last being an eleventh AUDIT 1 did not count
 
 **Examined by the sweep and deliberately kept**, because a rule still asks:
-`attachments` (S115) · `delete_requests` (S105–S107) · `duplicate_flags` and
-`non_duplicates` (S21–S23) · `companies.merged_into_id` (S21–S23) ·
-`quotation_threads.closed_at` and `closed_by_user_id` (S47) ·
-`roles.can_export`, `can_approve_delete` and `can_resolve_duplicate` (S8, and
-item 14 above) · `product_specifications` (§16). Their indexes go with them.
-**Unused was never the test — unwanted was**, and `verify:schema25` §2 now
-asserts each of them present, with its rule, so a later sweep cannot take them
-for being empty.
+`delete_requests` (S105–S107) · `duplicate_flags` and `non_duplicates`
+(S21–S23) · `companies.merged_into_id` (S21–S23) · `quotation_threads.closed_at`
+and `closed_by_user_id` (S47) · `roles.can_export`, `can_approve_delete` and
+`can_resolve_duplicate` (S8, and item 14 above). Their indexes go with them.
+**Unused was never the test — unwanted was**, and `verify:schema25` §2 asserts
+each of them present, with its rule, so a later sweep cannot take them for
+being empty.
+
+**Two left that list in session 50, the test having flipped from unused to
+unwanted:** `attachments` (S115 deleted) and `product_specifications` (§16's
+question answered — not needed, SMAC prints the quotation). Both are **drop
+candidates for the next dead-structure sweep**, and that sweep must move the
+`verify:schema25` §2 assertions that currently hold them present — a check
+asserting a table nobody wants is the check keeping it alive.
 
 ---
 
 ## 16. Open
 
-- **The quiet thresholds.** Start at 30 days qualified, 60 unqualified, stored in settings and editable by a manager rather than hardcoded. Revisit once there are three months of real data.
-- **Product specifications.** The standards-and-alloy block was designed to print
-  onto quotations, but SMAC prints the quotation. Needed at all?
+- **The quiet thresholds — half resolved, session 50.** The values ARE
+  settings rows, seeded and read at query time (the founder's belief,
+  checked and confirmed); 30/60 stay as starting values. What does not exist
+  is a screen for a manager to edit them — that half stays with `WORKFLOW §4`
+  row 37. Revisit the numbers once there are three months of real data.
 - **The performance formula.** Activity and target are shown side by side and
   never combined into one score. Nothing scores a rep.
 - **Where a rep's explanation lives when a project jumps a position** on the
   board (S134). A note, not an override — but S76 and S131 disagree about who
   may read a project's conversation, and that is settled before a note renders.
-- **What stops a moving quotation being chased** once payment leaves the
-  quotation (S133). Two follow-up conditions suppress themselves on a confirmed
-  payment today and lose their test with the column.
+- **The overseer-dashboard conversation** (session 50). What a manager and an
+  executive should actually measure and see — *"metrics, what's shown, what's
+  worth knowing"* — is deliberately unsettled; the founder wants a proper
+  conversation, and **no session builds more dashboard until it is had**.
+  D64's book-holder narrowing and D68's for-now shape stand meanwhile.
+- **Form field order** (session 50) — settled as a PROCESS, not an answer:
+  one form at a time, current order and proposed order side by side, the
+  founder corrects. Each form is its own `WORKFLOW §4` row; nothing here is
+  decided in passing.
+- **Category and lead source, a month into the pilot** (session 50). Both
+  fields stay — *"lead source especially: it's how I'd learn where business
+  actually comes from."* If they are still empty a month in, **the problem is
+  the form, not the fields** — re-raise then, against the form-order work.
+
+Closed here in session 50, recorded in `docs/archive/28-fixation/`:
+product specifications (not needed — SMAC prints the quotation) and the
+chase-suppression question (answered by S137).

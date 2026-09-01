@@ -67,8 +67,8 @@ else is a **defect**, not a flourish `D8`.
 | `--surface` + `--blur` + `--line-hi` + `--shadow`/`--shadow-lift` | the card texture, identical on every card; resting and hovered depth `D14` `D8`. It is the **`card-face glass`** utility pair in `globals.css`, worn by `Card`, `ListCard`, the board column and the stream card — the dashboard tiles stopped wearing it when `D33` became one quartered card (`A2-27`); a fifth card surface wears that pair, never its own copy |
 | `--blur` alone | the rail and the header. Nothing else `D8` `D21` — the **`glass`** utility |
 | `--surface-solid` `--surface-2-solid` `--rail-solid` | what each blurred surface becomes under `prefers-reduced-transparency` `D19`. Below 980px the blur is **reduced to 8px, never removed** `D19` |
-| `--brand-grad` | **six uses**: primary button · active rail marker · target bar fill · rail count badge · dispatched segment of a rollup bar `D15` · a row's action button filling on hover `D17` |
-| `--brand-glow` | **six uses**: primary button · app mark · the pace badge's ring · today's cell in the week strip · the target fill's bloom `D16` · the current chain dot's soft ring `D27` |
+| `--brand-grad` | **two uses** `D15`: the primary button, and the target bar's fill — the dashboard panel and `D39`'s team-table bars are the one fill, the overage segment at reduced opacity that fill continued. A new use is added by amending `D15` first, never by citing it |
+| `--brand-glow` | **one use** `D16`: the primary button. Nothing else glows — the chain dot rings `tone-amber` `D27`, the pace figure is plain text. (This table said six and six until session 50; the counts were the concept's, and session 49 rewrote both rules to the measured truth) |
 
 Motion is the closed list in `D17`, `prefers-reduced-motion` is the tested path, radius is
 `D9` — which records the code at 10/14 and deliberately did not move it — and `D21` names

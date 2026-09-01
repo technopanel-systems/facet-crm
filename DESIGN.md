@@ -542,18 +542,10 @@ carries what that costs.
 `?view=calendar`. All three read one query. "Just me" is a filter chip on the
 stream, not a separate screen.
 
-**D71. [BUILD]** **A mark is a small label on a card, never a column and never
-a colour.** `S135`'s four — catalogue sent, samples sent, documents sent,
-technical submitting — say *what is out with this customer*, and several may sit
-on one card at once. They are not a position, so they never become a column
-`D29`; and they are not a duration, so they take no colour — `D6` gives colour
-to how long something has waited and nothing else. A card with no mark shows
-nothing rather than an empty slot.
-
-**Nothing draws one yet.** `S135` is itself unbuilt, so no card carries a mark
-on any screen and this rule describes the shape one takes when it does. It was
-written beside `S132`–`S135` in the board-rules slice and landed unmarked; the
-marker is the correction, not a change of mind.
+**D71.** *Deleted, session 50, by founder decision — together with `S135`.*
+The card marks were never built and are not wanted; the shape they would have
+taken (a label, never a column, never a colour) survives in git history if
+they ever return. The number is kept and never reused.
 
 **D31.** Build order: table and stream first. Board second. Cards and calendar
 only if someone asks twice.
@@ -580,13 +572,30 @@ them after. There is **one** dashboard, and six blocks:
 |---|---|---|
 | My target and pace | a target row exists for this person | `D32` |
 | Requests waiting on me | `can_approve_quotation` or `can_dispatch` | `D65` |
-| My waiting list | always | `D33`–`D36` |
+| My waiting list | holds a company book (`S9`'s four) **[CHANGE]** | `D33` `D34` |
 | The team table | `sees_all_reps` | `D39` |
 | Waiting on the coordinator | `sees_all_reps` | `D40` |
 | Needs a decision | `can_assign` | `D41` |
 
 **The order is fixed** and does not vary by who is looking. A block that does
 not qualify is absent, not disabled and not empty `D53`.
+
+**Narrowed in session 50, by founder decision — a personal to-do list renders
+only for people who hold customers.** The waiting list, the counts strip
+`D33` and the personal greeting follow a **data condition the system already
+knows**: the identity holds a company book (`S9`'s four holding roles — rep,
+desk rep, marketing, coordinator — the `companyBookHolderFilter` partition).
+His words: *"a manager or executive CAN hold customers as a rep does — that
+stays possible and nothing should block it. But their dashboard is for
+overseeing, not for their own queue. If a manager has personal customers, he
+sees them where a rep sees them — on the Companies and Follow-ups screens —
+not on his dashboard."* An overseer's dashboard is the oversight blocks his
+flags already produce — the team table, the bottleneck card, the company
+panel. **What an overseer's dashboard should exactly show is the open
+dashboard conversation** (SPEC §16), and nothing new is built here until it
+is had. The `[CHANGE]` on the table row is this narrowing: today every
+identity renders the list, and *"132 things need you today"* greets people
+whose things they are not (`A2-8`).
 
 **The first block is the exception, in two ways.** Its condition is data rather
 than a flag — a target row exists for this person `S83`, `S84`, or, for a holder
@@ -833,14 +842,14 @@ first and `S90` gives *parked* as an exit; **that a planned row is shown in a
 section of its own, and that the act on a slipping row is called Plan**, are
 decisions this rule makes. `SPEC.md` has not been asked and does not say them.
 
-**D35. [BUILD]** **The week strip** on the narrow side: seven days, two bars
-per day — logged (red) and system events on your records (blue). Friday and
-Saturday visibly off. Nothing more; this is what stops the view becoming an
-attendance check. No component exists (`A2-24`).
+**D35.** *Deleted, session 50, by founder decision.* The week strip was
+promised, never built, and never missed through four audits — *"don't carry
+them as unbuilt debt."* If the dashboard conversation (SPEC §16) later shows
+the gap, it returns as a new rule. The number is kept and never reused.
 
-**D36. [BUILD]** **Recently** below it: the last few events with three kinds
-of mark — ✎ typed by a person, ◆ observed by the system, 💬 said between
-colleagues. No component exists (`A2-24`).
+**D36.** *Deleted, session 50, with `D35` and for the same words.* The
+Recently feed goes the same way; the stream `D45` already carries the three
+event kinds it promised. The number is kept and never reused.
 
 **D37.** Nothing on the rep's dashboard is company-wide. No team figures, no
 other reps, no executive analytics.
@@ -1022,9 +1031,21 @@ list — plus **Needs a decision** via `can_assign`. Marketing holds companies a
 a rep does `S9`, so the no-flag case is already the right screen. Short because
 nobody holds the role yet.
 
-**D68. The Executive** gets **the team table** and nothing else. No target, no
-queue, nothing to approve: the question is how the company is doing, not what is
-waiting. Short for the same reason as `D67`.
+**D68. The Executive reads how the company is doing** — the team table `D39`
+and the company target panel `D38` where a company target exists `S136` — and
+**no waiting list, no counts strip, no personal greeting**, which is exactly
+what `D64`'s book-holder narrowing produces for a non-holding overseer, so
+this needs **no role name in code**.
+
+**Rewritten in session 50, closing the `D64` conflict `A2-9`.** The old text
+("the team table and nothing else") was unsatisfiable lawfully: the only
+mechanism that could give one ROLE a different screen under `D64`'s flag
+model is a role name in code, which `CLAUDE.md` forbids — it was a sketch
+written before the flag model existed. The Executive's flags also produce
+the bottleneck card `D40`; whether that stays on his screen is part of the
+**dashboard conversation** (SPEC §16) — the founder: *"what a manager and an
+executive should actually be measuring is not settled and I want a proper
+conversation about it… don't build more dashboard until we've had it."*
 
 ---
 
@@ -1448,3 +1469,19 @@ grouped by the kind of question they ask, separated by a rule and **never by a
 section label**: a label repeated on every row is noise, not structure.
 Standard values are prefilled, so the row shows what is actually being typed. A
 computed value is never an input, and is not shown until the row exists.
+
+---
+
+## 18. Counts and dimensions
+
+**D75. [CHANGE]** **Counts and dimensions read like a person wrote them**
+(decided session 50, both halves the founder's). **Every count takes full
+CLDR plurals in both locales** — Arabic renders يوم / يومان / أيام by count,
+the shape `/companies` already ships and the rest of the product does not
+(`A2-13`); English gains its own plural forms in the same pass, so no manager
+reads *1 days*. No flat `"{count} يوم"` form survives the pass. **A dimension
+factor is trimmed for display** — *109 × 1.5 × 5.8*, never
+*109.0000 × 1.5000 × 5.8000* (`A2-16`) — while stored precision is
+untouched: a document line still reconciles against SMAC `S5`, and a computed
+m² keeps the four decimals where `S5` reads them. Display only; no stored
+value moves, and no rounding enters any figure that is summed.
