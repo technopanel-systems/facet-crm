@@ -99,10 +99,19 @@ outside Saudi Arabia has neither.
 estate, owner, consultant, station management, workshop, personal, other.
 **[BUILD]** Choosing **other requires a text field** saying what it is.
 
-**S17.** Lead source is one of: field visit, direct contact, referral,
+**S17. [CHANGE]** Lead source is one of: field visit, direct contact, referral,
 exhibition, marketing, other. **Marketing is not selectable by an ordinary rep**
 — it means the lead came from the marketing team. A company that already carries
 it keeps it when a rep edits.
+
+**Lead source is mandatory when a company is created** — decided with the
+overseer conversation (answer 10, `docs/archive/30`): *a rule change, not a
+chart decision*. A company created before the rule **may stay blank on
+edit** — the 261 existing blanks honestly record that nobody asked, and
+forcing a value at edit time would invent the very data the blank records;
+what becomes of them is a founder decision after the pilot (§16). **Once a
+company carries a source, an edit may change it but never clear it** — the
+marker is the create-side requirement, which does not exist yet.
 
 **S18.** The rep who creates a company becomes its **primary rep**
 automatically. **Primacy follows the company, not its finder**: it moves to the
@@ -118,6 +127,17 @@ and moves with the company on handover. The coordinator is the one exception,
 per **S76** — they see every contact without seeing its company, because a
 dispatch names a contact. A dispatch does not carry a contact today; the reason
 is S76's, and S76 carries its own marker.
+
+**S139. [BUILD]** A customer has **come back** when they buy again on **new
+work**: their approved dispatches span more than one project. A second
+delivery on the same job is one deal finishing, never a customer returning.
+Derived from dispatches — S85's principle — and never flagged. The Reports
+tab's coming-back figure is this rule's reader when that tab is built.
+
+**S140. [BUILD]** A **real customer** is a company with **at least one
+approved dispatch, ever** — 36 of 382 on the day this was decided. Derived,
+never flagged, and never narrowed to a recency window without the founder
+re-deciding: §16 carries the revisit, after a year of real data.
 
 ---
 
@@ -851,6 +871,14 @@ distinguishes a regular customer, it is **bought more than once, derived from
 dispatches** — never a rep-maintained flag, because *"a rep-maintained flag
 goes stale the moment someone forgets."*
 
+**S141.** A rep has **gone silent** when nothing is logged for **a number of
+days** — a settings row, `attention.silent_days`, seeded at **14** (the near
+end of the founder's *"2–3 weeks"*), read at query time like the quiet
+thresholds beside it and adjustable by super admin; the screen to edit it is
+the same missing half as every settings row (`WORKFLOW §4` row 37).
+Deliberately **not** *"this week"*, which fires on a Monday for everyone.
+*Who needs attention* (`D79`) is its reader.
+
 **S138. [BUILD]** **A company added and never contacted joins the reminder
 list.** Every S89 condition anchors to an event that happened; a company with
 no contact at all anchors to its own creation. Some days after being added
@@ -860,8 +888,9 @@ capped** so forty companies added in a day do not drown the real reminders:
 *"if dumping 40 companies puts 40 reminders on your own list, dumping stops
 being free."* **And the manager reads a per-rep never-contacted count** where
 he reads the team — *"the manager count lets you see whether it worked"* —
-its exact placement decided with the overseer-dashboard conversation (§16).
-Both halves decided session 50.
+placed by the overseer conversation (session 51, `docs/archive/30`): a *Who
+needs attention* row where the count is large (`D79`), and a Team-table
+column when that tab is built (`D39`). Both halves decided session 50.
 
 ---
 
@@ -1036,6 +1065,12 @@ is nothing on one for this rule to withhold from her — the exception is
 enforced in exactly one place, the project. A company's conversation was never
 hers, and a company has none either.
 
+**S142. [BUILD]** Whether a pipeline is **real** is read as
+**quoted-versus-delivered**, with **how long deals have been sitting** shown
+beside it — and the two are **never combined into a score**. Nothing scores
+a rep; §16's standing sentence is now citable. The Reports tab draws both
+when it is built, and `D43`'s by-rep bars gain the sitting time beside them.
+
 ---
 
 ## 15. The work this implies
@@ -1143,20 +1178,34 @@ asserting a table nobody wants is the check keeping it alive.
 - **Where a rep's explanation lives when a project jumps a position** on the
   board (S134). A note, not an override — but S76 and S131 disagree about who
   may read a project's conversation, and that is settled before a note renders.
-- **The overseer-dashboard conversation** (session 50). What a manager and an
-  executive should actually measure and see — *"metrics, what's shown, what's
-  worth knowing"* — is deliberately unsettled; the founder wants a proper
-  conversation, and **no session builds more dashboard until it is had**.
-  D64's book-holder narrowing and D68's for-now shape stand meanwhile.
+- **The 261 companies with no lead source** (session 51). S17 now requires a
+  source at creation and leaves the blanks untouched; the Reports chart will
+  show them as *not recorded* until they age out. **What becomes of them is
+  a founder decision after the pilot.**
+- **"Real customer", revisited after a year** (session 51). S140's
+  ever-definition was chosen on 36-of-382 real data; whether recency should
+  enter it is re-examined once a year of real data exists.
+- **The never-contacted attention floor** (session 51). `D79` surfaces a
+  rep's never-contacted count at a built-in floor of 10; the founder named
+  the mechanism, not the floor. Re-raise with pilot data.
 - **Form field order** (session 50) — settled as a PROCESS, not an answer:
   one form at a time, current order and proposed order side by side, the
   founder corrects. Each form is its own `WORKFLOW §4` row; nothing here is
   decided in passing.
-- **Category and lead source, a month into the pilot** (session 50). Both
-  fields stay — *"lead source especially: it's how I'd learn where business
-  actually comes from."* If they are still empty a month in, **the problem is
-  the form, not the fields** — re-raise then, against the form-order work.
+- **Category and lead source, a month into the pilot** (session 50, sharpened
+  51). Both fields stay — *"lead source especially: it's how I'd learn where
+  business actually comes from."* Lead source is now mandatory at creation
+  (S17), so the month-in check moves from *are they filled* to **do the
+  values arriving look truthful** — a mandatory field with a thin list makes
+  reps pick anything to get past it, and the chart lies differently.
+  Category is still optional; its emptiness check stands.
 
 Closed here in session 50, recorded in `docs/archive/28-fixation/`:
 product specifications (not needed — SMAC prints the quotation) and the
 chase-suppression question (answered by S137).
+
+Closed in session 51, recorded in `docs/archive/30-overseer-answers.md`:
+**the overseer-dashboard conversation.** The founder answered its twelve
+questions; the answers are S139–S142, the S17 and S138 amendments, and
+D76–D81 with the D39, D40, D44, D64 and D68 rewrites. The Today tab builds
+from them; Reports and Team are their own later sessions.

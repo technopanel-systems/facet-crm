@@ -566,19 +566,28 @@ longer one nobody reaches for.
 appears when the person's flags qualify it.** A role in FACET is a row of
 permission flags and never a name in code (CLAUDE.md), so there is no rep
 dashboard and no manager dashboard to build — there would be nothing to name
-them after. There is **one** dashboard, and six blocks:
+them after. There is **one** dashboard, its blocks grouped into tabs by
+`D76`, and these blocks:
 
 | Block | Appears when | Contents |
 |---|---|---|
 | My target and pace | a target row exists for this person | `D32` |
 | Requests waiting on me | `can_approve_quotation` or `can_dispatch` | `D65` |
 | My waiting list | holds a company book (`S9`'s four) **[CHANGE]** | `D33` `D34` |
-| The team table | `sees_all_reps` | `D39` |
-| Waiting on the coordinator | `sees_all_reps` | `D40` |
-| Needs a decision | `can_assign` | `D41` |
+| The company band — target and Yesterday | `sees_all_reps` **[BUILD]** | `D38` `D77` |
+| Stuck | `sees_all_reps` **[BUILD]** | `D78`, `D40` and `D41` inside |
+| Who needs attention | `sees_all_reps`, and someone qualifies **[BUILD]** | `D79` |
+| Big deals in play | `sees_all_reps`, and an open deal exists **[BUILD]** | `D80` |
+| The team table | `sees_all_reps` — behind the Team tab `D76` | `D39` |
 
 **The order is fixed** and does not vary by who is looking. A block that does
-not qualify is absent, not disabled and not empty `D53`.
+not qualify is absent, not disabled and not empty `D53`. **The overseer
+surface is this table's `sees_all_reps` half**, decided by the dashboard
+conversation (`docs/archive/30-overseer-answers.md`): the band, then Stuck
+full-width, then attention and big deals side by side. *Waiting on the
+coordinator* is no longer a card of its own — `D40`'s aggregate is Stuck's
+first section — and the team table moves behind the Team tab, so the count
+of blocks on the Today tab is what the drawings measured.
 
 **Narrowed in session 50, by founder decision — a personal to-do list renders
 only for people who hold customers.** The waiting list, the counts strip
@@ -613,23 +622,25 @@ case** rather than a design of their own, and `D38`–`D41` are what a flag adds
 This is also what gives Marketing `D67` and the Executive `D68` a sensible
 screen without anyone designing one.
 
-All five flags named above are columns on `roles` today. **Five of the six
-blocks are built** — *My target and pace*, to `D32` entire, including the pace
-tick, both side figures and the overage segment, **and since `25b` at company
+All flags named above are columns on `roles` today. **The book-holder half is
+built** — *My target and pace*, to `D32` entire, including the pace tick,
+both side figures and the overage segment, **and since `25b` at company
 scope for `sees_all_reps` `D38` `S136`**; *Requests waiting on me*, to `D65`
 **entire since `25c`**, its two columns and the day count beneath them; *My
-waiting list*, to `D33` and `D34`; **the team table, to `D39` entire**; and
-**Waiting on the coordinator, to `D40`**. The notifications list that stood
-under `D65`'s heading is gone: it was news `S92`, not work, and on a rep's
-screen it was twenty-five rows of it.
+waiting list*, to `D33` and `D34`. The notifications list that stood under
+`D65`'s heading is gone: it was news `S92`, not work, and on a rep's screen
+it was twenty-five rows of it. **The overseer half carries the `[BUILD]`
+markers above** — today a manager still gets the old shape (his own waiting
+list and counts strip among them, which the narrowing below ends), the team
+table renders on the page rather than behind a tab, and `D40` is a card of
+its own.
 
-**The one that is not built is `D41`, and it waits on two build paths rather
-than on a decision.** A manager gets the target, the waiting list, the team table
-and the bottleneck card today. *Needs a decision* is still to come because both
-objects it names — a duplicate flag `S22` and an archive request `S105` — have no
-writer, no reader and no rows: `S21` says nothing flags a duplicate and `S106`
-says the rep's request is the missing half. `AD4` closed the founder question
-about what a manager decides; what remains is code nobody has written, carried by
+**`D41` waits on two build paths rather than on a decision, and inside Stuck
+it stays absent** — not zero, not explained. Both objects it names — a
+duplicate flag `S22` and an archive request `S105` — have no writer, no
+reader and no rows: `S21` says nothing flags a duplicate and `S106` says the
+rep's request is the missing half. `AD4` closed the founder question about
+what a manager decides; what remains is code nobody has written, carried by
 `WORKFLOW §4 25e`.
 
 **The team table is where the first block's condition is read across people
@@ -878,22 +889,25 @@ cannot name is the confusion `25a` surfaced rather than a rule satisfied. With n
 company target set, the block is **absent** `D32` `D53`, and a holder's own target
 row is not read here: `S136` says they carry none.
 
-**D39. The team table**: one row per rep — a small pace bar with the tick, m²
-dispatched of target, waiting-on-them as two counts (overdue in red, due soon
-plain), logged this week, quiet companies. **The footer says what the table is
-for and is not**: *"Saad logged the most and dispatched the least. That is a
-conversation, not a formula."* Activity and target sit side by side and are
-never combined into a score.
+**D39. [CHANGE] The team table**: one row per rep — a small pace bar with the
+tick, m² dispatched of target, waiting-on-them as two counts (overdue in red,
+due soon plain), logged this week, quiet companies. **The footer says what the
+table is for and is not**: *"Saad logged the most and dispatched the least.
+That is a conversation, not a formula."* Activity and target sit side by side
+and are never combined into a score.
 
-**Which reps are rows: everyone `D64`'s first block would render for, read
-wider.** An active user this identity may read who has a **target row for the
-period** — which is `D64`'s own condition rather than a new predicate, and is
-`D38`'s shape applied per person. **A rep with no target this month does not
-appear at all**: `D32` already says someone unmeasured has no target to be ahead
-or behind of, and two of the five columns have no denominator without one, so a
-blank pace bar would be the empty shell that rule forbids. `S83` makes targets
-independent of role, so a manager who carries one appears in his own table —
-that is the rule behaving correctly and is not special-cased.
+**Which reps are rows: every active book-holder this identity may read who
+holds at least one live company or carries a target row for the period** —
+the founder's answer 12 (`docs/archive/30`): *a rep with no target appears,
+with all his real figures and a dash where the target and pace bar would
+be.* The only difference between a rep with a target and one without is
+whether achievement can be measured against anything; everything else he
+does still happens and management still needs to see it — Majed holding 14
+companies unseen is what the old row set caused. `S83` still makes targets
+independent of role, so anyone carrying a target row appears whatever they
+hold. **The marker is the dash rows**: today the table renders only the
+targeted, and the change ships with the Team tab session, which is where
+the table now lives (`D76`).
 
 **The two counts are the split the waiting list already draws** — overdue is a
 row that has been waiting more than a day and due-soon is a date the rep set for
@@ -927,11 +941,13 @@ nobody would otherwise read.
 figure, and a second way to reach one set of records is worse than reusing the
 first.
 
-**D40. "Waiting on the coordinator"** — the bottleneck card, because the
+**D40. [CHANGE] "With the coordinator"** — the bottleneck reading, because the
 coordinator is one person and **both chains run through her**: the quotation
-chain, and since `S72` and `S124` the dispatch chain too. It is a block on
+chain, and since `S72` and `S124` the dispatch chain too. It is on
 `sees_all_reps` `D64`, the same flag as the team table — a manager watching one
-person's queue is the same act as watching the team's.
+person's queue is the same act as watching the team's. **It renders as the
+first section of Stuck (`D78`), not as a card of its own** — that move is
+the marker; today it is still its own card.
 
 **It is the aggregate and not the list**, which this rule did not say: the
 identity it appears for holds neither `can_approve_quotation` nor `can_dispatch`,
@@ -946,13 +962,16 @@ is clear* is what a watcher came to read.
 and deliberately **not** the `coordinator` pile `/quotations` groups by, which
 also holds `readyToShip` and would count one request once in each tile.
 
-**Neither tile carries an age, and that is a refusal rather than an omission.**
+**One age renders under the two counts — *oldest N days* — and it is the
+dispatch pile's clock alone, stated here so nobody reads it as both piles'.**
 The two piles have no comparable clock: `quotation_versions` has no `issued_at`,
 so the issuing side could offer only the thread's own age — *how old the deal
 is, not how long this position has been owed* — where `submitted_at` is a true
-wait, and two figures meaning two things under one heading is worse than
-neither. The clock that would answer properly is `follow-ups.ts`'s, which is the
-second ladder `D27` pins to one file.
+wait. So the line reads the **oldest submitted dispatch request**, the one
+figure that honestly means *how long the coordinator has owed something*, and
+the issuing pile still offers none: two figures meaning two things under one
+heading is worse than one that says what it is. With no submitted request the
+line is absent.
 
 **Each tile is suppressed where the reader holds that chain's own flag** —
 `D65`'s *each column follows its own flag*, read from the other side. A holder of
@@ -1031,21 +1050,112 @@ list — plus **Needs a decision** via `can_assign`. Marketing holds companies a
 a rep does `S9`, so the no-flag case is already the right screen. Short because
 nobody holds the role yet.
 
-**D68. The Executive reads how the company is doing** — the team table `D39`
-and the company target panel `D38` where a company target exists `S136` — and
-**no waiting list, no counts strip, no personal greeting**, which is exactly
-what `D64`'s book-holder narrowing produces for a non-holding overseer, so
-this needs **no role name in code**.
+**D68. The Executive reads how the company is doing** — the overseer surface
+exactly as `sees_all_reps` produces it: the Today tab's band, Stuck,
+attention and big deals (`D64`), the Team tab (`D76`, `D39`) — and **no
+waiting list, no counts strip, no personal greeting**, which is exactly what
+`D64`'s book-holder narrowing produces for a non-holding overseer, so this
+needs **no role name in code**.
 
-**Rewritten in session 50, closing the `D64` conflict `A2-9`.** The old text
+**Rewritten in session 50, closing the `D64` conflict `A2-9`; settled in
+session 51 by the dashboard conversation** (`docs/archive/30`). The old text
 ("the team table and nothing else") was unsatisfiable lawfully: the only
 mechanism that could give one ROLE a different screen under `D64`'s flag
 model is a role name in code, which `CLAUDE.md` forbids — it was a sketch
-written before the flag model existed. The Executive's flags also produce
-the bottleneck card `D40`; whether that stays on his screen is part of the
-**dashboard conversation** (SPEC §16) — the founder: *"what a manager and an
-executive should actually be measuring is not settled and I want a proper
-conversation about it… don't build more dashboard until we've had it."*
+written before the flag model existed. The bottleneck question is answered:
+`D40`'s aggregate lives inside Stuck (`D78`) and the Executive reads it
+there.
+
+**D76. [BUILD] The dashboard's blocks group into tabs — Today · Reports ·
+Team — and the strip renders only when more than one group qualifies.** A
+tab is a group of `D64`'s flag-qualified blocks, never a route of its own:
+the strip is URL state (`?tab=`) on the one dashboard, plain GET links, no
+script (`D20`, `D28`'s instinct). *Today* holds the day's blocks and
+qualifies for everyone — so **a rep sees no strip at all**, a strip of one
+being noise, **and the coordinator sees none either**: her day is the queue,
+not the trend. *Team* holds the team table (`D39`) and qualifies on
+`sees_all_reps`. *Reports* is the weekly study and **carries no pill until
+that tab is built** — `D51`: a control that does nothing is worse than no
+control; the pill joins in the slice that builds it. **Targets stays in the
+rail until the Team tab absorbs it** (`28b`'s precedent — moving the rail
+item first hides attainment from everyone who could reach it); the slice
+that ships Team takes the rail item and amends `D49`.
+
+**D77. [BUILD] Yesterday — the previous working day's movement, beside the
+company target in one band.** Four figures: dispatched m², approvals,
+quotations issued, reports logged — a sum and three counts over the previous
+working day (`S93`'s week, so on a Sunday that is Thursday). **Plus
+Saturday, only when something happened**: Saturday is not a working day and
+nobody is expected to work it, but reps outside Riyadh or working from home
+sometimes do, and that work must show — a Saturday section renders exactly
+when one of its figures is non-zero, and **an empty Saturday section never
+renders** (the founder's answer 7). Friday never renders a section; the
+answer named Saturday alone. The band is one card: the company target panel
+`D38` at the inline start, Yesterday at the inline end; with no company
+target for the month the target half is absent (`D32` `D53`) and Yesterday
+takes the row alone — the two zeros of a quiet day are readings, not empty
+shells. Approvals and issues are read from the audit log — a refusal and an
+issue have no columns (`D65`'s reasoning) — and dispatched m² is **the same
+derivation as the month figure beside it, over one day**, so the band cannot
+disagree with itself.
+
+**D78. [BUILD] Stuck — one full-width block: the things sitting that should
+be moving.** Three sections, in order. **With the coordinator** — `D40`'s
+two counts with its *oldest N days* line; at zero it reads *the bottleneck
+is clear*, which is what a watcher came to read. **Needs a decision** —
+`D41`'s two counts, **absent until its writers exist** (`D41`, `D70`) — and
+no sentence explains the absence: product copy never names unbuilt
+machinery. **Untouched too long** — one figure, **always with its breakdown
+beneath it**: N companies · N projects · N quotations (the founder's answer
+9 — *191 alone is not actionable; 102 stalled projects and 66 quiet
+companies are different jobs chased differently*). The figure reads the same
+follow-up ladder the waiting list reads (`S89`, one ladder): the companies
+count holds the company-quiet kinds, the quotations count the quotation
+kinds, the projects count the stage-unchanged kind; `date_due` is a rep's
+own plan, not something stuck, and is not counted. At zero the section
+renders one line — *nothing has been sitting long enough to count* — rather
+than a large zero. The block itself renders whenever `sees_all_reps` does.
+
+**D79. [BUILD] Who needs attention — the people a manager should ask about
+today, at most six rows.** A row is a person, a one-line reason, and the way
+in — **Open**, the person's own stream (`/activity?who=`), the one door
+every `sees_all_reps` holder may open; `/users/[id]` is `can_manage_users`'
+door and an executive does not hold it. Three conditions, each derived
+(`S108`), over the active book-holders the reader may see who hold at least
+one live company: **gone silent** — nothing logged in `attention.silent_days`
+(`S141`); **behind pace** — a target row this month with achievement short
+of the pace expectation, `D32`'s own derivation per person; **never
+contacted** — `S138`'s per-rep count, surfaced at a floor of 10 (a constant;
+the founder named the mechanism, not the floor — SPEC §16). A person may
+appear once per condition — two problems are two rows. Rows order silent
+first (longest first), then behind (largest gap first), then never (largest
+count first); the block caps at six with *and N more* as plain text, so it
+cannot push the page down without limit, and **when nobody qualifies the
+block is absent** (`D70`).
+
+**D80. [BUILD] Big deals in play — the biggest five open deals by expected
+size.** The founder's answer 4: the top five, never a threshold — the real
+spread runs 3,100 down to 2,400 m², so any fixed line would show all or
+none. A deal is a live project: not lost, its position short of Won
+(`S132`), carrying an expected size (`S29`). Each row: the project's name
+(`dir="auto"`, `D62`), its position as a plain pill (`S132`'s name, `D6` —
+no colour), and one line beneath — expected m², **how long it has been
+sitting** (days since the project last moved, `/projects`' own clock `D26`),
+and its owner. Five rows or fewer; **with no open deal the block is absent**
+(`D70`). Expected m² renders per deal and is never summed across them —
+a sum of forecasts reads as a pipeline value, which is the thing `S68`
+exists to stop being invented.
+
+**D81. [BUILD] The first-run screen — while the system has never recorded
+any work, the overseer's Today says what to do first instead of a row of
+zeros.** The condition is three empty tables, read at query time: no report,
+no quotation thread and no dispatch has ever existed. Zeros on day one look
+broken to a rep who has never seen it working, and first impressions decide
+whether they use it (the founder's answer 11). The screen names the first
+moves — add companies, log the first interaction, set the month's target —
+each with its way in. The moment any of the three tables holds a row, the
+real blocks take over; nothing is stored and no flag is set (`S108` — the
+system already knows).
 
 ---
 
@@ -1065,9 +1175,14 @@ Whether a figure stands in its place, and what the rollup measures instead, is
 **D43. Quoted vs dispatched, by rep** — a two-segment bar per rep, red for
 dispatched, grey for the gap. Sliced by rep as the first cut, per the founder.
 
-**D44. Where the gap went** — loss reasons ranked as horizontal bars, with the
-square metres lost to each. And one line under it, which is the whole point of
-the signal system: *"7 of 9 losses had the same reason logged as a signal before
+**D44. [BUILD] Where the gap went** — loss reasons ranked as horizontal bars
+**by how often each reason comes up, with the square metres lost to each
+printed beside it**. The founder's answer 8 (`docs/archive/30`): *one big
+deal lost on price is bad luck; five lost on lead time is a problem* — and
+on real data the two rankings disagree, price leading by metres from one
+deal while "other" leads by count with five, so which ranks is what the
+longest bar means. And one line under it, which is the whole point of the
+signal system: *"7 of 9 losses had the same reason logged as a signal before
 the loss — 19 days before."* Whether that number moves is how you know the
 signals are worth recording.
 
