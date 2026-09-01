@@ -1,6 +1,44 @@
 {
   "autoMemoryEnabled": false,
   "permissions": {
-    "deny": ["Read(./.env)", "Read(./.env.*)"]
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "mcp__claude_ai_Supabase__*",
+      "mcp__claude_ai_Vercel__*"
+    ],
+    "ask": [
+      "Read(./legacy/**)",
+      "Edit(./legacy/**)",
+      "Write(./legacy/**)",
+      "Bash(npm install *)",
+      "Bash(npm i *)",
+      "Bash(npm uninstall *)",
+      "Bash(npm run db:push*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/guard-writes.mjs",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/guard-bash.mjs",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
   }
 }
