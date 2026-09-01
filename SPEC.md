@@ -99,7 +99,7 @@ outside Saudi Arabia has neither.
 estate, owner, consultant, station management, workshop, personal, other.
 **[BUILD]** Choosing **other requires a text field** saying what it is.
 
-**S17. [CHANGE]** Lead source is one of: field visit, direct contact, referral,
+**S17.** Lead source is one of: field visit, direct contact, referral,
 exhibition, marketing, other. **Marketing is not selectable by an ordinary rep**
 — it means the lead came from the marketing team. A company that already carries
 it keeps it when a rep edits.
@@ -110,8 +110,10 @@ chart decision*. A company created before the rule **may stay blank on
 edit** — the 261 existing blanks honestly record that nobody asked, and
 forcing a value at edit time would invent the very data the blank records;
 what becomes of them is a founder decision after the pilot (§16). **Once a
-company carries a source, an edit may change it but never clear it** — the
-marker is the create-side requirement, which does not exist yet.
+company carries a source, an edit may change it but never clear it.** The
+requirement lives at the form's door and the data layer holds the
+never-clear half; scripts recreating the pre-rule world stay legal, which
+is why the column is not NOT NULL.
 
 **S18.** The rep who creates a company becomes its **primary rep**
 automatically. **Primacy follows the company, not its finder**: it moves to the

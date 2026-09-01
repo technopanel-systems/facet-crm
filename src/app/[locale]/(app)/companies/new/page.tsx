@@ -44,6 +44,8 @@ export default async function NewCompanyPage({
         countries={countries}
         cities={cities}
         leadSources={leadSources}
+        // `S17` — mandatory when a company is created.
+        leadSourceRequired
         locale={locale}
       />
     </div>

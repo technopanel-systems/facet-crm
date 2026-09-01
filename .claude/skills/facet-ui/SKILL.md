@@ -114,8 +114,10 @@ is** `D25`, each header naming the group and its count.
   element** `D24`; `DetailRow` survives only for a totals block.
 - *Form* — `FormShell` (`form-field`), shaped by `D24`, phone-first `D55`; `wide` is for
   repeating rows only. *Dashboard* — `D24`, and **one screen of blocks** `D64`: no rep
-  dashboard and no manager dashboard, six blocks in a fixed order, each qualified by a
-  permission flag. Contents `D32`–`D41`, `D65`–`D68`.
+  dashboard and no manager dashboard, each block qualified by a permission flag, the
+  blocks grouped into tabs by `D76` (a strip renders only when more than one group
+  qualifies — a rep and the coordinator see none). Contents `D32`–`D41`, `D65`–`D68`,
+  and the overseer surface `D76`–`D81`.
 
 **Two numeric treatments**: magnitudes, money, counts and dates take the `numeric` prop on
 `TableHead`/`TableCell`/`Fact` — mono **and** end-aligned together `D11` `D24`; identifiers
@@ -202,10 +204,12 @@ do not drag** `D29`. Build order `D31`.
   took projects off that list; `bilingualName` is gone.
 
 Screen contents when you need them: the dashboard's block model `D64` · its no-flag case
-`D32`–`D37` · what a flag adds `D38`–`D41` · the coordinator `D65` · Marketing and the
-Executive `D67` `D68` · where a dispatch's difference is seen `D66` · rollup `D42`–`D44` ·
-stream, Log button, private note `D45`–`D47` · comments on quotation threads and projects
-only `D48` `S114` · responsive `D55` `D56` `D74` · deliberately not built `D58` `D21`.
+`D32`–`D37` · what a flag adds `D38`–`D41` · the overseer surface — tabs, Yesterday,
+Stuck, attention, big deals, first-run `D76`–`D81` · the coordinator `D65` · Marketing
+and the Executive `D67` `D68` · where a dispatch's difference is seen `D66` · rollup
+`D42`–`D44` · stream, Log button, private note `D45`–`D47` · comments on quotation
+threads and projects only `D48` `S114` · responsive `D55` `D56` `D74` · deliberately not
+built `D58` `D21`.
 
 **Two rules here carry markers and describe something unbuilt** — read them before citing
 them. `D71`, a mark on a card, waits on `S135`; `D72`, the visible refresh line, ships on

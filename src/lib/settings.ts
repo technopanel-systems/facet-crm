@@ -74,6 +74,16 @@ export const PROJECT_STAGE_UNCHANGED_KEY =
   "followup.project_stage_unchanged.days";
 export const PROJECT_STAGE_UNCHANGED_DEFAULT = 21;
 
+/**
+ * `S141` — a rep has gone silent when nothing is logged for this many
+ * **calendar** days. The founder's *"2–3 weeks"*, seeded at the near end —
+ * deliberately not *"this week"*, which fires on a Monday for everyone.
+ * *Who needs attention* (`D79`) is the reader; the edit screen is the same
+ * missing half as every row here (`WORKFLOW §4` row 37).
+ */
+export const ATTENTION_SILENT_DAYS_KEY = "attention.silent_days";
+export const ATTENTION_SILENT_DAYS_DEFAULT = 14;
+
 export type QuietThresholds = {
   qualified: number;
   unqualified: number;

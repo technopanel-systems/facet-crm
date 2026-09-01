@@ -664,7 +664,18 @@ function planCompanies(look: Lookups): void {
         countryId: need(look.countryId, country, "country"),
         categoryId: need(look.categoryId, row.category, "company category"),
         cityId: row.city ? need(look.cityId, row.city, "city") : null,
-        leadSourceId: need(look.sourceId, row.source, "lead source"),
+        // `S17` — the pre-rule world. Lead source became mandatory at
+        // creation only after the real data existed: in the founder's
+        // database 261 of 382 companies carry none. A company registered
+        // before the rule — older than 45 days here, 76 of 121 rows, the
+        // real share — seeds BLANK; the row's own `source` is what the rep
+        // would have picked, kept in the dataset for the day the founder
+        // decides what to do with the blanks (SPEC §16). New companies
+        // arrive filled, which is exactly how the founder described the
+        // not-recorded bar aging out. This is also what gives
+        // `verify:routes` §13's stay-blank half a permanent subject.
+        leadSourceId:
+          row.age > 45 ? null : need(look.sourceId, row.source, "lead source"),
         notes: row.note ?? null,
       });
       companyId.set(row.name, created.id);

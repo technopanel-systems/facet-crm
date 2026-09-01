@@ -546,6 +546,15 @@ export async function updateCompany(
       before.leadSourceId,
     );
 
+    // `S17` — once a company carries a lead source, an edit may change it but
+    // never clear it. The create-side requirement lives at the form's own
+    // door (`companies/actions.ts`), not here: the seed and the verify
+    // fixtures legitimately recreate the pre-rule world — the 261 blanks —
+    // which is also why the column is not NOT NULL.
+    if (before.leadSourceId && !input.leadSourceId) {
+      throw new RuleError("companies.errors.leadSourceRequired");
+    }
+
     // What will actually be written: the region comes from the city `S15`, and
     // both go when the country is not Saudi. The diff below compares against
     // this, not against the form, so a derived region — or a city dropped by a

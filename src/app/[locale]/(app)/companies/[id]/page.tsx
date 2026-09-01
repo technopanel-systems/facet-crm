@@ -273,7 +273,10 @@ export default async function CompanyDetailPage({
             <Fact label={t("common.city")} name="city">
               {pickName(locale, company.cityNameEn, company.cityNameAr) ?? dash}
             </Fact>
-            <Fact label={t("companies.fields.leadSource")}>
+            {/* `name` so `verify:routes` §13 can read whether a source
+                survived a clearing attempt `S17` — the same handle the three
+                Facts above carry. */}
+            <Fact label={t("companies.fields.leadSource")} name="leadSource">
               {pickName(
                 locale,
                 company.leadSourceNameEn,

@@ -246,10 +246,10 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
  * before this was written. `@/db` never reaches `src/auth/index.ts`, so no
  * secret is demanded. What is spent is the property, not startup behaviour.
  */
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { closeDatabase, db } from "@/db";
-import { sessions, users } from "@/db/schema";
+import { companies, companyReps, sessions, users } from "@/db/schema";
 
 process.loadEnvFile(".env");
 
@@ -1896,9 +1896,19 @@ async function main(): Promise<void> {
     // is this run's alone — a fixed literal would make every run a duplicate.
     registration.set("phone", `+9665${stamp}0`);
     registration.set("countryId", foreignId ?? "");
+    // `S17` — the action refuses a company without a lead source, so one is
+    // read off the very form this POST is filling, the way §16 reads its
+    // city. §13 owns both halves of the rule; this section only needs a
+    // company.
+    registration.set(
+      "leadSourceId",
+      blank.body
+        .match(/<select[^>]*name="leadSourceId"[\s\S]*?<\/select>/)?.[0]
+        ?.match(/<option value="([0-9a-f-]{36})"/)?.[1] ?? "",
+    );
     // The rest empty, exactly as an untouched form would send them. No region
     // is set, because the form offers no such field `S15`.
-    for (const empty of ["cityId", "categoryId", "leadSourceId", "notes"]) {
+    for (const empty of ["cityId", "categoryId", "notes"]) {
       registration.set(empty, "");
     }
     const registered = await fetch(`${BASE}/en/companies/new`, {
@@ -2308,7 +2318,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    "\n13. Registering a company, posted for real [S13], [S14], [S15]",
+    "\n13. Registering a company, posted for real [S13], [S14], [S15], [S17]",
   );
   {
     // **Deliberately after the key sweep**, unlike every other replay section.
@@ -2428,6 +2438,29 @@ async function main(): Promise<void> {
         (citySelect?.match(/<optgroup/g) ?? []).length > 1,
       );
 
+      // `S17` — mandatory when a company is created. The `data-required`
+      // marker is the screen's own declaration (`FormField`), and the option
+      // id feeds every accepted POST below, the way the city select feeds
+      // §16's. Both halves in one check: a required field with no options
+      // would be worse than an optional one.
+      const sourceSelect = form.body.match(
+        /<select[^>]*name="leadSourceId"[\s\S]*?<\/select>/,
+      )?.[0];
+      const leadSourceId = sourceSelect?.match(
+        /<option value="([0-9a-f-]{36})"/,
+      )?.[1];
+      const requiredField = (body: string, name: string) =>
+        new RegExp(`<div[^>]*data-field="${name}"[^>]*data-required`).test(
+          body,
+        );
+      check(
+        `${locale}: *** the register form marks lead source REQUIRED, with real options *** [S17]`,
+        requiredField(form.body, "leadSourceId") && Boolean(leadSourceId),
+        `required ${requiredField(form.body, "leadSourceId")}, first option ${
+          leadSourceId ?? "missing"
+        }`,
+      );
+
       /**
        * The action envelope plus what a browser would send.
        *
@@ -2454,6 +2487,10 @@ async function main(): Promise<void> {
         // would make every run's companies duplicates of the last run's.
         fields.set("phone", `+9665${stamp}${phoneSeq++}`);
         fields.set("countryId", country);
+        // `S17` — a lead source is set the way the phone is: one place, so
+        // the no-source case below clears it deliberately, and the pair
+        // differs in nothing else.
+        fields.set("leadSourceId", leadSourceId ?? "");
         // **No region is set.** The form offers no such field `S15`, so an
         // untouched form sends none, and a payload that invented one would be
         // testing a control that does not exist.
@@ -2461,12 +2498,7 @@ async function main(): Promise<void> {
         // The rest, empty, exactly as an untouched form would send them —
         // `cityId` included, which is what makes the Saudi POST below the
         // no-city case.
-        for (const empty of [
-          "cityId",
-          "categoryId",
-          "leadSourceId",
-          "notes",
-        ]) {
+        for (const empty of ["cityId", "categoryId", "notes"]) {
           fields.set(empty, "");
         }
         return fields;
@@ -2515,6 +2547,21 @@ async function main(): Promise<void> {
         `${locale}: *** registering a Saudi company with NO city answers 200, not 303 *** [S15]`,
         refusedCity.status === 200,
         `got ${refusedCity.status} ${refusedCity.location}`,
+      );
+
+      /* --- S17: no lead source is refused, and the abroad POST is the pair - */
+
+      // The same pair discipline as `S15` above: this payload differs from
+      // the accepted abroad POST in nothing but the lead source, so only the
+      // pair says the refusal is this field's — a form that refused
+      // everything would pass the check alone.
+      const noSource = fieldsFor(foreignId, "nosource");
+      noSource.set("leadSourceId", "");
+      const refusedSource = await post(noSource);
+      check(
+        `${locale}: *** registering with NO lead source answers 200, not 303 *** [S17]`,
+        refusedSource.status === 200,
+        `got ${refusedSource.status} ${refusedSource.location}`,
       );
 
       // **The assertion that matters, and the reason both POSTs are still
@@ -2569,6 +2616,139 @@ async function main(): Promise<void> {
         `${locale}: *** …and asks for no region there either *** [S15]`,
         !edit.body.includes('name="region"'),
       );
+
+      /* --- S17's edit side: a carried source never clears, a blank stays --- */
+
+      // Once per run, not per locale: both halves write (or decline to), and
+      // the claim is the server's, which has no locale.
+      if (locale === "en") {
+        // Values are read back off the edit form itself, so the POST carries
+        // exactly what the screen holds — nothing is invented and nothing
+        // else changes.
+        const editForm =
+          edit.body.match(
+            /<form[^>]*data-slot="form-shell"[\s\S]*?<\/form>/,
+          )?.[0] ?? "";
+        const valueIn = (fragment: string, name: string) =>
+          unescapeHtml(
+            fragment
+              .match(new RegExp(`<input[^>]*name="${name}"[^>]*>`))?.[0]
+              ?.match(/value="([^"]*)"/)?.[1] ?? "",
+          );
+        const selectedIn = (fragment: string, name: string) => {
+          const control = fragment.match(
+            new RegExp(`<select[^>]*name="${name}"[\\s\\S]*?</select>`),
+          )?.[0];
+          for (const option of control?.matchAll(
+            /<option[^>]*value="([0-9a-f-]{36})"[^>]*>/g,
+          ) ?? []) {
+            if (option[0].includes("selected")) return option[1];
+          }
+          return "";
+        };
+        const notesIn = (fragment: string) =>
+          unescapeHtml(
+            fragment.match(
+              /<textarea[^>]*name="notes"[^>]*>([\s\S]*?)<\/textarea>/,
+            )?.[1] ?? "",
+          );
+        const editBody = (fragment: string, leadSource: string) => {
+          const body = envelopeOf(fragment);
+          body.set("name", valueIn(fragment, "name"));
+          body.set("phone", valueIn(fragment, "phone"));
+          body.set("countryId", selectedIn(fragment, "countryId"));
+          body.set("cityId", selectedIn(fragment, "cityId"));
+          body.set("categoryId", selectedIn(fragment, "categoryId"));
+          body.set("leadSourceId", leadSource);
+          body.set("notes", notesIn(fragment));
+          return body;
+        };
+
+        // (1) The abroad company registered above CARRIES the source its POST
+        // set: its edit form marks the field required, a POST clearing it is
+        // refused as a message rather than a 500, and the source survives.
+        check(
+          "a company carrying a source has it marked required on edit [S17]",
+          requiredField(edit.body, "leadSourceId"),
+        );
+        const cleared = await fetch(`${BASE}${abroadPath}/edit`, {
+          method: "POST",
+          headers: { cookie: header(jar), origin: BASE },
+          body: editBody(editForm, ""),
+          redirect: "manual",
+        });
+        store(jar, cleared);
+        check(
+          "*** clearing a carried lead source is REFUSED — 200, not 303 *** [S17]",
+          cleared.status === 200,
+          `got ${cleared.status}`,
+        );
+        const survived = await get(jar, abroadPath);
+        check(
+          "…and the source survives on the record [S17]",
+          factOf(survived.body, "leadSource") !== DASH,
+          `lead source reads "${factOf(survived.body, "leadSource")}"`,
+        );
+
+        // (2) A pre-rule BLANK may stay blank. One of rep-a's own blank
+        // companies is read by id — a reach past HTTP on §30's precedent —
+        // because the rule's whole point is that no such company can be
+        // created over HTTP any more.
+        const [blankCompany] = await db
+          .select({ id: companies.id })
+          .from(companies)
+          .innerJoin(companyReps, eq(companyReps.companyId, companies.id))
+          .innerJoin(users, eq(companyReps.userId, users.id))
+          .where(
+            and(
+              eq(users.email, "rep-a@example.test"),
+              isNull(companyReps.removedAt),
+              isNull(companies.leadSourceId),
+              isNull(companies.archivedAt),
+              isNull(companies.mergedIntoId),
+            ),
+          )
+          .limit(1);
+        if (!blankCompany) {
+          console.log(
+            "  NOT MEASURED — rep-a holds no blank-source company, so the stay-blank half has no subject. Run `npm run seed:demo` for the pre-rule world.",
+          );
+        } else {
+          const blankEdit = await get(
+            jar,
+            `/en/companies/${blankCompany.id}/edit`,
+          );
+          const blankForm =
+            blankEdit.body.match(
+              /<form[^>]*data-slot="form-shell"[\s\S]*?<\/form>/,
+            )?.[0] ?? "";
+          check(
+            "*** a pre-rule blank company is NOT marked required on edit *** [S17]",
+            blankEdit.status === 200 &&
+              blankForm !== "" &&
+              !requiredField(blankEdit.body, "leadSourceId"),
+            `status ${blankEdit.status}`,
+          );
+          // Saved back exactly as it stands — still blank — the write is a
+          // no-op and the action still answers 303: nothing forces a value
+          // onto the 261.
+          const kept = await fetch(
+            `${BASE}/en/companies/${blankCompany.id}/edit`,
+            {
+              method: "POST",
+              headers: { cookie: header(jar), origin: BASE },
+              body: editBody(blankForm, ""),
+              redirect: "manual",
+            },
+          );
+          store(jar, kept);
+          check(
+            "*** a blank company saved STILL BLANK answers 303 *** [S17]",
+            kept.status === 303,
+            `got ${kept.status}`,
+          );
+        }
+      }
     }
   }
 
@@ -2684,11 +2864,15 @@ async function main(): Promise<void> {
       companyFields.set("phone", `+9665${stamp}${phoneSeq++}`);
       companyFields.set("countryId", saudiId);
       companyFields.set("cityId", cityId);
-      for (const empty of [
-        "categoryId",
+      // `S17` — the action refuses a company without a lead source; the id
+      // comes off the form like the city above. §13 owns the rule.
+      companyFields.set(
         "leadSourceId",
-        "notes",
-      ]) {
+        newCompany.body
+          .match(/<select[^>]*name="leadSourceId"[\s\S]*?<\/select>/)?.[0]
+          ?.match(/<option value="([0-9a-f-]{36})"/)?.[1] ?? "",
+      );
+      for (const empty of ["categoryId", "notes"]) {
         companyFields.set(empty, "");
       }
       const registered = await post(
@@ -6946,7 +7130,15 @@ async function main(): Promise<void> {
       registration.set("name", `refresh-${stamp}`);
       registration.set("phone", `+9665${stamp}1`);
       registration.set("countryId", foreignId ?? "");
-      for (const empty of ["cityId", "categoryId", "leadSourceId", "notes"]) {
+      // `S17` — the action refuses a company without a lead source; the id
+      // comes off the very form this POST is filling. §13 owns the rule.
+      registration.set(
+        "leadSourceId",
+        blank.body
+          .match(/<select[^>]*name="leadSourceId"[\s\S]*?<\/select>/)?.[0]
+          ?.match(/<option value="([0-9a-f-]{36})"/)?.[1] ?? "",
+      );
+      for (const empty of ["cityId", "categoryId", "notes"]) {
         registration.set(empty, "");
       }
       const registered = await fetch(`${BASE}/en/companies/new`, {

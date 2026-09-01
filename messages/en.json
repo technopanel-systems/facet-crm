@@ -287,7 +287,8 @@
     },
     "errors": {
       "notFound": "That company does not exist, or it is not one of yours.",
-      "leadSourceNotSelectable": "That lead source can only be set by someone who assigns leads."
+      "leadSourceNotSelectable": "That lead source can only be set by someone who assigns leads.",
+      "leadSourceRequired": "Lead source is required — it can be changed, but not removed."
     },
     "emptyFilteredAction": "Clear the search",
     "qualifiedMark": "Q",

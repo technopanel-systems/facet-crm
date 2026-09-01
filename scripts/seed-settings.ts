@@ -25,6 +25,8 @@ import { eq } from "drizzle-orm";
 import { closeDatabase, db } from "@/db";
 import { settings } from "@/db/schema";
 import {
+  ATTENTION_SILENT_DAYS_DEFAULT,
+  ATTENTION_SILENT_DAYS_KEY,
   CATALOGUE_NO_RESPONSE_DEFAULT,
   CATALOGUE_NO_RESPONSE_KEY,
   PROJECT_STAGE_UNCHANGED_DEFAULT,
@@ -46,6 +48,9 @@ const SETTING_SEED: { key: string; value: unknown }[] = [
   { key: QUOTATION_RETURNED_KEY, value: QUOTATION_RETURNED_DEFAULT },
   { key: CATALOGUE_NO_RESPONSE_KEY, value: CATALOGUE_NO_RESPONSE_DEFAULT },
   { key: PROJECT_STAGE_UNCHANGED_KEY, value: PROJECT_STAGE_UNCHANGED_DEFAULT },
+  // `S141` — the gone-silent threshold `D79` reads. Seeded like the six
+  // above: something reads it, so it exists.
+  { key: ATTENTION_SILENT_DAYS_KEY, value: ATTENTION_SILENT_DAYS_DEFAULT },
 ];
 
 export async function seedSettings(): Promise<void> {

@@ -41,6 +41,7 @@ export function CompanyForm({
   countries,
   cities,
   leadSources,
+  leadSourceRequired,
   locale,
 }: {
   action: Action;
@@ -51,6 +52,14 @@ export function CompanyForm({
   countries: CountryRow[];
   cities: CityRow[];
   leadSources: LookupRow[];
+  /**
+   * `S17` — mandatory when a company is created, so the create page passes
+   * true; on an edit it is true exactly when the company already carries one,
+   * because a pre-rule blank may stay blank while a carried source may be
+   * changed but never cleared. Decided server-side by the page, so the form
+   * states the rule rather than guessing at it.
+   */
+  leadSourceRequired: boolean;
   locale: string;
 }) {
   const t = useTranslations();
@@ -156,11 +165,16 @@ export function CompanyForm({
         label={t("companies.fields.leadSource")}
         error={errors.leadSourceId}
         hint={leadSources.length === 0 ? t("common.noOptions") : undefined}
+        required={leadSourceRequired}
       >
+        {/* `required` on the control too `S17` — the empty option is the
+            placeholder, and the browser refusing it saves a round trip on the
+            value the action will refuse anyway. */}
         <SelectField
           name="leadSourceId"
           defaultValue={value("leadSourceId")}
           placeholder={t("common.none")}
+          required={leadSourceRequired}
           disabled={leadSources.length === 0}
           invalid={Boolean(errors.leadSourceId)}
         >

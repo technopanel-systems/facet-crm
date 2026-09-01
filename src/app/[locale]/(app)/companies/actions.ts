@@ -42,7 +42,10 @@ import {
  * satisfy the non-nullable `CompanyInput`, which is what makes an edit path
  * that drops the phone `S13` fail to compile.
  */
-function readCompanyForm(formData: FormData) {
+function readCompanyForm(
+  formData: FormData,
+  { leadSourceRequired }: { leadSourceRequired: boolean },
+) {
   const fields = readFields(formData);
   const input: CompanyInput = {
     name: fields.text("name", { required: true, max: 200 }) ?? "",
@@ -59,7 +62,13 @@ function readCompanyForm(formData: FormData) {
     // so the form posts none and this reader must not invent a way to accept
     // one `[AUDIT 1 F3]`.
     cityId: fields.uuid("cityId"),
-    leadSourceId: fields.uuid("leadSourceId"),
+    // `S17` — mandatory when a company is CREATED, so the create action passes
+    // true and the update action false: a pre-rule blank may stay blank on
+    // edit, and the data layer refuses only a CLEARING. The requirement sits
+    // at this door rather than inside `createCompany`, because the seed and
+    // the verify fixtures legitimately recreate the pre-rule world — the 261
+    // blanks — and the form is the only door a rep can reach.
+    leadSourceId: fields.uuid("leadSourceId", { required: leadSourceRequired }),
     notes: fields.text("notes", { max: 4000 }),
   };
   return { fields, input };
@@ -70,7 +79,9 @@ export async function createCompanyAction(
   formData: FormData,
 ): Promise<FormState> {
   const session = await requireSession();
-  const { fields, input } = readCompanyForm(formData);
+  const { fields, input } = readCompanyForm(formData, {
+    leadSourceRequired: true,
+  });
   if (!fields.ok) return fields.state;
 
   let companyId: string;
@@ -93,7 +104,9 @@ export async function updateCompanyAction(
   formData: FormData,
 ): Promise<FormState> {
   const session = await requireSession();
-  const { fields, input } = readCompanyForm(formData);
+  const { fields, input } = readCompanyForm(formData, {
+    leadSourceRequired: false,
+  });
   if (!fields.ok) return fields.state;
 
   try {

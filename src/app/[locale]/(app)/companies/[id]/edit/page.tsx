@@ -52,6 +52,10 @@ export default async function EditCompanyPage({
         countries={countries}
         cities={cities}
         leadSources={leadSources}
+        // `S17` — a carried source may be changed but never cleared; a
+        // pre-rule blank may stay blank, so the field is required exactly
+        // when a value exists.
+        leadSourceRequired={Boolean(company.leadSourceId)}
         locale={locale}
       />
     </div>
