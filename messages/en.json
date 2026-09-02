@@ -327,7 +327,11 @@
       "plannedDetail": "Nothing recorded for {count, plural, one {# day} other {# days}}.",
       "quietDetail": "Log a visit or a call, or decide whether this is still worth chasing.",
       "neverDetail": "Registered {count, plural, one {# day} other {# days}} ago."
-    }
+    },
+    "filter": {
+      "everyone": "Everyone"
+    },
+    "emptyFilteredPerson": "No companies for this person."
   },
   "contacts": {
     "title": "Contacts",
@@ -1209,7 +1213,11 @@
       "notListed": "Set a target for someone not listed",
       "notListedPerson": "Person",
       "notListedChoose": "Choose a person",
-      "companyUnset": "No company target this month"
+      "companyUnset": "No company target this month",
+      "groups": {
+        "targeted": "Measured against a target",
+        "holding": "Holding companies, no target this month"
+      }
     },
     "tabs": {
       "today": "Today",
@@ -1287,7 +1295,8 @@
       "achievedOf": "{achieved} of {target} m² · {pct}%",
       "setBy": "{sqm} m² · set by {name}",
       "inForce": "in force",
-      "superseded": "superseded"
+      "superseded": "superseded",
+      "companiesAll": "See all {total} in Companies"
     }
   },
   "rollup": {

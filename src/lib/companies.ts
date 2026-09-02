@@ -20,6 +20,7 @@ import {
   count,
   desc,
   eq,
+  exists,
   ilike,
   isNull,
   or,
@@ -187,6 +188,32 @@ function searchFilter(query: string | undefined): SQL | undefined {
 }
 
 /**
+ * `D82`'s term — a live membership row for the person, the same fact
+ * `attentionPeople` counts a book by and `companiesHeldBySilence` lists.
+ * Archived companies stay in: the founder's reason for the filter is
+ * *going through one rep's companies*, and a customer somebody gave up on
+ * is part of that reading; the meter says it is archived.
+ */
+function heldByFilter(
+  session: AuthSession,
+  userId: string | undefined,
+): SQL | undefined {
+  if (!userId || !session.user.role.seesAllReps) return undefined;
+  return exists(
+    db
+      .select({ one: sql`1` })
+      .from(companyReps)
+      .where(
+        and(
+          eq(companyReps.companyId, companies.id),
+          eq(companyReps.userId, userId),
+          isNull(companyReps.removedAt),
+        ),
+      ),
+  );
+}
+
+/**
  * The companies list — **ordered by attention** `D25`.
  *
  * `D25` says a list is grouped by whose move it is and names this list's
@@ -209,13 +236,29 @@ function searchFilter(query: string | undefined): SQL | undefined {
  */
 export async function listCompanies(
   session: AuthSession,
-  options: { q?: string; page?: number; sort?: CompanySort } = {},
+  options: {
+    q?: string;
+    page?: number;
+    sort?: CompanySort;
+    /**
+     * `D82` — one person's companies, for whoever already sees other
+     * people's. **Honoured for `sees_all_reps` alone**: a rep's list is
+     * already his own, so for him the parameter narrows nothing and is
+     * ignored rather than refused — `D59`'s wrong-rows failure needs a
+     * scope wider than the reader's own, and he has none.
+     */
+    rep?: string;
+  } = {},
 ): Promise<CompanyListResult> {
   const page = Math.max(1, options.page ?? 1);
   const sort = options.sort ?? "attention";
   const thresholds = await getQuietThresholds();
   const silence = companySilence(thresholds);
-  const where = and(visibleCompaniesFilter(session), searchFilter(options.q));
+  const where = and(
+    visibleCompaniesFilter(session),
+    searchFilter(options.q),
+    heldByFilter(session, options.rep),
+  );
 
   // `attention` leads with the quiet — `isQuiet desc` puts true first — and
   // ranks within each group by how long the clock has run, which is `D34`'s

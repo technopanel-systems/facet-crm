@@ -9377,6 +9377,61 @@ async function main(): Promise<void> {
             dashRows.every((tag) => !targetedIds.has(attr(tag, "data-user"))),
           `${dashRows.length} dash rows, ${dashMarkers} markers`,
         );
+
+        /*
+         * 1b. **Two sections, targeted first** — `D39` as amended in session
+         *     54: the people carrying a target under one group row, everyone
+         *     else holding a company under a second, each header carrying
+         *     its count `D24`, and a section nobody is in absent `D70`. The
+         *     counts are held to the roster this script derived — targeted
+         *     is a `targets` row for the month — and the order to the row
+         *     positions in the built HTML: the last targeted row sits above
+         *     the first dash row, and the targeted header above the holding
+         *     one. A flat table with the dash rows interleaved goes red here
+         *     and nowhere above.
+         */
+        const groupTags = [
+          ...block.matchAll(/<tr\b[^>]*data-slot="team-group"[^>]*>/g),
+        ].map((m) => m[0]);
+        const groups = groupTags.map((tag) => ({
+          group: attr(tag, "data-group"),
+          count: Number(attr(tag, "data-count")),
+          at: block.indexOf(tag),
+        }));
+        const targetedGroup = groups.find((g) => g.group === "targeted");
+        const holdingGroup = groups.find((g) => g.group === "holding");
+        const positions = rows.map((tag) => ({
+          at: block.indexOf(tag),
+          targeted: attr(tag, "data-target") !== "",
+        }));
+        const lastTargetedAt = Math.max(
+          -1,
+          ...positions.filter((r) => r.targeted).map((r) => r.at),
+        );
+        const firstDashAt = Math.min(
+          Number.POSITIVE_INFINITY,
+          ...positions.filter((r) => !r.targeted).map((r) => r.at),
+        );
+        const expectTargeted = [...teamIds].filter((id) => targetedIds.has(id))
+          .length;
+        const expectHolding = teamIds.size - expectTargeted;
+        check(
+          `${locale}: *** two sections — targeted first (header ${
+            targetedGroup ? targetedGroup.count : "absent"
+          } against ${expectTargeted} in the records), then holding without a target (header ${
+            holdingGroup ? holdingGroup.count : "absent"
+          } against ${expectHolding}), every targeted row above every dash row *** [D39] [D24] [D70]`,
+          (expectTargeted > 0
+            ? targetedGroup?.count === expectTargeted
+            : !targetedGroup) &&
+            (expectHolding > 0
+              ? holdingGroup?.count === expectHolding
+              : !holdingGroup) &&
+            (!targetedGroup || !holdingGroup || targetedGroup.at < holdingGroup.at) &&
+            lastTargetedAt < firstDashAt &&
+            groups.length <= 2,
+          `groups ${groups.map((g) => `${g.group}=${g.count}`).join(",")}, last targeted at ${lastTargetedAt}, first dash at ${firstDashAt}`,
+        );
       }
 
       /*
@@ -10823,7 +10878,7 @@ async function main(): Promise<void> {
       }
       const attention = openTag(body, "today-attention");
       const behindRows = [
-        ...body.matchAll(/<div[^>]*data-slot="attention-row"[^>]*data-kind="behind"/g),
+        ...body.matchAll(/<div\b[^>]*data-slot="attention-row"[^>]*data-kind="behind"/g),
       ].length;
       if (!opening) {
         console.log(
@@ -12647,6 +12702,255 @@ async function main(): Promise<void> {
               afterOff.body.includes('data-slot="team-unlisted"') === unlistedHolders > 0,
           );
         }
+      }
+    }
+  }
+
+  /* ── 44 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n44. The per-person filter on /companies — the chips against the roster, the count against the records, the carry-through, its absence for a rep, and the way in from one person's world [D82], [D59], [D53], [D39]",
+  );
+  {
+    const setup = (step: string, ok: boolean, detail = ""): boolean => {
+      checks += 1;
+      if (ok) {
+        console.log(`  setup ${step}`);
+        return true;
+      }
+      failures += 1;
+      console.log(`  SETUP FAILED at ${step}${detail ? ` — ${detail}` : ""}`);
+      return false;
+    };
+    const openTag = (body: string, slot: string): string =>
+      body.match(
+        new RegExp(`<[a-z]+\\b[^>]*data-slot="${slot}"[^>]*>`),
+      )?.[0] ?? "";
+    const tagAttr = (tag: string, name: string): string =>
+      tag.match(new RegExp(`${name}="([^"]*)"`))?.[1] ?? "";
+    const listTotal = (body: string): number => {
+      const m = body.match(/data-slot="list-card"[^>]*data-total="(\d+)"/);
+      if (m) return Number(m[1]);
+      return body.includes('data-slot="companies-empty"') ? 0 : -1;
+    };
+    /** The `<div data-slot="companies-rep-filter">` block, to its closing
+     *  `</nav>` — the chips inside it and nothing of the sort row above. */
+    const repNav = (body: string): string => {
+      const at = body.indexOf('data-slot="companies-rep-filter"');
+      if (at === -1) return "";
+      const end = body.indexOf("</nav>", at);
+      return end === -1 ? "" : body.slice(at, end);
+    };
+    /** Every chip's `data-chip` and `href` inside one fragment. */
+    const chips = (fragment: string) =>
+      [...fragment.matchAll(/<a\b[^>]*>/g)]
+        .map((m) => m[0])
+        .filter((tag) => tag.includes("data-chip="))
+        .map((tag) => ({
+          value: tagAttr(tag, "data-chip"),
+          href: unescapeHtml(tagAttr(tag, "href")),
+          current: tag.includes('aria-current="true"'),
+        }));
+    /** The sort row's chips — the `<nav>` that precedes the person block. */
+    const sortNav = (body: string): string => {
+      const at = body.indexOf('data-chip="name"');
+      if (at === -1) return "";
+      const start = body.lastIndexOf("<nav", at);
+      const end = body.indexOf("</nav>", at);
+      return start === -1 || end === -1 ? "" : body.slice(start, end);
+    };
+
+    /*
+     * **The records, in this script's own SQL.** The roster is `D39`'s
+     * first set written fresh — an active book-holder (`sees_all_reps`
+     * false, `S9`'s proxy) with a live `company_reps` row — and rep-a's
+     * count is the live-membership rows on distinct companies, archived
+     * and merged included, because `D82` keeps them in. Two origins, so
+     * the chips and the total each have something to disagree with.
+     */
+    let repA = "";
+    let repB = "";
+    let heldByRepA = -1;
+    let repAPhone = "";
+    const roster = new Set<string>();
+    try {
+      const people = (await db.execute(sql`
+        select u.id::text as id, u.email
+        from users u
+        join roles r on r.id = u.role_id
+        where u.is_active = true
+          and r.sees_all_reps = false
+          and exists (select 1 from company_reps cr
+                      where cr.user_id = u.id and cr.removed_at is null)
+      `)) as unknown as { id: string; email: string }[];
+      for (const person of people) roster.add(person.id);
+      repA = people.find((p) => p.email === "rep-a@example.test")?.id ?? "";
+      repB = people.find((p) => p.email === "rep-b@example.test")?.id ?? "";
+      if (repA) {
+        const held = (await db.execute(sql`
+          select count(distinct cr.company_id)::int as n
+          from company_reps cr
+          where cr.user_id = ${repA}::uuid and cr.removed_at is null
+        `)) as unknown as { n: number }[];
+        heldByRepA = Number(held[0]?.n ?? -1);
+        const one = (await db.execute(sql`
+          select c.phone
+          from company_reps cr
+          join companies c on c.id = cr.company_id
+          where cr.user_id = ${repA}::uuid and cr.removed_at is null
+          order by c.name
+          limit 1
+        `)) as unknown as { phone: string }[];
+        repAPhone = one[0]?.phone ?? "";
+      }
+    } catch (error) {
+      console.log(`  --    the records could not be read — ${String(error)}`);
+    }
+
+    if (!repA || !repB || heldByRepA < 1 || roster.size < 2) {
+      console.log(
+        `  --    rep-a (${repA ? "found" : "missing"}), rep-b (${
+          repB ? "found" : "missing"
+        }), rep-a holds ${heldByRepA}, roster ${roster.size} — the filter is NOT MEASURED`,
+      );
+    } else {
+      const manager44 = jars["manager@example.test"];
+      const repJar44 = jars["rep-a@example.test"];
+
+      for (const locale of ["en", "ar"] as const) {
+        /*
+         * 1. **The chips are the roster** — *Everyone* plus one per person,
+         *    the set equal to this script's own book-holder query, on the
+         *    unfiltered list. And every chip carries nothing it should not:
+         *    no `rep=` on *Everyone*, its own id on each person.
+         */
+        const plain = await get(manager44, `/${locale}/companies`);
+        if (
+          !setup(
+            `${locale}: the manager's /companies answers 200`,
+            plain.status === 200,
+            `saw ${plain.status}`,
+          )
+        )
+          continue;
+        const nav = repNav(plain.body);
+        const people = chips(nav);
+        const ids = people.map((c) => c.value).filter(Boolean);
+        const idSet = new Set(ids);
+        const missing = [...roster].filter((id) => !idSet.has(id));
+        const extra = ids.filter((id) => !roster.has(id));
+        check(
+          `${locale}: *** the person chips are D39's roster — Everyone plus ${ids.length} people against ${roster.size} active book-holders holding a live company in the records *** [D82] [D39] [S9]`,
+          nav !== "" &&
+            people.some((c) => c.value === "" && !c.href.includes("rep=")) &&
+            missing.length === 0 &&
+            extra.length === 0 &&
+            people
+              .filter((c) => c.value)
+              .every((c) => c.href.includes(`rep=${c.value}`)),
+          `missing ${missing.length}, extra ${extra.length}, nav ${nav === "" ? "absent" : "present"}`,
+        );
+
+        /*
+         * 2. **The count against the records** — rep-a's chip narrows the
+         *    list to exactly the companies he holds a live membership on,
+         *    and the chip reads as current.
+         */
+        const filtered = await get(manager44, `/${locale}/companies?rep=${repA}`);
+        const total = listTotal(filtered.body);
+        const current = chips(repNav(filtered.body)).find((c) => c.current);
+        check(
+          `${locale}: *** ?rep= narrows to the person's own book — saw ${total} against ${heldByRepA} live membership(s) in the records, current chip ${
+            current ? (current.value === repA ? "is rep-a" : "is SOMEBODY ELSE") : "NONE"
+          } *** [D82] [D24]`,
+          total === heldByRepA && current?.value === repA,
+          `total ${total}`,
+        );
+
+        /*
+         * 3. **Carry-through, all three ways** `D59`: the sort chips keep
+         *    the person, the search form keeps him as a hidden field, and
+         *    the person chips keep a sort. Read off the built HTML, then
+         *    one rendered href FOLLOWED — §33's device — so a correct-
+         *    looking link landing on the unfiltered list goes red here.
+         */
+        const sortChips = chips(sortNav(filtered.body));
+        const hidden = filtered.body.match(
+          /<input[^>]*type="hidden"[^>]*name="rep"[^>]*value="([^"]*)"/,
+        );
+        const sorted = await get(
+          manager44,
+          `/${locale}/companies?rep=${repA}&sort=name`,
+        );
+        const sortedPeople = chips(repNav(sorted.body));
+        check(
+          `${locale}: *** every sort chip carries rep= (${sortChips.filter((c) => c.href.includes(`rep=${repA}`)).length} of ${sortChips.length}), the search form hides rep=${hidden ? "the person" : "NOTHING"}, and under ?sort=name every person chip carries the sort (${sortedPeople.filter((c) => c.href.includes("sort=name")).length} of ${sortedPeople.length}) *** [D82] [D59]`,
+          sortChips.length >= 2 &&
+            sortChips.every((c) => c.href.includes(`rep=${repA}`)) &&
+            hidden?.[1] === repA &&
+            sortedPeople.length >= 2 &&
+            sortedPeople.every((c) => c.href.includes("sort=name")),
+        );
+        const nameChip = sortChips.find((c) => c.value === "name");
+        if (nameChip) {
+          const followed = await get(manager44, nameChip.href);
+          check(
+            `${locale}: *** following the rendered Name chip lands on the same ${listTotal(followed.body)} companies (rep-a's ${heldByRepA}), not the unfiltered list *** [D59] [S45-9]`,
+            followed.status === 200 && listTotal(followed.body) === heldByRepA,
+            `followed ${nameChip.href} → ${followed.status}, total ${listTotal(followed.body)}`,
+          );
+        }
+
+        /*
+         * 4. **The search inside the person** — one of rep-a's own phones
+         *    as `q` keeps the person: the row set is at least one and at
+         *    most his book, and the person chips carry the query.
+         */
+        if (repAPhone) {
+          const searched = await get(
+            manager44,
+            `/${locale}/companies?rep=${repA}&q=${encodeURIComponent(repAPhone)}`,
+          );
+          const searchedTotal = listTotal(searched.body);
+          const searchedPeople = chips(repNav(searched.body));
+          check(
+            `${locale}: *** searching inside the person keeps him — saw ${searchedTotal} of his ${heldByRepA} for his own phone, and ${searchedPeople.filter((c) => c.href.includes("q=")).length} of ${searchedPeople.length} person chips carry q= *** [D82] [D59]`,
+            searchedTotal >= 1 &&
+              searchedTotal <= heldByRepA &&
+              searchedPeople.length >= 2 &&
+              searchedPeople.every((c) => c.href.includes("q=")),
+          );
+        }
+
+        /*
+         * 5. **Absent for a rep, and ignored rather than obeyed** `D53`:
+         *    rep-a gets no chips, and `?rep=` naming rep-b narrows his
+         *    list to nothing other than his own — the same total as his
+         *    bare list. The guard is that his bare list is non-empty.
+         */
+        const own = listTotal((await get(repJar44, `/${locale}/companies`)).body);
+        const typed = await get(repJar44, `/${locale}/companies?rep=${repB}`);
+        check(
+          `${locale}: *** a rep gets no person chips and a typed ?rep= narrows nothing — saw ${listTotal(typed.body)} against his own ${own} *** [D82] [D53]`,
+          own > 0 &&
+            listTotal(typed.body) === own &&
+            !typed.body.includes('data-slot="companies-rep-filter"'),
+        );
+
+        /*
+         * 6. **The way in from one person's world** — the companies card
+         *    on `?tab=team&rep=` links to `/companies?rep=`, so the
+         *    ten-quietest cap has a road through `D39` `D82`.
+         */
+        const world = await get(manager44, `/${locale}?tab=team&rep=${repA}`);
+        const allLink = openTag(world.body, "rep-companies-all");
+        check(
+          `${locale}: *** one person's world links to /companies?rep= — ${
+            allLink ? `href ${unescapeHtml(tagAttr(allLink, "href"))}` : "NO link"
+          } *** [D82] [D39]`,
+          world.status === 200 &&
+            unescapeHtml(tagAttr(allLink, "href")).endsWith(`/companies?rep=${repA}`),
+        );
       }
     }
   }

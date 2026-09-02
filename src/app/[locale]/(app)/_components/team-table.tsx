@@ -113,6 +113,22 @@ export async function teamRowSet(
   );
 }
 
+/**
+ * `D39`'s two sections — targeted people, then everyone else. A section
+ * with nobody in it is not returned, so nothing renders a header over
+ * nothing `D70`.
+ */
+function sections(
+  rows: AchievementRow[],
+): { group: "targeted" | "holding"; people: AchievementRow[] }[] {
+  const targeted = rows.filter((row) => row.targetSqm !== null);
+  const holding = rows.filter((row) => row.targetSqm === null);
+  return [
+    { group: "targeted" as const, people: targeted },
+    { group: "holding" as const, people: holding },
+  ].filter((section) => section.people.length > 0);
+}
+
 export async function TeamTable({
   session,
   rows,
@@ -201,7 +217,36 @@ export async function TeamTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((row) => {
+            {/* `D39`'s two sections (session 54): the people carrying a
+                target first, then everyone else holding a live company —
+                *a book-holder with no target is a different kind of row*.
+                One table, two group rows with their counts, the shape
+                `/companies`' groups take; a section nobody is in is absent
+                `D70`. The rows arrive ordered by name, so each section keeps
+                that order without re-sorting. */}
+            {sections(rows).flatMap(({ group, people }) => [
+              <TableRow
+                key={`group-${group}`}
+                data-slot="team-group"
+                data-group={group}
+                data-count={String(people.length)}
+                className="hover:bg-transparent"
+              >
+                <TableCell colSpan={7} className="text-start">
+                  {/* A flex row with a gap, never `ms-*` on the count —
+                      the count carries `dir="ltr"` and a logical margin
+                      resolves against its OWN direction `D57`. */}
+                  <span className="flex items-baseline gap-2">
+                    <span className="text-faint text-[10.5px] font-semibold tracking-[.09em] uppercase">
+                      {t(`today.team.groups.${group}`)}
+                    </span>
+                    <span className="text-faint num text-[10.5px]" dir="ltr">
+                      {people.length}
+                    </span>
+                  </span>
+                </TableCell>
+              </TableRow>,
+              ...people.map((row) => {
               const target = row.targetSqm;
               const achievementPct =
                 target === null
@@ -340,7 +385,8 @@ export async function TeamTable({
                   ) : null}
                 </Fragment>
               );
-            })}
+              }),
+            ])}
           </TableBody>
         </Table>
 

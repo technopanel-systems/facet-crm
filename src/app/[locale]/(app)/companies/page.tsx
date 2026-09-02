@@ -17,6 +17,7 @@ import {
   listCompanies,
   type CompanyListRow,
 } from "@/lib/companies";
+import { attentionPeople } from "@/lib/coverage";
 import { pickName } from "@/lib/lookups";
 
 import { FilterNav, ListCard, SearchForm } from "../_components/list-controls";
@@ -30,14 +31,27 @@ export default async function CompaniesPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ q?: string; page?: string; sort?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    page?: string;
+    sort?: string;
+    rep?: string;
+  }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const { q, page, sort } = await searchParams;
+  const { q, page, sort, rep } = await searchParams;
 
   const session = await requireSession();
   const t = await getTranslations();
+
+  // `D82` — the per-person chips, for whoever already sees other people's
+  // companies. The same roster *Who needs attention* and the team table
+  // read `D39` `D79`: every active book-holder holding at least one live
+  // company. A rep gets no chips, and a `?rep=` he types narrows nothing.
+  const overseer = session.user.role.seesAllReps;
+  const people = overseer ? await attentionPeople(session) : [];
+  const activeRep = people.find((person) => person.id === rep)?.id;
 
   const currentPage = Number(page) || 1;
   const { rows, total, sort: activeSort, groupCounts } = await listCompanies(
@@ -48,12 +62,21 @@ export default async function CompaniesPage({
       // An unknown `?sort=` falls back to the default rather than 404ing: it is
       // a display preference in a URL people edit and share, not a record.
       sort: isCompanySort(sort) ? sort : undefined,
+      // An id that is nobody on the roster narrows to nobody's companies —
+      // the URL is honest about what it asked for `D59` — while a rep's own
+      // `?rep=` is ignored in the data layer, where the flag is asked.
+      rep: overseer ? rep : undefined,
     },
   );
 
   // Filters the search and the pager must carry, so neither throws the other
-  // away `D59`. Only a non-default sort is worth putting in a URL.
-  const extra = { sort: activeSort === "attention" ? undefined : activeSort };
+  // away `D59`. Only a non-default sort is worth putting in a URL; the person
+  // is carried whenever one is set.
+  const extra = {
+    sort: activeSort === "attention" ? undefined : activeSort,
+    rep: overseer ? rep : undefined,
+  };
+  const filtered = Boolean(q) || Boolean(overseer && rep);
 
   return (
     <div className="flex flex-col gap-6">
@@ -77,31 +100,61 @@ export default async function CompaniesPage({
           name="sort"
           active={activeSort === "attention" ? undefined : activeSort}
           query={q}
+          extra={{ rep: extra.rep }}
           options={[
             { label: t("companies.sort.attention") },
             { value: "name", label: t("companies.sort.name") },
             { value: "recent", label: t("companies.sort.recent") },
           ]}
         />
+        {/* `D82` — the same chip shape as the sort above, one row beneath it:
+            *Everyone*, then a chip per person. Each carries the search and
+            the sort `D59`, and the sort chips carry the person back. No
+            counts on the chips — the sort chips carry none, and a count per
+            person is the team table's job `D39`. Absent for a reader whose
+            list is already their own `D53`. */}
+        {people.length > 0 ? (
+          <div data-slot="companies-rep-filter" data-active={activeRep ?? ""}>
+            <FilterNav
+              basePath="/companies"
+              name="rep"
+              active={activeRep}
+              query={q}
+              extra={{ sort: extra.sort }}
+              options={[
+                { label: t("companies.filter.everyone") },
+                ...people.map((person) => ({
+                  value: person.id,
+                  label: person.name,
+                })),
+              ]}
+            />
+          </div>
+        ) : null}
       </div>
 
       {rows.length === 0 ? (
         // Outside `ListCard` `D60` — inside a card with a pagination footer an
         // empty list reads as a broken page rather than an empty one.
         //
-        // **Emptiness is judged on `q` alone.** A sort never removes a row, so
-        // asking about it here would show the filtered message on a full list.
+        // **Emptiness is judged on the search and the person** `D82`. A sort
+        // never removes a row, so asking about it here would show the
+        // filtered message on a full list.
         // `D52` wants both to say what would make the list non-empty and to
         // offer the action; the filtered half's action is the way back.
         <div
           data-slot="companies-empty"
-          data-filtered={q ? "true" : "false"}
+          data-filtered={filtered ? "true" : "false"}
           className="border-line flex flex-col items-center gap-3 rounded-[14px] border border-dashed p-8 text-center"
         >
           <p className="text-muted-foreground text-sm">
-            {q ? t("companies.emptyFiltered") : t("companies.empty")}
+            {q
+              ? t("companies.emptyFiltered")
+              : filtered
+                ? t("companies.emptyFilteredPerson")
+                : t("companies.empty")}
           </p>
-          {q ? (
+          {filtered ? (
             <Button asChild size="sm" variant="outline">
               <Link href="/companies">{t("companies.emptyFilteredAction")}</Link>
             </Button>

@@ -327,7 +327,11 @@
       "plannedDetail": "لم يُسجَّل شيء منذ {count} يوم.",
       "quietDetail": "سجّل زيارة أو مكالمة، أو قرّر ما إذا كانت المتابعة ما زالت تستحق.",
       "neverDetail": "سُجِّلت قبل {count} يوم."
-    }
+    },
+    "filter": {
+      "everyone": "الجميع"
+    },
+    "emptyFilteredPerson": "لا شركات لهذا الشخص."
   },
   "contacts": {
     "title": "جهات الاتصال",
@@ -1209,7 +1213,11 @@
       "notListed": "تحديد هدف لشخص غير مدرج",
       "notListedPerson": "الشخص",
       "notListedChoose": "اختر شخصًا",
-      "companyUnset": "لا هدف للشركة هذا الشهر"
+      "companyUnset": "لا هدف للشركة هذا الشهر",
+      "groups": {
+        "targeted": "يُقاسون على هدف",
+        "holding": "يحملون شركات دون هدف هذا الشهر"
+      }
     },
     "tabs": {
       "today": "اليوم",
@@ -1287,7 +1295,8 @@
       "achievedOf": "{achieved} من {target} م² · {pct}%",
       "setBy": "{sqm} م² · حدده {name}",
       "inForce": "ساري",
-      "superseded": "مُستبدَل"
+      "superseded": "مُستبدَل",
+      "companiesAll": "عرض الكل ({total}) في الشركات"
     }
   },
   "rollup": {

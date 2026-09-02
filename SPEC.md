@@ -1215,30 +1215,6 @@ asserting a table nobody wants is the check keeping it alive.
   reps pick anything to get past it, and the chart lies differently.
   Category is still optional; its emptiness check stands.
 
-- **The opening week's length** (session 53). The founder decided *keep the
-  number, change the words*; where the line sits was the session's to
-  choose, and it chose **one working week** — five, derived from S93's
-  weekend, no stored setting — so the 6th working day is the first that
-  reads *ahead* or *behind* (`D32`, `D79`). Both directions are withheld
-  through the week. Confirm the week, or name a different count.
-- **The coordinator on the team table** (session 53). `D39`'s row set as
-  approved says *book-holder with a live company*, and Nouf holds four in
-  the seed, so she is a row with a dash. Whether the coordinator belongs on
-  a table about the sales team is his call; the sentence was built as
-  written.
-- **The rail's user-management item is *Users* / *المستخدمون*** (session
-  53). The tab strip's *Team* and the rail's *Team* were one word on one
-  screen; the item that manages accounts took the plainer name. His to
-  rename.
-- **`/targets` stays for a book-holder** (session 53) — their own goal and
-  attainment by month, off the overseer's rail (`D49`). The alternative was
-  a history block on the rep's own Today; the rail item was kept as the
-  smaller change. Confirm, or ask for the block.
-- **A per-person filter on `/companies`** (session 53). The drill-in lists
-  a person's ten quietest companies with the total stated and each row a way
-  in; there is no list of *all of one person's companies* anywhere an
-  overseer can reach, because `/companies` takes no `rep=`. Add one, or
-  leave the cap.
 - **The Reports tab's windows** (session 52). Built as: a block over
   events takes the period — losses by the day marked lost, quotations by
   their raise, companies by their registration, buyers by dispatch date —
@@ -1262,6 +1238,19 @@ asserting a table nobody wants is the check keeping it alive.
 Closed here in session 50, recorded in `docs/archive/28-fixation/`:
 product specifications (not needed — SMAC prints the quotation) and the
 chase-suppression question (answered by S137).
+
+Closed in session 54 — **the five questions session 53 left, answered by
+the founder** (`WORKFLOW §4` row 59): **the opening week stays at five
+working days** (*"not a big deal"* — `D32`, `D79` unchanged); **the team
+table splits into two sections** — the people carrying a target first, then
+everyone else holding a live company, so Nouf's four companies are visible
+without her sitting among the people being measured (`D39` amended — *a
+book-holder with no target is a different kind of row*); **Users stands** as
+the rail's user-management label (`D49`); **`/targets` stays in the rail for
+a book-holder** (`D49`, confirmed); and **`/companies` takes a per-person
+filter** for whoever already sees other people's companies (`D82`) — the
+founder's reason, in his words: *auditing each page later — opening one
+rep's companies and going through them*.
 
 Closed in session 53: **behind pace on the first days of a month** — the
 founder's decision, recorded at `D32` and `D79`: the figure stays exactly as

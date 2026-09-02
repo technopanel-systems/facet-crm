@@ -184,15 +184,21 @@ export async function RepWorld({
           <CardHeader>
             <CardTitle className="flex flex-wrap items-baseline justify-between gap-x-4 text-start text-sm">
               <span>{t("today.rep.companies")}</span>
-              {companies.total > companies.rows.length ? (
-                <span className="text-faint text-[11.5px] font-normal">
+              {/* `D82` — the way to ALL of this person's companies, which
+                  `/companies?rep=` now lists; before session 54 the cap
+                  here was the end of the road (`SPEC §16`, answered). A
+                  link whenever the person holds anything, not only when
+                  the cap bites: the list is the auditing screen. */}
+              {companies.total > 0 ? (
+                <Link
+                  href={`/companies?rep=${person.id}`}
+                  data-slot="rep-companies-all"
+                  className="text-faint text-[11.5px] font-normal hover:underline"
+                >
                   <span dir="auto">
-                    {t("today.rep.companiesOf", {
-                      shown: companies.rows.length,
-                      total: companies.total,
-                    })}
+                    {t("today.rep.companiesAll", { total: companies.total })}
                   </span>
-                </span>
+                </Link>
               ) : null}
             </CardTitle>
           </CardHeader>

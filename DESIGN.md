@@ -937,6 +937,19 @@ the holder of `can_set_targets` gets one disclosure beneath the table — *set
 a target for someone not listed* — offering the active book-holders without
 a row, absent when everybody has one `D53` `D70`.
 
+**Two sections, session 54 — the founder's answer to session 53's
+coordinator question.** The people carrying a target row for the period
+come first, under their own group header; everyone else on the row set —
+a book-holder with a live company and no target — sits beneath a second
+header. Nouf holding four companies is real and should be visible, but she
+should not sit among the people being measured: **a book-holder with no
+target is a different kind of row**, and the dash was saying so one cell at
+a time. One table, one header row, two group rows carrying their counts
+(`D24`'s header-with-count, the shape `/companies`' groups already take),
+ordered by name inside each. The footer, the edit rows and the unlisted
+control are unchanged; the second section is absent when nobody is in it,
+and so is the first.
+
 **Clicking a person opens their world** — `?rep=` on the same tab, `D76`'s
 URL-state shape, never a route: their pace (this rule's bar at their own
 scope, without `D32`'s side figures, because `quotedCount` answers for a
@@ -1218,6 +1231,24 @@ moves — add companies, log the first interaction, set the month's target —
 each with its way in. The moment any of the three tables holds a row, the
 real blocks take over; nothing is stored and no flag is set (`S108` — the
 system already knows).
+
+**D82. `/companies` takes a person — `?rep=` — for whoever already sees
+other people's companies.** The founder's reason (session 54, `SPEC §16`
+answered): *auditing each page later — opening one rep's companies and
+going through them.* It follows the screen's own filter idiom and invents
+no second shape: a chip row beneath the sort chips — *Everyone*, then one
+chip per active book-holder holding a live company (`D39`'s roster) — and
+every control carries it: the search keeps it as a hidden field, the sort
+chips and the pager keep it in their hrefs, and its own chips keep the
+search and the sort (`D59`). No counts on the chips: the sort chips carry
+none, and a count per person is the team table's. **Absent for a reader
+whose list is already their own** — a rep filtering to himself is not a
+feature, so the chips render on `sees_all_reps` alone and the data layer
+ignores the parameter for anyone else (`D53`). Archived companies stay in
+the filtered list — the meter says so — because a customer somebody gave
+up on is part of going through a rep's book. The empty state names the
+person rather than the search. One person's world (`D39`) links here from
+its companies card, so the ten-quietest cap has a way through.
 
 ---
 
