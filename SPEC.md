@@ -100,9 +100,16 @@ estate, owner, consultant, station management, workshop, personal, other.
 **[BUILD]** Choosing **other requires a text field** saying what it is.
 
 **S17.** Lead source is one of: field visit, direct contact, referral,
-exhibition, marketing, other. **Marketing is not selectable by an ordinary rep**
-— it means the lead came from the marketing team. A company that already carries
-it keeps it when a rep edits.
+exhibition, marketing, **online or WhatsApp, consultant or architect**, other.
+**Marketing is not selectable by an ordinary rep** — it means the lead came
+from the marketing team. A company that already carries it keeps it when a
+rep edits. The two channels in bold joined the list in session 52 on the
+founder's word, flagged when the field became mandatory: a mandatory field
+with a channel missing makes reps pick wrong, and the chart then lies
+quietly. An architect specifying Technopanel is a different kind of win from
+a rep walking in, and how often it happens is what the second one measures.
+The list is the founder's to change; a new channel is a seed row, never a
+migration.
 
 **Lead source is mandatory when a company is created** — decided with the
 overseer conversation (answer 10, `docs/archive/30`): *a rule change, not a

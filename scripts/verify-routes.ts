@@ -266,7 +266,13 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { closeDatabase, db } from "@/db";
-import { companies, companyReps, sessions, users } from "@/db/schema";
+import {
+  companies,
+  companyReps,
+  leadSources,
+  sessions,
+  users,
+} from "@/db/schema";
 
 process.loadEnvFile(".env");
 
@@ -2476,6 +2482,60 @@ async function main(): Promise<void> {
           leadSourceId ?? "missing"
         }`,
       );
+
+      /*
+       * **The list is the founder's, and the form offers the whole of it**
+       * `S17` — session 52 added two channels (online or WhatsApp, consultant
+       * or architect) because a mandatory field with a channel missing makes
+       * reps pick wrong. The rep's select is held to the `rep_selectable`
+       * rows and the manager's (`can_assign`) to every row, each read off
+       * `lead_sources` itself — an independent origin, so a seed row that
+       * never reached the screen, or a screen offering a row the seed does
+       * not carry, is a disagreement and not a coincidence. Both counts print
+       * on the green line. NOT MEASURED when the table reads empty: two zeros
+       * agreeing would be an assertion that reads nothing.
+       */
+      const optionIds = (select: string | undefined) =>
+        select
+          ? [...select.matchAll(/<option value="([0-9a-f-]{36})"/g)].length
+          : 0;
+      let selectable = -1;
+      let every = -1;
+      try {
+        const rows = await db
+          .select({ repSelectable: leadSources.repSelectable })
+          .from(leadSources);
+        every = rows.length;
+        selectable = rows.filter((row) => row.repSelectable).length;
+      } catch (error) {
+        console.log(`  --    lead_sources could not be read — ${String(error)}`);
+      }
+      if (every <= 0) {
+        console.log(
+          `  --    ${locale}: lead_sources reads ${every < 0 ? "nothing" : "empty"}, so the option counts are NOT MEASURED`,
+        );
+      } else {
+        const repSeen = optionIds(sourceSelect);
+        check(
+          `${locale}: *** the rep's lead-source select offers every rep-selectable row — saw ${repSeen} option(s) against ${selectable} of ${every} rows *** [S17]`,
+          repSeen === selectable,
+          `screen ${repSeen} vs records ${selectable}`,
+        );
+        const managerForm = await get(
+          jars["manager@example.test"],
+          `/${locale}/companies/new`,
+        );
+        const managerSeen = optionIds(
+          managerForm.body.match(
+            /<select[^>]*name="leadSourceId"[\s\S]*?<\/select>/,
+          )?.[0],
+        );
+        check(
+          `${locale}: *** the manager's lead-source select offers every row, Marketing included — saw ${managerSeen} option(s) against ${every} rows *** [S17]`,
+          managerSeen === every,
+          `screen ${managerSeen} vs records ${every}`,
+        );
+      }
 
       /**
        * The action envelope plus what a browser would send.

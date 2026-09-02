@@ -68,12 +68,17 @@ export type Category =
   | "Personal"
   | "Other";
 
-/** `lead_sources.name_en`, minus Marketing — see the note above. */
+/** `lead_sources.name_en`, minus Marketing — see the note above. The two
+ *  channels session 52 added `S17` reach four recent rows, so the
+ *  *where business comes from* chart is drawn with every source a rep can
+ *  pick; the pre-rule blanks (age over 45) are untouched by that. */
 export type Source =
   | "Field visit"
   | "Direct contact"
   | "Referral"
   | "Exhibition"
+  | "Online or WhatsApp"
+  | "Consultant or architect"
   | "Other";
 
 export type CompanyRow = {
@@ -698,7 +703,7 @@ export const COMPANIES: readonly CompanyRow[] = [
     owner: "faisal",
     category: "Contractor",
     city: "Riyadh",
-    source: "Direct contact",
+    source: "Online or WhatsApp",
     phone: "0112889911",
     age: 4,
     contact: { name: "أنس الشهراني", phone: "0544490012" },
@@ -709,7 +714,7 @@ export const COMPANIES: readonly CompanyRow[] = [
     owner: "faisal",
     category: "Consultant",
     city: "Riyadh",
-    source: "Exhibition",
+    source: "Consultant or architect",
     phone: "0112337766",
     age: 2,
   },
@@ -983,7 +988,7 @@ export const COMPANIES: readonly CompanyRow[] = [
     owner: "saad",
     category: "Other",
     city: "Jubail",
-    source: "Exhibition",
+    source: "Online or WhatsApp",
     phone: "0133889900",
     age: 5,
     contact: { name: "Abdulwahab Al-Munajjem", phone: "0566645512" },
@@ -1131,7 +1136,7 @@ export const COMPANIES: readonly CompanyRow[] = [
     owner: "majed",
     category: "Real Estate",
     city: "Jeddah",
-    source: "Field visit",
+    source: "Consultant or architect",
     phone: "0126223344",
     age: 9,
     contact: { name: "طلال بازرعة", phone: "0555567712" },
