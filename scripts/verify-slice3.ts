@@ -401,6 +401,31 @@ async function endRunAccounts(): Promise<void> {
   );
 }
 
+/**
+ * **The fixture calendar is derived from the run's own Riyadh month, never
+ * typed in.** It was September–December 2026 as literals, and on 2 Sep 2026
+ * the script aged out overnight: `setCreditSplit` refuses an effective date
+ * before today (`credit.errors.splitNotBackdated`), so a `2026-09-01` that
+ * was fine on the 1st threw on the 2nd. `M0` is the month AFTER the current
+ * one — a split dated its 1st is never backdated — and `M1`–`M3` follow;
+ * `MNOW` is the current month, which this run never dispatches into, so
+ * section 21's zero stays a zero.
+ */
+function monthKey(ahead: number): string {
+  const riyadh = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Riyadh",
+    dateStyle: "short",
+  }).format(new Date());
+  const [year, month] = riyadh.split("-").map(Number);
+  const shifted = new Date(Date.UTC(year, month - 1 + ahead, 1));
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+const MNOW = monthKey(0);
+const M0 = monthKey(1);
+const M1 = monthKey(2);
+const M2 = monthKey(3);
+const M3 = monthKey(4);
+
 async function main(): Promise<void> {
   if (process.env.NODE_ENV !== "development") {
     console.error(
@@ -620,7 +645,7 @@ async function main(): Promise<void> {
   const directInput = {
     ...SHIP,
     lines: linesOf("10.0000"),
-    dispatchDate: "2026-09-10",
+    dispatchDate: `${M0}-10`,
     quotationThreadId: null,
     companyId: company.id,
     userId: repB.user.id,
@@ -636,7 +661,7 @@ async function main(): Promise<void> {
   const repRequest = await requestDispatch(repA, {
     ...SHIP,
     lines: linesOf("10.0000"),
-    dispatchDate: "2026-09-10",
+    dispatchDate: `${M0}-10`,
     quotationThreadId: null,
     companyId: company.id,
     userId: null,
@@ -673,19 +698,19 @@ async function main(): Promise<void> {
     "credit.errors.creditSplitOnly",
     () =>
       setCreditSplit(repA, project.id, {
-        effectiveFrom: "2026-09-01",
+        effectiveFrom: `${M0}-01`,
         userIds: [repA.user.id],
       }),
   );
   await refuses(
     "a rep may not set targets",
     "targets.errors.setTargetsOnly",
-    () => setTarget(repA, repA.user.id, "2026-09", "500.0000"),
+    () => setTarget(repA, repA.user.id, `${M0}`, "500.0000"),
   );
   await refuses(
     "the coordinator may not set targets",
     "targets.errors.setTargetsOnly",
-    () => setTarget(coordinator, repA.user.id, "2026-09", "500.0000"),
+    () => setTarget(coordinator, repA.user.id, `${M0}`, "500.0000"),
   );
 
   /* --- 3. Approval needs a payment METHOD [S73], [S70], [S71] ----- */
@@ -724,7 +749,7 @@ async function main(): Promise<void> {
   const onDeliveryRequest = await requestDispatch(coordinator, {
     ...SHIP,
     lines: linesOf("10.0000"),
-    dispatchDate: "2026-12-10",
+    dispatchDate: `${M3}-10`,
     quotationThreadId: onDeliveryThread.id,
     companyId: null,
     userId: null,
@@ -788,7 +813,7 @@ async function main(): Promise<void> {
     ...SHIP,
     lines: linesOf("7.0000"),
     // December, for the reason above §3's first request.
-    dispatchDate: "2026-12-10",
+    dispatchDate: `${M3}-10`,
     quotationThreadId: null,
     companyId: company.id,
     userId: null,
@@ -825,7 +850,7 @@ async function main(): Promise<void> {
     ...SHIP,
     lines: linesOf("5.0000"),
     // December, for the reason above §3's first request.
-    dispatchDate: "2026-12-10",
+    dispatchDate: `${M3}-10`,
     quotationThreadId: null,
     companyId: company.id,
     userId: null,
@@ -852,7 +877,7 @@ async function main(): Promise<void> {
   const linked = await approvedDispatch(coordinator, {
     ...SHIP,
     lines: linesOf("100.0000"),
-    dispatchDate: "2026-09-10",
+    dispatchDate: `${M0}-10`,
     quotationThreadId: mainThread.id,
     companyId: null,
     userId: null,
@@ -880,7 +905,7 @@ async function main(): Promise<void> {
       approvedDispatch(coordinator, {
     ...SHIP,
         lines: linesOf("1.0000"),
-        dispatchDate: "2026-09-10",
+        dispatchDate: `${M0}-10`,
         quotationThreadId: mainThread.id,
         companyId: project.id, // any id that is not the thread's company
         userId: null,
@@ -891,7 +916,7 @@ async function main(): Promise<void> {
   const secondPartial = await approvedDispatch(coordinator, {
     ...SHIP,
     lines: linesOf("5000.0000"), // far beyond the 86.3040 m² quoted
-    dispatchDate: "2026-09-11",
+    dispatchDate: `${M0}-11`,
     quotationThreadId: mainThread.id,
     companyId: null,
     userId: null,
@@ -910,7 +935,7 @@ async function main(): Promise<void> {
   const direct = await approvedDispatch(coordinator, {
     ...SHIP,
     lines: linesOf("40.0000"),
-    dispatchDate: "2026-09-12",
+    dispatchDate: `${M0}-12`,
     quotationThreadId: null,
     companyId: company.id,
     userId: repB.user.id,
@@ -948,7 +973,7 @@ async function main(): Promise<void> {
       approvedDispatch(coordinator, {
     ...SHIP,
         lines: linesOf("1.0000"),
-        dispatchDate: "2026-09-12",
+        dispatchDate: `${M0}-12`,
         quotationThreadId: null,
         companyId: null,
         userId: repB.user.id,
@@ -962,7 +987,7 @@ async function main(): Promise<void> {
   const forSelf = await approvedDispatch(coordinator, {
     ...SHIP,
     lines: linesOf("1.0000"),
-    dispatchDate: "2026-09-12",
+    dispatchDate: `${M0}-12`,
     quotationThreadId: null,
     companyId: company.id,
     userId: null,
@@ -980,7 +1005,7 @@ async function main(): Promise<void> {
       approvedDispatch(coordinator, {
     ...SHIP,
         lines: linesOf("0.0000"),
-        dispatchDate: "2026-09-12",
+        dispatchDate: `${M0}-12`,
         quotationThreadId: null,
         companyId: company.id,
         userId: repB.user.id,
@@ -1044,10 +1069,10 @@ async function main(): Promise<void> {
     "\n7. The split in force on each dispatch's own date [07 D3] — the central claim",
   );
   await setCreditSplit(manager, project.id, {
-    effectiveFrom: "2026-09-01",
+    effectiveFrom: `${M0}-01`,
     userIds: [repA.user.id, repB.user.id],
   });
-  const g1 = await getCreditSplitInForce(manager, project.id, "2026-09-15");
+  const g1 = await getCreditSplitInForce(manager, project.id, `${M0}-15`);
   check(
     "G1 divides equally, two ways [18 §3]",
     g1?.rows.length === 2 && g1.rows.every((row) => row.percentage === "50.00"),
@@ -1066,7 +1091,7 @@ async function main(): Promise<void> {
   check("D1 now uses the split", d1Credit.basis === "split");
   check(
     "D1's generation is G1",
-    d1Credit.generationEffectiveFrom === "2026-09-01",
+    d1Credit.generationEffectiveFrom === `${M0}-01`,
   );
   check(
     "D1 credits 50.0000 each",
@@ -1080,10 +1105,10 @@ async function main(): Promise<void> {
   // no project visibility, so a strict project check would have made a
   // founder-granted flag unusable. This script found that on its first run.
   await setCreditSplit(coordinator, project.id, {
-    effectiveFrom: "2026-10-01",
+    effectiveFrom: `${M1}-01`,
     userIds: [repA.user.id, repB.user.id, repC.user.id],
   });
-  const g2 = await getCreditSplitInForce(manager, project.id, "2026-10-15");
+  const g2 = await getCreditSplitInForce(manager, project.id, `${M1}-15`);
   check(
     "G2 divides three ways and still totals 100.00 [18 §5]",
     g2?.rows.map((row) => row.percentage).join("/") === "33.34/33.33/33.33",
@@ -1093,7 +1118,7 @@ async function main(): Promise<void> {
   const d1Again = await creditOf(d1);
   check(
     "*** D1's credit is UNCHANGED by the later generation [07 D3] ***",
-    d1Again.generationEffectiveFrom === "2026-09-01" &&
+    d1Again.generationEffectiveFrom === `${M0}-01` &&
       d1Again.shares.every((share) => share.sqm === "50.0000"),
     `got ${d1Again.generationEffectiveFrom} ${d1Again.shares.map((s) => s.sqm).join("/")}`,
   );
@@ -1101,7 +1126,7 @@ async function main(): Promise<void> {
   const d2Row = await approvedDispatch(coordinator, {
     ...SHIP,
     lines: linesOf("100.0000"),
-    dispatchDate: "2026-10-05",
+    dispatchDate: `${M1}-05`,
     quotationThreadId: mainThread.id,
     companyId: null,
     userId: null,
@@ -1133,7 +1158,7 @@ async function main(): Promise<void> {
     .where(
       and(
         eq(projectCreditSplits.projectId, project.id),
-        eq(projectCreditSplits.effectiveFrom, "2026-09-01"),
+        eq(projectCreditSplits.effectiveFrom, `${M0}-01`),
       ),
     );
   check(
@@ -1150,7 +1175,7 @@ async function main(): Promise<void> {
     "credit.errors.splitNeedsRow",
     () =>
       setCreditSplit(manager, project.id, {
-        effectiveFrom: "2026-11-01",
+        effectiveFrom: `${M2}-01`,
         userIds: [],
       }),
   );
@@ -1159,7 +1184,7 @@ async function main(): Promise<void> {
     "credit.errors.splitDuplicateUser",
     () =>
       setCreditSplit(manager, project.id, {
-        effectiveFrom: "2026-11-01",
+        effectiveFrom: `${M2}-01`,
         userIds: [repA.user.id, repA.user.id],
       }),
   );
@@ -1283,9 +1308,9 @@ async function main(): Promise<void> {
   console.log(
     "\n10. Targets are superseding rows, never edits [07 D1], [10 §6]",
   );
-  await setTarget(manager, repA.user.id, "2026-09", "500.0000");
-  await setTarget(manager, repA.user.id, "2026-09", "600.0000");
-  const history = await listTargetHistory(manager, repA.user.id, "2026-09");
+  await setTarget(manager, repA.user.id, `${M0}`, "500.0000");
+  await setTarget(manager, repA.user.id, `${M0}`, "600.0000");
+  const history = await listTargetHistory(manager, repA.user.id, `${M0}`);
   check(
     "a same-month correction wrote a SECOND row, not an edit",
     history.length === 2,
@@ -1296,7 +1321,7 @@ async function main(): Promise<void> {
     history.every((row) => row.setByName.length > 0),
   );
 
-  const september = await achievementForPeriod(manager, "2026-09");
+  const september = await achievementForPeriod(manager, `${M0}`);
   const repARow = september.find((row) => row.userId === repA.user.id);
   check(
     "achievement reads the latest row, 600.0000",
@@ -1338,14 +1363,14 @@ async function main(): Promise<void> {
     // is 100 + 5000 dispatched. Neither figure appears.
     repARow?.achievedSqm === "2550.0000",
   );
-  const august = await achievementForPeriod(manager, "2026-08");
+  const august = await achievementForPeriod(manager, `${MNOW}`);
   const augustRepA = august.find((row) => row.userId === repA.user.id);
   check(
     "an accepted, PAID, undispatched quotation credits nothing [16 §5]",
     augustRepA?.achievedSqm === "0.0000",
     `got ${augustRepA?.achievedSqm}`,
   );
-  const october = await achievementForPeriod(manager, "2026-10");
+  const october = await achievementForPeriod(manager, `${M1}`);
   const octoberShares = [repA.user.id, repB.user.id, repC.user.id].map(
     (id) => october.find((row) => row.userId === id)?.achievedSqm ?? "0.0000",
   );
@@ -1448,7 +1473,7 @@ async function main(): Promise<void> {
     "a split-credited rep with no project or thread access still cannot open it",
     (await getDispatch(repB, linked.id)) === null,
   );
-  const repBTargets = await achievementForPeriod(repB, "2026-09");
+  const repBTargets = await achievementForPeriod(repB, `${M0}`);
   check(
     "a rep's targets screen shows exactly one row — their own",
     repBTargets.length === 1 && repBTargets[0].userId === repB.user.id,
@@ -1595,7 +1620,7 @@ async function main(): Promise<void> {
   await approvedDispatch(coordinator, {
     ...SHIP,
     lines: linesOf("40.0000"),
-    dispatchDate: "2026-09-13",
+    dispatchDate: `${M0}-13`,
     quotationThreadId: null,
     companyId: company.id,
     userId: repB.user.id,
@@ -1611,7 +1636,7 @@ async function main(): Promise<void> {
   await approvedDispatch(coordinator, {
     ...SHIP,
     lines: linesOf("7.0000"),
-    dispatchDate: "2026-09-13",
+    dispatchDate: `${M0}-13`,
     quotationThreadId: mainThread.id,
     companyId: null,
     userId: null,
@@ -1666,7 +1691,7 @@ async function main(): Promise<void> {
   await approvedDispatch(coordinator, {
     ...SHIP,
     lines: linesOf("250.0000"),
-    dispatchDate: "2026-09-13",
+    dispatchDate: `${M0}-13`,
     quotationThreadId: secondThread.id,
     companyId: null,
     userId: null,
@@ -1713,7 +1738,7 @@ async function main(): Promise<void> {
   const takenFrom = await approvedDispatch(coordinator, {
     ...SHIP,
     lines: linesOf("3.0000"),
-    dispatchDate: "2026-09-14",
+    dispatchDate: `${M0}-14`,
     quotationThreadId: mainThread.id,
     companyId: null,
     userId: null,
@@ -1748,7 +1773,7 @@ async function main(): Promise<void> {
       approvedDispatch(coordinator, {
     ...SHIP,
         lines: linesOf("1.0000"),
-        dispatchDate: "2026-09-14",
+        dispatchDate: `${M0}-14`,
         quotationThreadId: mainThread.id,
         companyId: null,
         userId: null,
@@ -1921,7 +1946,7 @@ async function main(): Promise<void> {
   await refuses(
     "…nor set a follow-up date on one",
     "followUps.errors.notYours",
-    () => setNextFollowUp(coordinator, "project", project.id, "2026-12-01"),
+    () => setNextFollowUp(coordinator, "project", project.id, `${M3}-01`),
   );
 
   // `S38` is not revisited here: the coordinator holds no `sees_all_reps` and
@@ -2035,7 +2060,7 @@ async function main(): Promise<void> {
       approvedDispatch(coordinator, {
     ...SHIP,
         lines: linesOf("1.0000"),
-        dispatchDate: "2026-09-20",
+        dispatchDate: `${M0}-20`,
         quotationThreadId: notIssuedThread.id,
         companyId: null,
         userId: null,
@@ -2095,7 +2120,7 @@ async function main(): Promise<void> {
   const asQuoted = await approvedDispatch(coordinator, {
     ...SHIP,
     lines: prefilled.lines,
-    dispatchDate: "2026-09-21",
+    dispatchDate: `${M0}-21`,
     quotationThreadId: notIssuedThread.id,
     companyId: null,
     userId: null,
@@ -2126,7 +2151,7 @@ async function main(): Promise<void> {
       // …plus a product the quotation never had `S116`.
       ...linesOf("10.0000", "80.00"),
     ],
-    dispatchDate: "2026-09-22",
+    dispatchDate: `${M0}-22`,
     quotationThreadId: notIssuedThread.id,
     companyId: null,
     userId: null,
@@ -2163,7 +2188,7 @@ async function main(): Promise<void> {
   const freeEntry = await approvedDispatch(coordinator, {
     ...SHIP,
     lines: linesOf("9.0000", "70.00"),
-    dispatchDate: "2026-09-23",
+    dispatchDate: `${M0}-23`,
     quotationThreadId: null,
     companyId: company.id,
     userId: repB.user.id,
@@ -2186,7 +2211,7 @@ async function main(): Promise<void> {
       approvedDispatch(coordinator, {
     ...SHIP,
         lines: linesOf("4.0000", ""),
-        dispatchDate: "2026-09-24",
+        dispatchDate: `${M0}-24`,
         quotationThreadId: null,
         companyId: company.id,
         userId: repB.user.id,
@@ -2200,7 +2225,7 @@ async function main(): Promise<void> {
       approvedDispatch(coordinator, {
     ...SHIP,
         lines: [],
-        dispatchDate: "2026-09-24",
+        dispatchDate: `${M0}-24`,
         quotationThreadId: null,
         companyId: company.id,
         userId: repB.user.id,
@@ -2217,7 +2242,7 @@ async function main(): Promise<void> {
   const repPath = await requestDispatch(repA, {
     ...SHIP,
     lines: linesOf("30.0000", "80.00"),
-    dispatchDate: "2026-09-25",
+    dispatchDate: `${M0}-25`,
     quotationThreadId: mainThread.id,
     companyId: null,
     userId: null,
@@ -2233,13 +2258,13 @@ async function main(): Promise<void> {
   await updateDispatchRequest(repA, repPath.id, {
     ...SHIP,
     lines: linesOf("31.0000", "80.00"),
-    dispatchDate: "2026-09-26",
+    dispatchDate: `${M0}-26`,
     projectId: null,
   });
   const editedByRep = (await getDispatch(repA, repPath.id))!;
   check(
     "…and edits it while it is a draft [S125]",
-    editedByRep.sqm === "31.0000" && editedByRep.dispatchDate === "2026-09-26",
+    editedByRep.sqm === "31.0000" && editedByRep.dispatchDate === `${M0}-26`,
     `got ${editedByRep.sqm} on ${editedByRep.dispatchDate}`,
   );
   check(
@@ -2257,7 +2282,7 @@ async function main(): Promise<void> {
       updateDispatchRequest(repB, repPath.id, {
     ...SHIP,
         lines: linesOf("1.0000", "80.00"),
-        dispatchDate: "2026-09-26",
+        dispatchDate: `${M0}-26`,
         projectId: null,
       }),
   );
@@ -2277,7 +2302,7 @@ async function main(): Promise<void> {
       updateDispatchRequest(coordinator, repPath.id, {
     ...SHIP,
         lines: linesOf("1.0000", "80.00"),
-        dispatchDate: "2026-09-26",
+        dispatchDate: `${M0}-26`,
         projectId: null,
       }),
   );
@@ -2304,7 +2329,7 @@ async function main(): Promise<void> {
       updateDispatchRequest(repA, repPath.id, {
     ...SHIP,
         lines: linesOf("99.0000", "80.00"),
-        dispatchDate: "2026-09-26",
+        dispatchDate: `${M0}-26`,
         projectId: null,
       }),
   );
@@ -2316,7 +2341,7 @@ async function main(): Promise<void> {
   await updateDispatchRequest(coordinator, repPath.id, {
     ...SHIP,
     lines: linesOf("32.0000", "85.00"),
-    dispatchDate: "2026-09-26",
+    dispatchDate: `${M0}-26`,
     projectId: null,
   });
   const editedByCoordinator = (await getDispatch(coordinator, repPath.id))!;
@@ -2357,7 +2382,7 @@ async function main(): Promise<void> {
       updateDispatchRequest(coordinator, repPath.id, {
     ...SHIP,
         lines: linesOf("1.0000", "80.00"),
-        dispatchDate: "2026-09-26",
+        dispatchDate: `${M0}-26`,
         projectId: null,
       }),
   );
@@ -2376,7 +2401,7 @@ async function main(): Promise<void> {
   const doomed = await requestDispatch(repA, {
     ...SHIP,
     lines: linesOf("7.0000", "60.00"),
-    dispatchDate: "2026-09-27",
+    dispatchDate: `${M0}-27`,
     quotationThreadId: mainThread.id,
     companyId: null,
     userId: null,
@@ -2482,7 +2507,7 @@ async function main(): Promise<void> {
   await updateDispatchRequest(repA, doomed.id, {
     ...SHIP,
     lines: linesOf("8.0000", "60.00"),
-    dispatchDate: "2026-09-28",
+    dispatchDate: `${M0}-28`,
     projectId: null,
   });
   await submitDispatchRequest(repA, doomed.id);
@@ -2564,7 +2589,7 @@ async function main(): Promise<void> {
   const hers = await requestDispatch(herself, {
     ...SHIP,
     lines: linesOf("55.0000", "90.00"),
-    dispatchDate: "2026-09-29",
+    dispatchDate: `${M0}-29`,
     quotationThreadId: null,
     companyId: herCompany.id,
     userId: null,
@@ -2595,7 +2620,7 @@ async function main(): Promise<void> {
   );
   check(
     "…and it credits her, like any other approved dispatch [S72], [S78]",
-    (await dispatchesInPeriod("2026-09-01", "2026-10-01")).some(
+    (await dispatchesInPeriod(`${M0}-01`, `${M1}-01`)).some(
       (row) => row.id === hers.id && row.userId === herUser.id,
     ),
   );
@@ -2628,7 +2653,7 @@ async function main(): Promise<void> {
   const pending = await requestDispatch(repA, {
     ...SHIP,
     lines: linesOf("500.0000", "100.00"),
-    dispatchDate: "2026-09-30",
+    dispatchDate: `${M0}-30`,
     quotationThreadId: mainThread.id,
     companyId: null,
     userId: null,
@@ -2693,7 +2718,7 @@ async function main(): Promise<void> {
   // already been raised. On the dispatch it is `dispatches_stock_shipment`.
   const ctInput = {
     lines: linesOf("3.0000"),
-    dispatchDate: "2026-09-12",
+    dispatchDate: `${M0}-12`,
     quotationThreadId: null,
     companyId: company.id,
     userId: null,
@@ -2786,7 +2811,7 @@ async function main(): Promise<void> {
     () =>
       updateDispatchRequest(coordinator, editable.id, {
         lines: linesOf("3.0000"),
-        dispatchDate: "2026-09-12",
+        dispatchDate: `${M0}-12`,
         projectId: null,
         stock: "dammam",
         shipment: "tt",
@@ -2795,7 +2820,7 @@ async function main(): Promise<void> {
   );
   await updateDispatchRequest(coordinator, editable.id, {
     lines: linesOf("3.0000"),
-    dispatchDate: "2026-09-12",
+    dispatchDate: `${M0}-12`,
     projectId: null,
     stock: "dammam",
     shipment: "ct",
@@ -2824,7 +2849,7 @@ async function main(): Promise<void> {
     .limit(1);
   const elsewhere = await approvedDispatch(coordinator, {
     lines: linesOf("4.0000"),
-    dispatchDate: "2026-09-13",
+    dispatchDate: `${M0}-13`,
     quotationThreadId: mainThread.id,
     companyId: null,
     userId: null,
@@ -2855,7 +2880,7 @@ async function main(): Promise<void> {
     () =>
       updateDispatchRequest(coordinator, elsewhere.id, {
         lines: linesOf("4.0000"),
-        dispatchDate: "2026-09-13",
+        dispatchDate: `${M0}-13`,
         projectId: null,
         stock: "malham",
         shipment: "tt",
@@ -2874,7 +2899,7 @@ async function main(): Promise<void> {
   const numbering = await requestDispatch(coordinator, {
     ...SHIP,
     lines: linesOf("6.0000"),
-    dispatchDate: "2026-09-14",
+    dispatchDate: `${M0}-14`,
     quotationThreadId: null,
     companyId: company.id,
     userId: null,
@@ -2901,7 +2926,7 @@ async function main(): Promise<void> {
   );
   check(
     "and an unnumbered approved dispatch still credits its target [S72], [S121]",
-    (await dispatchesInPeriod("2026-09-01", "2026-10-01")).some(
+    (await dispatchesInPeriod(`${M0}-01`, `${M1}-01`)).some(
       (row) => row.id === numbering.id,
     ),
   );
@@ -2919,7 +2944,7 @@ async function main(): Promise<void> {
   const otherNumbered = await approvedDispatch(coordinator, {
     ...SHIP,
     lines: linesOf("6.0000"),
-    dispatchDate: "2026-09-14",
+    dispatchDate: `${M0}-14`,
     quotationThreadId: null,
     companyId: company.id,
     userId: null,
@@ -3046,7 +3071,7 @@ async function main(): Promise<void> {
   const asQuotedReq = await requestDispatch(repA, {
     ...SHIP,
     lines: untouched.prefill,
-    dispatchDate: "2026-09-27",
+    dispatchDate: `${M0}-27`,
     quotationThreadId: untouched.id,
     companyId: null,
     userId: null,
@@ -3077,7 +3102,7 @@ async function main(): Promise<void> {
     lines: colourOnly.prefill.map((row, index) =>
       index === 0 ? { ...row, customColour: "7016" } : row,
     ),
-    dispatchDate: "2026-09-27",
+    dispatchDate: `${M0}-27`,
     quotationThreadId: colourOnly.id,
     companyId: null,
     userId: null,
@@ -3111,7 +3136,7 @@ async function main(): Promise<void> {
   const addedReq = await requestDispatch(repA, {
     ...SHIP,
     lines: [...addedThread.prefill, ...linesOf("2.0000", "60.00")],
-    dispatchDate: "2026-09-27",
+    dispatchDate: `${M0}-27`,
     quotationThreadId: addedThread.id,
     companyId: null,
     userId: null,
@@ -3127,7 +3152,7 @@ async function main(): Promise<void> {
   const droppedReq = await requestDispatch(repA, {
     ...SHIP,
     lines: dropped.prefill.slice(0, 1),
-    dispatchDate: "2026-09-27",
+    dispatchDate: `${M0}-27`,
     quotationThreadId: dropped.id,
     companyId: null,
     userId: null,
@@ -3146,7 +3171,7 @@ async function main(): Promise<void> {
   const reorderedReq = await requestDispatch(repA, {
     ...SHIP,
     lines: [...reordered.prefill].reverse(),
-    dispatchDate: "2026-09-27",
+    dispatchDate: `${M0}-27`,
     quotationThreadId: reordered.id,
     companyId: null,
     userId: null,
@@ -3180,7 +3205,7 @@ async function main(): Promise<void> {
   const pricedReq = await requestDispatch(repA, {
     ...SHIP,
     lines: unpriced.prefill.map((row) => ({ ...row, unitPrice: "77.00" })),
-    dispatchDate: "2026-09-27",
+    dispatchDate: `${M0}-27`,
     quotationThreadId: unpriced.id,
     companyId: null,
     userId: null,
@@ -3199,7 +3224,7 @@ async function main(): Promise<void> {
   const hersReq = await requestDispatch(repA, {
     ...SHIP,
     lines: hersThread.prefill,
-    dispatchDate: "2026-09-27",
+    dispatchDate: `${M0}-27`,
     quotationThreadId: hersThread.id,
     companyId: null,
     userId: null,
@@ -3212,7 +3237,7 @@ async function main(): Promise<void> {
     lines: hersThread.prefill.map((row, index) =>
       index === 0 ? { ...row, quantityPcs: "1.0000" } : row,
     ),
-    dispatchDate: "2026-09-27",
+    dispatchDate: `${M0}-27`,
     projectId: null,
     ...SHIP,
   });
@@ -3227,7 +3252,7 @@ async function main(): Promise<void> {
   // An edit that touches no line is not a difference anybody made.
   await updateDispatchRequest(coordinator, asQuotedReq.id, {
     lines: untouched.prefill,
-    dispatchDate: "2026-09-28",
+    dispatchDate: `${M0}-28`,
     projectId: null,
     ...SHIP,
   });
@@ -3248,7 +3273,7 @@ async function main(): Promise<void> {
     lines: bothOf.prefill.map((row, index) =>
       index === 0 ? { ...row, customColour: "5010" } : row,
     ),
-    dispatchDate: "2026-09-27",
+    dispatchDate: `${M0}-27`,
     quotationThreadId: bothOf.id,
     companyId: null,
     userId: null,
@@ -3259,7 +3284,7 @@ async function main(): Promise<void> {
     lines: bothOf.prefill.map((row, index) =>
       index === 0 ? { ...row, customColour: "5010", unitPrice: "10.00" } : row,
     ),
-    dispatchDate: "2026-09-27",
+    dispatchDate: `${M0}-27`,
     projectId: null,
     ...SHIP,
   });
@@ -3278,7 +3303,7 @@ async function main(): Promise<void> {
     lines: back.prefill.map((row, index) =>
       index === 0 ? { ...row, customColour: "5010" } : row,
     ),
-    dispatchDate: "2026-09-27",
+    dispatchDate: `${M0}-27`,
     quotationThreadId: back.id,
     companyId: null,
     userId: null,
@@ -3287,7 +3312,7 @@ async function main(): Promise<void> {
   await submitDispatchRequest(repA, backReq.id);
   await updateDispatchRequest(coordinator, backReq.id, {
     lines: back.prefill,
-    dispatchDate: "2026-09-27",
+    dispatchDate: `${M0}-27`,
     projectId: null,
     ...SHIP,
   });
@@ -3305,7 +3330,7 @@ async function main(): Promise<void> {
   const freeFlagged = await requestDispatch(coordinator, {
     ...SHIP,
     lines: linesOf("5.0000"),
-    dispatchDate: "2026-09-27",
+    dispatchDate: `${M0}-27`,
     quotationThreadId: null,
     companyId: company.id,
     userId: repB.user.id,
@@ -3336,7 +3361,7 @@ async function main(): Promise<void> {
   const beforeRevision = await requestDispatch(repA, {
     ...SHIP,
     lines: revised.prefill,
-    dispatchDate: "2026-09-27",
+    dispatchDate: `${M0}-27`,
     quotationThreadId: revised.id,
     companyId: null,
     userId: null,
@@ -3391,7 +3416,7 @@ async function main(): Promise<void> {
     lines: revivable.prefill.map((row, index) =>
       index === 0 ? { ...row, quantityPcs: "1.0000" } : row,
     ),
-    dispatchDate: "2026-09-27",
+    dispatchDate: `${M0}-27`,
     quotationThreadId: revivable.id,
     companyId: null,
     userId: null,
@@ -3421,7 +3446,7 @@ async function main(): Promise<void> {
   );
   await updateDispatchRequest(repA, revivedReq.id, {
     lines: revivable.prefill,
-    dispatchDate: "2026-09-27",
+    dispatchDate: `${M0}-27`,
     projectId: null,
     ...SHIP,
   });
@@ -3655,7 +3680,7 @@ async function main(): Promise<void> {
   const awaitingHer = await requestDispatch(repA, {
     ...SHIP,
     lines: linesOf("40.0000"),
-    dispatchDate: "2026-09-20",
+    dispatchDate: `${M0}-20`,
     quotationThreadId: winnableThread.id,
     companyId: null,
     userId: null,
@@ -3711,7 +3736,7 @@ async function main(): Promise<void> {
   const unlinkedWin = await approvedDispatch(coordinator, {
     ...SHIP,
     lines: linesOf("11.0000"),
-    dispatchDate: "2026-09-21",
+    dispatchDate: `${M0}-21`,
     quotationThreadId: null,
     companyId: company.id,
     userId: repA.user.id,
@@ -3790,8 +3815,8 @@ async function main(): Promise<void> {
    * exact worked example and §10 October's; a new approval in either month
    * moves a number this script proves by arithmetic. Nothing measures December.
    */
-  const CANCEL_MONTH = "2026-12";
-  const CANCEL_DATE = "2026-12-08";
+  const CANCEL_MONTH = `${M3}`;
+  const CANCEL_DATE = `${M3}-08`;
 
   const undoneProject = await createProject(
     repA,
@@ -3821,7 +3846,7 @@ async function main(): Promise<void> {
    * generation in force on THAT date, so this one applies to it.
    */
   await setCreditSplit(manager, undoneProject.id, {
-    effectiveFrom: "2026-12-01",
+    effectiveFrom: `${M3}-01`,
     userIds: [repA.user.id, repB.user.id],
   });
 
@@ -3960,7 +3985,7 @@ async function main(): Promise<void> {
     `before=${repBBefore} after=${repBAfter} share=${halves[1]}`,
   );
 
-  const decemberRows = await dispatchesInPeriod("2026-12-01", "2027-01-01");
+  const decemberRows = await dispatchesInPeriod(`${M3}-01`, "2027-01-01");
   check(
     "…and the one predicate every figure composes no longer returns it [S72]",
     decemberRows.every((row) => row.id !== undone.id),
@@ -4142,7 +4167,7 @@ async function main(): Promise<void> {
   const forRep = await requestDispatch(herself, {
     ...SHIP,
     lines: linesOf("21.0000", "70.00"),
-    dispatchDate: "2026-11-04",
+    dispatchDate: `${M2}-04`,
     quotationThreadId: null,
     companyId: herCompany.id,
     userId: repA.user.id,
@@ -4210,7 +4235,7 @@ async function main(): Promise<void> {
   const dateMoved = await requestDispatch(repA, {
     ...SHIP,
     lines: linesOf("9.0000", "65.00"),
-    dispatchDate: "2026-11-05",
+    dispatchDate: `${M2}-05`,
     quotationThreadId: s123Thread.id,
     companyId: null,
     userId: null,
@@ -4229,13 +4254,13 @@ async function main(): Promise<void> {
   await updateDispatchRequest(coordinator, dateMoved.id, {
     ...SHIP,
     lines: linesOf("9.0000", "65.00"),
-    dispatchDate: "2026-11-06",
+    dispatchDate: `${M2}-06`,
     projectId: null,
   });
   const afterDateEdit = (await getDispatch(coordinator, dateMoved.id))!;
   check(
     "*** the coordinator edited it, and S120's column still says false *** [S120]",
-    afterDateEdit.dispatchDate === "2026-11-06" &&
+    afterDateEdit.dispatchDate === `${M2}-06` &&
       afterDateEdit.linesChangedAfterSubmission === false,
     `${afterDateEdit.dispatchDate}, linesChanged ${afterDateEdit.linesChangedAfterSubmission}`,
   );
@@ -4257,7 +4282,7 @@ async function main(): Promise<void> {
   await updateDispatchRequest(asHer, forRep.id, {
     ...SHIP,
     lines: linesOf("21.0000", "70.00"),
-    dispatchDate: "2026-11-07",
+    dispatchDate: `${M2}-07`,
     projectId: null,
   });
   const [impersonated] = await db
@@ -4450,7 +4475,7 @@ async function main(): Promise<void> {
   const unblocked = await requestDispatch(repA, {
     ...SHIP,
     lines: linesOf("3.0000", "50.00"),
-    dispatchDate: "2026-11-08",
+    dispatchDate: `${M2}-08`,
     quotationThreadId: null,
     companyId: s123Company.id,
     userId: null,

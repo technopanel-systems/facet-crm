@@ -136,8 +136,10 @@ export default async function UserDetailPage({
         </CardContent>
       </Card>
 
-      {/* `19` requirement 3 — targets are already built. This links to them
-          rather than rebuilding a per-person panel. */}
+      {/* `19` requirement 3 — targets are already built. This links to the
+          person's world on the Team tab (`D39`, session 53) rather than
+          rebuilding a per-person panel: every holder of `can_manage_users`
+          also holds `sees_all_reps`, which is that tab's gate. */}
       <Card>
         <CardHeader>
           <CardTitle>{t("team.detail.targets")}</CardTitle>
@@ -145,7 +147,9 @@ export default async function UserDetailPage({
         </CardHeader>
         <CardContent>
           <Button asChild size="sm" variant="outline">
-            <Link href="/targets">{t("team.detail.viewTargets")}</Link>
+            <Link href={`/?tab=team&rep=${user.id}`}>
+              {t("team.detail.viewTargets")}
+            </Link>
           </Button>
         </CardContent>
       </Card>

@@ -42,7 +42,17 @@
  *
  * Diagnostic only. Nothing is written and nothing is penalised `[07 D6]`.
  */
-import { and, asc, eq, exists, gte, inArray, isNull, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  exists,
+  gte,
+  inArray,
+  isNull,
+  sql,
+} from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -206,9 +216,26 @@ export function companySilence(thresholds: QuietThresholds) {
         (${companies.createdAt} at time zone 'Asia/Riyadh')::date
       )`.as("silence_days"),
       /** **On hold is never quiet** `[20 §5]` — the clock is deliberately
-       *  suppressed, so the row is calm however long it has been. */
+       *  suppressed, so the row is calm however long it has been.
+       *
+       *  **Neither is an archived company or a merge tombstone** — added
+       *  session 53, closing `WORKFLOW §5`'s *archived companies stay inside
+       *  the silence figures*. `archiveCompany` sets `archived_at` and leaves
+       *  the `company_reps` rows live, so before this term `quietCountsByRep`
+       *  would have counted a customer somebody archived as *quiet* from the
+       *  day it crossed its threshold (latent — 0 archived in the seed, and
+       *  the pilot's first archive would have made it real). The term lives
+       *  HERE, in the one derivation, rather than at every reader: `companyTurn`
+       *  already forced `isQuiet` false for these and `neverContactedByRep`
+       *  already excluded them, so this is the subquery catching up with its
+       *  own readers, and `/companies`' meter, its quiet-first order, the rep's
+       *  queue and `D39`'s column now all say the same thing about an
+       *  archived customer: nobody owes it a call. `silentDays` still runs,
+       *  so the meter on an archived company's own page keeps its figure. */
       isQuiet: sql<boolean>`(
         ${onHold.until} is null
+        and ${companies.archivedAt} is null
+        and ${companies.mergedIntoId} is null
         and (now() at time zone 'Asia/Riyadh')::date - coalesce(
           ${lastInteraction.at},
           (${companies.createdAt} at time zone 'Asia/Riyadh')::date
@@ -244,6 +271,9 @@ export function companySilence(thresholds: QuietThresholds) {
  * the same set. Nothing about archived or merged companies is added here for
  * the same reason: `listCompanies` does not exclude them, and a second opinion
  * about the scope is how two numbers describing one thing start to differ.
+ * **Since session 53 an archived company is never `isQuiet`** — the term sits
+ * inside `companySilence` itself, so this count, `/companies`' quiet group and
+ * the company's own turn panel drop it together (`WORKFLOW §5`, closed).
  *
  * **`follow-ups.ts`'s `companyQuiet` is deliberately NOT the reader.** It is
  * the third copy of this derivation and `WORKFLOW §5` records that it has
@@ -340,8 +370,156 @@ export async function neverContactedByRep(
 }
 
 /**
+ * One person's companies, quietest first — the rep drill-in's *companies by
+ * silence* (`D39`, session 53).
+ *
+ * **Membership, not visibility**, as `quietCountsByRep` above: live
+ * `company_reps` rows, so the list is exactly the set that rep's quiet column
+ * counted. Archived companies and merge tombstones are left out for
+ * `neverContactedByRep`'s reason — a customer somebody archived is not one
+ * anybody is being asked to contact — and the total says how many the list
+ * is of `D70`. Ordered on `silentDays` **in SQL, before the cap**
+ * (`CLAUDE.md`): the quietest must lead whatever the cap is.
+ *
+ * No session: the one caller has already run `visibleMeasuredUsersFilter`
+ * over the person, and a second visibility answer here would be the
+ * two-copies trap.
+ */
+export type HeldCompany = {
+  id: string;
+  name: string;
+  /** Days the clock has run — since the last interaction, else registration. */
+  silentDays: number;
+  /** Null = never logged against, which must not read as 0. */
+  lastInteractionAt: string | null;
+  thresholdDays: number;
+  isQuiet: boolean;
+  onHoldUntil: string | null;
+};
+
+export async function companiesHeldBySilence(
+  userId: string,
+  limit: number,
+): Promise<{ rows: HeldCompany[]; total: number }> {
+  const thresholds = await getQuietThresholds();
+  const silence = companySilence(thresholds);
+
+  const scope = and(
+    eq(companyReps.userId, userId),
+    isNull(companyReps.removedAt),
+    isNull(companies.archivedAt),
+    isNull(companies.mergedIntoId),
+  );
+
+  const [rows, [count]] = await Promise.all([
+    db
+      .select({
+        id: companies.id,
+        name: companies.name,
+        silentDays: silence.silentDays,
+        lastInteractionAt: silence.lastInteractionAt,
+        thresholdDays: silence.thresholdDays,
+        isQuiet: silence.isQuiet,
+        onHoldUntil: silence.onHoldUntil,
+      })
+      .from(companyReps)
+      .innerJoin(companies, eq(companies.id, companyReps.companyId))
+      .innerJoin(silence, eq(silence.companyId, companies.id))
+      .where(scope)
+      .orderBy(desc(silence.silentDays), asc(companies.name))
+      .limit(limit),
+    db
+      .select({ total: sql<number>`count(*)`.mapWith(Number) })
+      .from(companyReps)
+      .innerJoin(companies, eq(companies.id, companyReps.companyId))
+      .where(scope),
+  ]);
+
+  return {
+    rows: rows.map((row) => ({
+      ...row,
+      silentDays: Number(row.silentDays),
+      thresholdDays: Number(row.thresholdDays),
+      isQuiet: Boolean(row.isQuiet),
+    })),
+    total: count?.total ?? 0,
+  };
+}
+
+/**
+ * One person of the team, or `null` when this identity may not read them —
+ * the rep drill-in's subject (`D39`, session 53). The name and the role's
+ * two names, which is what the header prints; `S7` keeps the role name in
+ * `roles` and nowhere else.
+ */
+export async function teamPerson(
+  session: AuthSession,
+  userId: string,
+): Promise<{
+  id: string;
+  name: string;
+  role: { nameEn: string; nameAr: string | null };
+  isBookHolder: boolean;
+} | null> {
+  const [row] = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      nameEn: roles.nameEn,
+      nameAr: roles.nameAr,
+      seesAllReps: roles.seesAllReps,
+    })
+    .from(users)
+    .innerJoin(roles, eq(roles.id, users.roleId))
+    .where(
+      and(
+        eq(users.id, userId),
+        eq(users.isActive, true),
+        visibleMeasuredUsersFilter(session),
+      ),
+    )
+    .limit(1);
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    role: { nameEn: row.nameEn, nameAr: row.nameAr },
+    isBookHolder: !row.seesAllReps,
+  };
+}
+
+/**
+ * Every active book-holder this identity may read, book or no book — the
+ * *someone not listed* control's options on the Team tab (`D39`, session 53).
+ * A rep who has been given no company yet still needs a target, and `S83`
+ * lets anyone active carry one; the control is where an overseer reaches
+ * them, since `D39`'s row set needs a company or a target to show a row.
+ * Not `attentionPeople` below: that one keeps out the empty book, which is
+ * right for attention and wrong for setting a target.
+ */
+export async function bookHolders(
+  session: AuthSession,
+): Promise<{ id: string; name: string }[]> {
+  return db
+    .select({ id: users.id, name: users.name })
+    .from(users)
+    .innerJoin(roles, eq(roles.id, users.roleId))
+    .where(
+      and(
+        eq(users.isActive, true),
+        companyBookHolderFilter(),
+        visibleMeasuredUsersFilter(session),
+      ),
+    )
+    .orderBy(asc(users.name));
+}
+
+/**
  * The people *Who needs attention* reads — `D79`: the active book-holders
- * this identity may see who hold at least one live company.
+ * this identity may see who hold at least one live company. **`D39`'s team
+ * table reads the same roster** (session 53): its rows are these people plus
+ * anyone carrying a target row, so the two blocks cannot disagree about who
+ * is on the team.
  *
  * `companyBookHolderFilter` is the partition (`S9`'s four holding roles, the
  * proxy `authz` documents), `visibleMeasuredUsersFilter` is whose numbers the

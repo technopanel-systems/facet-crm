@@ -1,5 +1,8 @@
 /**
- * Session-51 shot runner for the overseer Today tab — capture.mjs's
+ * Session-51 shot runner for the overseer Today tab (session 53: every shot
+ * also reports the top and height of the dashboard's cards as `boxes`, so a
+ * built screen can be measured against a drawing without a second script) —
+ * capture.mjs's
  * mechanics (persistent per-identity sessions, form login, theme cookie,
  * host assert, wait on `load` never `networkidle`) over an explicit
  * state × identity × locale × theme × width list passed as env:
@@ -103,6 +106,7 @@ for (const [identity, shots] of byIdentity) {
     const name = [shot.identity, shot.path.replace(/[\\/?=&]+/g, "_"), shot.locale, shot.theme, shot.width].join("-");
     const file = ${JSON.stringify(OUT.replace(/\\/g, "/"))} + "/" + name + ".png";
     await page.screenshot({ path: file, fullPage: true, timeout: 20000 });
+    const boxes = await page.evaluate(() => Object.fromEntries(["today-band","today-team","today-tabs","today-shortcuts","rep-world","rep-pace","rep-companies","rep-threads","rep-dispatches","rep-targets"].map((s) => { const el = document.querySelector('[data-slot="' + s + '"]'); if (!el) return [s, null]; const r = el.getBoundingClientRect(); return [s, { top: Math.round(r.top + window.scrollY), height: Math.round(r.height) }]; })));
     const meta = await page.evaluate(() => ({
       scrollHeight: document.documentElement.scrollHeight,
       scrollWidth: document.documentElement.scrollWidth,
@@ -110,7 +114,7 @@ for (const [identity, shots] of byIdentity) {
       dir: document.documentElement.getAttribute("dir"),
       lang: document.documentElement.getAttribute("lang"),
     }));
-    out.push({ file, url: page.url(), ...meta });
+    out.push({ file, url: page.url(), ...meta, boxes });
   }
   return JSON.stringify(out);
 }`;

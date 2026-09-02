@@ -1215,15 +1215,30 @@ asserting a table nobody wants is the check keeping it alive.
   reps pick anything to get past it, and the chart lies differently.
   Category is still optional; its emptiness check stands.
 
-- **Behind pace on the first days of a month** (session 52, found
-  answering the founder's *the meter reads zero* report). The zero was real
-  — nothing approved yet in September, the same zero on the band, the Team
-  tab and `/targets` — but `D32` counts today, so on the morning of the 1st
-  the company reads *behind pace by 273 m²* and `D79` lists every targeted
-  rep as behind: measured 2 Sep 2026, three of three, before anything could
-  have been approved. The rules as written. Whether *behind* should wait a
-  number of working days, or a gap floor, is the founder's to name; nothing
-  was changed.
+- **The opening week's length** (session 53). The founder decided *keep the
+  number, change the words*; where the line sits was the session's to
+  choose, and it chose **one working week** — five, derived from S93's
+  weekend, no stored setting — so the 6th working day is the first that
+  reads *ahead* or *behind* (`D32`, `D79`). Both directions are withheld
+  through the week. Confirm the week, or name a different count.
+- **The coordinator on the team table** (session 53). `D39`'s row set as
+  approved says *book-holder with a live company*, and Nouf holds four in
+  the seed, so she is a row with a dash. Whether the coordinator belongs on
+  a table about the sales team is his call; the sentence was built as
+  written.
+- **The rail's user-management item is *Users* / *المستخدمون*** (session
+  53). The tab strip's *Team* and the rail's *Team* were one word on one
+  screen; the item that manages accounts took the plainer name. His to
+  rename.
+- **`/targets` stays for a book-holder** (session 53) — their own goal and
+  attainment by month, off the overseer's rail (`D49`). The alternative was
+  a history block on the rep's own Today; the rail item was kept as the
+  smaller change. Confirm, or ask for the block.
+- **A per-person filter on `/companies`** (session 53). The drill-in lists
+  a person's ten quietest companies with the total stated and each row a way
+  in; there is no list of *all of one person's companies* anywhere an
+  overseer can reach, because `/companies` takes no `rep=`. Add one, or
+  leave the cap.
 - **The Reports tab's windows** (session 52). Built as: a block over
   events takes the period — losses by the day marked lost, quotations by
   their raise, companies by their registration, buyers by dispatch date —
@@ -1247,6 +1262,13 @@ asserting a table nobody wants is the check keeping it alive.
 Closed here in session 50, recorded in `docs/archive/28-fixation/`:
 product specifications (not needed — SMAC prints the quotation) and the
 chase-suppression question (answered by S137).
+
+Closed in session 53: **behind pace on the first days of a month** — the
+founder's decision, recorded at `D32` and `D79`: the figure stays exactly as
+computed and the words say *the month has just started* through the first
+working week. And **the overseer conversation is closed entirely**: the Team
+tab shipped, `D64`'s eight blocks are eight built, and `WORKFLOW §4` row 58
+is done.
 
 Closed in session 51, recorded in `docs/archive/30-overseer-answers.md`:
 **the overseer-dashboard conversation.** The founder answered its twelve

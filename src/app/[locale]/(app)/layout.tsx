@@ -62,6 +62,7 @@ export default async function AppLayout({
     <div className="flex min-h-svh flex-col md:flex-row">
       <AppRail
         canManageUsers={can(session, "canManageUsers")}
+        holdsBook={!session.user.role.seesAllReps}
         todayCount={follow.total}
         userName={session.user.name}
         roleLabel={lookupName(session.user.role, locale)}

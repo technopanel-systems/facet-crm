@@ -389,6 +389,9 @@ function threadScopeWhere(
     options.companyId
       ? eq(quotationThreads.companyId, options.companyId)
       : undefined,
+    options.raisedByUserId
+      ? eq(quotationThreads.raisedByUserId, options.raisedByUserId)
+      : undefined,
   );
 }
 
@@ -437,6 +440,13 @@ export type QuotationScope = {
    * ascending, the same way `listDispatches` orders its submitted scope.
    */
   awaitingIssue?: boolean;
+  /**
+   * The threads one person raised — the rep drill-in's *threads by position*
+   * (`D39`, session 53). A term on the join key the row's name already comes
+   * through, so it costs nothing and narrows nothing else: the visibility
+   * filter still applies first.
+   */
+  raisedByUserId?: string;
 };
 
 /**

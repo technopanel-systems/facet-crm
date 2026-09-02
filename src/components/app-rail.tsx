@@ -29,6 +29,17 @@ import { logoutAction } from "@/app/[locale]/(app)/actions";
  * that deleting one line would leave `D49`'s order already correct, which is
  * what happened.
  *
+ * **Targets is conditional since session 53, on the partition the dashboard
+ * already draws** `D64` `D49`: a book-holder keeps it — their own goal and
+ * attainment by month, the one thing the Team tab could not give a rep —
+ * and an overseer does not, because the Team tab `D76` absorbed everything
+ * `/targets` carried for them (`28b`'s precedent honoured in reverse: the
+ * rail item leaves only where the screen behind it already moved). Both
+ * partitions still read seven items. **User management is *Users*, not
+ * *Team***, since the same session: the tab strip's *Team* and this item
+ * were the same word in both locales on one screen, and this is the one
+ * that manages accounts.
+ *
  * It replaced a twelve-item horizontal nav. Contacts, Reports, Coverage,
  * Follow-ups and Notifications are still not top-level: contacts live inside a
  * company, coverage is `/companies` and `/follow-ups` `S88`, and follow-ups and
@@ -110,14 +121,17 @@ const GROUPS = [
     key: "track",
     items: [
       { href: "/activity", key: "activity", Icon: Activity },
-      { href: "/targets", key: "targets", Icon: Target },
-      { href: "/users", key: "team", Icon: Users, requires: "canManageUsers" },
+      { href: "/targets", key: "targets", Icon: Target, requires: "holdsBook" },
+      { href: "/users", key: "users", Icon: Users, requires: "canManageUsers" },
     ],
   },
 ] as const;
 
 type RailFlags = {
   canManageUsers: boolean;
+  /** `D64`'s book-holder partition — `!sees_all_reps`, computed by the
+   *  layout. Targets renders for this half; the other half has Team `D76`. */
+  holdsBook: boolean;
   /** Follow-ups waiting on this identity — the Today badge `D49`. */
   todayCount: number;
   userName: string;
@@ -159,6 +173,7 @@ function Count({ count }: { count: number }) {
 
 export function AppRail({
   canManageUsers,
+  holdsBook,
   todayCount,
   userName,
   roleLabel,
@@ -166,6 +181,11 @@ export function AppRail({
   const t = useTranslations("nav");
   const tAuth = useTranslations("auth");
   const pathname = usePathname();
+
+  // `D50` — booleans the layout computed; no `can()` in a client component.
+  const flags = { canManageUsers, holdsBook } as const;
+  const shows = (item: (typeof GROUPS)[number]["items"][number]) =>
+    "requires" in item ? flags[item.requires] : true;
 
   // Prefix match so a detail page keeps its section lit. Today is the one
   // exception: every path starts with "/", so it must match exactly.
@@ -213,9 +233,7 @@ export function AppRail({
   // the bar says *Menu* rather than naming a section the reader is not in.
   const items = [
     { href: "/", key: "today" },
-    ...GROUPS.flatMap((group) =>
-      group.items.filter((item) => !("requires" in item) || canManageUsers),
-    ),
+    ...GROUPS.flatMap((group) => group.items.filter(shows)),
   ];
   const current = items.find((item) => isActive(item.href));
 
@@ -294,9 +312,7 @@ export function AppRail({
         {link("/", t("today"), House, todayCount)}
 
         {GROUPS.map((group) => {
-          const groupItems = group.items.filter(
-            (item) => !("requires" in item) || canManageUsers,
-          );
+          const groupItems = group.items.filter(shows);
           if (groupItems.length === 0) return null;
           return (
             <div key={group.key} className="space-y-0.5 pt-2">

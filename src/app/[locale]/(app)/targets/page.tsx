@@ -3,11 +3,11 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Link } from "@/i18n/navigation";
-import { can, requireSession } from "@/lib/authz";
+import { Link, redirect } from "@/i18n/navigation";
+import type { Locale } from "@/i18n/routing";
+import { requireSession } from "@/lib/authz";
 import {
   achievementForPeriod,
-  companyAchievementForPeriod,
   currentPeriod,
   periodStart,
 } from "@/lib/targets";
@@ -15,7 +15,6 @@ import {
 import { ListCard } from "../_components/list-controls";
 
 import { AttainmentTable } from "./attainment-table";
-import { CompanyTarget } from "./company-target";
 
 export const dynamic = "force-dynamic";
 
@@ -25,37 +24,36 @@ function asMonth(period: string): string {
 }
 
 /**
- * Targets `D49` — **one item on the rail, one table, one row per rep, the goal
- * and the attainment together.**
+ * Targets `D49` — **the book-holder's own screen**: their goal and their
+ * attainment together, by month.
  *
- * **This screen absorbed `/performance` in session `28b`**, which was three
- * screens stacked under one title. `D49` had already ruled the two one item;
- * the rail carried both until the merge because moving the item first would
- * have hidden attainment from everyone who could reach it. Of the three blocks
- * that were there, **one is this table**, one moved and one was deleted:
+ * **An overseer is sent to the Team tab** (session 53). `D49` moved the
+ * overseer's Targets there — `D39`'s table with every person's goal and
+ * attainment, the company target above it `S136`, the per-row control, and
+ * one person's history behind a click — so for `sees_all_reps` this route is
+ * a deep link to that tab, not a second screen with the same figures. The
+ * redirect is on the flag `D64` reads, never a role name (`CLAUDE.md`).
  *
- *  - **Coverage was deleted.** `S88` says it outright — *there is no separate
- *    coverage screen* — and `D49` puts it with Reports and Follow-ups as the
- *    waiting list, filtered. `/companies` already lists every company with its
- *    silence meter, grouped quiet-first `D25`, and gained the Log action per
- *    row in the same slice; `/follow-ups` already lists the overdue half with
- *    the reps on each.
- *  - **`S123`'s two figures moved to `/users/[id]`.** They are facts about one
- *    person, and their clock is the ACT rather than the dispatch date this
- *    table is bounded by. Beside attainment they needed a paragraph to say so,
- *    and a caveat that three figures cannot be combined is a design failing
- *    rather than a disclaimer. On one person's own page there is no row to
- *    share and no second clock to disagree with.
+ * **Why the screen stays for a book-holder rather than going with the rail
+ * item.** The one real cost the Team-tab proposal named was a rep losing
+ * sight of their own target history — this screen, with its month picker,
+ * is where they had it. The alternatives were a history block on the rep's
+ * Today (a second derivation of past months on the commonest read in the
+ * product) or keeping this screen and its rail item for book-holders alone.
+ * The second is the smaller change and loses nothing: the rail is
+ * conditional on the same partition the dashboard already draws `D64`, so a
+ * rep keeps *Targets* and an overseer has *Team*.
  *
- * **Scoped, never gated** `S83`: a rep reads their own row, `sees_all_reps`
- * reads everyone's, and no permission flag guards the screen. Only the
- * set-target control is gated, by `canSetTargets` `S84`.
+ * **This screen absorbed `/performance` in session `28b`**; `S123`'s two
+ * figures live on `/users/[id]` and coverage is `/companies` `S88`. The
+ * company block `S136` left for the Team band in session 53 — for a rep it
+ * never rendered `D37`, and the one holder who could set it now does so
+ * where the team is.
  *
- * **`S136`'s company target sits above the table**, on the same two conditions
- * the dashboard applies: `sees_all_reps` to read a company-scope figure at all
- * `D37` `D38`, and `can_set_company_target` — deliberately narrower than
- * `canSetTargets` — to set one. It renders when a figure exists **or** the viewer
- * may set the first one; otherwise it is absent rather than an empty shell `D53`.
+ * **Scoped, never gated** `S83`: a rep reads their own row and no permission
+ * flag guards the screen. No control renders here — `can_set_targets` is
+ * never a book-holder's, and the overseers who hold it set targets on the
+ * Team tab.
  */
 export default async function TargetsPage({
   params,
@@ -69,6 +67,15 @@ export default async function TargetsPage({
   const { period: requested } = await searchParams;
 
   const session = await requireSession();
+
+  // The overseer's Targets is the Team tab `D49` `D76`.
+  if (session.user.role.seesAllReps) {
+    redirect({
+      href: { pathname: "/", query: { tab: "team" } },
+      locale: locale as Locale,
+    });
+  }
+
   const t = await getTranslations();
 
   const period = /^\d{4}-\d{2}/.test(requested ?? "")
@@ -76,15 +83,6 @@ export default async function TargetsPage({
     : currentPeriod();
 
   const rows = await achievementForPeriod(session, period);
-  const maySetTargets = can(session, "canSetTargets");
-
-  // Null for anybody without `sees_all_reps`, so the block below costs one query
-  // for a manager and none for a rep — the gated-before-it-fetches shape the
-  // dashboard already uses for its own flag blocks.
-  const company = await companyAchievementForPeriod(session, period);
-  const maySetCompanyTarget = can(session, "canSetCompanyTarget");
-  const showCompany =
-    company !== null && (company.targetSqm !== null || maySetCompanyTarget);
 
   return (
     <div data-slot="attainment" className="flex flex-col gap-6">
@@ -112,14 +110,6 @@ export default async function TargetsPage({
         </Button>
       </form>
 
-      {showCompany && company ? (
-        <CompanyTarget
-          attainment={company}
-          period={period}
-          maySet={maySetCompanyTarget}
-        />
-      ) : null}
-
       {/* No pager: `achievementForPeriod` returns the whole measured set for
           the month, so the footer is a count and nothing else. */}
       {rows.length === 0 ? (
@@ -129,11 +119,7 @@ export default async function TargetsPage({
       ) : (
         // A month's measured set is never paged, so the footer is the count.
         <ListCard basePath="/targets" page={1} total={rows.length}>
-          <AttainmentTable
-            rows={rows}
-            period={period}
-            maySetTargets={maySetTargets}
-          />
+          <AttainmentTable rows={rows} />
         </ListCard>
       )}
 

@@ -1,10 +1,12 @@
 import { getFormatter, getTranslations, setRequestLocale } from "next-intl/server";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { getPathname, Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
+import { can } from "@/lib/authz";
+import { teamPerson } from "@/lib/coverage";
 import {
   FOLLOW_UP_GROUP_NAMES,
   FOLLOW_UP_GROUPS,
@@ -14,7 +16,6 @@ import { quotedCount } from "@/lib/quotations";
 import { isRollupPeriod, rollupFor, rollupPeriod } from "@/lib/rollup";
 import {
   achievementForPeriod,
-  companyAchievementForPeriod,
   currentPeriod,
   previousPeriodStart,
 } from "@/lib/targets";
@@ -22,19 +23,24 @@ import { systemHasWork } from "@/lib/timeline";
 import { isWorkingDay, riyadhDayOf } from "@/lib/working-days";
 import { percentOf } from "@/lib/decimal";
 
+import { CompanyBand } from "./_components/company-band";
 import {
   AttentionBlock,
   BigDealsBlock,
   FirstRun,
   OverseerTabs,
   StuckBlock,
-  YesterdayPanel,
 } from "./_components/overseer";
+import { RepWorld } from "./_components/rep-world";
 import { RequestsBlock } from "./_components/requests-block";
 import { RollupBody, RollupPeriodNav } from "./_components/rollup";
 import { shellCounts } from "./_components/shell-counts";
-import { TargetBody, TargetPanel } from "./_components/target-panel";
-import { TeamTable } from "./_components/team-table";
+import { TargetPanel } from "./_components/target-panel";
+import {
+  TeamTable,
+  teamRowSet,
+  UnlistedTarget,
+} from "./_components/team-table";
 import { WaitingList } from "./_components/waiting-list";
 
 export const dynamic = "force-dynamic";
@@ -74,10 +80,10 @@ export default async function TodayPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ tab?: string; period?: string }>;
+  searchParams: Promise<{ tab?: string; period?: string; rep?: string }>;
 }) {
   const { locale } = await params;
-  const { tab, period: periodParam } = await searchParams;
+  const { tab, period: periodParam, rep } = await searchParams;
   setRequestLocale(locale);
 
   const t = await getTranslations();
@@ -220,32 +226,83 @@ export default async function TodayPage({
     );
   }
 
+  // `D76` — the Team tab: `D39`'s table under the same band Today draws, and
+  // since session 53 the home of everything `/targets` carried for an
+  // overseer `D49` — the company control, the per-row control, and one
+  // person's world behind `?rep=`. Same door as Reports: the book-holder
+  // screen returned first, so `?tab=team` typed by a rep reaches nothing.
   if (activeTab === "team") {
-    const targeted = attainment.filter((row) => row.targetSqm !== null);
+    const maySetTargets = can(session, "canSetTargets");
+
+    // The drill-in `D39` — `teamPerson` composes the visibility filter, so an
+    // id the reader may not open falls through to the table rather than
+    // rendering a stranger; the tab is not a route, so no `notFound()` `D53`.
+    const person = rep ? await teamPerson(session, rep) : null;
+    if (person) {
+      return (
+        <div className="flex flex-col gap-6">
+          <Shortcuts locale={locale} />
+          <OverseerTabs active="team" />
+          <RepWorld
+            session={session}
+            person={person}
+            attainment={attainment}
+            pacePct={pacePct}
+            daysWorked={daysWorked}
+            daysInMonth={daysInMonth}
+            period={period}
+            maySetTargets={maySetTargets}
+            locale={locale}
+          />
+        </div>
+      );
+    }
+
+    const rows = await teamRowSet(session, attainment);
     return (
       <div className="flex flex-col gap-6">
         <Shortcuts locale={locale} />
         <OverseerTabs active="team" />
-        {targeted.length > 0 ? (
+        {/* The SAME band as Today — one derivation, no drift — with the
+            company control for its flag holder `S136`. */}
+        <CompanyBand
+          session={session}
+          period={period}
+          month={month}
+          pacePct={pacePct}
+          daysWorked={daysWorked}
+          daysInMonth={daysInMonth}
+          maySetCompanyTarget={can(session, "canSetCompanyTarget")}
+        />
+        {rows.length > 0 ? (
           <TeamTable
             session={session}
-            attainment={attainment}
+            rows={rows}
             follow={follow}
             pacePct={pacePct}
+            period={period}
+            maySetTargets={maySetTargets}
           />
         ) : (
-          // `D52` — an empty state says what would make it non-empty and
-          // offers the action; outside a card, where a bare shell would read
-          // as broken `D60`.
-          <div className="text-start">
+          // `D52` — an empty state says what would make it non-empty; outside
+          // a card, where a bare shell would read as broken `D60`. The way in
+          // is the control beneath, for the holder who can set a target.
+          <div data-slot="team-empty" className="text-start">
             <p className="text-muted-foreground text-sm">
               {t("today.teamEmpty")}
             </p>
-            <Button asChild variant="outline" className="mt-3">
-              <Link href="/targets">{t("nav.targets")}</Link>
-            </Button>
+            <p className="text-faint mt-1 text-[12.5px]">
+              {t("today.teamEmptyHint")}
+            </p>
           </div>
         )}
+        {maySetTargets ? (
+          <UnlistedTarget
+            session={session}
+            excludeIds={rows.map((row) => row.userId)}
+            period={period}
+          />
+        ) : null}
       </div>
     );
   }
@@ -263,54 +320,23 @@ export default async function TodayPage({
     );
   }
 
-  // `D38` — the company target, `S136`'s figure. Null target means the band's
-  // target half is absent and Yesterday takes the row alone `D77` `D53`.
-  const company = await companyAchievementForPeriod(session, period);
-  const measured = company?.targetSqm == null ? undefined : company;
-
-  const previous = previousPeriodStart(period);
-  const [lastMonth, quoted] = measured
-    ? await Promise.all([
-        companyAchievementForPeriod(session, previous).then(
-          (row) => row ?? undefined,
-        ),
-        quotedCount(session),
-      ])
-    : [undefined, 0];
-
   return (
     <div className="flex flex-col gap-6">
       <Shortcuts locale={locale} />
       <OverseerTabs active="today" />
 
       {/* `D77` — one band: the company target at the inline start, Yesterday
-          at the inline end; with no company target, Yesterday alone. */}
-      <Card data-slot="today-band">
-        <CardContent>
-          {measured ? (
-            <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_19rem]">
-              <div data-slot="today-target" data-scope="company">
-                <p className="text-faint mb-2 text-[10.5px] font-semibold tracking-[.09em] uppercase">
-                  {t("today.target.labelCompany", { month })}
-                </p>
-                <TargetBody
-                  measured={measured}
-                  lastMonth={lastMonth}
-                  quoted={quoted}
-                  pacePct={pacePct}
-                  daysWorked={daysWorked}
-                  daysInMonth={daysInMonth}
-                />
-              </div>
-              <div className="border-line border-t pt-4 md:border-s md:border-t-0 md:ps-6 md:pt-0">
-                <YesterdayPanel solo={false} />
-              </div>
-            </div>
-          ) : (
-            <YesterdayPanel solo />
-          )}
-        </CardContent>
-      </Card>
+          at the inline end; with no company target, Yesterday alone. Today
+          reads; the control lives on the Team tab `D49`. */}
+      <CompanyBand
+        session={session}
+        period={period}
+        month={month}
+        pacePct={pacePct}
+        daysWorked={daysWorked}
+        daysInMonth={daysInMonth}
+        maySetCompanyTarget={false}
+      />
 
       {/* `D64`'s requests block, for an overseer who also holds a queue flag
           — the super admin. Absent for the manager and the executive `D53`. */}

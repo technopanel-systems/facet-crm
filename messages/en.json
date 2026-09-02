@@ -16,7 +16,6 @@
     "dispatches": "Dispatches",
     "activity": "Activity",
     "targets": "Targets",
-    "team": "Team",
     "notifications": "Notifications",
     "followUps": "Follow-ups",
     "today": "Today",
@@ -25,7 +24,8 @@
     "brand": "Technopanel",
     "brandSub": "Operations",
     "brandMark": "T",
-    "menu": "Menu"
+    "menu": "Menu",
+    "users": "Users"
   },
   "common": {
     "create": "Create",
@@ -765,7 +765,7 @@
     }
   },
   "team": {
-    "title": "Team",
+    "title": "Users",
     "new": "New user",
     "newTitle": "New user",
     "editTitle": "Edit user",
@@ -795,8 +795,8 @@
       "account": "Account",
       "cannotSignIn": "No password set — this account cannot sign in yet.",
       "targets": "Targets",
-      "targetsHint": "Targets and achievement live on the targets screen, for everyone at once.",
-      "viewTargets": "Open targets",
+      "targetsHint": "Target, pace and history live on the Team tab, with the rest of the team.",
+      "viewTargets": "Open on the Team tab",
       "handover": "Handover",
       "handoverHint": "Review everything this person still holds and pass it to a colleague.",
       "handoverClosed": "Handover opens once the account is deactivated."
@@ -1192,15 +1192,24 @@
     },
     "team": {
       "title": "The team · this month",
-      "rep": "Rep",
-      "pace": "Dispatched vs target",
-      "sqm": "m²",
+      "rep": "Person",
+      "pace": "Pace",
+      "sqm": "m² of target",
       "waiting": "Waiting on them",
-      "logged": "Logged",
-      "quiet": "Quiet",
+      "logged": "Logged this week",
+      "quiet": "Quiet companies",
       "paceOf": "{pct}% of target",
       "tickNote": "The tick is today's pace.",
-      "notAFormula": "Activity and target sit side by side. That is a conversation, not a formula."
+      "notAFormula": "Activity and target sit side by side. That is a conversation, not a formula.",
+      "never": "Never contacted",
+      "noTarget": "No target this month",
+      "overdue": "{count} overdue",
+      "dueSoon": "{count} due",
+      "open": "Open {name}",
+      "notListed": "Set a target for someone not listed",
+      "notListedPerson": "Person",
+      "notListedChoose": "Choose a person",
+      "companyUnset": "No company target this month"
     },
     "tabs": {
       "today": "Today",
@@ -1241,7 +1250,7 @@
       "expected": "{sqm} m² expected",
       "sitting": "{count, plural, one {# day} other {# days}}"
     },
-    "teamEmpty": "Nobody carries a target this month — set one on Targets.",
+    "teamEmpty": "Nobody holds a company or carries a target this month.",
     "firstRun": {
       "title": "Nothing here yet",
       "lede": "This screen fills itself from real work — companies, interactions, quotations, dispatches. Nothing has been recorded yet, so there is nothing to measure. Here is where to start.",
@@ -1251,6 +1260,34 @@
       "logNote": "Everything in FACET is downstream of a rep recording something.",
       "target": "Set the month's target",
       "targetNote": "The pace bar has nothing to measure against until one exists."
+    },
+    "teamEmptyHint": "A person appears here once they hold a company or carry a target.",
+    "rep": {
+      "back": "The whole team",
+      "stream": "Their stream",
+      "pace": "Their pace",
+      "noTarget": "No target this month, so there is nothing to measure against.",
+      "companies": "Companies by silence",
+      "companiesOf": "{shown} of {total}",
+      "companiesNone": "Holds no company.",
+      "silent": "{count, plural, one {# day} other {# days}} silent",
+      "never": "never contacted",
+      "quiet": "Quiet",
+      "onHold": "On hold",
+      "threads": "Threads by position",
+      "threadsNone": "Has raised no quotation thread.",
+      "threadsOf": "{shown} of {total} open",
+      "closed": "Closed",
+      "sitting": "{count, plural, one {# day} other {# days}}",
+      "dispatches": "Dispatch history",
+      "dispatchesNone": "No dispatch yet.",
+      "seeAll": "See all {count}",
+      "targets": "Target history",
+      "targetsNone": "Has never carried a target.",
+      "achievedOf": "{achieved} of {target} m² · {pct}%",
+      "setBy": "{sqm} m² · set by {name}",
+      "inForce": "in force",
+      "superseded": "superseded"
     }
   },
   "rollup": {

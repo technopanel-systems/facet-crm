@@ -729,7 +729,8 @@ export async function FirstRun() {
   const steps = [
     { key: "companies", href: "/companies/new" },
     { key: "log", href: "/reports/new" },
-    { key: "target", href: "/targets" },
+    // The Team tab is where an overseer sets the month's target `D49`.
+    { key: "target", href: "/?tab=team" },
   ] as const;
 
   return (

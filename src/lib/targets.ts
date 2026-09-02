@@ -294,6 +294,119 @@ export async function setCompanyTarget(
   });
 }
 
+/**
+ * Every target row a person has ever carried, newest period first and, within
+ * a period, the row in force first — the rep drill-in's *target history*
+ * (`D39`, session 53). **A superseded row stays in the list** `S84` `S110`:
+ * the history is the point, and the first row of each period is the one that
+ * applies. Scoped by `visibleMeasuredUsersFilter`, as `listTargetHistory` is:
+ * a rep may read their own and an overseer anyone's.
+ */
+export async function targetHistoryFor(
+  session: AuthSession,
+  userId: string,
+): Promise<(TargetHistoryRow & { period: string })[]> {
+  const setter = alias(users, "target_setter");
+  const [measurable] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.id, userId), visibleMeasuredUsersFilter(session)))
+    .limit(1);
+  if (!measurable) return [];
+
+  return db
+    .select({
+      id: targets.id,
+      period: targets.period,
+      sqm: targets.sqm,
+      effectiveFrom: targets.effectiveFrom,
+      setByName: setter.name,
+      createdAt: targets.createdAt,
+    })
+    .from(targets)
+    .innerJoin(setter, eq(setter.id, targets.setBy))
+    .where(eq(targets.userId, userId))
+    .orderBy(
+      desc(targets.period),
+      desc(targets.effectiveFrom),
+      desc(targets.createdAt),
+    );
+}
+
+/**
+ * One person's target history WITH what was dispatched against each month —
+ * the rep drill-in's *target history* (`D39`, session 53), and where a
+ * manager now reads a rep's past months since `/targets` left the rail
+ * (`D49`).
+ *
+ * **The same derivation as `achievementForPeriod`, folded by month instead of
+ * by person**: `dispatchesInPeriod` over one span from the earliest target
+ * period to the latest, `creditForDispatches` once, and the share credited to
+ * this person bucketed by the dispatch's own month `S85` `[07 D3]`. Two
+ * queries for the whole history rather than four per month; nothing is
+ * apportioned a second way, and a cancelled dispatch is out here exactly as
+ * it is out there `S31`. A month with target rows and no dispatch reads zero.
+ */
+export type AchievementHistoryPeriod = {
+  /** `YYYY-MM-01`. */
+  period: string;
+  /** The row in force — the first of `rows`. */
+  targetSqm: string;
+  achievedSqm: string;
+  /** Every row for the period, in force first; the rest are superseded `S84`. */
+  rows: TargetHistoryRow[];
+};
+
+export async function achievementHistoryFor(
+  session: AuthSession,
+  userId: string,
+): Promise<AchievementHistoryPeriod[]> {
+  const history = await targetHistoryFor(session, userId);
+  if (history.length === 0) return [];
+
+  const byPeriod = new Map<string, TargetHistoryRow[]>();
+  for (const row of history) {
+    const { period, ...rest } = row;
+    const bucket = byPeriod.get(period) ?? [];
+    bucket.push(rest);
+    byPeriod.set(period, bucket);
+  }
+  // Newest first, as `targetHistoryFor` orders them.
+  const periods = [...byPeriod.keys()];
+  const earliest = periods[periods.length - 1];
+  const latest = periods[0];
+
+  const dispatched = await dispatchesInPeriod(
+    periodStart(earliest),
+    nextPeriodStart(latest),
+  );
+  const credits = await creditForDispatches(dispatched);
+
+  const achieved = new Map<string, bigint>();
+  for (const dispatch of dispatched) {
+    const credit = credits.get(dispatch.id);
+    if (!credit) continue;
+    for (const share of credit.shares) {
+      if (share.userId !== userId) continue;
+      const period = periodStart(dispatch.dispatchDate);
+      achieved.set(
+        period,
+        (achieved.get(period) ?? ZERO) + toScaled(share.sqm, SQM_SCALE),
+      );
+    }
+  }
+
+  return periods.map((period) => {
+    const rows = byPeriod.get(period) ?? [];
+    return {
+      period,
+      targetSqm: rows[0]?.sqm ?? "0",
+      achievedSqm: fromScaled(achieved.get(period) ?? ZERO, SQM_SCALE),
+      rows,
+    };
+  });
+}
+
 export async function listTargetHistory(
   session: AuthSession,
   userId: string,

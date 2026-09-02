@@ -631,8 +631,10 @@ count beneath them; *My waiting list*, to `D33` and `D34`. The notifications
 list that stood under `D65`'s heading is gone: it was news `S92`, not work,
 and on a rep's screen it was twenty-five rows of it. The overseer half
 shipped in session 51 to the approved drawings — the band, Stuck, attention
-and big deals, with the team table behind the Team tab `D76` (its `D39`
-rework to the dash rows is the Team session's, `§4` row 58).
+and big deals, with the team table behind the Team tab `D76`; the `D39`
+rework to the dash rows and the rest of the Team tab shipped in session 53.
+**D64 is complete: eight blocks in the table above, eight built** — the
+last of them, the team table, on the founder's twelfth answer.
 
 **`D41` waits on two build paths rather than on a decision, and inside Stuck
 it stays absent** — not zero, not explained. Both objects it names — a
@@ -909,10 +911,10 @@ cannot name is the confusion `25a` surfaced rather than a rule satisfied. With n
 company target set, the block is **absent** `D32` `D53`, and a holder's own target
 row is not read here: `S136` says they carry none.
 
-**D39. [CHANGE] The team table**: one row per rep — a small pace bar with the
+**D39. The team table**: one row per person — a small pace bar with the
 tick, m² dispatched of target, waiting-on-them as two counts (overdue in red,
-due soon plain), logged this week, quiet companies. **The footer says what the
-table is for and is not**: *"Saad logged the most and dispatched the least.
+due soon plain), logged this week, quiet companies, and `S138`'s
+never-contacted count. **The footer says what the table is for and is not**: *"Saad logged the most and dispatched the least.
 That is a conversation, not a formula."* Activity and target sit side by side
 and are never combined into a score.
 
@@ -925,9 +927,40 @@ whether achievement can be measured against anything; everything else he
 does still happens and management still needs to see it — Majed holding 14
 companies unseen is what the old row set caused. `S83` still makes targets
 independent of role, so anyone carrying a target row appears whatever they
-hold. **The marker is the dash rows**: today the table renders only the
-targeted, and the change ships with the Team tab session, which is where
-the table now lives (`D76`).
+hold. **Built session 53, on the Team tab** (`D76`): the dash rows are live —
+`—` where the target and the pace bar would be, the achieved figure real
+beside it. Two consequences the sentence carries and the founder should see:
+the **coordinator** holds four companies in the seed and is therefore a row
+(the answer says book-holder, not rep — `SPEC §16`), and a person with
+**neither a company nor a target has no row and still needs a target**, so
+the holder of `can_set_targets` gets one disclosure beneath the table — *set
+a target for someone not listed* — offering the active book-holders without
+a row, absent when everybody has one `D53` `D70`.
+
+**Clicking a person opens their world** — `?rep=` on the same tab, `D76`'s
+URL-state shape, never a route: their pace (this rule's bar at their own
+scope, without `D32`'s side figures, because `quotedCount` answers for a
+scope and not a person and a wrong figure is worse than none); their
+companies quietest first (`companySilence`'s figure, ten with the total
+stated `D70`, each row a way in to the company); their threads by position
+(`chainState`, `D27`'s one ladder, the open ones beneath with how old each
+deal is); their dispatch history (`/dispatches?userId=`'s own list, eight
+with the way to the rest); and their target history with what was dispatched
+against each month — every row, superseded ones included `S84`, the same
+apportionment folded by month `S85`. **Gated on `sees_all_reps` and nothing
+narrower**: the executive keeps it, and `/users/[id]` — `can_manage_users`'
+door — links here for the person's figures rather than to `/targets`.
+
+**The company target above the table is Today's band** `D77`, the same
+component with one prop more: the holder of `can_set_company_target` is
+offered the control `/targets` used to carry `S136`, and with no target set
+the band still renders the target half for that holder so the first figure
+has somewhere to be typed. **The edit control is a disclosure in a row
+beneath each person** — `D58` bans a control in a cell and `D49` asks for one
+per row, reconciled by the row exactly as `28b` did it; the approved drawing's
+*Edit* column was a cell control, which is the thing `D58` names. **Zero
+overdue takes no red**: `D6`'s colour describes how long something has
+waited, and nothing is waiting.
 
 **The two counts are the split the waiting list already draws** — overdue is a
 row that has been waiting more than a day and due-soon is a date the rep set for
@@ -1096,10 +1129,13 @@ not the trend. *Team* holds the team table (`D39`) and qualifies on
 `sees_all_reps`. *Reports* is the weekly study `D42` and qualifies on
 `sees_all_reps` too; its pill joined the strip in the slice that built the
 tab (session 52), having stayed off it until then — `D51`: a control that
-does nothing is worse than no control. **Targets stays in the
-rail until the Team tab absorbs it** (`28b`'s precedent — moving the rail
-item first hides attainment from everyone who could reach it); the slice
-that ships Team takes the rail item and amends `D49`.
+does nothing is worse than no control. **Targets left the overseer's rail
+with the Team tab** (session 53, `D49`): the tab holds `D39`'s table, the
+band with the company control, the per-row control and one person's world
+behind `?rep=` — URL state on the same tab, the same shape as the tab
+itself; a book-holder keeps the rail item and `/targets` as their own
+screen. `28b`'s precedent held both ways: the rail item stayed until the
+tab could carry everything the screen did, and left the day it could.
 
 **D77. Yesterday — the previous working day's movement, beside the
 company target in one band.** Four figures: dispatched m², approvals,
@@ -1360,13 +1396,17 @@ rather than beside it.
 ## 13. Navigation
 
 **D49.** The rail carries **Today** (with a count), then Companies, Projects,
-Quotations, Dispatches under *Sell*; Activity and Targets under *Track*.
-**Seven items — plus user management for those who hold it.** The count was
-always right and the sentence was wrong: user management is conditional `D50`,
-so it was never one of the seven, and running it into the same list read as
-eight named against seven counted (`WORKFLOW §5 AD14`). Reports, Coverage,
-Follow-ups, Notifications and Performance are **not top-level** — they are the
-waiting list and the stream, filtered.
+Quotations, Dispatches under *Sell*; Activity and, **for a book-holder,
+Targets** under *Track* — an overseer's Targets is the Team tab `D76` `D39`.
+**Seven items — plus user management, labelled *Users*, for those who hold
+it.** The count was always right and the sentence was wrong: user management
+is conditional `D50`, so it was never one of the seven, and running it into
+the same list read as eight named against seven counted (`WORKFLOW §5
+AD14`). Since session 53 Targets is conditional too, on `D64`'s partition
+(`!sees_all_reps`), so each half reads seven: Today, four under *Sell*,
+Activity, then Targets or Users. Reports, Coverage, Follow-ups,
+Notifications and Performance are **not top-level** — they are the waiting
+list and the stream, filtered.
 
 **The first item is Today, not *Waiting on me*.** It is shorter, and since
 `D34` split the list into planned and slipping, *waiting on me* describes only
@@ -1375,8 +1415,12 @@ half of what is on the screen.
 **The groups are *Sell* and *Track*, which is what the rail renders.** They
 were written here as *Work* and *Team*, and the rule moved rather than the
 code: *Track* is accurate for what is in the group, and *Team* would have
-collided with the user-management item, whose own label is already **Team** in
-both locales.
+collided with the user-management item, whose own label was **Team** in
+both locales. **The collision became real in session 51** when the tab strip
+gained a *Team* pill on the same screen, and session 53 resolved it the
+other way round: the user-management item is **Users** / **المستخدمون** —
+it manages accounts, and that is its name; the tab is the team. The
+founder's to rename (`SPEC §16`).
 
 **Performance and Targets are one item, called Targets.** One table, one row per
 rep, **the goal and the attainment together** — they were never two questions,
@@ -1386,7 +1430,22 @@ and **not in a cell**: `D58` bans inline cell editing and this rule asks for a
 control on every row, so the row carries a disclosure of its own beneath its
 figures. Merging them is what frees the seventh slot for Activity.
 
-**`S136`'s company target sits ABOVE the table, not as a row in it**, carrying the
+**Since session 53 the overseer reads that table on the Team tab** (`D39`,
+`D76`) — every person's goal and attainment, the company target above it,
+the per-row control, and one person's history behind a click — and
+`/targets` for a `sees_all_reps` holder is a deep link to the tab. **The
+screen and its rail item stay for a book-holder**: their own goal and
+attainment by month, with the month picker, is the one thing the tab could
+not give a rep, and the Team-tab proposal named losing it as the move's one
+real cost. The alternatives were a history block on the rep's Today — a
+second derivation of past months on the commonest read in the product — or
+the conditional rail item; the item is the smaller change and loses nothing,
+and it is `28b`'s precedent honoured in reverse: the rail item leaves only
+where the screen behind it already moved. No control renders on `/targets`
+any more — `can_set_targets` is never a book-holder's.
+
+**`S136`'s company target sits ABOVE the table, not as a row in it** — on the
+Team tab it is Today's band `D77` with the control — carrying the
 same pairing — the figure and what was dispatched against it — for the one target
 that is nobody's. This rule says *one row per rep* and the table's first column is
 **Person**: as a row a company would make that column a lie. It reuses the per-row

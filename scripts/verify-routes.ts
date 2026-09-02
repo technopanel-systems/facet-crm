@@ -174,7 +174,23 @@
  *      scratch database (`audit-shots/today-firstrun/`). §19 carries `D64`'s
  *      narrowing biconditional; §35 the team table behind `?tab=team`; §37
  *      `D40`'s counts as `stuck-coordinator`'s attributes with the oldest
- *      submitted request's own age.
+ *      submitted request's own age. Since session 53 it also holds `D32`'s
+ *      opening week as a biconditional against its own working-day count.
+ *
+ *  42. **The Reports tab** `D42`–`D44` `S139` `S140` `S142` — the pill and
+ *      the gate, the period as URL state, eight readings against the records,
+ *      figures as text, the mirror (session 52).
+ *
+ *  43. **The Team tab** `D39` `S138` `D49` `D76` — the quiet and
+ *      never-contacted columns against this script's own silence SQL, the
+ *      archived term driven by an archive-and-restore flip, one person's
+ *      world (Majed with no target, rep-a with one) against the records and
+ *      last month's metres against the dispatch lines under §35's split
+ *      guard, the `sees_all_reps` gate from both sides, `/targets` as a deep
+ *      link, and the unlisted control as a biconditional plus a run-scoped
+ *      rep written through it and deactivated. §35 holds `D39`'s row set and
+ *      the dash rows; §36 the band and its control on the tab; §2 the
+ *      conditional rail item.
  *
  * Section 18 — `D69`'s two controls and `D32`'s panel — is in the code and was
  * never in this list either; 19 is listed the day it is written. Sections 20
@@ -263,7 +279,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
  * before this was written. `@/db` never reaches `src/auth/index.ts`, so no
  * secret is demanded. What is spent is the property, not startup behaviour.
  */
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { closeDatabase, db } from "@/db";
 import {
@@ -810,7 +826,13 @@ const MARKERS: Record<string, readonly string[]> = {
   //
   // `data-slot="turn"` went with the coverage table `S88`; §11, §22 and §24
   // assert the turn cell on the three lists that still render one.
-  "/targets": ['data-slot="attainment"', 'data-slot="target-edit"'],
+  //
+  // **Since session 53 `/targets` is a deep link for the marker identity**
+  // `D49`: a `sees_all_reps` holder is sent to the Team tab, `get()` follows
+  // the one redirect, and what renders is `D39`'s table with its per-row
+  // disclosure. `attainment` is the book-holder's own screen and §36 reads
+  // it as rep-a.
+  "/targets": ['data-slot="today-team"', 'data-slot="target-edit"'],
 };
 
 const MARKER_IDENTITY = "manager@example.test";
@@ -1091,12 +1113,19 @@ async function main(): Promise<void> {
       // at the wrong route, and the exact `href="…"` cannot match a detail
       // page under the same section.
       const rail = await get(jar, `/${locale}`);
-      for (const item of ["/activity", "/targets"] as const) {
-        check(
-          `  ${email} ${locale} rail carries ${item}`,
-          rail.body.includes(`href="/${locale}${item}"`),
-        );
-      }
+      check(
+        `  ${email} ${locale} rail carries /activity`,
+        rail.body.includes(`href="/${locale}/activity"`),
+      );
+      // `D49` since session 53: Targets is the book-holder's item — their own
+      // goal and attainment by month — and an overseer has the Team tab
+      // instead `D76`. The partition is `D64`'s own, `!sees_all_reps`, and the
+      // manager is the one seeded identity on the other side of it.
+      const holdsBook = email !== "manager@example.test";
+      check(
+        `  ${email} ${locale} rail ${holdsBook ? "carries" : "hides"} /targets [D49]`,
+        rail.body.includes(`href="/${locale}/targets"`) === holdsBook,
+      );
       // `D50`'s half: the link is hidden by a boolean the layout computes.
       // `FORBIDDEN` above asserts the other half on the same path — the route
       // answers 404 `D53` — so neither claim can pass on its own, and the
@@ -1107,11 +1136,13 @@ async function main(): Promise<void> {
         rail.body.includes(`href="/${locale}/users"`) === holdsUsers,
       );
       // **`D49`'s count, asserted rather than described.** Seven — Today, four
-      // under *Sell*, two under *Track* — plus user management for those who
-      // hold it `D50`. The rail carried eight until `28b` deleted
-      // `/performance`, and a rule whose whole content is a number is one
-      // nothing was checking: the eighth item could have come back and every
-      // check above would still be green.
+      // under *Sell*, two under *Track* — where *Track*'s second item is
+      // Targets for a book-holder and Users for a holder of user management
+      // `D50`; an identity holding both would read eight, and none is seeded.
+      // The rail carried eight until `28b` deleted `/performance`, and a rule
+      // whose whole content is a number is one nothing was checking: the
+      // eighth item could have come back and every check above would still be
+      // green.
       //
       // Counted off the `<nav>` alone, so the header, the footer and the
       // page's own links cannot inflate it. Today is `href="/en"` with no
@@ -1123,7 +1154,7 @@ async function main(): Promise<void> {
       const railItems = (
         nav.match(new RegExp(`href="/${locale}(/[a-z-]+)?"`, "g")) ?? []
       ).length;
-      const expected = holdsUsers ? 8 : 7;
+      const expected = 6 + (holdsBook ? 1 : 0) + (holdsUsers ? 1 : 0);
       check(
         `  ${email} ${locale} rail carries ${expected} items [D49]`,
         railItems === expected,
@@ -4736,10 +4767,12 @@ async function main(): Promise<void> {
       // refusal that writes nothing: `setTargetAction` always INSERTS a
       // superseding row `S84`, and a suite that set a real target would move
       // every attainment percentage §18 and §4401 read.
-      const targetsPage = await get(managerJar, `/${locale}/targets`);
+      // **On the Team tab since session 53** `D49` `D76` — the same disclosure
+      // in the same row-beneath-the-figures shape, at its new address.
+      const targetsPage = await get(managerJar, `/${locale}?tab=team`);
       const setTarget = actForm(targetsPage.body, "set-target");
       check(
-        `${locale}: /targets offers a per-row target editor [D49], [D58]`,
+        `${locale}: the Team tab offers a per-row target editor [D49], [D58], [D39]`,
         setTarget !== undefined,
         "no form carries data-act=\"set-target\"",
       );
@@ -4747,7 +4780,7 @@ async function main(): Promise<void> {
         await drives(
           `${locale}: *** setTarget, out of the cell ***`,
           managerJar,
-          `/${locale}/targets`,
+          `/${locale}?tab=team`,
           setTarget,
           { sqm: "" },
         );
@@ -7481,7 +7514,9 @@ async function main(): Promise<void> {
       // missed.** `D55` makes them laptop-first, and an unannotated table and
       // a deliberately unannotated one are identical in the markup — so the
       // claim this makes is the negative one, and `WORKFLOW §5` carries why.
-      for (const path of ["/users", "/targets", "/activity?view=by-rep"]) {
+      // `?tab=team` is `D39`'s table, where `/targets`' one stood until
+      // session 53 (`D49`); the same laptop-first declaration travelled with it.
+      for (const path of ["/users", "?tab=team", "/activity?view=by-rep"]) {
         const page = await get(manager, `/${locale}${path}`);
         if (page.status !== 200) {
           console.log(`  skip  ${locale}: ${path} returned ${page.status}`);
@@ -8953,7 +8988,7 @@ async function main(): Promise<void> {
         "/en",
         "/en/companies",
         "/en/follow-ups",
-        "/en/targets",
+        "/en?tab=team",
         "/en/notifications",
         "/en/activity",
         ...(ids.companies ? [`/en/companies/${ids.companies}`] : []),
@@ -9187,6 +9222,11 @@ async function main(): Promise<void> {
     let splitRows = -1;
     let repAId = "";
     const recorded = new Map<string, number>();
+    /** `D39`'s row set, from the records: every active book-holder with a live
+     *  company, plus anyone with a target row this month — and which of them
+     *  the records call targeted. */
+    const teamIds = new Set<string>();
+    const targetedIds = new Set<string>();
     try {
       const [rep] = await db
         .select({ id: users.id })
@@ -9229,6 +9269,32 @@ async function main(): Promise<void> {
         group by d.user_id
       `)) as unknown as { user_id: string; sqm: number }[];
       for (const row of sums) recorded.set(row.user_id, Number(row.sqm));
+
+      /*
+       * **The roster, written fresh from `D39`'s sentence** rather than read
+       * off `attentionPeople` or `achievementForPeriod`: a book-holder is a
+       * role without `sees_all_reps` `S9`, a live company is a `company_reps`
+       * row with no `removed_at`, and targeted is a `targets` row for the
+       * month `S83`. Two origins, so the row set has something to disagree
+       * with.
+       */
+      const roster = (await db.execute(sql`
+        select u.id::text as id,
+               exists (select 1 from targets t
+                       where t.user_id = u.id and t.period = ${monthStart}::date) as targeted
+        from users u
+        join roles r on r.id = u.role_id
+        where u.is_active = true
+          and ((r.sees_all_reps = false
+                and exists (select 1 from company_reps cr
+                            where cr.user_id = u.id and cr.removed_at is null))
+               or exists (select 1 from targets t
+                          where t.user_id = u.id and t.period = ${monthStart}::date))
+      `)) as unknown as { id: string; targeted: boolean }[];
+      for (const row of roster) {
+        teamIds.add(row.id);
+        if (row.targeted) targetedIds.add(row.id);
+      }
     } catch (error) {
       splitRows = -1;
       console.log(`  --    the dispatch records could not be read — ${String(error)}`);
@@ -9275,12 +9341,43 @@ async function main(): Promise<void> {
         continue;
       }
 
-      /* 1. The row set is `D64`'s first block, read wider `D38`. */
-      check(
-        `${locale}: *** every team row carries a target — the row set is D64's first block read wider — saw ${withFigures.length} of ${rows.length} *** [D39] [D64] [D32]`,
-        rows.length > 0 && withFigures.length === rows.length,
-        `${rows.length - withFigures.length} row(s) with no target`,
-      );
+      /*
+       * 1. **The row set is `D39`'s — the founder's answer 12** — against the
+       *    roster this script derived itself: every active book-holder with a
+       *    live company, plus anyone with a target row. Both directions, so a
+       *    table that still rendered only the targeted (the pre-53 row set,
+       *    Majed invisible) and one that rendered every active user both go
+       *    red. And **a person with no target is a row with a dash** where
+       *    the target and the pace bar would be — two dash markers per
+       *    untargeted row, and every dash row one the records call
+       *    untargeted.
+       */
+      if (teamIds.size === 0) {
+        console.log(
+          `  --    ${locale}: the roster could not be derived, so the row set is NOT MEASURED`,
+        );
+      } else {
+        const seenIds = rows.map((tag) => attr(tag, "data-user"));
+        const seenSet = new Set(seenIds);
+        const missing = [...teamIds].filter((id) => !seenSet.has(id));
+        const extra = seenIds.filter((id) => !teamIds.has(id));
+        check(
+          `${locale}: *** the row set is D39's — every active book-holder with a live company plus anyone carrying a target — saw ${rows.length} row(s) against the records' ${teamIds.size} (${targetedIds.size} targeted) *** [D39] [S83] [S9]`,
+          missing.length === 0 && extra.length === 0,
+          `missing ${missing.length}, extra ${extra.length}`,
+        );
+        const dashRows = rows.filter((tag) => attr(tag, "data-target") === "");
+        const dashMarkers = (block.match(/data-slot="team-no-target"/g) ?? [])
+          .length;
+        const untargeted = teamIds.size - targetedIds.size;
+        check(
+          `${locale}: *** a person with no target is a row with a dash where the target and the pace bar would be — ${dashRows.length} dash row(s) against ${untargeted} untargeted in the records, ${dashMarkers} dash marker(s) *** [D39]`,
+          dashRows.length === untargeted &&
+            dashMarkers === dashRows.length * 2 &&
+            dashRows.every((tag) => !targetedIds.has(attr(tag, "data-user"))),
+          `${dashRows.length} dash rows, ${dashMarkers} markers`,
+        );
+      }
 
       /*
        * 2. **One tick for the whole screen, against arithmetic this script does
@@ -9400,13 +9497,13 @@ async function main(): Promise<void> {
         return (block.slice(from, to).match(/<td\b/g) ?? []).length;
       });
       check(
-        `${locale}: *** no totals row, and every row is D39's six columns — saw [${cellCounts.join(
+        `${locale}: *** no totals row, and every row is D39's seven columns — saw [${cellCounts.join(
           "|",
-        )}] over ${rows.length} rows *** [D39]`,
+        )}] over ${rows.length} rows *** [D39] [S138]`,
         !block.includes("<tfoot") &&
           cellCounts.length > 0 &&
-          cellCounts.every((n) => n === 6),
-        block.includes("<tfoot") ? "a tfoot is rendered" : "a row is not six cells",
+          cellCounts.every((n) => n === 7),
+        block.includes("<tfoot") ? "a tfoot is rendered" : "a row is not seven cells",
       );
 
       /*
@@ -9656,8 +9753,14 @@ async function main(): Promise<void> {
          *    unequal on purpose; on a dataset where they happened to agree this
          *    reports NOT MEASURED rather than passing for the wrong reason.
          */
+        // The rows live behind the Team tab since session 51 `D76`; this read
+        // the Today body until session 53 and was NOT MEASURED on every run.
+        const teamPage = await get(
+          jars["manager@example.test"],
+          `/${locale}?tab=team`,
+        );
         const repTargets = [
-          ...page.body.matchAll(
+          ...teamPage.body.matchAll(
             /data-slot="team-row"[^>]*data-target="([^"]+)"/g,
           ),
         ].map((m) => metres(m[1]));
@@ -9680,44 +9783,42 @@ async function main(): Promise<void> {
         }
 
         /*
-         * 4. **`/targets` shows the same two figures, and the control follows
-         *    the OTHER flag.** Read and write are different questions `S136`, so
-         *    the manager — who may read and may not set — is what separates
-         *    them: asserted on the holder alone, a control rendered for everyone
-         *    would pass.
+         * 4. **The Team tab shows the same two figures in the same band, and
+         *    the control follows the OTHER flag.** Read and write are different
+         *    questions `S136`, so the manager — who may read and may not set —
+         *    is what separates them: asserted on the holder alone, a control
+         *    rendered for everyone would pass. The band is Today's own
+         *    component `D77`, so the figures are read off the same markers.
          */
-        const mgrTargets = await get(
-          jars["manager@example.test"],
-          `/${locale}/targets`,
-        );
         const mgrAchieved = metres(
-          attrOf(mgrTargets.body, "company-achieved", "data-sqm"),
+          attrOf(teamPage.body, "today-achieved", "data-sqm"),
         );
         const mgrTarget = metres(
-          attrOf(mgrTargets.body, "company-target-sqm", "data-sqm"),
+          attrOf(teamPage.body, "today-target-sqm", "data-sqm"),
         );
         check(
-          `${locale}: *** /targets shows the company block to sees_all_reps and offers NO control without the set flag — saw ${mgrAchieved} of ${mgrTarget}, against records ${recorded} of ${inForce} *** [D49] [S136]`,
-          mgrTargets.body.includes('data-slot="company-target"') &&
+          `${locale}: *** the Team tab shows the company band to sees_all_reps and offers NO control without the set flag — saw ${mgrAchieved} of ${mgrTarget}, against records ${recorded} of ${inForce} *** [D49] [S136] [D77]`,
+          attrOf(teamPage.body, "today-target", "data-scope") === "company" &&
             mgrAchieved === recorded &&
             mgrTarget === inForce &&
-            !mgrTargets.body.includes('data-act="set-company-target"'),
-          mgrTargets.body.includes('data-act="set-company-target"')
+            !teamPage.body.includes('data-act="set-company-target"'),
+          teamPage.body.includes('data-act="set-company-target"')
             ? "the manager is offered a control he holds no flag for"
-            : "block or figures missing",
+            : "band or figures missing",
         );
 
+        // `/targets` is the book-holder's own screen `D49`: no band, no
+        // company figure, his own table.
         const repPage = await get(
           jars["rep-a@example.test"],
           `/${locale}/targets`,
         );
         check(
-          `${locale}: *** a rep gets NO company block on /targets, and his own table still renders — saw ${
-            repPage.body.includes('data-slot="company-target"')
-              ? "the block"
-              : "no block"
-          } and ${repPage.body.includes('data-slot="attainment"') ? "the table" : "NO table"} *** [D37] [D53]`,
-          !repPage.body.includes('data-slot="company-target"') &&
+          `${locale}: *** a rep gets NO company band on /targets, and his own table still renders — saw ${
+            repPage.body.includes('data-slot="today-band"') ? "the band" : "no band"
+          } and ${repPage.body.includes('data-slot="attainment"') ? "the table" : "NO table"} *** [D37] [D53] [D49]`,
+          !repPage.body.includes('data-slot="today-band"') &&
+            !repPage.body.includes('data-slot="today-target"') &&
             repPage.body.includes('data-slot="attainment"'),
         );
       }
@@ -9743,11 +9844,11 @@ async function main(): Promise<void> {
        * would move the figure exactly as well and leave the count flat.
        */
       const adminTargets = adminDriven
-        ? await get(admin, "/en/targets")
+        ? await get(admin, "/en?tab=team")
         : { status: 0, body: "" };
       const form = actForm(adminTargets.body, "set-company-target");
       setup(
-        "the flag holder is offered the company control on /targets",
+        "the flag holder is offered the company control on the Team tab",
         form !== undefined,
         'no form carries data-act="set-company-target"',
       );
@@ -9762,7 +9863,7 @@ async function main(): Promise<void> {
           const body = envelope(form);
           body.set("period", monthStart);
           body.set("sqm", String(sqm));
-          const response = await fetch(`${BASE}/en/targets`, {
+          const response = await fetch(`${BASE}/en?tab=team`, {
             method: "POST",
             headers: { cookie: header(admin), origin: BASE },
             body,
@@ -12004,6 +12105,549 @@ async function main(): Promise<void> {
         monthPage.includes('data-slot="rollup-losses"') === lossesNow > 0 &&
           monthPage.includes('data-slot="rollup-sources"') === companiesNow > 0,
       );
+    }
+  }
+
+  /* ── 43 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n43. The Team tab — the quiet and never-contacted columns against the records, the archived term, one person's world, the unlisted control, the old deep link [D39], [S138], [D49], [D76], [D53]",
+  );
+  {
+    const setup = (step: string, ok: boolean, detail = ""): boolean => {
+      checks += 1;
+      if (ok) {
+        console.log(`  setup ${step}`);
+        return true;
+      }
+      failures += 1;
+      console.log(`  SETUP FAILED at ${step}${detail ? ` — ${detail}` : ""}`);
+      return false;
+    };
+    const openTag = (body: string, slot: string): string =>
+      body.match(
+        new RegExp(`<[a-z]+\\b[^>]*data-slot="${slot}"[^>]*>`),
+      )?.[0] ?? "";
+    const tagAttr = (tag: string, name: string): string =>
+      tag.match(new RegExp(`${name}="([^"]*)"`))?.[1] ?? "";
+    const rowTags = (body: string) =>
+      [...body.matchAll(/<tr\b[^>]*data-slot="team-row"[^>]*>/g)].map(
+        (m) => m[0],
+      );
+    const metres = (shown: string) => Number(shown.replace(/,/g, ""));
+    const actForm = (body: string, act: string): string | undefined =>
+      body.match(new RegExp(`<form[^>]*data-act="${act}"[\\s\\S]*?</form>`))?.[0];
+    const envelope = (form: string): FormData => {
+      const fields = new FormData();
+      for (const input of form.matchAll(/<input[^>]*>/g)) {
+        const name = input[0].match(/name="([^"]+)"/)?.[1];
+        if (!name?.startsWith("$ACTION")) continue;
+        fields.append(
+          name,
+          unescapeHtml(input[0].match(/value="([^"]*)"/)?.[1] ?? ""),
+        );
+      }
+      return fields;
+    };
+
+    const manager43 = jars["manager@example.test"];
+    const executive43 = await login("executive@example.test");
+
+    const riyadhToday = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Riyadh",
+      dateStyle: "short",
+    }).format(new Date());
+    const monthStart = `${riyadhToday.slice(0, 7)}-01`;
+
+    /*
+     * **The records, in this script's own SQL** — `companySilence` rewritten
+     * from `D25`/`S89`'s words rather than joined: an interaction's latest
+     * `report_date`, else registration in Riyadh; on hold suppresses; the
+     * threshold follows qualification (a quotation thread exists) and both
+     * thresholds are read from `settings`; **archived and merge tombstones are
+     * never quiet** (the session-53 term). Never-contacted is the same set
+     * with no interaction at all `S138`. Grouped by live membership, which is
+     * `D39`'s own fold. Two origins, so a column has something to disagree
+     * with; `§41` reads the never count at `D79`'s floor and this reads it
+     * whole.
+     */
+    let repA = "";
+    let majed = "";
+    let qualifiedDays = -1;
+    let unqualifiedDays = -1;
+    const quietByRep = new Map<string, number>();
+    const neverByRep = new Map<string, number>();
+    const liveByRep = new Map<string, number>();
+    let archiveCandidate = "";
+    let repAPeriods = -1;
+    let repARowsThisMonth = -1;
+    let repADispatches = -1;
+    let repAThreads = -1;
+    let previousRecorded = -1;
+    let previousSplits = -1;
+    let unlistedHolders = -1;
+    let repRoleId = "";
+    try {
+      const ids = await db
+        .select({ id: users.id, email: users.email })
+        .from(users)
+        .where(
+          inArray(users.email, ["rep-a@example.test", "rep-c@example.test"]),
+        );
+      repA = ids.find((row) => row.email === "rep-a@example.test")?.id ?? "";
+      majed = ids.find((row) => row.email === "rep-c@example.test")?.id ?? "";
+
+      const thresholds = (await db.execute(sql`
+        select key, value::text as v from settings
+        where key in ('followup.quiet_days.qualified', 'followup.quiet_days.unqualified')
+      `)) as unknown as { key: string; v: string }[];
+      qualifiedDays = Number(
+        thresholds.find((row) => row.key === "followup.quiet_days.qualified")?.v ?? -1,
+      );
+      unqualifiedDays = Number(
+        thresholds.find((row) => row.key === "followup.quiet_days.unqualified")?.v ?? -1,
+      );
+
+      const quietExpr = sql`
+        c.archived_at is null
+        and c.merged_into_id is null
+        and not exists (select 1 from rep_reports h
+                        where h.company_id = c.id
+                          and h.outcome = 'on_hold'
+                          and h.on_hold_until >= (now() at time zone 'Asia/Riyadh')::date)
+        and (now() at time zone 'Asia/Riyadh')::date - coalesce(
+              (select max(i.report_date) from rep_reports i
+               where i.company_id = c.id and i.entry_type = 'interaction'),
+              (c.created_at at time zone 'Asia/Riyadh')::date)
+            > case when exists (select 1 from quotation_threads t where t.company_id = c.id)
+                   then ${qualifiedDays}::int else ${unqualifiedDays}::int end`;
+
+      const columns = (await db.execute(sql`
+        select cr.user_id::text as id,
+               count(*) filter (where ${quietExpr})::int as quiet,
+               count(*) filter (where c.archived_at is null and c.merged_into_id is null
+                                  and not exists (select 1 from rep_reports i
+                                                  where i.company_id = c.id
+                                                    and i.entry_type = 'interaction'))::int as never,
+               count(*) filter (where c.archived_at is null and c.merged_into_id is null)::int as live
+        from company_reps cr
+        join companies c on c.id = cr.company_id
+        where cr.removed_at is null
+        group by cr.user_id
+      `)) as unknown as { id: string; quiet: number; never: number; live: number }[];
+      for (const row of columns) {
+        quietByRep.set(row.id, Number(row.quiet));
+        neverByRep.set(row.id, Number(row.never));
+        liveByRep.set(row.id, Number(row.live));
+      }
+
+      // A quiet company of rep-a's WITH an interaction, so archiving it moves
+      // quiet by one and never by none — the two columns are told apart.
+      const candidates = (await db.execute(sql`
+        select c.id::text as id
+        from company_reps cr
+        join companies c on c.id = cr.company_id
+        where cr.removed_at is null
+          and cr.user_id = ${repA}::uuid
+          and exists (select 1 from rep_reports i
+                      where i.company_id = c.id and i.entry_type = 'interaction')
+          and ${quietExpr}
+        order by c.name
+        limit 1
+      `)) as unknown as { id: string }[];
+      archiveCandidate = candidates[0]?.id ?? "";
+
+      const periods = (await db.execute(sql`
+        select count(distinct t.period)::int as periods,
+               count(*) filter (where t.period = ${monthStart}::date)::int as this_month
+        from targets t where t.user_id = ${repA}::uuid
+      `)) as unknown as { periods: number; this_month: number }[];
+      repAPeriods = Number(periods[0]?.periods ?? -1);
+      repARowsThisMonth = Number(periods[0]?.this_month ?? -1);
+
+      // `listDispatches`' working scope: everything but `refused` `S122`.
+      const dispatchCount = (await db.execute(sql`
+        select count(*)::int as n from dispatches d
+        where d.user_id = ${repA}::uuid and d.status <> 'refused'
+      `)) as unknown as { n: number }[];
+      repADispatches = Number(dispatchCount[0]?.n ?? -1);
+
+      const threadCount = (await db.execute(sql`
+        select count(*)::int as n from quotation_threads q
+        where q.raised_by_user_id = ${repA}::uuid
+      `)) as unknown as { n: number }[];
+      repAThreads = Number(threadCount[0]?.n ?? -1);
+
+      // Last month's metres for rep-a, from the dispatch lines, with §35's
+      // credit-split guard: where a split falls in that month the drill-in
+      // apportions and the records do not, so the two may legitimately differ.
+      const previous = (await db.execute(sql`
+        select round(coalesce(sum(l.sqm), 0))::int as sqm
+        from dispatches d
+        join dispatch_lines l on l.dispatch_id = d.id
+        where d.status = 'approved'
+          and d.user_id = ${repA}::uuid
+          and d.dispatch_date >= (${monthStart}::date - interval '1 month')
+          and d.dispatch_date < ${monthStart}::date
+      `)) as unknown as { sqm: number }[];
+      previousRecorded = Number(previous[0]?.sqm ?? -1);
+      const splits = (await db.execute(sql`
+        select count(*)::int as n
+        from project_credit_splits s
+        where exists (
+          select 1 from dispatches d
+          where d.project_id = s.project_id
+            and d.status = 'approved'
+            and d.dispatch_date >= (${monthStart}::date - interval '1 month')
+            and d.dispatch_date < ${monthStart}::date
+        )
+      `)) as unknown as { n: number }[];
+      previousSplits = Number(splits[0]?.n ?? -1);
+
+      // Active book-holders with NO row this month — the unlisted control's
+      // options, from the records.
+      const unlisted = (await db.execute(sql`
+        select count(*)::int as n
+        from users u join roles r on r.id = u.role_id
+        where u.is_active = true and r.sees_all_reps = false
+          and not exists (select 1 from company_reps cr
+                          where cr.user_id = u.id and cr.removed_at is null)
+          and not exists (select 1 from targets t
+                          where t.user_id = u.id and t.period = ${monthStart}::date)
+      `)) as unknown as { n: number }[];
+      unlistedHolders = Number(unlisted[0]?.n ?? -1);
+
+      const role = (await db.execute(sql`
+        select id::text as id from roles where name_en = 'Sales Rep' limit 1
+      `)) as unknown as { id: string }[];
+      repRoleId = role[0]?.id ?? "";
+    } catch (error) {
+      console.log(`  --    the team records could not be read — ${String(error)}`);
+    }
+
+    const recordsRead =
+      repA !== "" &&
+      majed !== "" &&
+      qualifiedDays > 0 &&
+      unqualifiedDays > 0 &&
+      quietByRep.size > 0;
+
+    if (!recordsRead) {
+      console.log(
+        "  --    the team records were not read, so the columns, the archived term and the drill-in are NOT MEASURED",
+      );
+    } else {
+      /* 1. **The quiet and never-contacted columns, every row, against the
+            records** — `S138`'s manager count whole, `D39`'s quiet column. */
+      for (const locale of ["en", "ar"] as const) {
+        const { body } = await get(manager43, `/${locale}?tab=team`);
+        const rows = rowTags(body);
+        if (
+          !setup(
+            `${locale}: the Team tab renders ${rows.length} team row(s)`,
+            rows.length >= 2,
+            "fewer than two rows — a one-row table proves nothing about a column",
+          )
+        )
+          continue;
+        const readQuiet: string[] = [];
+        const readNever: string[] = [];
+        const wrong: string[] = [];
+        for (const tag of rows) {
+          const id = tagAttr(tag, "data-user");
+          const quiet = Number(tagAttr(tag, "data-quiet"));
+          const never = Number(tagAttr(tag, "data-never"));
+          const fromQuiet = quietByRep.get(id) ?? 0;
+          const fromNever = neverByRep.get(id) ?? 0;
+          readQuiet.push(`${quiet}=${fromQuiet}`);
+          readNever.push(`${never}=${fromNever}`);
+          if (quiet !== fromQuiet) wrong.push(`${id} quiet ${quiet} vs ${fromQuiet}`);
+          if (never !== fromNever) wrong.push(`${id} never ${never} vs ${fromNever}`);
+        }
+        check(
+          `${locale}: *** every row's quiet count is the records' own — saw ${readQuiet.join(" · ")} over ${rows.length} rows *** [D39] [S89]`,
+          wrong.every((w) => !w.includes(" quiet ")),
+          wrong.filter((w) => w.includes(" quiet ")).join(" · "),
+        );
+        check(
+          `${locale}: *** every row's never-contacted count is the records' own, whole and unfloored — saw ${readNever.join(" · ")} over ${rows.length} rows *** [S138] [D39]`,
+          wrong.every((w) => !w.includes(" never ")),
+          wrong.filter((w) => w.includes(" never ")).join(" · "),
+        );
+      }
+
+      /*
+       * 2. **An archived company leaves the quiet figure** — the session-53
+       *    term inside `companySilence`, driven rather than read. One of
+       *    rep-a's quiet, interacted-with companies is archived by SQL (a
+       *    fixture toggle, not a user's act — no audit row, and `archiveCompany`
+       *    would leave the membership live exactly as this does), the column
+       *    must drop by one while never-contacted holds, and the flip is put
+       *    back and MEASURED.
+       */
+      if (archiveCandidate === "") {
+        console.log(
+          "  --    rep-a has no quiet company with an interaction, so the archived term is NOT MEASURED",
+        );
+      } else {
+        const before = rowTags((await get(manager43, "/en?tab=team")).body).find(
+          (tag) => tagAttr(tag, "data-user") === repA,
+        );
+        const quietBefore = Number(tagAttr(before ?? "", "data-quiet"));
+        const neverBefore = Number(tagAttr(before ?? "", "data-never"));
+        let flipped = false;
+        try {
+          await db.execute(sql`
+            update companies set archived_at = now()
+            where id = ${archiveCandidate}::uuid and archived_at is null
+          `);
+          flipped = true;
+        } catch (error) {
+          console.log(`  --    the archive flip failed — ${String(error)}`);
+        }
+        if (flipped) {
+          const during = rowTags((await get(manager43, "/en?tab=team")).body).find(
+            (tag) => tagAttr(tag, "data-user") === repA,
+          );
+          check(
+            `*** archiving one of rep-a's quiet companies takes it out of his quiet count and leaves never-contacted alone — quiet ${quietBefore} → ${tagAttr(
+              during ?? "",
+              "data-quiet",
+            )}, never ${neverBefore} → ${tagAttr(during ?? "", "data-never")} *** [D39] [S89] [WORKFLOW §5]`,
+            Number(tagAttr(during ?? "", "data-quiet")) === quietBefore - 1 &&
+              Number(tagAttr(during ?? "", "data-never")) === neverBefore,
+          );
+          let restored = false;
+          try {
+            await db.execute(sql`
+              update companies set archived_at = null
+              where id = ${archiveCandidate}::uuid
+            `);
+            restored = true;
+          } catch (error) {
+            console.log(`  --    the restore failed — ${String(error)}`);
+          }
+          const after = rowTags((await get(manager43, "/en?tab=team")).body).find(
+            (tag) => tagAttr(tag, "data-user") === repA,
+          );
+          check(
+            `*** the fixture is put back — the company is unarchived and rep-a's quiet count reads ${tagAttr(
+              after ?? "",
+              "data-quiet",
+            )}, the ${quietBefore} it started at *** [S89]`,
+            restored && Number(tagAttr(after ?? "", "data-quiet")) === quietBefore,
+          );
+        }
+      }
+
+      /*
+       * 3. **One person's world** — `?rep=` on the Team tab. Majed, who has no
+       *    target, and rep-a, who has: the pace card measured or not, the
+       *    company total against live non-archived memberships, the target
+       *    periods and this month's two rows `S84`, the dispatch and thread
+       *    totals, and last month's metres against the dispatch lines.
+       */
+      for (const locale of ["en", "ar"] as const) {
+        const majedPage = await get(manager43, `/${locale}?tab=team&rep=${majed}`);
+        const world = openTag(majedPage.body, "rep-world");
+        check(
+          `${locale}: *** the manager opens Majed's world — a person with no target — and reads no pace figure, ${tagAttr(
+            openTag(majedPage.body, "rep-companies"),
+            "data-total",
+          )} companies against the records' ${liveByRep.get(majed) ?? 0}, and ${tagAttr(
+            openTag(majedPage.body, "rep-targets"),
+            "data-periods",
+          )} target period(s) *** [D39] [D53]`,
+          tagAttr(world, "data-user") === majed &&
+            !openTag(majedPage.body, "rep-pace").includes("data-measured") &&
+            Number(tagAttr(openTag(majedPage.body, "rep-companies"), "data-total")) ===
+              (liveByRep.get(majed) ?? 0) &&
+            tagAttr(openTag(majedPage.body, "rep-targets"), "data-periods") === "0",
+        );
+
+        const repPage = await get(manager43, `/${locale}?tab=team&rep=${repA}`);
+        const targets = openTag(repPage.body, "rep-targets");
+        const thisMonth = [
+          ...repPage.body.matchAll(/<div\b[^>]*data-slot="rep-target-period"[^>]*>/g),
+        ]
+          .map((m) => m[0])
+          .find((tag) => tagAttr(tag, "data-period") === monthStart);
+        check(
+          `${locale}: *** rep-a's world reads a measured pace, ${tagAttr(
+            targets,
+            "data-periods",
+          )} target period(s) against the records' ${repAPeriods}, this month's ${tagAttr(
+            thisMonth ?? "",
+            "data-rows",
+          )} row(s) against ${repARowsThisMonth}, ${tagAttr(
+            openTag(repPage.body, "rep-dispatches"),
+            "data-total",
+          )} dispatches against ${repADispatches}, ${tagAttr(
+            openTag(repPage.body, "rep-threads"),
+            "data-total",
+          )} threads against ${repAThreads} *** [D39] [S84] [S122]`,
+          openTag(repPage.body, "rep-pace").includes("data-measured") &&
+            Number(tagAttr(targets, "data-periods")) === repAPeriods &&
+            Number(tagAttr(thisMonth ?? "", "data-rows")) === repARowsThisMonth &&
+            Number(tagAttr(openTag(repPage.body, "rep-dispatches"), "data-total")) ===
+              repADispatches &&
+            Number(tagAttr(openTag(repPage.body, "rep-threads"), "data-total")) ===
+              repAThreads,
+        );
+
+        if (locale === "en") {
+          const previousPeriod = `${new Date(
+            Date.UTC(Number(monthStart.slice(0, 4)), Number(monthStart.slice(5, 7)) - 2, 1),
+          )
+            .toISOString()
+            .slice(0, 10)}`;
+          const lastMonth = [
+            ...repPage.body.matchAll(/<div\b[^>]*data-slot="rep-target-period"[^>]*>/g),
+          ]
+            .map((m) => m[0])
+            .find((tag) => tagAttr(tag, "data-period") === previousPeriod);
+          if (!lastMonth || previousRecorded < 0) {
+            console.log(
+              `  --    rep-a carried no target for ${previousPeriod.slice(0, 7)} or the lines were not read — last month's metres are NOT MEASURED`,
+            );
+          } else if (previousSplits > 0) {
+            console.log(
+              `  --    ${previousSplits} credit split(s) fall in ${previousPeriod.slice(0, 7)} — the history apportions where the records do not: NOT MEASURED`,
+            );
+          } else {
+            check(
+              `*** the history's ${previousPeriod.slice(0, 7)} metres for rep-a are what the dispatch lines say — saw ${tagAttr(
+                lastMonth,
+                "data-sqm",
+              )} against ${previousRecorded} *** [S85] [D39]`,
+              metres(tagAttr(lastMonth, "data-sqm")) === previousRecorded,
+            );
+          }
+        }
+      }
+
+      /* 4. **The gate is `sees_all_reps`** — a rep typing the URL gets his own
+            screen, and the executive, who is not a manager, opens it `D68`. */
+      const repTyping = await get(jars["rep-a@example.test"], `/en?tab=team&rep=${majed}`);
+      check(
+        `*** a rep typing ?tab=team&rep= by hand gets nothing of it — saw ${
+          repTyping.body.includes('data-slot="rep-world"') ? "the world" : "no world"
+        } and ${repTyping.body.includes('data-slot="today-team"') ? "the table" : "no table"} *** [D76] [D64] [D53]`,
+        !repTyping.body.includes('data-slot="rep-world"') &&
+          !repTyping.body.includes('data-slot="today-team"'),
+      );
+      const executiveOpens = await get(executive43, `/en?tab=team&rep=${majed}`);
+      check(
+        `*** the executive opens a person's world — sees_all_reps, not can_manage_users, is the door *** [D68] [D39]`,
+        tagAttr(openTag(executiveOpens.body, "rep-world"), "data-user") === majed,
+      );
+
+      /* 5. **The old deep link** — `/targets` for an overseer lands on the Team
+            tab `D49`; for a book-holder it is still his own screen. */
+      const deepLink = await get(manager43, "/en/targets");
+      check(
+        `*** /targets sends an overseer to the Team tab — landed on ${deepLink.url.replace(BASE, "")} with ${
+          deepLink.body.includes('data-slot="today-team"') ? "the table" : "NO table"
+        } *** [D49] [D76]`,
+        deepLink.url.includes("tab=team") && deepLink.body.includes('data-slot="today-team"'),
+      );
+
+      /*
+       * 6. **Set a target for someone not listed** — absent while every
+       *    active book-holder has a row (a biconditional against the
+       *    records), present once one exists, and it writes: a run-scoped rep
+       *    with no company is inserted, offered, given a target through the
+       *    form, becomes a row with that target, and is deactivated at the end
+       *    — `S111` never deletes, so the account stays inactive, which is
+       *    what `cleanup:verify` would do to it.
+       */
+      const beforeUnlisted = await get(manager43, "/en?tab=team");
+      check(
+        `*** the unlisted control renders exactly when an active book-holder has no row — the records name ${unlistedHolders}, the tab ${
+          beforeUnlisted.body.includes('data-slot="team-unlisted"') ? "offers it" : "offers none"
+        } *** [D39] [D53] [D70]`,
+        unlistedHolders >= 0 &&
+          beforeUnlisted.body.includes('data-slot="team-unlisted"') === unlistedHolders > 0,
+      );
+      if (repRoleId === "") {
+        console.log("  --    no Sales Rep role, so the unlisted write is NOT MEASURED");
+      } else {
+        const stamp = Date.now();
+        let newId = "";
+        try {
+          const inserted = (await db.execute(sql`
+            insert into users (name, email, role_id, is_active)
+            values (${`Verify Unlisted ${stamp}`}, ${`verify-${stamp}-team53@example.test`}, ${repRoleId}::uuid, true)
+            returning id::text as id
+          `)) as unknown as { id: string }[];
+          newId = inserted[0]?.id ?? "";
+        } catch (error) {
+          console.log(`  --    the run-scoped rep could not be inserted — ${String(error)}`);
+        }
+        if (
+          setup("a run-scoped rep with no company and no target exists", newId !== "")
+        ) {
+          const offered = await get(manager43, "/en?tab=team");
+          const form = actForm(offered.body, "set-target-unlisted");
+          check(
+            `*** the unlisted control now renders and offers the new rep — control ${
+              offered.body.includes('data-slot="team-unlisted"') ? "present" : "ABSENT"
+            }, option ${form?.includes(`value="${newId}"`) ? "listed" : "MISSING"} *** [D39] [S83]`,
+            form !== undefined && form.includes(`value="${newId}"`) &&
+              !rowTags(offered.body).some((tag) => tagAttr(tag, "data-user") === newId),
+          );
+          if (form) {
+            const body = envelope(form);
+            body.set("period", monthStart);
+            body.set("userId", newId);
+            body.set("sqm", "123");
+            const response = await fetch(`${BASE}/en?tab=team`, {
+              method: "POST",
+              headers: { cookie: header(manager43), origin: BASE },
+              body,
+              redirect: "manual",
+            });
+            store(manager43, response);
+            const afterWrite = await get(manager43, "/en?tab=team");
+            const newRow = rowTags(afterWrite.body).find(
+              (tag) => tagAttr(tag, "data-user") === newId,
+            );
+            check(
+              `*** setting a target through the unlisted control answers a raw POST and the person becomes a row carrying it — saw ${response.status}, row ${
+                newRow ? `with data-target="${tagAttr(newRow, "data-target")}"` : "ABSENT"
+              } *** [S83] [S84] [D39]`,
+              response.status === 200 &&
+                newRow !== undefined &&
+                metres(tagAttr(newRow, "data-target")) === 123,
+            );
+          }
+          let deactivated = false;
+          try {
+            await db.execute(sql`
+              update users set is_active = false, deactivated_at = now()
+              where id = ${newId}::uuid
+            `);
+            deactivated = true;
+          } catch (error) {
+            console.log(`  --    the deactivation failed — ${String(error)}`);
+          }
+          const afterOff = await get(manager43, "/en?tab=team");
+          check(
+            `*** the run-scoped rep is deactivated and leaves the table — row ${
+              rowTags(afterOff.body).some((tag) => tagAttr(tag, "data-user") === newId)
+                ? "STILL RENDERS"
+                : "gone"
+            }, control ${
+              afterOff.body.includes('data-slot="team-unlisted"') === unlistedHolders > 0
+                ? "back where it started"
+                : "CHANGED"
+            } *** [S111] [D39]`,
+            deactivated &&
+              !rowTags(afterOff.body).some((tag) => tagAttr(tag, "data-user") === newId) &&
+              afterOff.body.includes('data-slot="team-unlisted"') === unlistedHolders > 0,
+          );
+        }
+      }
     }
   }
 

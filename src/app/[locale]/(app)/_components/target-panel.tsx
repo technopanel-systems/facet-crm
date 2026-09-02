@@ -53,6 +53,7 @@ export async function TargetBody({
   pacePct,
   daysWorked,
   daysInMonth,
+  sides = true,
 }: {
   /**
    * **The two fields this panel actually reads, and nothing more.**
@@ -70,6 +71,10 @@ export async function TargetBody({
   pacePct: number;
   daysWorked: number;
   daysInMonth: number;
+  /** The rep drill-in draws the body without `D32`'s two side figures —
+   *  `quotedCount` answers for a scope, not a person, and a wrong figure is
+   *  worse than none. Everything above the side block is unchanged. */
+  sides?: boolean;
 }) {
   const t = await getTranslations();
 
@@ -164,6 +169,7 @@ export async function TargetBody({
         target={formatSqm(target)}
       />
 
+      {sides ? (
       <div
         data-slot="today-side"
         className="border-line mt-1 flex flex-wrap gap-x-10 gap-y-3 border-t pt-3 text-start"
@@ -192,6 +198,7 @@ export async function TargetBody({
           }
         />
       </div>
+      ) : null}
     </div>
   );
 }
