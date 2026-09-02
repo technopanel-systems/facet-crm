@@ -13,6 +13,7 @@ import {
   ZERO,
 } from "@/lib/decimal";
 import { cn } from "@/lib/utils";
+import { isOpeningWeek } from "@/lib/working-days";
 
 import { paceGeometry } from "./pace";
 
@@ -90,8 +91,16 @@ export async function TargetBody({
   // `D6` is untouched: no tone on any of the three. Ahead-of-pace is an
   // outcome, and colour in FACET describes how long something has waited,
   // never how good the outcome is. The words carry the meaning.
-  const paceKey =
-    gap > ZERO
+  //
+  // **The opening week says *the month has just started*** `D32` — in both
+  // directions. Through the first working week the comparison has no meaning
+  // yet (nothing dispatched on the 2nd is not a rep 545 m² behind, and 500 m²
+  // on the 2nd is not a rep ahead), so neither word is printed. The figure is
+  // the figure: the tick, both percentages and `data-gap` are unchanged.
+  const opening = isOpeningWeek(worked);
+  const paceKey = opening
+    ? "today.target.pace.opening"
+    : gap > ZERO
       ? "today.target.pace.ahead"
       : gap < ZERO
         ? "today.target.pace.behind"
@@ -138,6 +147,9 @@ export async function TargetBody({
         data-slot="today-pace"
         data-pct={pacePct}
         data-gap={formatWholeSqm(gap < ZERO ? -gap : gap)}
+        // `D32`'s opening week, as a marker: the words are translated, so
+        // `verify:routes` §41 holds the attribute to its own working-day count.
+        data-opening={opening ? "" : undefined}
         className="text-muted-foreground text-start text-[12.5px]"
       >
         {t(paceKey, {

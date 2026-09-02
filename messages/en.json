@@ -1152,7 +1152,8 @@
       "pace": {
         "ahead": "{pct}% of the month gone · ahead of pace by {sqm} m²",
         "behind": "{pct}% of the month gone · behind pace by {sqm} m²",
-        "onPace": "{pct}% of the month gone · on pace"
+        "onPace": "{pct}% of the month gone · on pace",
+        "opening": "{pct}% of the month gone · the month has just started"
       },
       "lastMonth": "Last month",
       "lastMonthOf": "{pct}% of {target} m²",

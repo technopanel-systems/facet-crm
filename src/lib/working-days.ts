@@ -47,6 +47,27 @@ export function riyadhDayOf(at: Date): string {
 /** Friday and Saturday. `Date#getUTCDay()`: 0 = Sunday … 5 = Friday, 6 = Saturday. */
 const WEEKEND_DAYS = new Set([5, 6]);
 
+/**
+ * The working days in one week — derived from `S93`'s weekend, never typed:
+ * seven days less the two that are off. `D32`'s opening week reads it.
+ */
+export const WORKING_DAYS_PER_WEEK = 7 - WEEKEND_DAYS.size;
+
+/**
+ * `D32` — **the month has just started.** While the working days done this
+ * month (today counted) are no more than one working week, the pace line and
+ * `D79`'s *behind pace* condition say so instead of *ahead* or *behind*. The
+ * figure is untouched — the tick, the percentages and the gap attribute all
+ * stay — only the words change, and only for these days. The line sits at one
+ * working week because that is the unit the calendar already answers with
+ * (`S93`) and the shortest interval the pipeline itself measures in: a
+ * quotation is not even chased before five working days `S87`. No stored
+ * setting, no invented threshold.
+ */
+export function isOpeningWeek(daysWorked: number): boolean {
+  return daysWorked <= WORKING_DAYS_PER_WEEK;
+}
+
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function parse(day: string): number {

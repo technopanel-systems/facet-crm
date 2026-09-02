@@ -37,6 +37,7 @@ import type { AchievementRow } from "@/lib/targets";
 import { cn } from "@/lib/utils";
 import {
   calendarDaysBetween,
+  isOpeningWeek,
   previousWorkingDay,
   shiftDays,
 } from "@/lib/working-days";
@@ -457,6 +458,12 @@ type AttentionRow = {
  * condition — two problems are two rows. Silent first (longest first), then
  * behind (largest gap), then never (largest count). When nobody qualifies
  * the block is absent `D70`.
+ *
+ * **Nobody is behind in the opening week** `D32` `D79` — `isOpeningWeek`,
+ * the same line the pace panel reads, so the band and this block cannot
+ * disagree about whether the month has started. Silent and never-contacted
+ * are unaffected: a rep who has logged nothing for fourteen days is silent
+ * whatever the date.
  */
 export async function AttentionBlock({
   session,
@@ -489,6 +496,7 @@ export async function AttentionBlock({
 
   const now = today();
   const measuredBy = new Map(attainment.map((row) => [row.userId, row]));
+  const opening = isOpeningWeek(daysWorked);
 
   const silent: AttentionRow[] = [];
   const behindRaw: { row: AttentionRow; gap: bigint }[] = [];
@@ -512,7 +520,7 @@ export async function AttentionBlock({
     // whole-metre figures a reader could check by hand, never the rounded
     // percentage.
     const measured = measuredBy.get(person.id);
-    if (measured?.targetSqm != null) {
+    if (!opening && measured?.targetSqm != null) {
       const pct = percentOf(measured.achievedSqm, measured.targetSqm, SQM_SCALE);
       const expectedWhole = divideRounded(
         divideRounded(
@@ -566,6 +574,7 @@ export async function AttentionBlock({
       data-silent={silent.length}
       data-behind={behindRaw.length}
       data-never={never.length}
+      data-opening={opening ? "" : undefined}
     >
       <CardHeader>
         <CardTitle className="text-start text-sm">

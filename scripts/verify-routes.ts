@@ -10684,6 +10684,63 @@ async function main(): Promise<void> {
     }
 
     /*
+     * `D32` — **the opening week, as a biconditional against this script's own
+     * working-day count.** The words are translated, so the marker is
+     * `data-opening` on the pace line: present exactly while the working days
+     * done this month (Friday and Saturday off, today counted) are five or
+     * fewer, absent otherwise. And `D79`'s half — while it is present, the
+     * attention block carries no behind-pace row, whatever the figures say.
+     * Both halves asserted, so a panel that never printed *the month has just
+     * started* and one that never stopped both go red.
+     */
+    {
+      const riyadh = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Riyadh",
+        dateStyle: "short",
+      }).format(new Date());
+      const [yr, mo, dayOfMonth] = riyadh.split("-").map(Number);
+      let worked = 0;
+      for (let d = 1; d <= dayOfMonth; d += 1) {
+        const weekday = new Date(Date.UTC(yr, mo - 1, d)).getUTCDay();
+        if (weekday !== 5 && weekday !== 6) worked += 1;
+      }
+      const opening = worked <= 5;
+      const { body } = await get(jars["manager@example.test"], "/en");
+      const pace = openTag(body, "today-pace");
+      if (pace === "") {
+        console.log(
+          "  --    no company target this month, so the pace line is absent and the opening-week wording is NOT MEASURED",
+        );
+      } else {
+        check(
+          `*** the pace line reads "the month has just started" exactly through the first working week — ${worked} working day(s) done, marker ${
+            pace.includes("data-opening") ? "present" : "absent"
+          } *** [D32]`,
+          pace.includes("data-opening") === opening,
+          `worked ${worked}, opening ${opening}`,
+        );
+      }
+      const attention = openTag(body, "today-attention");
+      const behindRows = [
+        ...body.matchAll(/<div[^>]*data-slot="attention-row"[^>]*data-kind="behind"/g),
+      ].length;
+      if (!opening) {
+        console.log(
+          `  --    ${worked} working days done: past the opening week, so the no-behind-rows half is NOT MEASURED`,
+        );
+      } else {
+        check(
+          `*** nobody is behind pace in the opening week — ${worked} working day(s) done, the block ${
+            attention === "" ? "is absent" : `claims data-behind="${tagAttr(attention, "data-behind")}"`
+          } and ${behindRows} behind row(s) render *** [D79] [D32]`,
+          behindRows === 0 &&
+            (attention === "" || tagAttr(attention, "data-behind") === "0"),
+          `${behindRows} behind row(s)`,
+        );
+      }
+    }
+
+    /*
      * `D77` — **Yesterday's four figures against this script's own SQL.** The
      * day is re-derived here (walk back from Riyadh-today over Friday and
      * Saturday), dispatched m² is summed from the lines over `dispatch_date`

@@ -705,6 +705,27 @@ answering it a second time. Through Eid the tick advances while nothing ships.
 A calendar denominator is equally blind, so that is not a cost of counting
 working days — `WORKFLOW §5` carries the row.
 
+**The opening week says *the month has just started*, and the number does not
+move** — amended session 53, the founder's decision on his *the meter reads
+zero* report (`SPEC §16`, session 52): *keep the number, change the words.*
+Counting today makes the 2nd of a 22-working-day month read *behind pace by
+545 m²* on a morning nobody could have dispatched anything, and it will do so
+on the 1st of every real month — the rule was being obeyed and the screen
+still misled (`WORKFLOW §6`'s conforms-but-wrong box). So while the working
+days done this month, today counted, are **no more than one working week**
+(`working-days.ts` derives the five from `S93`'s weekend rather than typing
+it), the pace line prints *N% of the month gone · the month has just started*
+in place of *ahead* or *behind* — in **both** directions, because 500 m² on
+the 2nd is no more *ahead* than nothing is *behind*. Everything else stays:
+the large figure, the target, the tick at today's position, both
+percentages, and the gap as a data attribute for the checks. **The line sits
+at one working week** because that is the unit the calendar already answers
+with and the shortest interval the pipeline itself measures in — a quotation
+is not chased before five working days `S87` — so no setting is stored and
+no threshold is invented. `D79`'s *behind pace* follows the same line. From
+the sixth working day the words are *ahead* and *behind* again, whatever the
+figure says.
+
 **Both percentages render** — achievement in the bar's legend, expected-to-date
 in the pace line. *84% means nothing until you can see that the month expects
 82%.* The pace line then gives the distance in square metres, and **that
@@ -1130,7 +1151,13 @@ appear once per condition — two problems are two rows. Rows order silent
 first (longest first), then behind (largest gap first), then never (largest
 count first); the block caps at six with *and N more* as plain text, so it
 cannot push the page down without limit, and **when nobody qualifies the
-block is absent** (`D70`).
+block is absent** (`D70`). **Nobody is behind pace in the opening week** —
+amended session 53 with `D32`: through the first working week of a month
+(`isOpeningWeek`, the one line the pace panel reads) the behind condition
+does not fire, because on the 2nd every targeted rep read as behind before
+anything could have been approved. Silent and never-contacted are
+unaffected and keep firing: a rep who has logged nothing for fourteen days
+is silent whatever the date.
 
 **D80. Big deals in play — the biggest five open deals by expected
 size.** The founder's answer 4: the top five, never a threshold — the real
