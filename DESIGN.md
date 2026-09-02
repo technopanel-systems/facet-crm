@@ -1072,9 +1072,10 @@ script (`D20`, `D28`'s instinct). *Today* holds the day's blocks and
 qualifies for everyone — so **a rep sees no strip at all**, a strip of one
 being noise, **and the coordinator sees none either**: her day is the queue,
 not the trend. *Team* holds the team table (`D39`) and qualifies on
-`sees_all_reps`. *Reports* is the weekly study and **carries no pill until
-that tab is built** — `D51`: a control that does nothing is worse than no
-control; the pill joins in the slice that builds it. **Targets stays in the
+`sees_all_reps`. *Reports* is the weekly study `D42` and qualifies on
+`sees_all_reps` too; its pill joined the strip in the slice that built the
+tab (session 52), having stayed off it until then — `D51`: a control that
+does nothing is worse than no control. **Targets stays in the
 rail until the Team tab absorbs it** (`28b`'s precedent — moving the rail
 item first hides attainment from everyone who could reach it); the slice
 that ships Team takes the rail item and amends `D49`.
@@ -1159,21 +1160,81 @@ system already knows).
 
 ## 10. The monthly rollup — "what happened, and why?"
 
-**D42.** Figures across the top in square metres: quoted · approved ·
-dispatched, each with its count. Beside them: lost, and still open. A note under
-it stating that quoted counts each thread's latest live version once.
+**D42. The Reports tab — eight readings under three questions, over a
+period.** The rollup is the dashboard's Reports tab `D76`, read for
+`sees_all_reps` and nobody else `D53`, and it takes a **period** as URL
+state `D20`: this month · last month · 3 months · 12 months, four GET
+links, this month the default. Its blocks group under three headings — the
+grouping the founder accepted on the drawings
+(`docs/archive/30-overseer-answers.md`), session 52:
+
+- **The month** — *month against last month*: approved-dispatch square
+  metres as monthly columns, **the same derivation as every target figure**
+  `S85`; a one-month period draws the three months before it for context, a
+  longer period draws its own months, and the period's months take the
+  fill. And *why we lose* `D44`.
+- **The pipeline** — *quoted and nothing came back*: a **count** of live
+  issued quotations no interaction has followed, of every live issued
+  quotation, with how many are past the chase threshold `S89` — the
+  founder's answer 5, never the metres `S68`; *with the coordinator right
+  now*: `D40`'s two piles, the square metres on the submitted requests and
+  the oldest request's own age; *from quotation to delivery, per rep*
+  `D43`, with `S142`'s sitting time beside it.
+- **The customers** — *where business comes from*: companies added in the
+  period by lead source, ranked, with **not recorded as its own bar** `S17`
+  until the pre-rule blanks age out — it shrinks on its own and is never
+  hidden, because it is the finding; *which customers come back* `S139`,
+  per rep; *how many real customers* `S140`.
+
+**A block over events takes the period; a block that is a snapshot says
+so.** Dispatched metres, losses, quotations raised, companies added and
+buyers are events inside the window. Quoted-and-silent, the coordinator's
+piles and real customers are the state of things right now or ever, and each
+prints that beside its figure rather than letting a period chip imply a
+window that does not apply.
+
+**Charts are CSS bars, never SVG, in four forms only**: the single bar, the
+two-segment comparison, the ranked horizontal list, the monthly columns. SVG
+has no logical direction, so every x-coordinate would be hand-mirrored in
+Arabic — the defect class `AUDIT 2` catalogued; a CSS bar is an inline size
+from the reading edge and flips for free `D57`. **Every chart prints its
+figures as text; the geometry is a reading aid and the number is the fact.**
+A ranked list is useless when values cluster and unreadable when one dwarfs
+the rest — the proposal's heavy drawing proved both — so the figure sits on
+the bar's own row and never under `D12`'s 12.5px floor. Solid red for what
+happened — `--brand`, the flat red the bell's dot and the chain strip's
+filled steps already wear; `--brand-grad` has two uses `D15` and neither is
+a chart — and the track for the remainder; never green-for-good `D6`. On a phone ranked bars take the full width and
+stack, and a column chart shows at most six periods.
+
+**A block with nothing to show is absent** `D70`, a heading whose blocks are
+all absent goes with them, and when every block is absent the tab says so
+once, outside any card `D52` `D60`. **Nothing here sums a quotation** `S68`:
+silent quotations are counted, conversion is counted in deals, and the
+metres beside a loss reason are the lost projects' expected size `S29`.
+
+**Superseded by the drawings**: the figures-across-the-top this rule named
+until session 52 — quoted · approved · dispatched with counts, lost and
+still open — of which *quoted* was `S68`'s refusal in another form.
 
 **Paid is not a stage.** Payment is recorded on the dispatch (S70) and no route
 to approved bypasses it (S72, S73), so there is no interval between paid and
 dispatched for the funnel to measure, and "dispatched can exceed paid because
 credit customers ship first" was the credit-terms flag SPEC §15 deleted.
-Whether a figure stands in its place, and what the rollup measures instead, is
-**OPEN — not chosen**.
+What the rollup measures instead is the eight readings above; nothing stands
+in paid's place.
 
-**D43. Quoted vs dispatched, by rep** — a two-segment bar per rep, red for
-dispatched, grey for the gap. Sliced by rep as the first cut, per the founder.
+**D43. From quotation to delivery, by rep** — a two-segment bar per rep: of
+the quotations that rep raised in the period and that were issued (a price
+was produced `S63`), how many an approved dispatch followed `S31` — red for
+delivered, the track for the gap — **counted in deals, never square metres**
+`S68`. Sliced by rep as the first cut, per the founder. **Beside each bar,
+`S142`'s sitting time**: how many of those quotations are still open, and how
+long half of them have sat — the lower median of the days since each last
+moved (its latest version), so *half have sat N days or more* is exactly
+true. Two figures side by side, never one score.
 
-**D44. [BUILD] Where the gap went** — loss reasons ranked as horizontal bars
+**D44. Where the gap went** — loss reasons ranked as horizontal bars
 **by how often each reason comes up, with the square metres lost to each
 printed beside it**. The founder's answer 8 (`docs/archive/30`): *one big
 deal lost on price is bad luck; five lost on lead time is a problem* — and
@@ -1183,6 +1244,17 @@ longest bar means. And one line under it, which is the whole point of the
 signal system: *"7 of 9 losses had the same reason logged as a signal before
 the loss — 19 days before."* Whether that number moves is how you know the
 signals are worth recording.
+
+**Built in session 52 to that ranking.** The square metres beside a reason
+are the lost projects' expected size `S29` — never a quotation's `S68` — and
+a lost project counts once `S48`, in the month it was marked lost. The signal
+line counts a signal on a report against the project or one of its
+companies, dated before the loss day, whose value is the loss reason's own
+signal: `S43`'s one vocabulary, bridged once in code because the seeded
+reason codes keep `25 §5`'s wording (*lost to a competitor* reads
+*competitor cheaper*); stock shortage and customer went quiet have no signal,
+so a loss under either can never count as warned. The days are the mean gap
+between the last such signal and the loss.
 
 ---
 

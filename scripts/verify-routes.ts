@@ -10644,11 +10644,12 @@ async function main(): Promise<void> {
 
     /*
      * `D76` — **the strip renders exactly when more than one group
-     * qualifies, and carries no Reports pill.** Four identities × both
+     * qualifies, as Today · Reports · Team.** Four identities × both
      * locales: the two book holders see none (a strip of one is noise, and
      * the coordinator's day is the queue, not the trend), the two overseers
-     * see Today and Team and nothing third (`D51` — a control with nothing
-     * behind it).
+     * see the three pills and nothing fourth. The Reports pill joined in
+     * session 52 with the tab behind it — `D51` kept it off until then, and
+     * §42 holds what stands behind it.
      */
     for (const who of [
       { label: "manager", jar: jars["manager@example.test"], strip: true },
@@ -10671,10 +10672,12 @@ async function main(): Promise<void> {
           : [];
         check(
           `${who.label} ${locale}: *** the tab strip ${
-            who.strip ? "renders as Today · Team, nothing third" : "is ABSENT"
+            who.strip
+              ? "renders as Today · Reports · Team, nothing fourth"
+              : "is ABSENT"
           } — saw [${named.join(" · ") || "none"}] *** [D76] [D51] [D64]`,
           who.strip
-            ? strip && named.join(",") === "today,team"
+            ? strip && named.join(",") === "today,reports,team"
             : !strip && named.length === 0,
         );
       }
@@ -11103,6 +11106,846 @@ async function main(): Promise<void> {
         "*** the first-run screen is ABSENT on a database that has recorded work, and the band stands in its place *** [D81]",
         !body.includes('data-slot="today-firstrun"') &&
           body.includes('data-slot="today-band"'),
+      );
+    }
+  }
+
+  /* ── 42 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n42. The Reports tab — the pill and the gate, the period as URL state, eight readings against the records, figures as text, the mirror [D42]–[D44], [S139], [S140], [S142], [S17], [D76]",
+  );
+  {
+    const setup = (step: string, ok: boolean, detail = ""): boolean => {
+      checks += 1;
+      if (ok) {
+        console.log(`  setup reports: ${step}`);
+        return true;
+      }
+      failures += 1;
+      console.log(
+        `  SETUP FAILED at reports: ${step}${detail ? ` — ${detail}` : ""}`,
+      );
+      return false;
+    };
+    const attr = (tag: string, name: string): string =>
+      tag.match(new RegExp(`${name}="([^"]*)"`))?.[1] ?? "";
+    const tagsOf = (body: string, slot: string): string[] =>
+      [
+        ...body.matchAll(
+          new RegExp(`<[a-z]+\\b[^>]*data-slot="${slot}"[^>]*>`, "g"),
+        ),
+      ].map((m) => m[0]);
+    /** `formatSqm` groups by thousands; the comparison is arithmetic. */
+    const metres = (shown: string): number => Number(shown.replace(/,/g, ""));
+    /**
+     * The visible text of each element carrying a slot — from its open tag to
+     * the next `data-slot` of any kind, tags stripped. A chart row nests no
+     * slot of its own, so this is exactly the row and nothing after it.
+     */
+    const textOf = (body: string, slot: string): string[] =>
+      [
+        ...body.matchAll(
+          new RegExp(`<[a-z]+\\b[^>]*data-slot="${slot}"[^>]*>`, "g"),
+        ),
+      ].map((m) => {
+        const start = (m.index ?? 0) + m[0].length;
+        const next = body.indexOf('data-slot="', start);
+        return body
+          .slice(start, next === -1 ? start + 4000 : next)
+          .replace(/<[^>]+>/g, " ");
+      });
+
+    /* --- the window, re-derived: Riyadh's month, twelve back, exclusive end - */
+    const riyadhToday = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Riyadh",
+      dateStyle: "short",
+    }).format(new Date());
+    const shiftMonths = (month: string, by: number): string => {
+      const [year, m] = month.split("-").map(Number);
+      const total = year * 12 + (m - 1) + by;
+      return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}-01`;
+    };
+    const thisMonth = `${riyadhToday.slice(0, 7)}-01`;
+    const windowFrom = shiftMonths(thisMonth, -11);
+    const windowTo = shiftMonths(thisMonth, 1);
+    const twelve = Array.from({ length: 12 }, (_, i) =>
+      shiftMonths(windowFrom, i),
+    );
+    const backWorkingDays = (day: string, count: number): string => {
+      let cursor = new Date(`${day}T00:00:00Z`);
+      let left = count;
+      while (left > 0) {
+        cursor = new Date(cursor.getTime() - 86_400_000);
+        if (![5, 6].includes(cursor.getUTCDay())) left -= 1;
+      }
+      return cursor.toISOString().slice(0, 10);
+    };
+
+    /*
+     * `D76` `D53` `D64` — **the pill and the gate, as a biconditional.** The
+     * executive is the second overseer and the identity `§41` never signs in;
+     * the two book holders are driven to `?tab=reports` by hand and must get
+     * their own screen — the tab is a grouping of flag-qualified blocks,
+     * never a door past the flags — and the overseers' Reports screen must
+     * carry none of Today's blocks.
+     */
+    const executive = await login("executive@example.test");
+    const executiveHome = await get(executive, "/en");
+    // **Not `status === 200` alone**: a failed sign-in lands on `/login`,
+    // which also answers 200 — run C's bogus address sailed through this
+    // line and the four executive checks went red instead of the setup
+    // failing apart from the claims. The landing URL is the evidence.
+    setup(
+      `the executive signed in — /en answers ${executiveHome.status} at ${executiveHome.url}`,
+      executiveHome.status === 200 && !executiveHome.url.includes("/login"),
+    );
+
+    for (const who of [
+      { label: "manager", jar: jars["manager@example.test"], overseer: true },
+      { label: "executive", jar: executive, overseer: true },
+      { label: "rep-a", jar: jars["rep-a@example.test"], overseer: false },
+      {
+        label: "coordinator",
+        jar: jars["coordinator@example.test"],
+        overseer: false,
+      },
+    ] as const) {
+      for (const locale of ["en", "ar"] as const) {
+        const home = await get(who.jar, `/${locale}`);
+        // The anchor carrying the marker, then its href — never a verbatim
+        // run of two attributes, which is the fifteenth wrong-red's shape
+        // (a check coupled to attribute order fails on a correct screen).
+        const pillTag =
+          [...home.body.matchAll(/<a\b[^>]*>/g)]
+            .map((m) => m[0])
+            .find((tag) => attr(tag, "data-tab") === "reports") ?? "";
+        const pillHref = attr(pillTag, "href");
+        check(
+          `reports: ${who.label} ${locale}: *** the Reports pill ${
+            who.overseer
+              ? `is on the strip, linking to ?tab=reports — saw ${pillHref || "no pill"}`
+              : "is ABSENT"
+          } *** [D76] [D51]`,
+          who.overseer
+            ? pillTag !== "" &&
+                pillHref.startsWith(`/${locale}`) &&
+                pillHref.endsWith("?tab=reports")
+            : pillTag === "",
+        );
+
+        const tab = await get(who.jar, `/${locale}?tab=reports`);
+        const rollup = tab.body.includes('data-slot="rollup"');
+        const todayBlocks =
+          tab.body.includes('data-slot="today-band"') ||
+          tab.body.includes('data-slot="today-team"') ||
+          tab.body.includes('data-slot="today-stuck"');
+        const ownScreen =
+          tab.body.includes('data-slot="today-greeting"') &&
+          tab.body.includes('data-slot="today-counts"');
+        check(
+          `reports: ${who.label} ${locale}: *** ?tab=reports ${
+            who.overseer
+              ? "renders the rollup and none of Today's blocks"
+              : "renders the book holder's own screen and NO rollup"
+          } — saw ${rollup ? "rollup" : "no rollup"}, ${
+            todayBlocks ? "Today blocks" : "no Today block"
+          }, ${ownScreen ? "own screen" : "no own screen"} *** [D76] [D53] [D64]`,
+          tab.status === 200 &&
+            (who.overseer
+              ? rollup && !todayBlocks && !ownScreen
+              : !rollup && ownScreen),
+        );
+      }
+    }
+
+    /*
+     * `D20` `D42` — **the period is URL state.** Four GET links in a fixed
+     * order, each carrying `tab=reports`; this month is the default and the
+     * current chip, an unknown value falls back to it, and the chosen chip
+     * is what the rollup stamps on itself.
+     */
+    for (const locale of ["en", "ar"] as const) {
+      const jar = jars["manager@example.test"];
+      const plain = await get(jar, `/${locale}?tab=reports`);
+      const chips = tagsOf(plain.body, "rollup-periods").length
+        ? [
+            ...(plain.body.match(
+              /<nav\b[^>]*data-slot="rollup-periods"[\s\S]*?<\/nav>/,
+            )?.[0] ?? "").matchAll(/<a\b[^>]*>/g),
+          ].map((m) => m[0])
+        : [];
+      const keys = chips.map((tag) => attr(tag, "data-period"));
+      const current = chips
+        .filter((tag) => attr(tag, "aria-current") === "true")
+        .map((tag) => attr(tag, "data-period"));
+      check(
+        `reports: ${locale}: *** four period chips in order, every one a GET link carrying tab=reports, this month current by default — saw [${keys.join(
+          " · ",
+        )}], current [${current.join(" · ") || "none"}] *** [D20] [D42]`,
+        keys.join(",") === "month,last,3m,12m" &&
+          chips.every((tag) => attr(tag, "href").includes("tab=reports")) &&
+          current.join(",") === "month" &&
+          attr(tagsOf(plain.body, "rollup")[0] ?? "", "data-period") === "month",
+      );
+      const twelveMonths = await get(jar, `/${locale}?tab=reports&period=12m`);
+      const twelveCurrent = [
+        ...(twelveMonths.body.match(
+          /<nav\b[^>]*data-slot="rollup-periods"[\s\S]*?<\/nav>/,
+        )?.[0] ?? "").matchAll(/<a\b[^>]*aria-current="true"[^>]*>/g),
+      ].map((m) => attr(m[0], "data-period"));
+      const bogus = await get(jar, `/${locale}?tab=reports&period=bogus`);
+      check(
+        `reports: ${locale}: *** ?period=12m makes 12m current and the rollup stamps it; an unknown period falls back to this month — saw [${twelveCurrent.join(
+          " · ",
+        )}] and ${attr(tagsOf(bogus.body, "rollup")[0] ?? "", "data-period") || "nothing"} *** [D20] [D42]`,
+        twelveCurrent.join(",") === "12m" &&
+          attr(tagsOf(twelveMonths.body, "rollup")[0] ?? "", "data-period") ===
+            "12m" &&
+          attr(tagsOf(bogus.body, "rollup")[0] ?? "", "data-period") === "month",
+      );
+    }
+
+    /*
+     * **The fixture step, reported apart from the claims.** `D44`'s whole
+     * point is that a ranking by count can DIFFER from a ranking by metres —
+     * on the seed every reason is lost once, so the two rankings coincide and
+     * a screen ranking by metres would pass. Two of rep-a's smallest open
+     * projects are marked lost under one reason with no signal (`customer
+     * went quiet`), over the real edit POST `§7` drives, so that reason
+     * leads by count and trails by metres. Nothing is put back: FACET
+     * deletes nothing and `seed:demo` is the reset.
+     */
+    const repJar = jars["rep-a@example.test"];
+    let marked = 0;
+    try {
+      const candidates = (await db.execute(sql`
+        select p.id::text as id
+        from projects p
+        join users u on u.id = p.owner_user_id
+        where u.email = 'rep-a@example.test'
+          and p.end_state is null
+          and not exists (
+            select 1 from dispatches d
+            where d.project_id = p.id and d.status = 'approved')
+        order by coalesce(p.sqm_expected, 0) asc, p.created_at asc
+        limit 2
+      `)) as unknown as { id: string }[];
+      for (const { id } of candidates) {
+        const page = await get(repJar, `/en/projects/${id}/edit`);
+        const form = page.body.match(
+          /<form[^>]*>(?:(?!<\/form>)[\s\S])*?name="endState"[\s\S]*?<\/form>/,
+        )?.[0];
+        const reasonId = form?.match(
+          /<option value="([^"]+)"[^>]*data-code="customer_went_quiet"/,
+        )?.[1];
+        if (!form || !reasonId) continue;
+        const fields = envelopeOf(form);
+        fields.set("name", nameOf(page.body) ?? "Project");
+        fields.set(
+          "sqmExpected",
+          attr(form.match(/<input[^>]*name="sqmExpected"[^>]*>/)?.[0] ?? "", "value"),
+        );
+        fields.set(
+          "cityId",
+          attr(
+            form
+              .match(/<select[^>]*name="cityId"[\s\S]*?<\/select>/)?.[0]
+              ?.match(/<option[^>]*\bselected\b[^>]*>/)?.[0] ?? "",
+            "value",
+          ),
+        );
+        fields.set("endState", "lost");
+        fields.set("lostReasonId", reasonId);
+        fields.set("lossReason", "");
+        const response = await fetch(`${BASE}/en/projects/${id}/edit`, {
+          method: "POST",
+          headers: { cookie: header(repJar), origin: BASE },
+          body: fields,
+          redirect: "manual",
+        });
+        store(repJar, response);
+        if (response.status === 303) marked += 1;
+      }
+    } catch (error) {
+      console.log(`  --    reports: the fixture step failed — ${String(error)}`);
+    }
+    setup(
+      `two of rep-a's smallest open projects marked lost under one reason, so a count ranking can differ from a metres ranking — ${marked} marked`,
+      marked === 2,
+      `${marked} of 2 POSTs answered 303`,
+    );
+
+    /* --- the records, each read by this script's own SQL --------------- */
+    type MonthRecord = { month: string; n: number; sqm: number };
+    type LossRecord = { code: string; n: number; sqm: number };
+    type LossDayRecord = { lost_day: string; signal_day: string | null };
+    type QuotedRecord = { live: number; silent: number; past: number };
+    type PileRecord = {
+      to_issue: number;
+      requests: number;
+      sqm: number;
+      oldest: number | null;
+    };
+    type ThreadRecord = {
+      user_id: string;
+      end_state: string | null;
+      quoted: boolean;
+      delivered: boolean;
+      sitting: number;
+    };
+    type SourceRecord = { source: string; n: number };
+    type ReturnRecord = {
+      user_id: string | null;
+      buyers: number;
+      returned: number;
+    };
+
+    const signalBridge = sql.raw(
+      "case lr.code" +
+        " when 'price_too_high' then 'price_too_high'" +
+        " when 'lost_to_competitor' then 'competitor_cheaper'" +
+        " when 'colour_or_product_unavailable' then 'colour_unavailable'" +
+        " when 'delivery_time_too_long' then 'lead_time_too_long'" +
+        " when 'specification_not_offered' then 'specification_unavailable'" +
+        " when 'project_cancelled_or_postponed' then 'project_delayed'" +
+        " when 'other' then 'other' else null end",
+    );
+
+    let months: MonthRecord[] = [];
+    let losses: LossRecord[] = [];
+    let lossDays: LossDayRecord[] = [];
+    let quoted: QuotedRecord | null = null;
+    let pile: PileRecord | null = null;
+    let threads: ThreadRecord[] = [];
+    let sources: SourceRecord[] = [];
+    let returning: ReturnRecord[] = [];
+    let real: { real: number; companies: number } | null = null;
+    let thresholdDays = 5;
+    let readable = false;
+    try {
+      const setting = (await db.execute(sql`
+        select value::text as value from settings
+        where key = 'followup.quotation_no_response.working_days'
+      `)) as unknown as { value: string }[];
+      if (setting[0]?.value && Number.isFinite(Number(setting[0].value))) {
+        thresholdDays = Number(setting[0].value);
+      }
+      const cutoff = backWorkingDays(riyadhToday, thresholdDays);
+
+      // **`count(distinct d.id)`, not `count(*)`** — the join is to the
+      // lines, and a dispatch with three lines is one dispatch. This read
+      // `count(*)` on its first run and went red on a correct screen: the
+      // script's SQL, not the screen's, was the side that moved.
+      months = (
+        (await db.execute(sql`
+          select to_char(d.dispatch_date, 'YYYY-MM-01') as month,
+                 count(distinct d.id)::int as n,
+                 round(coalesce(sum(l.sqm), 0))::int as sqm
+          from dispatches d
+          join dispatch_lines l on l.dispatch_id = d.id
+          where d.status = 'approved'
+            and d.dispatch_date >= ${windowFrom}::date
+            and d.dispatch_date < ${windowTo}::date
+          group by 1
+        `)) as unknown as MonthRecord[]
+      ).map((row) => ({ ...row, n: Number(row.n), sqm: Number(row.sqm) }));
+
+      losses = (
+        (await db.execute(sql`
+          select lr.code, count(*)::int as n,
+                 round(coalesce(sum(p.sqm_expected), 0))::int as sqm
+          from projects p
+          join loss_reasons lr on lr.id = p.lost_reason_id
+          where p.end_state = 'lost'
+            and p.lost_at >= ${windowFrom}::date::timestamp at time zone 'Asia/Riyadh'
+            and p.lost_at < ${windowTo}::date::timestamp at time zone 'Asia/Riyadh'
+          group by lr.code, lr.name_en
+          order by n desc, sqm desc, lr.name_en asc
+        `)) as unknown as LossRecord[]
+      ).map((row) => ({ ...row, n: Number(row.n), sqm: Number(row.sqm) }));
+
+      lossDays = (await db.execute(sql`
+        select (p.lost_at at time zone 'Asia/Riyadh')::date::text as lost_day,
+          (
+            select max(r.report_date)::text
+            from rep_reports r
+            join rep_report_signals sg on sg.report_id = r.id
+            where sg.signal::text = ${signalBridge}
+              and r.report_date < (p.lost_at at time zone 'Asia/Riyadh')::date
+              and (r.project_id = p.id or r.company_id in (
+                select pc.company_id from project_companies pc
+                where pc.project_id = p.id))
+          ) as signal_day
+        from projects p
+        join loss_reasons lr on lr.id = p.lost_reason_id
+        where p.end_state = 'lost'
+          and p.lost_at >= ${windowFrom}::date::timestamp at time zone 'Asia/Riyadh'
+          and p.lost_at < ${windowTo}::date::timestamp at time zone 'Asia/Riyadh'
+      `)) as unknown as LossDayRecord[];
+
+      const quotedRows = (await db.execute(sql`
+        select
+          count(*)::int as live,
+          count(*) filter (where a.created_at is not null and not exists (
+            select 1 from rep_reports r
+            where r.company_id = t.company_id
+              and r.entry_type = 'interaction'
+              and r.report_date > (a.created_at at time zone 'Asia/Riyadh')::date
+          ))::int as silent,
+          count(*) filter (where a.created_at is not null and not exists (
+            select 1 from rep_reports r
+            where r.company_id = t.company_id
+              and r.entry_type = 'interaction'
+              and r.report_date > (a.created_at at time zone 'Asia/Riyadh')::date
+          ) and (a.created_at at time zone 'Asia/Riyadh')::date <= ${cutoff}::date)::int
+            as past
+        from quotation_threads t
+        join quotation_versions v on v.thread_id = t.id and v.status = 'issued'
+        join companies c on c.id = t.company_id
+        left join lateral (
+          select a.created_at from audit_log a
+          where a.entity_id = v.id and a.action = 'quotation_version.issued'
+          order by a.created_at desc limit 1
+        ) a on true
+        where t.end_state is null
+          and c.archived_at is null and c.merged_into_id is null
+      `)) as unknown as QuotedRecord[];
+      quoted = {
+        live: Number(quotedRows[0]?.live ?? 0),
+        silent: Number(quotedRows[0]?.silent ?? 0),
+        past: Number(quotedRows[0]?.past ?? 0),
+      };
+
+      const pileRows = (await db.execute(sql`
+        select
+          (select count(*)::int from quotation_threads qt
+             join quotation_versions qv on qv.thread_id = qt.id
+             where qv.status = 'requested' and qt.end_state is null) as to_issue,
+          (select count(*)::int from dispatches d where d.status = 'submitted')
+            as requests,
+          (select round(coalesce(sum(l.sqm), 0))::int
+             from dispatches d join dispatch_lines l on l.dispatch_id = d.id
+             where d.status = 'submitted') as sqm,
+          (select ((now() at time zone 'Asia/Riyadh')::date
+                   - (min(d.submitted_at) at time zone 'Asia/Riyadh')::date)::int
+             from dispatches d where d.status = 'submitted') as oldest
+      `)) as unknown as PileRecord[];
+      pile = {
+        to_issue: Number(pileRows[0]?.to_issue ?? 0),
+        requests: Number(pileRows[0]?.requests ?? 0),
+        sqm: Number(pileRows[0]?.sqm ?? 0),
+        oldest: pileRows[0]?.oldest == null ? null : Number(pileRows[0].oldest),
+      };
+
+      threads = (
+        (await db.execute(sql`
+          select u.id::text as user_id, t.end_state::text as end_state,
+            exists (select 1 from quotation_versions v
+                    where v.thread_id = t.id and v.smac_reference is not null) as quoted,
+            exists (select 1 from dispatches d
+                    where d.quotation_thread_id = t.id and d.status = 'approved') as delivered,
+            ((now() at time zone 'Asia/Riyadh')::date
+             - ((select max(v.created_at) from quotation_versions v where v.thread_id = t.id)
+                at time zone 'Asia/Riyadh')::date)::int as sitting
+          from quotation_threads t
+          join users u on u.id = t.raised_by_user_id
+          where t.created_at >= ${windowFrom}::date::timestamp at time zone 'Asia/Riyadh'
+            and t.created_at < ${windowTo}::date::timestamp at time zone 'Asia/Riyadh'
+        `)) as unknown as ThreadRecord[]
+      ).map((row) => ({ ...row, sitting: Number(row.sitting) }));
+
+      sources = (
+        (await db.execute(sql`
+          select coalesce(c.lead_source_id::text, 'none') as source,
+                 count(*)::int as n
+          from companies c
+          left join lead_sources ls on ls.id = c.lead_source_id
+          where c.merged_into_id is null
+            and c.created_at >= ${windowFrom}::date::timestamp at time zone 'Asia/Riyadh'
+            and c.created_at < ${windowTo}::date::timestamp at time zone 'Asia/Riyadh'
+          group by 1, ls.name_en
+          order by n desc, ls.name_en asc nulls last
+        `)) as unknown as SourceRecord[]
+      ).map((row) => ({ ...row, n: Number(row.n) }));
+
+      returning = (
+        (await db.execute(sql`
+          with buyers as (
+            select distinct d.company_id
+            from dispatches d join companies c on c.id = d.company_id
+            where d.status = 'approved'
+              and d.dispatch_date >= ${windowFrom}::date
+              and d.dispatch_date < ${windowTo}::date
+              and c.merged_into_id is null),
+          spans as (
+            select d.company_id, count(distinct d.project_id)::int as projects
+            from dispatches d
+            where d.status = 'approved' and d.project_id is not null
+            group by d.company_id)
+          select u.id::text as user_id, count(*)::int as buyers,
+                 count(*) filter (where coalesce(s.projects, 0) > 1)::int as returned
+          from buyers b
+          left join spans s on s.company_id = b.company_id
+          left join company_reps cr
+            on cr.company_id = b.company_id and cr.is_primary and cr.removed_at is null
+          left join users u on u.id = cr.user_id
+          group by u.id
+        `)) as unknown as ReturnRecord[]
+      ).map((row) => ({
+        ...row,
+        buyers: Number(row.buyers),
+        returned: Number(row.returned),
+      }));
+
+      const realRows = (await db.execute(sql`
+        select
+          (select count(distinct d.company_id) from dispatches d
+             join companies c on c.id = d.company_id
+             where d.status = 'approved' and c.merged_into_id is null)::int as real,
+          (select count(*) from companies c where c.merged_into_id is null)::int
+            as companies
+      `)) as unknown as { real: number; companies: number }[];
+      real = {
+        real: Number(realRows[0]?.real ?? 0),
+        companies: Number(realRows[0]?.companies ?? 0),
+      };
+      readable = true;
+    } catch (error) {
+      console.log(`  --    reports: the records could not be read — ${String(error)}`);
+    }
+
+    if (!readable) {
+      console.log("  --    reports: the readings are NOT MEASURED");
+    } else {
+      const jar = jars["manager@example.test"];
+      const en = (await get(jar, "/en?tab=reports&period=12m")).body;
+      const ar = (await get(jar, "/ar?tab=reports&period=12m")).body;
+
+      /* 1. `D42` — the twelve columns are the records' own months and sums. */
+      const columns = tagsOf(en, "rollup-column");
+      const byMonth = new Map(months.map((row) => [row.month, row]));
+      const anyDispatch = months.some((row) => row.n > 0);
+      if (!anyDispatch) {
+        console.log(
+          "  --    reports: no approved dispatch in twelve months, so the columns are NOT MEASURED (the block should be absent — asserted below)",
+        );
+        check(
+          "reports: *** with no approved dispatch in the window the month columns are ABSENT *** [D42] [D70]",
+          columns.length === 0,
+        );
+      } else {
+        check(
+          `reports: *** twelve monthly columns, ascending, each the records' own approved-dispatch metres and count — saw ${columns.length} column(s), [${columns
+            .map((tag) => `${attr(tag, "data-sqm")}/${attr(tag, "data-count")}`)
+            .join(" · ")}] against [${twelve
+            .map(
+              (month) =>
+                `${byMonth.get(month)?.sqm ?? 0}/${byMonth.get(month)?.n ?? 0}`,
+            )
+            .join(" · ")}] *** [D42] [S85]`,
+          columns.length === 12 &&
+            columns.every(
+              (tag, index) =>
+                attr(tag, "data-month") === twelve[index] &&
+                metres(attr(tag, "data-sqm")) ===
+                  (byMonth.get(twelve[index])?.sqm ?? 0) &&
+                Number(attr(tag, "data-count")) ===
+                  (byMonth.get(twelve[index])?.n ?? 0),
+            ),
+          `screen [${columns.map((tag) => attr(tag, "data-month")).join(",")}]`,
+        );
+        const columnText = textOf(en, "rollup-column");
+        check(
+          `reports: *** every column prints its figure as text — ${columns.length} column(s) read *** [D42]`,
+          columns.length > 0 &&
+            columns.every((tag, index) =>
+              columnText[index]?.includes(attr(tag, "data-sqm")),
+            ),
+        );
+      }
+
+      /* 2. `D44` — losses ranked by count, the metres beside, the signal line. */
+      const lossRows = tagsOf(en, "rollup-loss");
+      if (losses.length === 0) {
+        check(
+          "reports: *** with no loss in the window, why we lose is ABSENT *** [D44] [D70]",
+          lossRows.length === 0 && !en.includes('data-slot="rollup-losses"'),
+        );
+      } else {
+        const byMetres = [...losses].sort(
+          (a, b) => b.sqm - a.sqm || b.n - a.n || a.code.localeCompare(b.code),
+        );
+        const rankingsDiffer =
+          byMetres.map((row) => row.code).join(",") !==
+          losses.map((row) => row.code).join(",");
+        check(
+          `reports: *** why we lose ranks by HOW OFTEN, the metres beside each — saw [${lossRows
+            .map((tag) => `${attr(tag, "data-code")}:${attr(tag, "data-count")}/${attr(tag, "data-sqm")}`)
+            .join(" · ")}] against [${losses
+            .map((row) => `${row.code}:${row.n}/${row.sqm}`)
+            .join(" · ")}]${
+            rankingsDiffer
+              ? " — and a metres ranking would read differently"
+              : " — NOTE: every reason ties, so a metres ranking would read the same"
+          } *** [D44] [S48]`,
+          lossRows.length === losses.length &&
+            lossRows.every(
+              (tag, index) =>
+                attr(tag, "data-code") === losses[index].code &&
+                Number(attr(tag, "data-count")) === losses[index].n &&
+                metres(attr(tag, "data-sqm")) === losses[index].sqm,
+            ),
+        );
+        check(
+          "reports: *** the count ranking is DISTINGUISHABLE from a metres ranking on this data — the fixture step made it so *** [D44]",
+          rankingsDiffer,
+          `by count [${losses.map((r) => r.code).join(",")}], by metres [${byMetres.map((r) => r.code).join(",")}]`,
+        );
+        const warned = lossDays.filter((row) => row.signal_day !== null);
+        const meanDays =
+          warned.length === 0
+            ? null
+            : Math.round(
+                warned.reduce(
+                  (sum, row) =>
+                    sum +
+                    (Date.parse(`${row.lost_day}T00:00:00Z`) -
+                      Date.parse(`${row.signal_day}T00:00:00Z`)) /
+                      86_400_000,
+                  0,
+                ) / warned.length,
+              );
+        const card = tagsOf(en, "rollup-losses")[0] ?? "";
+        check(
+          `reports: *** the signal line is the records' own — saw ${attr(card, "data-with-signal")} of ${attr(card, "data-losses")} warned, ${attr(card, "data-days-before") || "no"} days before, against ${warned.length} of ${lossDays.length} and ${meanDays ?? "no"} days *** [D44] [S44]`,
+          Number(attr(card, "data-losses")) === lossDays.length &&
+            Number(attr(card, "data-with-signal")) === warned.length &&
+            (meanDays === null
+              ? attr(card, "data-days-before") === ""
+              : Number(attr(card, "data-days-before")) === meanDays),
+        );
+        const lossText = textOf(en, "rollup-loss");
+        check(
+          `reports: *** every loss row prints its count and metres as text — ${lossRows.length} row(s) read *** [D42]`,
+          lossRows.every(
+            (tag, index) =>
+              lossText[index]?.includes(attr(tag, "data-sqm")) &&
+              lossText[index]?.includes(attr(tag, "data-count")),
+          ),
+        );
+      }
+
+      /* 3. `S68` — quoted and nothing came back, a count of deals. */
+      const quotedCard = tagsOf(en, "rollup-quoted")[0] ?? "";
+      if (!quoted || quoted.live === 0) {
+        console.log(
+          "  --    reports: no live issued quotation in the records, so quoted-and-silent is NOT MEASURED",
+        );
+      } else {
+        check(
+          `reports: *** quoted-and-silent is the ladder's own count of deals — saw ${attr(quotedCard, "data-silent")} silent of ${attr(quotedCard, "data-live")} live, ${attr(quotedCard, "data-past")} past the ${thresholdDays}-working-day threshold, against ${quoted.silent} of ${quoted.live} and ${quoted.past} *** [S68] [S89] [D42]`,
+          Number(attr(quotedCard, "data-silent")) === quoted.silent &&
+            Number(attr(quotedCard, "data-live")) === quoted.live &&
+            Number(attr(quotedCard, "data-past")) === quoted.past,
+        );
+      }
+
+      /* 4. `D40` — with the coordinator right now, the metres included. */
+      const pileCard = tagsOf(en, "rollup-coordinator")[0] ?? "";
+      if (!pile || (pile.to_issue === 0 && pile.requests === 0)) {
+        console.log(
+          "  --    reports: both piles are empty in the records, so an equality against them would read nothing: NOT MEASURED",
+        );
+      } else {
+        check(
+          `reports: *** the coordinator's piles are the records' — saw ${attr(pileCard, "data-issue")} to issue, ${attr(pileCard, "data-requests")} requests carrying ${attr(pileCard, "data-sqm")} m², oldest ${attr(pileCard, "data-oldest") || "none"}, against ${pile.to_issue}, ${pile.requests}, ${pile.sqm} m², ${pile.oldest ?? "none"} *** [D40] [S72] [S116]`,
+          Number(attr(pileCard, "data-issue")) === pile.to_issue &&
+            Number(attr(pileCard, "data-requests")) === pile.requests &&
+            metres(attr(pileCard, "data-sqm")) === pile.sqm &&
+            (pile.oldest === null
+              ? attr(pileCard, "data-oldest") === ""
+              : Number(attr(pileCard, "data-oldest")) === pile.oldest),
+        );
+      }
+
+      /* 5. `D43` `S142` — per rep, in deals, sitting time beside. */
+      const repRows = tagsOf(en, "rollup-rep");
+      const byRep = new Map<
+        string,
+        { quoted: number; delivered: number; sitting: number[] }
+      >();
+      for (const row of threads) {
+        if (!row.quoted) continue;
+        const bucket = byRep.get(row.user_id) ?? {
+          quoted: 0,
+          delivered: 0,
+          sitting: [],
+        };
+        bucket.quoted += 1;
+        if (row.delivered) bucket.delivered += 1;
+        else if (row.end_state === null) bucket.sitting.push(row.sitting);
+        byRep.set(row.user_id, bucket);
+      }
+      if (byRep.size === 0) {
+        check(
+          "reports: *** with no issued quotation raised in the window, the per-rep block is ABSENT *** [D43] [D70]",
+          repRows.length === 0,
+        );
+      } else {
+        const median = (days: number[]): string => {
+          if (days.length === 0) return "";
+          const sorted = [...days].sort((a, b) => a - b);
+          return String(sorted[Math.floor((sorted.length - 1) / 2)]);
+        };
+        check(
+          `reports: *** per rep: quoted, delivered, open and the sitting median are the records' own — saw ${repRows.length} row(s) [${repRows
+            .map(
+              (tag) =>
+                `${attr(tag, "data-delivered")}/${attr(tag, "data-quoted")} open ${attr(tag, "data-open")} sit ${attr(tag, "data-sitting") || "-"}`,
+            )
+            .join(" · ")}] against ${byRep.size} rep(s) *** [D43] [S142] [S68]`,
+          repRows.length === byRep.size &&
+            repRows.every((tag) => {
+              const expected = byRep.get(attr(tag, "data-user"));
+              return (
+                expected !== undefined &&
+                Number(attr(tag, "data-quoted")) === expected.quoted &&
+                Number(attr(tag, "data-delivered")) === expected.delivered &&
+                Number(attr(tag, "data-open")) === expected.sitting.length &&
+                attr(tag, "data-sitting") === median(expected.sitting)
+              );
+            }),
+        );
+        const repText = textOf(en, "rollup-rep");
+        check(
+          `reports: *** every rep row prints delivered-of-quoted as text, and no row folds the two figures into one — ${repRows.length} row(s) read *** [S142] [D42]`,
+          repRows.every(
+            (tag, index) =>
+              repText[index]?.includes(attr(tag, "data-delivered")) &&
+              repText[index]?.includes(attr(tag, "data-quoted")),
+          ),
+        );
+      }
+
+      /* 6. `S17` — where business comes from, not recorded as its own bar. */
+      const sourceRows = tagsOf(en, "rollup-source");
+      if (sources.length === 0) {
+        check(
+          "reports: *** with no company added in the window, where business comes from is ABSENT *** [S17] [D70]",
+          sourceRows.length === 0,
+        );
+      } else {
+        const blanks = sources.find((row) => row.source === "none")?.n ?? 0;
+        check(
+          `reports: *** lead sources ranked by count with not-recorded as its own bar — saw [${sourceRows
+            .map((tag) => `${attr(tag, "data-source") === "none" ? "none" : "src"}:${attr(tag, "data-count")}`)
+            .join(" · ")}] against [${sources
+            .map((row) => `${row.source === "none" ? "none" : "src"}:${row.n}`)
+            .join(" · ")}], ${blanks} blank *** [S17] [D42]`,
+          sourceRows.length === sources.length &&
+            sourceRows.every(
+              (tag, index) =>
+                attr(tag, "data-source") === sources[index].source &&
+                Number(attr(tag, "data-count")) === sources[index].n,
+            ) &&
+            (blanks > 0) ===
+              sourceRows.some((tag) => attr(tag, "data-source") === "none"),
+        );
+        const total = sources.reduce((sum, row) => sum + row.n, 0);
+        check(
+          `reports: *** the card's total is the sum of its bars — saw ${attr(tagsOf(en, "rollup-sources")[0] ?? "", "data-total")} against ${total} *** [S17]`,
+          Number(attr(tagsOf(en, "rollup-sources")[0] ?? "", "data-total")) ===
+            total,
+        );
+      }
+
+      /* 7. `S139` — which customers come back. */
+      const returningCard = tagsOf(en, "rollup-returning")[0] ?? "";
+      const buyers = returning.reduce((sum, row) => sum + row.buyers, 0);
+      const returned = returning.reduce((sum, row) => sum + row.returned, 0);
+      if (buyers === 0) {
+        check(
+          "reports: *** with no buyer in the window, which customers come back is ABSENT *** [S139] [D70]",
+          returningCard === "",
+        );
+      } else {
+        const rowsBack = tagsOf(en, "rollup-returning-rep");
+        check(
+          `reports: *** coming back is bought-again-on-new-work over the buyers in the window — saw ${attr(returningCard, "data-returned")} of ${attr(returningCard, "data-buyers")} on the card and ${rowsBack.length} rep row(s) summing to ${rowsBack.reduce((sum, tag) => sum + Number(attr(tag, "data-buyers")), 0)}, against ${returned} of ${buyers} over ${returning.length} holder(s) *** [S139] [S18]`,
+          Number(attr(returningCard, "data-buyers")) === buyers &&
+            Number(attr(returningCard, "data-returned")) === returned &&
+            rowsBack.length === returning.length &&
+            rowsBack.every((tag) => {
+              const expected = returning.find(
+                (row) => (row.user_id ?? "none") === attr(tag, "data-user"),
+              );
+              return (
+                expected !== undefined &&
+                Number(attr(tag, "data-buyers")) === expected.buyers &&
+                Number(attr(tag, "data-returned")) === expected.returned
+              );
+            }),
+        );
+      }
+
+      /* 8. `S140` — how many real customers, ever. */
+      const realCard = tagsOf(en, "rollup-real")[0] ?? "";
+      if (!real || real.companies === 0) {
+        console.log(
+          "  --    reports: no company in the records, so real customers is NOT MEASURED",
+        );
+      } else {
+        check(
+          `reports: *** real customers is bought-at-least-once-ever — saw ${attr(realCard, "data-real")} of ${attr(realCard, "data-companies")} against ${real.real} of ${real.companies} *** [S140]`,
+          Number(attr(realCard, "data-real")) === real.real &&
+            Number(attr(realCard, "data-companies")) === real.companies,
+        );
+      }
+
+      /* 9. `D57` — the mirror is CSS: the Arabic DOM order is the English one. */
+      const order = (body: string): string =>
+        [
+          ...tagsOf(body, "rollup-column").map((tag) => attr(tag, "data-month")),
+          ...tagsOf(body, "rollup-loss").map((tag) => attr(tag, "data-code")),
+          ...tagsOf(body, "rollup-rep").map((tag) => attr(tag, "data-user")),
+          ...tagsOf(body, "rollup-source").map((tag) => attr(tag, "data-source")),
+          ...tagsOf(body, "rollup-returning-rep").map((tag) =>
+            attr(tag, "data-user"),
+          ),
+        ].join(",");
+      check(
+        `reports: ar: *** the DOM order of every chart is identical to English — the mirror is CSS — ${order(en).split(",").filter(Boolean).length} marker(s) compared *** [D57] [D42]`,
+        order(en).length > 0 && order(en) === order(ar),
+      );
+
+      /*
+       * 10. `D70` — **this month, as a biconditional against the records.**
+       * The event blocks are present exactly when the month holds their
+       * events; earlier sections have already written this month's rows
+       * (a lost project in §7, companies in §13, quotations in §14), so the
+       * present half is what a full run exercises and the absent half is
+       * proven by eye on a fresh seed (`audit-shots/reports/`, this month).
+       */
+      const monthPage = (await get(jar, "/en?tab=reports")).body;
+      const monthLosses = (await db.execute(sql`
+        select count(*)::int as n from projects p
+        where p.end_state = 'lost'
+          and p.lost_at >= ${thisMonth}::date::timestamp at time zone 'Asia/Riyadh'
+          and p.lost_at < ${windowTo}::date::timestamp at time zone 'Asia/Riyadh'
+      `)) as unknown as { n: number }[];
+      const monthCompanies = (await db.execute(sql`
+        select count(*)::int as n from companies c
+        where c.merged_into_id is null
+          and c.created_at >= ${thisMonth}::date::timestamp at time zone 'Asia/Riyadh'
+          and c.created_at < ${windowTo}::date::timestamp at time zone 'Asia/Riyadh'
+      `)) as unknown as { n: number }[];
+      const lossesNow = Number(monthLosses[0]?.n ?? 0);
+      const companiesNow = Number(monthCompanies[0]?.n ?? 0);
+      check(
+        `reports: *** this month: why we lose is ${lossesNow > 0 ? "present" : "ABSENT"} and where business comes from is ${companiesNow > 0 ? "present" : "ABSENT"}, exactly as the records say (${lossesNow} loss(es), ${companiesNow} company(ies) this month) *** [D70] [D44] [S17]`,
+        monthPage.includes('data-slot="rollup-losses"') === lossesNow > 0 &&
+          monthPage.includes('data-slot="rollup-sources"') === companiesNow > 0,
       );
     }
   }

@@ -2726,6 +2726,52 @@ export async function dispatchesInPeriod(
   }));
 }
 
+/** `D42`'s *with the coordinator right now* — the submitted pile as one
+ *  reading: how many, the square metres they carry, and the oldest. */
+export type SubmittedPile = {
+  count: number;
+  /** Summed from the lines, in SQL `S116`. A sum of REQUESTS, which `S68`
+   *  does not forbid: a request is one shipment asked for, never a
+   *  quotation counted again. */
+  sqm: string;
+  oldestSubmittedAt: Date | null;
+};
+
+/**
+ * The submitted dispatch requests as one aggregate `D40` `D42`.
+ *
+ * `listDispatches({ status: "submitted" })` answers the count and the oldest
+ * (its page is oldest-first `S87`), and Stuck reads it that way. The square
+ * metres need every row, not page one — 25 rows of 96 would understate the
+ * pile silently, `CLAUDE.md`'s pagination trap — so this is one grouped
+ * statement over the whole scope. `S72`'s one status, and
+ * `visibleDispatchesFilter` composed as every other reader composes it.
+ * `dispatchSqm` names both tables outright, so the correlated sum cannot
+ * lose its qualifier inside the aggregate.
+ */
+export async function submittedRequestsNow(
+  session: AuthSession,
+): Promise<SubmittedPile> {
+  const [row] = await db
+    .select({
+      count: count(),
+      sqm: sql<string>`coalesce(sum(${dispatchSqm}), 0)::numeric(14, 4)`,
+      oldest: sql<Date | null>`min(${dispatches.submittedAt})`.mapWith(
+        dispatches.submittedAt,
+      ),
+    })
+    .from(dispatches)
+    .where(
+      and(visibleDispatchesFilter(session), eq(dispatches.status, "submitted")),
+    );
+
+  return {
+    count: row?.count ?? 0,
+    sqm: row?.sqm ?? "0",
+    oldestSubmittedAt: row?.oldest ?? null,
+  };
+}
+
 /* ------------------------------------------------------------------ *
  * `S123` — who created a record is a measure
  * ------------------------------------------------------------------ */

@@ -53,15 +53,20 @@ import {
  * ------------------------------------------------------------------ */
 
 /**
- * Today · Team, as plain GET links on the one dashboard `D20` `D28`. The
- * parent renders this only when more than one group qualifies, so a rep and
- * the coordinator never see it. **No Reports pill until that tab exists** —
- * `D51`: a control that does nothing is worse than no control.
+ * Today · Reports · Team, as plain GET links on the one dashboard `D20`
+ * `D28`. The parent renders this only when more than one group qualifies, so
+ * a rep and the coordinator never see it. **The Reports pill joined in the
+ * slice that built the tab** (session 52) — `D51` kept it off the strip until
+ * something stood behind it.
  *
  * Hand-rolled pills rather than `Button`, so the `D74` floor is said here:
  * anything not on `Button`'s base has to carry 44px below `md` itself.
  */
-export async function OverseerTabs({ active }: { active: "today" | "team" }) {
+export async function OverseerTabs({
+  active,
+}: {
+  active: "today" | "reports" | "team";
+}) {
   const t = await getTranslations();
 
   const pill = (on: boolean) =>
@@ -82,6 +87,14 @@ export async function OverseerTabs({ active }: { active: "today" | "team" }) {
         className={pill(active === "today")}
       >
         {t("today.tabs.today")}
+      </Link>
+      <Link
+        href="/?tab=reports"
+        data-tab="reports"
+        aria-current={active === "reports" ? "page" : undefined}
+        className={pill(active === "reports")}
+      >
+        {t("today.tabs.reports")}
       </Link>
       <Link
         href="/?tab=team"

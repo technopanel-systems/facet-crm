@@ -1203,6 +1203,7 @@
     },
     "tabs": {
       "today": "Today",
+      "reports": "Reports",
       "team": "Team"
     },
     "yesterday": {
@@ -1249,6 +1250,72 @@
       "logNote": "Everything in FACET is downstream of a rep recording something.",
       "target": "Set the month's target",
       "targetNote": "The pace bar has nothing to measure against until one exists."
+    }
+  },
+  "rollup": {
+    "periods": {
+      "month": "This month",
+      "last": "Last month",
+      "3m": "3 months",
+      "12m": "12 months"
+    },
+    "periodLabel": "Period",
+    "sections": {
+      "month": "The month",
+      "pipeline": "The pipeline",
+      "customers": "The customers"
+    },
+    "empty": "Nothing has been recorded in this period yet. Every block fills from real events, and with none it is absent rather than an empty frame.",
+    "months": {
+      "title": "Month against last month",
+      "note": "Approved-dispatch square metres by month — the same derivation as every target figure."
+    },
+    "losses": {
+      "title": "Why we lose",
+      "beside": "{sqm} m² · {count, plural, one {# deal} other {# deals}}",
+      "note": "Ranked by how often a reason comes up. The square metres beside each are the lost projects' expected size; a lost project counts once.",
+      "signals": "{withSignal} of {losses, plural, one {# loss} other {# losses}} had the same reason logged as a signal before the loss — {days, plural, one {# day} other {# days}} before, on average.",
+      "signalsNone": "No loss in this period had its reason logged as a signal beforehand."
+    },
+    "quoted": {
+      "title": "Quoted — and nothing came back",
+      "figure": "{silent} of {live}",
+      "lede": "live issued quotations with no reply of any kind",
+      "past": "{count, plural, one {# past the chase threshold} other {# past the chase threshold}}",
+      "pastNone": "none past the chase threshold",
+      "snapshot": "right now, whatever the period"
+    },
+    "coordinator": {
+      "title": "With the coordinator right now",
+      "line": "{quotations, plural, one {# quotation to issue} other {# quotations to issue}} · {requests, plural, one {# dispatch request} other {# dispatch requests}}",
+      "detail": "{sqm} m² in submitted requests · oldest waiting {days, plural, one {# day} other {# days}}",
+      "clear": "The bottleneck is clear."
+    },
+    "conversion": {
+      "title": "From quotation to delivery — per rep",
+      "delivered": "{delivered} of {quoted} delivered",
+      "open": "{open, plural, one {# open} other {# open}} · half have sat {days, plural, one {# day} other {# days}} or more",
+      "openOne": "{open, plural, one {# open} other {# open}} · sitting {days, plural, one {# day} other {# days}}",
+      "openNone": "nothing still open",
+      "note": "Of each rep's quotations raised in the period, how many ended in an approved dispatch — counted in deals, never m². How long the open ones have sat is beside it and is never folded in."
+    },
+    "sources": {
+      "title": "Where business comes from",
+      "notRecorded": "Not recorded",
+      "count": "{count, plural, one {# company} other {# companies}}",
+      "note": "Companies added in the period, by lead source. Not recorded is the companies registered before the field was mandatory — it shrinks on its own."
+    },
+    "returning": {
+      "title": "Which customers come back",
+      "row": "{returned} of {buyers}",
+      "total": "{returned} of {buyers, plural, one {# buyer} other {# buyers}} in the period had bought on new work before",
+      "unheld": "No current holder",
+      "note": "A customer has come back when they buy again on new work — their deliveries span more than one project. A second delivery on the same job is one deal finishing."
+    },
+    "real": {
+      "title": "How many real customers",
+      "of": "of {companies, plural, one {# company} other {# companies}}",
+      "note": "A real customer has bought at least once, ever. Not narrowed to a window."
     }
   }
 }

@@ -271,15 +271,39 @@ function matchesSearch(row: FollowUpRow, query: string | undefined): boolean {
  * worth 3 of the 15 threads in this pool, and it is a new rule rather than a
  * replacement: `WORKFLOW §5` carries it with the measurement.
  */
-async function quotationNoResponse(
+/** The day a quotation must have gone out on or before to be chased today —
+ *  `07 D5`'s working-day threshold, read off the settings row. */
+export function noResponseCutoff(thresholds: FollowUpThresholds): string {
+  return shiftWorkingDays(today(), thresholds.quotationNoResponse);
+}
+
+/** One live issued quotation nobody has answered — see `silentIssuedThreads`. */
+export type SilentIssuedThread = {
+  threadId: string;
+  companyId: string;
+  companyName: string;
+  projectName: string;
+  smacReference: string | null;
+  /** The moment the live version was issued, off the audit log. */
+  issuedAt: Date;
+};
+
+/**
+ * **The one definition of *quoted and nothing came back*.** The rung below
+ * reads it with the threshold; the Reports tab's *quoted — and nothing came
+ * back* block (`D42`) reads it with `cutoff` null for the whole silent set
+ * and once more with the threshold for the *past the chase threshold* line.
+ * One query, one predicate, two callers — a second copy beside the ladder
+ * is the drift `CLAUDE.md`'s one-ladder rule exists to prevent.
+ */
+export async function silentIssuedThreads(
   session: AuthSession,
-  thresholds: FollowUpThresholds,
-): Promise<FollowUpRow[]> {
-  const cutoff = shiftWorkingDays(today(), thresholds.quotationNoResponse);
+  cutoff: string | null,
+): Promise<SilentIssuedThread[]> {
   const issuedOn = riyadhDay(auditLog.createdAt);
   const laterIssue = alias(auditLog, "later_issue");
 
-  const rows = await db
+  return db
     .select({
       threadId: quotationThreads.id,
       companyId: quotationThreads.companyId,
@@ -310,7 +334,7 @@ async function quotationNoResponse(
         isNull(quotationThreads.endState),
         isNull(companies.archivedAt),
         isNull(companies.mergedIntoId),
-        lte(issuedOn, cutoff),
+        cutoff ? lte(issuedOn, cutoff) : undefined,
         // The latest issue, if a version were ever issued twice.
         notExists(
           subquery
@@ -338,6 +362,13 @@ async function quotationNoResponse(
         ),
       ),
     );
+}
+
+async function quotationNoResponse(
+  session: AuthSession,
+  thresholds: FollowUpThresholds,
+): Promise<FollowUpRow[]> {
+  const rows = await silentIssuedThreads(session, noResponseCutoff(thresholds));
 
   const now = today();
   return rows.map((row) => {

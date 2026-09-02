@@ -11,6 +11,7 @@ import {
   type FollowUpKind,
 } from "@/lib/enums";
 import { quotedCount } from "@/lib/quotations";
+import { isRollupPeriod, rollupFor, rollupPeriod } from "@/lib/rollup";
 import {
   achievementForPeriod,
   companyAchievementForPeriod,
@@ -30,6 +31,7 @@ import {
   YesterdayPanel,
 } from "./_components/overseer";
 import { RequestsBlock } from "./_components/requests-block";
+import { RollupBody, RollupPeriodNav } from "./_components/rollup";
 import { shellCounts } from "./_components/shell-counts";
 import { TargetBody, TargetPanel } from "./_components/target-panel";
 import { TeamTable } from "./_components/team-table";
@@ -72,10 +74,10 @@ export default async function TodayPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; period?: string }>;
 }) {
   const { locale } = await params;
-  const { tab } = await searchParams;
+  const { tab, period: periodParam } = await searchParams;
   setRequestLocale(locale);
 
   const t = await getTranslations();
@@ -196,7 +198,27 @@ export default async function TodayPage({
    * The overseer surface — `D64`'s `sees_all_reps` half `D76`–`D81`
    * ------------------------------------------------------------------ */
 
-  const activeTab = tab === "team" ? "team" : "today";
+  const activeTab =
+    tab === "team" ? "team" : tab === "reports" ? "reports" : "today";
+
+  // `D76` — the Reports tab: `D42`'s rollup over `?period=` `D20`, read
+  // company-wide for `sees_all_reps` and nothing else `D53`. A rep typing
+  // `?tab=reports` by hand never reaches this branch — the book-holder
+  // screen above returned first, and the tab is a grouping of flag-qualified
+  // blocks, never a door past the flags.
+  if (activeTab === "reports") {
+    const key = isRollupPeriod(periodParam) ? periodParam : "month";
+    const span = rollupPeriod(key);
+    const rollup = await rollupFor(session, span);
+    return (
+      <div className="flex flex-col gap-6">
+        <Shortcuts locale={locale} />
+        <OverseerTabs active="reports" />
+        <RollupPeriodNav active={key} />
+        {rollup ? <RollupBody rollup={rollup} locale={locale} /> : null}
+      </div>
+    );
+  }
 
   if (activeTab === "team") {
     const targeted = attainment.filter((row) => row.targetSqm !== null);

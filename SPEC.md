@@ -137,16 +137,20 @@ per **S76** — they see every contact without seeing its company, because a
 dispatch names a contact. A dispatch does not carry a contact today; the reason
 is S76's, and S76 carries its own marker.
 
-**S139. [BUILD]** A customer has **come back** when they buy again on **new
+**S139.** A customer has **come back** when they buy again on **new
 work**: their approved dispatches span more than one project. A second
 delivery on the same job is one deal finishing, never a customer returning.
 Derived from dispatches — S85's principle — and never flagged. The Reports
-tab's coming-back figure is this rule's reader when that tab is built.
+tab's *which customers come back* block is this rule's reader (D42): the
+buyers in the period, and of them the ones whose deliveries ever spanned
+more than one project, grouped by the company's primary rep today (S18).
 
-**S140. [BUILD]** A **real customer** is a company with **at least one
+**S140.** A **real customer** is a company with **at least one
 approved dispatch, ever** — 36 of 382 on the day this was decided. Derived,
 never flagged, and never narrowed to a recency window without the founder
-re-deciding: §16 carries the revisit, after a year of real data.
+re-deciding: §16 carries the revisit, after a year of real data. The Reports
+tab's *how many real customers* reads it (D42), of every company that is not
+a merge tombstone.
 
 ---
 
@@ -1074,11 +1078,13 @@ is nothing on one for this rule to withhold from her — the exception is
 enforced in exactly one place, the project. A company's conversation was never
 hers, and a company has none either.
 
-**S142. [BUILD]** Whether a pipeline is **real** is read as
+**S142.** Whether a pipeline is **real** is read as
 **quoted-versus-delivered**, with **how long deals have been sitting** shown
 beside it — and the two are **never combined into a score**. Nothing scores
 a rep; §16's standing sentence is now citable. The Reports tab draws both
-when it is built, and `D43`'s by-rep bars gain the sitting time beside them.
+(D43): per rep, the quotations raised in the period that were issued against
+the ones an approved dispatch followed, and beside it how many are still
+open and how long half of them have sat.
 
 ---
 
@@ -1208,6 +1214,35 @@ asserting a table nobody wants is the check keeping it alive.
   values arriving look truthful** — a mandatory field with a thin list makes
   reps pick anything to get past it, and the chart lies differently.
   Category is still optional; its emptiness check stands.
+
+- **Behind pace on the first days of a month** (session 52, found
+  answering the founder's *the meter reads zero* report). The zero was real
+  — nothing approved yet in September, the same zero on the band, the Team
+  tab and `/targets` — but `D32` counts today, so on the morning of the 1st
+  the company reads *behind pace by 273 m²* and `D79` lists every targeted
+  rep as behind: measured 2 Sep 2026, three of three, before anything could
+  have been approved. The rules as written. Whether *behind* should wait a
+  number of working days, or a gap floor, is the founder's to name; nothing
+  was changed.
+- **The Reports tab's windows** (session 52). Built as: a block over
+  events takes the period — losses by the day marked lost, quotations by
+  their raise, companies by their registration, buyers by dispatch date —
+  and a snapshot (quoted-and-silent, the coordinator's piles, real
+  customers) ignores it and says so on screen. Confirm or move.
+- **Sitting time** (S142, session 52): the days since an open quotation
+  last moved (its latest version), the lower median across the rep's open
+  ones. Median against oldest, and the quotation's clock against the
+  project's (D26), are the founder's to confirm.
+- **Coming back, per rep** (S139, session 52) attributes a buyer to the
+  company's primary rep today (S18), not the rep on the dispatch; a buyer
+  with no live holder counts in the totals under its own row.
+- **Why we lose** (D44, session 52): the metres beside a reason are S29's
+  expected size, and the signal bridge reads *lost to a competitor* as
+  *competitor cheaper*; stock shortage and customer went quiet have no
+  signal at all. Whether S43's two lists should be one list is his call.
+- **The two channel names** (S17, session 52): *Online or WhatsApp* and
+  *Consultant or architect*, in both languages, are a seed edit away from
+  whatever he says instead.
 
 Closed here in session 50, recorded in `docs/archive/28-fixation/`:
 product specifications (not needed — SMAC prints the quotation) and the

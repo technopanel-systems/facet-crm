@@ -327,7 +327,7 @@ function searchFilter(query: string | undefined): SQL | undefined {
  * `CLAUDE.md` — the outer query does join, so the qualifiers would survive
  * anyway, but the rule is not conditional on remembering that.
  */
-function threadHasApprovedDispatch(): SQL<boolean> {
+export function threadHasApprovedDispatch(): SQL<boolean> {
   return sql<boolean>`${exists(
     subquery
       .select({ one: sql`1` })
