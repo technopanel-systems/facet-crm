@@ -13636,7 +13636,11 @@ async function main(): Promise<void> {
                  (select p.id::text from project_companies pc join projects p on p.id = pc.project_id
                    where pc.company_id = b.id and pc.removed_at is null and p.owner_user_id = b.rep limit 1) as b_project
           from held a join held b on a.email = 'rep-a@example.test' and b.email = 'rep-b@example.test'
-          where not exists (
+          -- A pair whose numbers already agree cannot be RETYPED into a
+          -- duplicate — the detector runs on a change (session 54: a run
+          -- against a defective detector left such a pair behind).
+          where a.phone <> b.phone
+          and not exists (
             select 1 from project_companies x join project_companies y on x.project_id = y.project_id
             where x.company_id = a.id and y.company_id = b.id and x.removed_at is null and y.removed_at is null
           )
