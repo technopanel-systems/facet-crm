@@ -65,8 +65,9 @@ seed). **Delete approval and duplicate resolution are held by Executive, Sales
 Manager and Super Admin** — the founder's words: *"start with the person whose
 job it is; if the pilot shows he's not keeping up, or the decisions look
 wrong, it moves."* All three flags must be read by the code: `can_approve_delete`
-is read since session 54 (S107, and the *Needs a decision* section `D41`);
-`can_resolve_duplicate` and `can_export` are still unread.
+and `can_resolve_duplicate` are read since session 54 (S107 and S22, and the
+two halves of `D41`); `can_export` is still unread — export itself is
+unbuilt.
 
 **S9.** Marketing assigns a company to a **rep, a desk rep, marketing, or the
 coordinator**. **Marketing holds companies exactly as a rep does, and assigns
@@ -159,10 +160,12 @@ a merge tombstone.
 ## 4. Duplicates
 
 **S21.** A company is **always created**, even when it looks like a duplicate.
-Nothing blocks the rep. True today, because nothing flags a duplicate at all
-(S22).
+Nothing blocks the rep. **Since session 54 that is a property of the
+detector, not of its absence**: `flagDuplicatesFor` runs inside the
+registering transaction after the row is written, raises a flag to the
+manager on a match, and never touches the company or answers the rep.
 
-**S22. [BUILD]** A suspected duplicate raises a **flag to the Sales Manager**,
+**S22.** A suspected duplicate raises a **flag to the Sales Manager**,
 who resolves it three ways: **false duplicate** · **who continues** · **shared
 between both reps**. **Shared means access to the customer, never ownership of
 the deals** (the founder's correction, session 50): both reps hold the
@@ -171,9 +174,31 @@ already keeps a project its owner's, and a dispatch still credits the rep
 whose project and quotation it came from (S78), split only by the credit-split
 rule itself (S80), never by the sharing.
 
-**S23. [BUILD]** **Phone is the primary matching key.** With one name field
+**Built session 54.** The flag is a `duplicate_flags` row — the record that
+triggered it and the one it matched — and lands on `D41`'s section of
+Stuck for `can_resolve_duplicate` (S8); the manager opens the pair side by
+side on `/companies/duplicates/[flag]`: names, phones, who holds each, what
+each already has. **False duplicate** is remembered in `non_duplicates` as
+an ordered pair, so that pair is never raised again. **Who continues** names
+the surviving record; the other folds in — contacts, project links,
+quotation threads, dispatches and reports move to the survivor, its live
+memberships end, and it stays as a tombstone (`merged_into_id`): nothing is
+deleted (S107), and the folded record's rep gains nothing. **Shared** folds
+the newer record into the older the same way and gives every holder of the
+folded record a membership on the survivor, never primacy (S18). **The
+existing sharing rules were checked before building and already read the
+founder's way**: company membership is never a term of a project's or a
+thread's visibility (S30, `authz.ts`), and credit follows the dispatch (S78)
+— so sharing a company shares the customer and nothing else, and the merge
+touches none of that.
+
+**S23.** **Phone is the primary matching key.** With one name field
 (S12) and a mandatory phone (S13), cross-script name matching is no longer the
-main problem it was designed to be.
+main problem it was designed to be. **Built session 54**: the key is the
+phone's digits with the Saudi country code — `+966`, `00966`, `966` — folded
+to the local `0`, so one number typed two ways is one key; nothing else is
+folded, and the detector runs at registration and again when a phone
+changes. Whether the fold should reach further is §16's.
 
 ---
 
@@ -1231,6 +1256,25 @@ asserting a table nobody wants is the check keeping it alive.
   reps pick anything to get past it, and the chart lies differently.
   Category is still optional; its emptiness check stands.
 
+- **The phone fold** (S23, session 54). The detector compares digits with
+  the Saudi country code folded to `0`; a number typed with a different
+  operator prefix, a missing digit or a landline written with the area
+  code is a different key. Whether to fold further — and whether a name
+  match should ever raise a flag beside the phone — is his call after the
+  bulk import shows what lookalikes actually arrive.
+- **What a merge leaves on the tombstone** (S22, session 54). The folded
+  record keeps its own dormancy reviews, removal requests and audit rows,
+  and any open flag pairing it with a THIRD company stays open on the
+  tombstone and off the queue. Re-pointing such a flag at the survivor
+  would let one merge raise a new pair without anyone typing anything;
+  not done, recorded.
+- **Nobody tells the rep** (S22, S105, session 54). A flag is the
+  manager's and the rep sees nothing on his company; a request's outcome
+  reaches the rep only through the company's own page, where the history
+  says what was decided. S128 names three decisions that must reach the
+  person whose work they end and an archive is not among them. Whether it
+  should be — and whether a rep should see that his company is under a
+  duplicate flag — is his call.
 - **The Reports tab's windows** (session 52). Built as: a block over
   events takes the period — losses by the day marked lost, quotations by
   their raise, companies by their registration, buyers by dispatch date —

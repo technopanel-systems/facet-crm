@@ -17,6 +17,11 @@ import {
   requestRemoval,
 } from "@/lib/dormancy";
 import {
+  DUPLICATE_RESOLUTIONS,
+  resolveDuplicate,
+  type DuplicateDecision,
+} from "@/lib/duplicates";
+import {
   readFields,
   ruleErrorState,
   type FormState,
@@ -197,6 +202,46 @@ export async function requestRemovalAction(
 
   try {
     await requestRemoval(session, companyId, reason);
+  } catch (error) {
+    return ruleErrorState(error, fields.values);
+  }
+
+  revalidatePath("/companies", "layout");
+  revalidatePath("/");
+  return {};
+}
+
+/* ------------------------------------------------------------------ *
+ * Duplicates — `S22`'s three outcomes, one action
+ * ------------------------------------------------------------------ */
+
+/**
+ * The three forms on `/companies/duplicates/[flagId]` post here with their
+ * outcome as a field; *who continues* carries the survivor. The data layer
+ * re-checks the flag and the pair.
+ */
+export async function resolveDuplicateAction(
+  flagId: string,
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const session = await requireSession();
+  const fields = readFields(formData);
+  const resolution = fields.text("resolution", { required: true, max: 20 });
+  const survivorId = fields.uuid("survivorId");
+  if (!fields.ok || !resolution) return fields.state;
+
+  const chosen = DUPLICATE_RESOLUTIONS.find((value) => value === resolution);
+  if (!chosen) {
+    return { error: "duplicates.errors.unknownResolution", values: fields.values };
+  }
+  const decision: DuplicateDecision =
+    chosen === "who_continues"
+      ? { resolution: chosen, survivorId: survivorId ?? "" }
+      : { resolution: chosen };
+
+  try {
+    await resolveDuplicate(session, flagId, decision);
   } catch (error) {
     return ruleErrorState(error, fields.values);
   }

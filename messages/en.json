@@ -283,7 +283,9 @@
       "archived": "Archived",
       "noQuotations": "No quotations you can see.",
       "noDispatches": "Nothing dispatched yet.",
-      "viewAll": "View all"
+      "viewAll": "View all",
+      "merged": "Merged",
+      "mergedInto": "This record was folded into"
     },
     "errors": {
       "notFound": "That company does not exist, or it is not one of yours.",
@@ -1266,7 +1268,10 @@
       "decisionsNone": "Nothing is waiting for a decision.",
       "removalRequests": "{count, plural, one {# removal request} other {# removal requests}}",
       "askedBy": "{name} · {count, plural, one {# day} other {# days}}",
-      "andMore": "and {count} more"
+      "andMore": "and {count} more",
+      "duplicates": "{count, plural, one {# possible duplicate} other {# possible duplicates}}",
+      "duplicatePair": "{a} and {b}",
+      "since": "{count, plural, one {# day} other {# days}}"
     },
     "attention": {
       "title": "Who needs attention",
@@ -1387,6 +1392,51 @@
       "title": "How many real customers",
       "of": "of {companies, plural, one {# company} other {# companies}}",
       "note": "A real customer has bought at least once, ever. Not narrowed to a window."
+    }
+  },
+  "duplicates": {
+    "title": "Possible duplicate",
+    "samePhone": "Same phone: {phone}",
+    "newer": "Registered second",
+    "older": "Registered first",
+    "registered": "Registered {date} by {name}",
+    "holders": "Held by",
+    "nobody": "Nobody holds it",
+    "archivedMark": "Archived",
+    "counts": {
+      "projects": "{count, plural, one {# project} other {# projects}}",
+      "quotations": "{count, plural, one {# quotation} other {# quotations}}",
+      "dispatches": "{count, plural, one {# dispatch} other {# dispatches}}",
+      "reports": "{count, plural, one {# report} other {# reports}}",
+      "contacts": "{count, plural, one {# contact} other {# contacts}}"
+    },
+    "decide": {
+      "title": "Your decision",
+      "falseAlarm": "False alarm",
+      "falseAlarmHint": "Two different customers. Remembered — this pair is never raised again.",
+      "falseAlarmButton": "Not the same customer",
+      "continues": "One continues",
+      "continuesHint": "The other folds into it: its contacts, projects, quotations, dispatches and reports move across and nothing is deleted. The rep of the folded record no longer holds the customer.",
+      "pick": "Which record continues?",
+      "continuesButton": "This one continues",
+      "shared": "Shared",
+      "sharedHint": "Both reps hold the customer. The two records become one, and each rep keeps his own projects and quotations with it — sharing the customer is not sharing the deals.",
+      "sharedButton": "Share the customer"
+    },
+    "decided": {
+      "title": "Decided",
+      "false_flag": "False alarm — not the same customer",
+      "who_continues": "One continues — {name}",
+      "shared": "Shared — both reps hold {name}",
+      "open": "Open the record that continues"
+    },
+    "errors": {
+      "cannotResolve": "You may not resolve duplicates.",
+      "notFound": "That duplicate flag does not exist.",
+      "alreadyResolved": "This pair was already decided.",
+      "sideMerged": "One of these records has already been folded into another.",
+      "survivorNotInPair": "Pick one of the two records.",
+      "unknownResolution": "Choose one of the three outcomes."
     }
   }
 }

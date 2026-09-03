@@ -610,7 +610,9 @@ export default async function CompanyDetailPage({
             <CardTitle className="text-start text-sm">
               {t("dormancy.title")}
             </CardTitle>
-            {turn.state === "archived" ? (
+            {company.mergedIntoId ? (
+              <Badge variant="secondary">{t("companies.detail.merged")}</Badge>
+            ) : turn.state === "archived" ? (
               <Badge variant="secondary">
                 {t("enums.dormancyOutcome.archived")}
               </Badge>
@@ -650,7 +652,23 @@ export default async function CompanyDetailPage({
             {/* Archiving is the end of the lifecycle: there is nothing left to
                 decide, so no controls are offered. Nothing is deleted, so the
                 record and its history stay `[12 §7]`. */}
-            {turn.state === "archived" ? (
+            {company.mergedIntoId ? (
+              // `S22` — a tombstone: the customer continues on another
+              // record, and this one says where. Nothing is deleted `S107`.
+              <p
+                data-slot="merged-into"
+                data-survivor={company.mergedIntoId}
+                className="text-muted-foreground text-start text-sm"
+              >
+                {t("companies.detail.mergedInto")}{" "}
+                <Link
+                  href={`/companies/${company.mergedIntoId}`}
+                  className="font-medium hover:underline"
+                >
+                  <span dir="auto">{company.mergedIntoName ?? t("common.none")}</span>
+                </Link>
+              </p>
+            ) : turn.state === "archived" ? (
               <p className="text-muted-foreground text-start text-sm">
                 {t("dormancy.detail.archived")}
               </p>

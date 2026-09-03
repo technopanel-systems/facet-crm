@@ -87,6 +87,7 @@ import { normalizeName } from "@/lib/normalize";
 import {
   archiveCompany,
   dormancyReviews,
+  requestRemoval,
   reassignCompany,
   reincludeCompany,
 } from "@/lib/dormancy";
@@ -651,6 +652,20 @@ async function main(): Promise<void> {
     "archiving requires a written reason [10 §8]",
     "dormancy.errors.noteRequired",
     () => archiveCompany(manager, quietOver.id, "   "),
+  );
+  // `S105` — the second way in, asked of the DATA LAYER. `verify:routes` §45
+  // drives the same refusal over HTTP, but the action refuses a blank reason
+  // before this guard is reached, so an injection that removed the guard
+  // here stayed green there (session 54): this is the check that reads it.
+  await refuses(
+    "a removal request needs a reason — the data layer's own guard [S105]",
+    "dormancy.errors.reasonRequired",
+    () => requestRemoval(owner, quietOver.id, "   "),
+  );
+  await refuses(
+    "only somebody holding the company may ask to remove it — the manager sees it and does not hold it [S105]",
+    "dormancy.errors.notYourCompany",
+    () => requestRemoval(manager, quietOver.id, "no potential"),
   );
   await refuses(
     "a company cannot be handed to an inactive account [04 C2]",

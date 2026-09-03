@@ -38,6 +38,8 @@ import {
   leadSources,
   users,
 } from "@/db/schema";
+import { alias } from "drizzle-orm/pg-core";
+
 import { withAudit } from "@/lib/audit";
 import {
   canViewRecord,
@@ -45,6 +47,7 @@ import {
   type AuthSession,
 } from "@/lib/authz";
 import { companySilence } from "@/lib/coverage";
+import { flagDuplicatesFor } from "@/lib/duplicates";
 import { REGIONS, type Region, type SameValues } from "@/lib/enums";
 import { assertLeadSourceSelectable, placeForCountry } from "@/lib/lookups";
 import { normalizeName } from "@/lib/normalize";
@@ -376,6 +379,8 @@ export type CompanyDetail = Company & {
   leadSourceNameEn: string | null;
   leadSourceNameAr: string | null;
   createdByName: string | null;
+  /** `S22` — the record this one folded into, for the tombstone's page. */
+  mergedIntoName: string | null;
   /**
    * **Derived, never a field anyone sets** `[04 qualification]`, `[10 §1]`.
    *
@@ -400,6 +405,7 @@ export async function getCompany(
   session: AuthSession,
   id: string,
 ): Promise<CompanyDetail | null> {
+  const mergedInto = alias(companies, "merged_into");
   const [row] = await db
     .select({
       company: companies,
@@ -412,9 +418,11 @@ export async function getCompany(
       leadSourceNameEn: leadSources.nameEn,
       leadSourceNameAr: leadSources.nameAr,
       createdByName: users.name,
+      mergedIntoName: mergedInto.name,
       isQualified: companyIsQualified(companies.id),
     })
     .from(companies)
+    .leftJoin(mergedInto, eq(companies.mergedIntoId, mergedInto.id))
     .leftJoin(companyCategories, eq(companies.categoryId, companyCategories.id))
     // An INNER join, alone among these: every company has a country `S14`, and
     // a left join here would type the name as nullable and make the screen
@@ -438,6 +446,7 @@ export async function getCompany(
     leadSourceNameEn: row.leadSourceNameEn,
     leadSourceNameAr: row.leadSourceNameAr,
     createdByName: row.createdByName,
+    mergedIntoName: row.mergedIntoName,
     isQualified: row.isQualified,
   };
 }
@@ -521,6 +530,10 @@ export async function createCompany(
       entityId: company.id,
       after: company,
     });
+
+    // `S21` `S23` — the detector, AFTER the row: a match raises a flag to
+    // the manager and never touches this company or this rep.
+    await flagDuplicatesFor(tx, log, company.id, company.phone);
 
     const [rep] = await tx
       .insert(companyReps)
@@ -630,6 +643,11 @@ export async function updateCompany(
       before: Object.fromEntries(changed.map((key) => [key, before[key]])),
       after: Object.fromEntries(changed.map((key) => [key, after[key]])),
     });
+
+    // `S23` — the phone is the key, so a changed phone is checked again.
+    if (changed.includes("phone")) {
+      await flagDuplicatesFor(tx, log, id, after.phone);
+    }
 
     return after;
   });

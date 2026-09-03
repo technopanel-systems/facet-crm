@@ -20,6 +20,7 @@ import {
 } from "@/lib/decimal";
 import { dispatchesInPeriod, listDispatches } from "@/lib/dispatches";
 import { listPendingRemovalRequests } from "@/lib/dormancy";
+import { listOpenDuplicateFlags } from "@/lib/duplicates";
 import type { FollowUpKind } from "@/lib/enums";
 import { biggestOpenDeals } from "@/lib/projects";
 import { listQuotationThreads } from "@/lib/quotations";
@@ -284,10 +285,11 @@ export async function StuckBlock({
 
   const watchesIssuing = !session.user.role.canApproveQuotation;
   const watchesDeciding = !session.user.role.canDispatch;
-  // `D41` — the archive half of *Needs a decision*, on `S8`'s flag.
+  // `D41` — *Needs a decision*, each half on `S8`'s own flag.
   const decides = session.user.role.canApproveDelete;
+  const resolves = session.user.role.canResolveDuplicate;
 
-  const [quotations, dispatchList, removals] = await Promise.all([
+  const [quotations, dispatchList, removals, duplicates] = await Promise.all([
     watchesIssuing
       ? listQuotationThreads(session, { awaitingIssue: true })
       : Promise.resolve(null),
@@ -295,7 +297,9 @@ export async function StuckBlock({
       ? listDispatches(session, { status: "submitted" })
       : Promise.resolve(null),
     decides ? listPendingRemovalRequests(session) : Promise.resolve(null),
+    resolves ? listOpenDuplicateFlags(session) : Promise.resolve(null),
   ]);
+  const decisionsWaiting = (removals?.total ?? 0) + (duplicates?.total ?? 0);
 
   // The submitted pile is oldest-first `S87` `S89`, so the first row IS the
   // oldest — no second query and no second ordering to drift.
@@ -390,26 +394,81 @@ export async function StuckBlock({
             three decisions are. `D79`'s cap and *and N more*; at zero one
             line, `D78`'s own shape. Duplicates join it with `S22`'s
             detector. */}
-        {removals ? (
+        {removals || duplicates ? (
           <div
             data-slot="stuck-decisions"
-            data-requests={removals.total}
+            data-requests={removals?.total ?? ""}
+            data-duplicates={duplicates?.total ?? ""}
             className="text-start"
           >
             <p className="text-faint text-[10.5px] font-semibold tracking-[.09em] uppercase">
               {t("today.stuck.decisions")}
             </p>
-            {removals.total === 0 ? (
+            {decisionsWaiting === 0 ? (
               <p className="text-muted-foreground mt-1.5 text-[13px]">
                 {t("today.stuck.decisionsNone")}
               </p>
             ) : (
               <>
+                {/* One line, the two counts each a run of its own `D73`,
+                    and a half the reader does not hold is simply absent. */}
                 <p className="mt-1.5 text-[15px]">
-                  <span dir="auto">
-                    {t("today.stuck.removalRequests", { count: removals.total })}
-                  </span>
+                  {removals ? (
+                    <span dir="auto">
+                      {t("today.stuck.removalRequests", { count: removals.total })}
+                    </span>
+                  ) : null}
+                  {removals && duplicates ? " · " : null}
+                  {duplicates ? (
+                    <span dir="auto">
+                      {t("today.stuck.duplicates", { count: duplicates.total })}
+                    </span>
+                  ) : null}
                 </p>
+                {duplicates && duplicates.total > 0 ? (
+                  <ul className="mt-1 flex flex-col gap-0.5">
+                    {duplicates.rows.slice(0, DECISION_ROWS).map((flag) => (
+                      <li
+                        key={flag.id}
+                        data-slot="stuck-duplicate"
+                        data-flag={flag.id}
+                        className="text-[12.5px]"
+                      >
+                        <Link
+                          href={`/companies/duplicates/${flag.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          <span dir="auto">
+                            {t("today.stuck.duplicatePair", {
+                              a: flag.a.name,
+                              b: flag.b.name,
+                            })}
+                          </span>
+                        </Link>
+                        <span className="text-faint"> · </span>
+                        <span className="text-muted-foreground" dir="auto">
+                          {t("today.stuck.since", {
+                            count: calendarDaysBetween(
+                              riyadhDay(flag.createdAt),
+                              today(),
+                            ),
+                          })}
+                        </span>
+                      </li>
+                    ))}
+                    {duplicates.total > DECISION_ROWS ? (
+                      <li className="text-faint text-[12.5px]">
+                        <span dir="auto">
+                          {t("today.stuck.andMore", {
+                            count: duplicates.total - DECISION_ROWS,
+                          })}
+                        </span>
+                      </li>
+                    ) : null}
+                  </ul>
+                ) : null}
+                {removals && removals.total > 0 ? (
+                  <>
                 <ul className="mt-1 flex flex-col gap-0.5">
                   {removals.rows.slice(0, DECISION_ROWS).map((request) => (
                     <li
@@ -445,6 +504,8 @@ export async function StuckBlock({
                       })}
                     </span>
                   </p>
+                ) : null}
+                  </>
                 ) : null}
               </>
             )}

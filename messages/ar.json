@@ -283,7 +283,9 @@
       "archived": "مؤرشفة",
       "noQuotations": "لا توجد عروض أسعار يمكنك الاطلاع عليها.",
       "noDispatches": "لم يُورَّد شيء بعد.",
-      "viewAll": "عرض الكل"
+      "viewAll": "عرض الكل",
+      "merged": "مدمجة",
+      "mergedInto": "طُوي هذا السجل في"
     },
     "errors": {
       "notFound": "هذه الشركة غير موجودة، أو أنها ليست ضمن سجلاتك.",
@@ -1266,7 +1268,10 @@
       "decisionsNone": "لا شيء بانتظار قرار.",
       "removalRequests": "{count, plural, one {طلب إزالة واحد} two {طلبا إزالة} few {# طلبات إزالة} many {# طلب إزالة} other {# طلب إزالة}}",
       "askedBy": "{name} · {count, plural, one {يوم واحد} two {يومين} few {# أيام} many {# يومًا} other {# يوم}}",
-      "andMore": "و{count} أخرى"
+      "andMore": "و{count} أخرى",
+      "duplicates": "{count, plural, one {تكرار محتمل واحد} two {تكراران محتملان} few {# تكرارات محتملة} many {# تكرارًا محتملًا} other {# تكرار محتمل}}",
+      "duplicatePair": "{a} و{b}",
+      "since": "{count, plural, one {يوم واحد} two {يومين} few {# أيام} many {# يومًا} other {# يوم}}"
     },
     "attention": {
       "title": "من يحتاج انتباهك",
@@ -1387,6 +1392,51 @@
       "title": "كم عميلًا حقيقيًا لدينا",
       "of": "من {companies, plural, one {شركة واحدة} two {شركتين} few {# شركات} many {# شركة} other {# شركة}}",
       "note": "العميل الحقيقي اشترى مرة واحدة على الأقل، في أي وقت. بلا نافذة زمنية."
+    }
+  },
+  "duplicates": {
+    "title": "تكرار محتمل",
+    "samePhone": "الهاتف نفسه: {phone}",
+    "newer": "سُجّلت ثانياً",
+    "older": "سُجّلت أولاً",
+    "registered": "سُجّلت في {date} بواسطة {name}",
+    "holders": "يحملها",
+    "nobody": "لا يحملها أحد",
+    "archivedMark": "مؤرشفة",
+    "counts": {
+      "projects": "{count, plural, one {مشروع واحد} two {مشروعان} few {# مشاريع} many {# مشروعًا} other {# مشروع}}",
+      "quotations": "{count, plural, one {عرض سعر واحد} two {عرضا سعر} few {# عروض سعر} many {# عرض سعر} other {# عرض سعر}}",
+      "dispatches": "{count, plural, one {توريد واحد} two {توريدان} few {# توريدات} many {# توريدًا} other {# توريد}}",
+      "reports": "{count, plural, one {تقرير واحد} two {تقريران} few {# تقارير} many {# تقريرًا} other {# تقرير}}",
+      "contacts": "{count, plural, one {جهة اتصال واحدة} two {جهتا اتصال} few {# جهات اتصال} many {# جهة اتصال} other {# جهة اتصال}}"
+    },
+    "decide": {
+      "title": "قرارك",
+      "falseAlarm": "إنذار خاطئ",
+      "falseAlarmHint": "عميلان مختلفان. يُحفظ ذلك — لا يُطرح هذا الزوج مرة أخرى.",
+      "falseAlarmButton": "ليس العميل نفسه",
+      "continues": "يستمر أحدهما",
+      "continuesHint": "يُطوى الآخر فيه: تنتقل جهات اتصاله ومشاريعه وعروض أسعاره وتوريداته وتقاريره ولا يُحذف شيء. لا يعود مندوب السجل المطويّ يحمل العميل.",
+      "pick": "أي سجل يستمر؟",
+      "continuesButton": "هذا يستمر",
+      "shared": "مشترك",
+      "sharedHint": "يحمل المندوبان العميل معاً. يصبح السجلان سجلاً واحداً، ويحتفظ كل مندوب بمشاريعه وعروض أسعاره معه — مشاركة العميل ليست مشاركة الصفقات.",
+      "sharedButton": "مشاركة العميل"
+    },
+    "decided": {
+      "title": "تم القرار",
+      "false_flag": "إنذار خاطئ — ليس العميل نفسه",
+      "who_continues": "يستمر أحدهما — {name}",
+      "shared": "مشترك — يحمل المندوبان {name}",
+      "open": "افتح السجل الذي يستمر"
+    },
+    "errors": {
+      "cannotResolve": "لا يمكنك البتّ في التكرارات.",
+      "notFound": "علامة التكرار هذه غير موجودة.",
+      "alreadyResolved": "تم البتّ في هذا الزوج من قبل.",
+      "sideMerged": "أحد هذين السجلين طُوي في سجل آخر بالفعل.",
+      "survivorNotInPair": "اختر أحد السجلين.",
+      "unknownResolution": "اختر إحدى النتائج الثلاث."
     }
   }
 }

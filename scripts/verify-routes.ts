@@ -8970,6 +8970,11 @@ async function main(): Promise<void> {
           );
         }
         if (commentId) paths.push(`/${locale}/comments/${commentId}/edit`);
+        // `/companies/duplicates/[flagId]` — any id will do for nobody, who
+        // is redirected before the flag is looked up `S44-4`.
+        if (ids.companies) {
+          paths.push(`/${locale}/companies/duplicates/${ids.companies}`);
+        }
       }
       /** The API surface, including the endpoints login cannot work without. */
       const API = [
@@ -13304,6 +13309,495 @@ async function main(): Promise<void> {
           console.log(`  --    open requests before ${openBefore}, after ${await openCount()} (the run's own consumed)`);
         }
       }
+    }
+  }
+
+  /* ── 46 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n46. Duplicate detection — never blocks, the phone is the key, the manager sees both side by side, three outcomes; a merge loses nothing, counted before and after in the records; shared shares the customer and not the deals [S21], [S22], [S23], [S30], [S8], [D41], [D53]",
+  );
+  {
+    const setup = (step: string, ok: boolean, detail = ""): boolean => {
+      checks += 1;
+      if (ok) {
+        console.log(`  setup ${step}`);
+        return true;
+      }
+      failures += 1;
+      console.log(`  SETUP FAILED at ${step}${detail ? ` — ${detail}` : ""}`);
+      return false;
+    };
+    const openTag = (body: string, slot: string): string =>
+      body.match(
+        new RegExp(`<[a-z]+\\b[^>]*data-slot="${slot}"[^>]*>`),
+      )?.[0] ?? "";
+    const tagAttr = (tag: string, name: string): string =>
+      tag.match(new RegExp(`${name}="([^"]*)"`))?.[1] ?? "";
+    const actForm = (body: string, act: string): string | undefined =>
+      body.match(new RegExp(`<form[^>]*data-act="${act}"[\\s\\S]*?</form>`))?.[0];
+    const valueIn = (fragment: string, name: string) =>
+      unescapeHtml(
+        fragment
+          .match(new RegExp(`<input[^>]*name="${name}"[^>]*>`))?.[0]
+          ?.match(/value="([^"]*)"/)?.[1] ?? "",
+      );
+    const selectedIn = (fragment: string, name: string) => {
+      const control = fragment.match(
+        new RegExp(`<select[^>]*name="${name}"[\\s\\S]*?</select>`),
+      )?.[0];
+      for (const option of control?.matchAll(
+        /<option[^>]*value="([0-9a-f-]{36})"[^>]*>/g,
+      ) ?? []) {
+        if (option[0].includes("selected")) return option[1];
+      }
+      return "";
+    };
+    const firstOption = (fragment: string, name: string) =>
+      fragment
+        .match(new RegExp(`<select[^>]*name="${name}"[\\s\\S]*?</select>`))?.[0]
+        ?.match(/<option[^>]*value="([0-9a-f-]{36})"/)?.[1] ?? "";
+    const notesIn = (fragment: string) =>
+      unescapeHtml(
+        fragment.match(
+          /<textarea[^>]*name="notes"[^>]*>([\s\S]*?)<\/textarea>/,
+        )?.[1] ?? "",
+      );
+    const postForm = async (
+      jar: Jar,
+      path: string,
+      body: FormData,
+    ): Promise<{ status: number; location: string }> => {
+      const response = await fetch(`${BASE}${path}`, {
+        method: "POST",
+        headers: { cookie: header(jar), origin: BASE },
+        body,
+        redirect: "manual",
+      });
+      store(jar, response);
+      await response.text();
+      return { status: response.status, location: response.headers.get("location") ?? "" };
+    };
+    /** Register a company over HTTP as `§9` does — abroad, so no city is
+     *  asked — and return its id from the 303's location. */
+    const register = async (
+      jar: Jar,
+      name: string,
+      phone: string,
+    ): Promise<{ status: number; id: string }> => {
+      const blank = (await get(jar, "/en/companies/new")).body;
+      const form =
+        blank.match(/<form[^>]*data-slot="form-shell"[\s\S]*?<\/form>/)?.[0] ?? "";
+      const body = envelopeOf(form);
+      body.set("name", name);
+      body.set("phone", phone);
+      // The first NON-Saudi country — a Saudi company would need a city.
+      // `data-code` is the form's own device for telling them apart.
+      const abroad = [
+        ...form.matchAll(/<option[^>]*value="([0-9a-f-]{36})"[^>]*data-code="([A-Z]+)"/g),
+      ].find((m) => m[2] !== "SA")?.[1];
+      body.set("countryId", abroad ?? firstOption(form, "countryId"));
+      body.set("cityId", "");
+      body.set("categoryId", "");
+      body.set("leadSourceId", firstOption(form, "leadSourceId"));
+      body.set("notes", "");
+      const { status, location } = await postForm(jar, "/en/companies/new", body);
+      return {
+        status,
+        id: location.match(/\/companies\/([0-9a-f-]{36})/)?.[1] ?? "",
+      };
+    };
+    /** Change one company's phone through its own edit form. */
+    const editPhone = async (jar: Jar, companyId: string, phone: string): Promise<number> => {
+      const page = (await get(jar, `/en/companies/${companyId}/edit`)).body;
+      const form =
+        page.match(/<form[^>]*data-slot="form-shell"[\s\S]*?<\/form>/)?.[0] ?? "";
+      if (!form) return -1;
+      const body = envelopeOf(form);
+      body.set("name", valueIn(form, "name"));
+      body.set("phone", phone);
+      body.set("countryId", selectedIn(form, "countryId"));
+      body.set("cityId", selectedIn(form, "cityId"));
+      body.set("categoryId", selectedIn(form, "categoryId"));
+      body.set("leadSourceId", selectedIn(form, "leadSourceId"));
+      body.set("notes", notesIn(form));
+      return (await postForm(jar, `/en/companies/${companyId}/edit`, body)).status;
+    };
+    type FlagRow = { id: string; a: string; b: string; status: string; resolution: string | null };
+    const flagsBetween = async (x: string, y: string): Promise<FlagRow[]> =>
+      (await db.execute(sql`
+        select id::text as id, record_a_id::text as a, record_b_id::text as b,
+               status::text as status, resolution::text as resolution
+        from duplicate_flags
+        where record_type = 'company'
+          and ((record_a_id = ${x}::uuid and record_b_id = ${y}::uuid)
+            or (record_a_id = ${y}::uuid and record_b_id = ${x}::uuid))
+        order by created_at
+      `)) as unknown as FlagRow[];
+    const openFlagCount = async (): Promise<number> => {
+      const rows = (await db.execute(sql`
+        select count(*)::int as n from duplicate_flags f
+        join companies a on a.id = f.record_a_id join companies b on b.id = f.record_b_id
+        where f.status = 'open' and a.merged_into_id is null and b.merged_into_id is null
+      `)) as unknown as { n: number }[];
+      return Number(rows[0]?.n ?? -1);
+    };
+    type Work = { projects: number; quotations: number; dispatches: number; reports: number; contacts: number; holders: string };
+    /** This script's own reading of what a company has — live project
+     *  links, threads, dispatches, reports, contacts, and who holds it. */
+    const workOf = async (companyId: string): Promise<Work> => {
+      const [row] = (await db.execute(sql`
+        select
+          (select count(*)::int from project_companies pc where pc.company_id = ${companyId}::uuid and pc.removed_at is null) as projects,
+          (select count(*)::int from quotation_threads q where q.company_id = ${companyId}::uuid) as quotations,
+          (select count(*)::int from dispatches d where d.company_id = ${companyId}::uuid) as dispatches,
+          (select count(*)::int from rep_reports r where r.company_id = ${companyId}::uuid) as reports,
+          (select count(*)::int from contacts c where c.company_id = ${companyId}::uuid) as contacts,
+          (select coalesce(string_agg(cr.user_id::text, ',' order by cr.user_id), '') from company_reps cr where cr.company_id = ${companyId}::uuid and cr.removed_at is null) as holders
+      `)) as unknown as Work[];
+      return {
+        projects: Number(row?.projects ?? 0),
+        quotations: Number(row?.quotations ?? 0),
+        dispatches: Number(row?.dispatches ?? 0),
+        reports: Number(row?.reports ?? 0),
+        contacts: Number(row?.contacts ?? 0),
+        holders: row?.holders ?? "",
+      };
+    };
+    const sum = (x: Work, y: Work, key: keyof Omit<Work, "holders">) => x[key] + y[key];
+
+    const stamp46 = Date.now();
+    const repJar = jars["rep-a@example.test"];
+    const managerJar = jars["manager@example.test"];
+    const coordJar = jars["coordinator@example.test"];
+    const repBJar = await login("rep-b@example.test");
+    const executiveJar = await login("executive@example.test");
+    const openBefore = await openFlagCount();
+
+    /* --- A. Never blocked, and the phone is the key `S21` `S23` ------- */
+    const p1 = await register(repJar, `dup46-${stamp46}-a`, `+9665${stamp46}7`);
+    const p2 = await register(repBJar, `dup46-${stamp46}-b`, `05${stamp46}7`);
+    check(
+      `*** two reps register the same number in two formats and BOTH save — ${p1.status} and ${p2.status}, both with an id *** [S21] [S23]`,
+      p1.status === 303 && p2.status === 303 && Boolean(p1.id) && Boolean(p2.id),
+    );
+    let flagId = "";
+    if (p1.id && p2.id) {
+      const flags = await flagsBetween(p1.id, p2.id);
+      flagId = flags[0]?.id ?? "";
+      const audited = (await db.execute(sql`
+        select count(*)::int as n from audit_log where action = 'duplicate.flagged' and entity_id = ${flagId || "00000000-0000-0000-0000-000000000000"}
+      `)) as unknown as { n: number }[];
+      check(
+        `*** one open flag for the pair, the newer record as A and the match as B, audited *** [S22] [S23] [S112]`,
+        flags.length === 1 &&
+          flags[0].status === "open" &&
+          flags[0].a === p2.id &&
+          flags[0].b === p1.id &&
+          Number(audited[0]?.n ?? 0) === 1,
+        `${flags.length} flag(s)`,
+      );
+    }
+
+    if (!flagId) {
+      console.log("  --    no flag was raised — the queue, the screen and the three outcomes are NOT MEASURED");
+    } else {
+      /* --- B. The queue and the screen, four identities `D41` `S8` `D53` --- */
+      const openNow = await openFlagCount();
+      const managerStuck = openTag((await get(managerJar, "/en")).body, "stuck-decisions");
+      const executiveStuck = openTag((await get(executiveJar, "/en")).body, "stuck-decisions");
+      check(
+        `*** needs-a-decision counts ${tagAttr(managerStuck, "data-duplicates") || "absent"} (manager) and ${tagAttr(executiveStuck, "data-duplicates") || "absent"} (executive) possible duplicates against ${openNow} open in the records *** [D41] [S8]`,
+        openNow > openBefore &&
+          Number(tagAttr(managerStuck, "data-duplicates")) === openNow &&
+          Number(tagAttr(executiveStuck, "data-duplicates")) === openNow,
+      );
+      const managerHome = (await get(managerJar, "/en")).body;
+      if (openNow <= 5) {
+        check(
+          `*** the pair is a row in the section, a way in to the side-by-side *** [D41]`,
+          managerHome.includes(`data-flag="${flagId}"`) &&
+            managerHome.includes(`/companies/duplicates/${flagId}`),
+        );
+      } else {
+        console.log(`  --    ${openNow} open flags exceed the five rows shown — the row's presence is NOT MEASURED`);
+      }
+
+      const dupPath = `/en/companies/duplicates/${flagId}`;
+      const managerView = await get(managerJar, dupPath);
+      const executiveView = await get(executiveJar, dupPath);
+      const repView = await get(repJar, dupPath);
+      const coordView = await get(coordJar, dupPath);
+      const arView = await get(managerJar, `/ar/companies/duplicates/${flagId}`);
+      check(
+        `*** the side-by-side opens for the manager and the executive (${managerView.status}, ${executiveView.status}) and is a 404 for the rep and the coordinator (${repView.status}, ${coordView.status}) *** [S8] [D53]`,
+        managerView.status === 200 &&
+          executiveView.status === 200 &&
+          repView.status === 404 &&
+          coordView.status === 404,
+      );
+      const sides = [...managerView.body.matchAll(/data-slot="duplicate-side"[^>]*data-company="([0-9a-f-]{36})"/g)].map((m) => m[1]);
+      check(
+        `*** both records side by side — the newer first, then the match — with the three outcomes offered, in both locales (ar ${arView.status}, rtl ${arView.body.includes('dir="rtl"')}) *** [S22] [D20]`,
+        sides.length === 2 &&
+          sides[0] === p2.id &&
+          sides[1] === p1.id &&
+          Boolean(actForm(managerView.body, "false-alarm")) &&
+          Boolean(actForm(managerView.body, "one-continues")) &&
+          Boolean(actForm(managerView.body, "shared")) &&
+          arView.status === 200 &&
+          arView.body.includes('dir="rtl"') &&
+          (arView.body.match(/data-slot="duplicate-side"/g) ?? []).length === 2,
+        `sides [${sides.join(",")}]`,
+      );
+
+      /* --- C. False alarm is remembered `S22` `[07 B5]` ------------------ */
+      const falseAlarm = actForm(managerView.body, "false-alarm");
+      if (falseAlarm) {
+        // The envelope carries the action's own fields only; the form's
+        // hidden `resolution` is posted here as a browser would post it.
+        const falseBody = envelopeOf(falseAlarm);
+        falseBody.set("resolution", "false_flag");
+        const decided = await postForm(managerJar, dupPath, falseBody);
+        const afterFalse = await flagsBetween(p1.id, p2.id);
+        const [remembered] = (await db.execute(sql`
+          select count(*)::int as n from non_duplicates
+          where record_type = 'company'
+            and record_a_id = least(${p1.id}::uuid, ${p2.id}::uuid)
+            and record_b_id = greatest(${p1.id}::uuid, ${p2.id}::uuid)
+        `)) as unknown as { n: number }[];
+        check(
+          `*** false alarm — ${decided.status}, the flag resolved as false_flag and the pair remembered as one ordered row *** [S22]`,
+          decided.status === 200 &&
+            afterFalse.length === 1 &&
+            afterFalse[0].status === "resolved" &&
+            afterFalse[0].resolution === "false_flag" &&
+            Number(remembered?.n ?? 0) === 1,
+        );
+        const decidedView = await get(managerJar, dupPath);
+        check(
+          `*** a decided flag shows its decision and offers no outcome *** [S22] [D51]`,
+          decidedView.body.includes('data-slot="duplicate-decided"') &&
+            !actForm(decidedView.body, "false-alarm") &&
+            !actForm(decidedView.body, "one-continues") &&
+            !actForm(decidedView.body, "shared"),
+        );
+        // rep-b retypes the number in a third format: the detector runs on
+        // the change and the remembered pair is NOT raised again. **Only
+        // once the false alarm has resolved** — while the first flag is
+        // still open it alone suppresses a second, and the check would be
+        // green for the wrong reason (session 54, seen).
+        if (afterFalse[0]?.status !== "resolved") {
+          console.log("  --    the false alarm did not resolve — the memory is NOT MEASURED");
+        } else {
+          const retyped = await editPhone(repBJar, p2.id, `009665${stamp46}7`);
+          const afterRetype = await flagsBetween(p1.id, p2.id);
+          check(
+            `*** the pair is never asked about again — rep-b retypes the number (${retyped}) and no second flag is raised, the one flag still resolved *** [S22] [S23]`,
+            retyped === 303 && afterRetype.length === 1 && afterRetype[0].status === "resolved",
+            `${afterRetype.length} flag(s)`,
+          );
+        }
+        // …while a THIRD company changing its phone to that key raises a
+        // flag against each of the two, so the update path is the detector
+        // too and the memory is per pair.
+        const p3 = await register(repJar, `dup46-${stamp46}-c`, `+9665${stamp46}8`);
+        if (p3.id) {
+          const changed = await editPhone(repJar, p3.id, `05${stamp46}7`);
+          const against1 = await flagsBetween(p3.id, p1.id);
+          const against2 = await flagsBetween(p3.id, p2.id);
+          check(
+            `*** a phone CHANGE runs the detector — a third company retyped to the same number (${changed}) is flagged against each of the two, and the remembered pair stays remembered *** [S23] [S22]`,
+            changed === 303 &&
+              against1.length === 1 && against1[0].status === "open" && against1[0].a === p3.id &&
+              against2.length === 1 && against2[0].status === "open" && against2[0].a === p3.id &&
+              (await flagsBetween(p1.id, p2.id)).length === 1,
+          );
+        }
+      }
+
+      /* --- D. A merge on the real seed, counted before and after `S22` `S107` --- */
+      type Pair = { a: string; b: string; a_rep: string; b_rep: string; a_phone: string; b_project: string };
+      let pair: Pair | undefined;
+      try {
+        const rows = (await db.execute(sql`
+          with held as (
+            select c.id, c.phone, cr.user_id as rep, u.email
+            from companies c
+            join company_reps cr on cr.company_id = c.id and cr.removed_at is null and cr.is_primary
+            join users u on u.id = cr.user_id
+            where c.archived_at is null and c.merged_into_id is null
+              and not exists (select 1 from duplicate_flags f where f.status = 'open' and (f.record_a_id = c.id or f.record_b_id = c.id))
+              and exists (select 1 from dispatches d where d.company_id = c.id)
+              and exists (select 1 from quotation_threads q where q.company_id = c.id)
+              and exists (select 1 from rep_reports r where r.company_id = c.id)
+          )
+          select a.id::text as a, b.id::text as b, a.rep::text as a_rep, b.rep::text as b_rep, a.phone as a_phone,
+                 (select p.id::text from project_companies pc join projects p on p.id = pc.project_id
+                   where pc.company_id = b.id and pc.removed_at is null and p.owner_user_id = b.rep limit 1) as b_project
+          from held a join held b on a.email = 'rep-a@example.test' and b.email = 'rep-b@example.test'
+          where not exists (
+            select 1 from project_companies x join project_companies y on x.project_id = y.project_id
+            where x.company_id = a.id and y.company_id = b.id and x.removed_at is null and y.removed_at is null
+          )
+          and exists (select 1 from project_companies pc join projects p on p.id = pc.project_id
+                      where pc.company_id = b.id and pc.removed_at is null and p.owner_user_id = b.rep)
+          order by a.id, b.id
+          limit 1
+        `)) as unknown as Pair[];
+        pair = rows[0];
+      } catch (error) {
+        console.log(`  --    the seeded pair could not be read — ${String(error)}`);
+      }
+
+      if (!pair) {
+        console.log(
+          "  --    no seeded pair (rep-a's and rep-b's companies with dispatches, threads and reports, no shared project) — the merge accounting is NOT MEASURED",
+        );
+      } else {
+        const beforeA = await workOf(pair.a);
+        const beforeB = await workOf(pair.b);
+        const distinctProjects = (await db.execute(sql`
+          select count(distinct pc.project_id)::int as n from project_companies pc
+          where pc.removed_at is null and pc.company_id in (${pair.a}::uuid, ${pair.b}::uuid)
+        `)) as unknown as { n: number }[];
+        // The manager makes B a duplicate of A by retyping A's number on B.
+        const madeDuplicate = await editPhone(managerJar, pair.b, pair.a_phone);
+        const seededFlag = (await flagsBetween(pair.a, pair.b)).find((f) => f.status === "open");
+        if (
+          !setup(
+            `the manager retypes A's number on B (${madeDuplicate}) and the detector raises the pair`,
+            madeDuplicate === 303 && Boolean(seededFlag),
+          ) ||
+          !seededFlag
+        ) {
+          // nothing to merge
+        } else {
+          const seededPath = `/en/companies/duplicates/${seededFlag.id}`;
+          const view = await get(managerJar, seededPath);
+          const continues = actForm(view.body, "one-continues");
+          const shown = {
+            a: openTag(view.body, "duplicate-side"),
+          };
+          // The side-by-side reads what each already has — against this
+          // script's own counts for A (B is the other card).
+          const sideA = view.body.slice(view.body.indexOf(`data-company="${pair.a}"`));
+          const countOn = (fragment: string, key: string) =>
+            Number(fragment.match(new RegExp(`data-slot="duplicate-${key}"[^>]*data-count="(\\d+)"`))?.[1] ?? -1);
+          check(
+            `*** the card says what A already has — projects ${countOn(sideA, "projects")}/${beforeA.projects} · quotations ${countOn(sideA, "quotations")}/${beforeA.quotations} · dispatches ${countOn(sideA, "dispatches")}/${beforeA.dispatches} · reports ${countOn(sideA, "reports")}/${beforeA.reports} · contacts ${countOn(sideA, "contacts")}/${beforeA.contacts} against the records *** [S22]`,
+            Boolean(shown.a) &&
+              countOn(sideA, "projects") === beforeA.projects &&
+              countOn(sideA, "quotations") === beforeA.quotations &&
+              countOn(sideA, "dispatches") === beforeA.dispatches &&
+              countOn(sideA, "reports") === beforeA.reports &&
+              countOn(sideA, "contacts") === beforeA.contacts,
+          );
+          if (continues) {
+            const body = envelopeOf(continues);
+            body.set("resolution", "who_continues");
+            body.set("survivorId", pair.a);
+            const merged = await postForm(managerJar, seededPath, body);
+            const afterA = await workOf(pair.a);
+            const afterB = await workOf(pair.b);
+            const [tomb] = (await db.execute(sql`
+              select merged_into_id::text as into_id from companies where id = ${pair.b}::uuid
+            `)) as unknown as { into_id: string | null }[];
+            const mergedAudit = (await db.execute(sql`
+              select count(*)::int as n from audit_log where action = 'company.merged' and entity_id = ${pair.b}
+            `)) as unknown as { n: number }[];
+            const expectedProjects = Number(distinctProjects[0]?.n ?? -1);
+            check(
+              `*** NOTHING IS LOST — under A after the merge: projects ${afterA.projects} (distinct across both before: ${expectedProjects}) · quotations ${afterA.quotations}=${sum(beforeA, beforeB, "quotations")} · dispatches ${afterA.dispatches}=${sum(beforeA, beforeB, "dispatches")} · reports ${afterA.reports}=${sum(beforeA, beforeB, "reports")} · contacts ${afterA.contacts}=${sum(beforeA, beforeB, "contacts")}; B is a tombstone into A holding nothing; audited *** [S22] [S107]`,
+              merged.status === 200 &&
+                tomb?.into_id === pair.a &&
+                afterA.projects === expectedProjects &&
+                afterA.quotations === sum(beforeA, beforeB, "quotations") &&
+                afterA.dispatches === sum(beforeA, beforeB, "dispatches") &&
+                afterA.reports === sum(beforeA, beforeB, "reports") &&
+                afterA.contacts === sum(beforeA, beforeB, "contacts") &&
+                afterB.projects === 0 && afterB.quotations === 0 && afterB.dispatches === 0 &&
+                afterB.reports === 0 && afterB.contacts === 0 && afterB.holders === "" &&
+                Number(mergedAudit[0]?.n ?? 0) === 1,
+              `status ${merged.status}, B after: ${JSON.stringify(afterB)}`,
+            );
+            check(
+              `*** who continues gives the other rep nothing — A's holders are unchanged (${afterA.holders === beforeA.holders}) *** [S22]`,
+              afterA.holders === beforeA.holders && beforeA.holders.length > 0,
+            );
+            // Over HTTP: rep-b cannot open A, keeps his own project `S30`;
+            // the tombstone's page says where the customer went.
+            const repBOnA = await get(repBJar, `/en/companies/${pair.a}`);
+            const repBProject = await get(repBJar, `/en/projects/${pair.b_project}`);
+            const repAProject = await get(repJar, `/en/projects/${pair.b_project}`);
+            const tombPage = await get(managerJar, `/en/companies/${pair.b}`);
+            check(
+              `*** rep-b cannot open the surviving company (${repBOnA.status}) and still opens his moved project (${repBProject.status}); rep-a cannot (${repAProject.status}) — the deal stayed its owner's; the tombstone names the survivor *** [S22] [S30] [S107]`,
+              repBOnA.status === 404 &&
+                repBProject.status === 200 &&
+                repAProject.status === 404 &&
+                tombPage.status === 200 &&
+                tombPage.body.includes(`data-slot="merged-into"`) &&
+                tombPage.body.includes(`data-survivor="${pair.a}"`),
+            );
+          }
+        }
+      }
+
+      /* --- E. Shared shares the customer, never the deals `S22` `S30` --- */
+      const p4 = await register(repJar, `dup46-${stamp46}-d`, `+9665${stamp46}9`);
+      const p5 = await register(repBJar, `dup46-${stamp46}-e`, `05${stamp46}9`);
+      const [repB] = (await db.execute(sql`select id::text as id from users where email = 'rep-b@example.test'`)) as unknown as { id: string }[];
+      const [repA] = (await db.execute(sql`select id::text as id from users where email = 'rep-a@example.test'`)) as unknown as { id: string }[];
+      const sharedFlag = p4.id && p5.id ? (await flagsBetween(p4.id, p5.id)).find((f) => f.status === "open") : undefined;
+      if (!sharedFlag || !repB?.id || !repA?.id) {
+        console.log("  --    the shared pair could not be raised — the shared outcome is NOT MEASURED");
+      } else {
+        // rep-b's project on the newer record — written by SQL, so the
+        // merge has a deal to keep out of rep-a's reach. **A name the
+        // normaliser leaves alone** (lowercase, digits, single spaces), so
+        // `name_normalized` written verbatim keeps `verify:schema25`'s
+        // invariant — a hyphen here broke it once (session 54).
+        const dealName = `dup46 ${stamp46} shared deal`;
+        const [project] = (await db.execute(sql`
+          insert into projects (name, name_normalized, owner_user_id, created_by)
+          values (${dealName}, ${dealName}, ${repB.id}::uuid, ${repB.id}::uuid)
+          returning id::text as id
+        `)) as unknown as { id: string }[];
+        await db.execute(sql`insert into project_companies (project_id, company_id) values (${project.id}::uuid, ${p5.id}::uuid)`);
+        const sharedPath = `/en/companies/duplicates/${sharedFlag.id}`;
+        const sharedForm = actForm((await get(managerJar, sharedPath)).body, "shared");
+        if (sharedForm) {
+          const sharedBody = envelopeOf(sharedForm);
+          sharedBody.set("resolution", "shared");
+          const shared = await postForm(managerJar, sharedPath, sharedBody);
+          const holders = (await db.execute(sql`
+            select user_id::text as user_id, is_primary from company_reps
+            where company_id = ${p4.id}::uuid and removed_at is null order by is_primary desc
+          `)) as unknown as { user_id: string; is_primary: boolean }[];
+          const [tomb] = (await db.execute(sql`select merged_into_id::text as into_id from companies where id = ${p5.id}::uuid`)) as unknown as { into_id: string | null }[];
+          const [link] = (await db.execute(sql`select company_id::text as company_id from project_companies where project_id = ${project.id}::uuid and removed_at is null`)) as unknown as { company_id: string }[];
+          check(
+            `*** shared — ${shared.status}: the older record survives, the newer is its tombstone, and BOTH reps hold it (rep-a primary, rep-b added) *** [S22] [S18]`,
+            shared.status === 200 &&
+              tomb?.into_id === p4.id &&
+              holders.length === 2 &&
+              holders[0].user_id === repA.id && holders[0].is_primary === true &&
+              holders[1].user_id === repB.id && holders[1].is_primary === false &&
+              link?.company_id === p4.id,
+            `holders ${JSON.stringify(holders)}, tomb ${tomb?.into_id}, link ${link?.company_id}`,
+          );
+          const repAOn = await get(repJar, `/en/companies/${p4.id}`);
+          const repBOn = await get(repBJar, `/en/companies/${p4.id}`);
+          const repAProj = await get(repJar, `/en/projects/${project.id}`);
+          const repBProj = await get(repBJar, `/en/projects/${project.id}`);
+          check(
+            `*** sharing the customer is not sharing the deals — both open the company (${repAOn.status}, ${repBOn.status}); rep-b's project answers him (${repBProj.status}) and not rep-a (${repAProj.status}) *** [S22] [S30]`,
+            repAOn.status === 200 && repBOn.status === 200 && repBProj.status === 200 && repAProj.status === 404,
+          );
+        }
+      }
+      console.log(`  --    open flags before ${openBefore}, after ${await openFlagCount()} (the run's own)`);
     }
   }
 
