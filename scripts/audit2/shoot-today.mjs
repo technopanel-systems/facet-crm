@@ -36,7 +36,13 @@ const EMAIL = {
   coordinator: "coordinator@example.test",
   admin: "admin@example.test",
   executive: "executive@example.test",
+  // Session 55 — the one account `db:clear` keeps, for shooting the
+  // first-run screen (`D81`) on an empty database; signs in with the
+  // bootstrap password, never the fixture one.
+  founder: process.env.BOOTSTRAP_ADMIN_EMAIL ?? "",
 };
+const PASSWORD_OF = (identity) =>
+  identity === "founder" ? process.env.BOOTSTRAP_ADMIN_PASSWORD ?? "" : PASSWORD;
 
 const SPEC = (process.env.SHOT_SPEC ?? "")
   .split(",")
@@ -87,7 +93,7 @@ for (const [identity, shots] of byIdentity) {
   await page.goto(BASE + "/en/login", { waitUntil: "load" });
   if (page.url().includes("/login")) {
     await page.fill('input[name="email"]', ${JSON.stringify(EMAIL[identity] ?? "")});
-    await page.fill('input[name="password"]', ${JSON.stringify(PASSWORD)});
+    await page.fill('input[name="password"]', ${JSON.stringify(PASSWORD_OF(identity))});
     await Promise.all([
       page.waitForURL((u) => !u.toString().includes("/login"), { timeout: 20000 }),
       page.click('button[type="submit"]'),

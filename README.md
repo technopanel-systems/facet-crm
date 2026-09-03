@@ -108,7 +108,7 @@ The answer is layered, and became deterministic in session 50:
   without a writer is a lie about what the system does, and the
   dead-structure sweeps delete it.
 - **Checks are guilty until fed their defect** — the project's wrong-red
-  ledger records fifteen checks that were wrong in the direction that
+  ledger records eighteen checks that were wrong in the direction that
   matters; the discipline that found them is the crown jewel.
 
 ## Where everything lives
@@ -185,6 +185,7 @@ npm run db:seed       # roles, lookups, settings, notification types
 npm run db:studio     # browse data
 npm run db:push       # local scratch only — never against a real database
 npm run db:reset      # development only — destroy the volume and rebuild
+npm run db:clear      # development only — empty every record table, keep one account (§ Day one)
 npm run seed:demo     # development only — a realistic dataset to look at
 ```
 
@@ -201,6 +202,42 @@ realistic one (~120 companies, Arabic names, 120 days of history, replayed
 through the real writers so nothing is in a state the app cannot produce).
 It needs `BOOTSTRAP_ADMIN_*` in `.env` before it destroys anything, refuses
 outside development, and is idempotent.
+
+## Day one — an empty product
+
+```bash
+npm run db:clear -- --database <name>      # keeps BOOTSTRAP_ADMIN_EMAIL's account
+npm run db:clear -- --database <name> --keep you@technopanel.com.sa
+```
+
+Empties **every record table** — companies, contacts, projects, quotations,
+dispatches, reports, comments, notifications, targets, the calendar, the
+audit log — and deletes every account but the one kept, with its sessions
+intact. Roles, permissions, lookups, settings and the migration ledger stay,
+so the product is usable and meets you the way it meets a customer on day
+one: the first-run screen (`D81`) on Today, and nothing else. It refuses
+outside `NODE_ENV=development`, refuses unless `--database` names the
+database it is actually connected to, and asks for the name to be typed
+back (or `--yes` with no terminal). Nothing is touched until every check
+has passed.
+
+> **With the seed cleared, MOST OF THE VERIFY SUITE GOES RED.** Nearly every
+> check asserts against seeded records and the fixture accounts
+> (`rep-a@example.test` and friends). That is **expected and is not a
+> defect**. Measured on 3 Sep 2026 against an empty database: **eight of the
+> ten scripts stop at their first line** (*No user manager@example.test — run
+> npm run dev:fixtures*, 0 checks each); `verify:schema25` passes its **134**
+> structural checks and stops at its first fixture read; `verify:routes` runs
+> **816** of its ~1,980 checks and **445 of them fail** (every check behind a
+> fixture login), 371 pass. So roughly **500 checks survive an empty
+> database and about 2,800 do not**, and nothing in that count is a defect.
+> `npm run seed:demo` restores the world and the suite goes green again.
+
+To restore: `npm run seed:demo` (needs `BOOTSTRAP_ADMIN_*` and
+`DEV_FIXTURE_PASSWORD` in `.env`; it truncates the same tables, rebuilds
+~120 companies and 120 days of history through the real writers, and
+recreates the fixture accounts), then `npm run build && npm run start` and
+the suite as usual.
 
 ## Bilingual and RTL
 
