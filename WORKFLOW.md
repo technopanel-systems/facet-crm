@@ -7,6 +7,138 @@ Written to be pasted into a fresh chat as a starting brief.
 
 ---
 
+## 0. Handover — Phase 4, the founder's hand pass
+
+**Written at the close of session 55, 3 Sep 2026. Start here.** A new chat with
+no memory of that session can pick the project up from this section alone.
+Everything else in this file is the plan; this is where the plan currently is.
+
+### Where the product is
+
+**Everything planned for the dashboard is built. Nothing is half-finished.**
+There is no branch, no stash, nothing uncommitted. Last commit **`d9503ae`** —
+the run-app launcher, committed rather than ignored. The work itself is
+`5f65756` (the empty database and the first-run screen) and `f30e7d4` (the rep
+is told, the calendar, the error pages, `S137`), with `cc5efd9` a one-line
+correction to `§4` row 60.
+
+Built and shipped: the **three-tab dashboard** — Today (`D76`–`D81`), Reports
+(`D42`–`D44`), Team (`D39`, `D64`) · **duplicate detection and the merge**
+(`S21`–`S23`) · **rep-requested archiving** and the dormancy review
+(`S105`–`S107`) · the **non-working-day calendar** (`S94`, `/calendar`,
+migration `0036`) · the **error pages and the styled 404** (`D52`, `D53`) ·
+`S137`'s chase suppression · `S128`'s five decision kinds on the rep's bell.
+
+**Not built, and not part of this phase**: bulk import (`§4` row 34 — the
+pilot's precondition, and three `§5` rows wait on it), password reset (`S11`),
+the threshold **edit** screen, `can_export`'s reader (all three are what
+remains of `§4` row 37), and the monthly rollup (row 36).
+
+### What Phase 4 is — and what the next session must not do
+
+The founder is using the **empty product by hand**, the way a customer meets it
+on day one, creating every record himself. Then a **customer audit**: the
+product read as a customer would meet it. **No session runs while he does it.**
+
+**He comes back with NOTES, not code.** The next session's first job is to read
+those notes and turn them into rows — `§5` rows for defects, `§4` rows for work,
+`SPEC §16` entries for questions that are his to answer. **It is not to start
+building.** A note is an observation, not a rule; nothing it implies becomes
+code before it is written into `SPEC.md` or `DESIGN.md` with a number.
+
+**He has already begun.** As of the backup below the database holds his first
+hour: three accounts he created (Rawan, Zaid, Alzaben), one company (Sanabel),
+one contact, one project, one quotation thread, one dispatch, two targets and
+28 audit rows, all written between 10:36 and 11:27 UTC on 3 Sep 2026. **Do not
+clear, seed or reset the database without asking him** — that is his pass, and
+it is the only copy outside `backups/`.
+
+### The empty database — READ THIS BEFORE FIXING ANYTHING
+
+> **MOST OF THE VERIFY SUITE IS RED, BY DESIGN, AND IT IS NOT A DEFECT.**
+> The demo seed was cleared for this phase (`npm run db:clear`, session 55).
+> Nearly every check asserts against seeded records and the fixture accounts
+> (`rep-a@example.test` and friends), which no longer exist. Measured on
+> 3 Sep 2026: **eight of the ten scripts stop at their first line** for want of
+> a fixture account (0 checks each); `verify:schema25` passes its **134**
+> structural checks and then stops at its first fixture read; `verify:routes`
+> runs **816** of its ~1,980 and **445 fail**, 371 green. So **roughly 500
+> checks survive an empty database and about 2,800 do not.**
+>
+> **`npm run seed:demo` restores the world and the suite goes green again.**
+
+Without that paragraph a session spends an hour repairing something that is not
+broken. Run `typecheck`, `lint`, `build` and `check:messages` on the empty
+database — they are honest there. Do not run the verify suite against it and do
+not read its reds as findings. `README` § *Day one* carries the same measurement.
+
+### What is open, and who owns it
+
+`SPEC §16` is the list of questions. Nothing there is a defect; each is a
+decision nobody has made yet. **Ask him in plain language, never by rule
+number.**
+
+**His to answer** (a session may prepare the question, never the answer):
+the **calendar's three edges** (`S94`) — who enters leave and holidays, whose
+leave a manager's grouped list honours, and whether the silence clock should
+pause · the **flag half of "nobody tells the rep"** (`S22`) — the decision half
+is closed and reaches the bell; whether an *open* flag should show on his own
+company is still his · **where "this is wrong" goes** (`§4` row 45) — whether a
+rep can send a broken screen to somebody from the screen · **what a merge leaves
+on the tombstone** (`S22`) · the **phone fold's reach** (`S23`, after bulk
+import shows what really arrives) · the **Reports tab's windows** · **sitting
+time** (`S142`) · **coming back, per rep** (`S139`) · **why we lose** (`D44`) ·
+the **two channel names** (`S17`) · the **261 companies with no lead source** ·
+the **never-contacted floor of 10** (`D79`) · **category and lead source** a
+month into the pilot · **"real customer"** re-examined after a year of data ·
+the **quiet thresholds' numbers** after three months.
+
+**And one that is his but lives in `§5`, not `§16`:** the **Team tab attributes
+rows a person's own list cannot carry** — `D39` credits every live holder of a
+company, `S30` keeps a project to its owner. Measured: the manager attributes 67
+rows to rep-a against rep-a's own 65. Whose row is a project under my company
+but owned by somebody else — the holder's, the owner's, or both — is a rule
+question.
+
+**A session's to do, not his:** the **threshold edit screen**, **password
+reset** (`S11`) and **`can_export`'s reader** (`§4` row 37) · **form field
+order**, which is settled as a process — one form per session, current and
+proposed order side by side, he corrects · **bulk import** (row 34) · **where a
+rep's explanation lives when a project jumps** (`S134`), blocked until `S76` and
+`S131` stop disagreeing about who may read a project's conversation.
+
+**Neither — it waits on Next, not on us:** a thrown `notFound()` is still
+answered with Next's error shell, so the **permission 404** arrives in the
+flight payload and is blank with scripts off (`D20`). An *unmatched* URL is
+fixed and renders server-side. The `§5` row says which half `verify:routes` §6
+reads until a Next answer exists. Do not spend a session guessing at it.
+
+### How sessions run here
+
+`CLAUDE.md` is the index and it loads itself — the authority files, the
+path-scoped `.claude/rules/`, the four skills, the three agents, the hooks. The
+`facet-plugin/` mirror carries the same. Do not restate them; read them.
+
+The one thing worth saying in place: **the founder is the customer.** He is a
+semi-beginner developer, not a professional engineer. Questions go to him in
+plain language about what the business does — never as a rule number, never as
+a schema choice. `S94`'s three edges are asked as *who should be allowed to put
+someone's holiday in*, not as *`S94`'s entry rule*.
+
+### What comes after Phase 4
+
+1. **The customer audit** — his, from the hand pass.
+2. **The overall AI audit** — `§6`, AUDIT 3, pre-pilot.
+3. **The move to the office PC** — `§4` row 43, `README` § Deployment.
+   **He says he has his own way of transferring**, so that half is his; what is
+   ours is that the repository and `run-app.cmd` work on a second machine.
+
+Then `§4` Phase 5, the pilot: two or three reps, one month, real records.
+
+**Restore the demo world in one line: `npm run seed:demo`.**
+
+---
+
 ## 1. Who does what
 
 **Jerom** is the founder and owner of Technopanel's FACET project. He is a
@@ -277,10 +409,15 @@ with roles, lookups, settings and his own account and nothing else, and the
 first-run screen (`D81`) is what he meets — creating every record himself, as
 a customer would on day one. (2) A **customer audit**: the product read as a
 customer would meet it. (3) An **overall AI audit** (`§6`, AUDIT 3). (4) The
-**move to the office PC** (`README` § Deployment, row 43's second machine).
-Until (1) is over, the demo seed stays cleared and **most of the verify suite
-is red by design** — `README` § *Day one* says which, and `npm run seed:demo`
-brings it back.
+**move to the office PC** (`README` § Deployment, row 43's second machine) —
+**his own transfer method**, so that half is his. Until (1) is over, the demo
+seed stays cleared and **most of the verify suite is red by design** —
+`README` § *Day one* says which, and `npm run seed:demo` brings it back.
+
+**Step (1) is running now, and `§0` is its handover** — where the product is,
+what a returning session must do with his notes before it writes any code, the
+empty-database measurement, and which open question is his and which is a
+session's. A new chat starts there, not here.
 
 Two or three reps. One month. Real companies, real quotations, real dispatches.
 Everything after this is decided by what they say, not by this plan.
@@ -1061,6 +1198,14 @@ status`'s reading · `src` 52,379 lines by `wc -l` · the database is **cleared
 for the founder's first-day pass** (`npm run db:clear`), one account and the
 seed's roles, lookups and settings in it, and the verify suite is red by design
 until `npm run seed:demo` (`README` § Day one).
+
+**Amended at the session's close.** Two rows moved after the paragraph above
+was written. `WORKFLOW.md` is longer — `§0`'s handover — and the database is no
+longer empty: the founder's hand pass began at 10:36 UTC on 3 Sep and by 11:27
+had written **4 users, 1 company, 1 contact, 1 project, 1 quotation thread, 1
+dispatch, 2 targets and 28 audit rows**. `backups/facet-2026-09-03-143359.dump`
+holds that state and was proved by `npm run backup:verify` (45 tables, 338 rows,
+both restores matching). The last commit is `d9503ae`.
 
 | | |
 |---|---|

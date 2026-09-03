@@ -205,6 +205,10 @@ outside development, and is idempotent.
 
 ## Day one — an empty product
 
+> **To put the demo world back, one line: `npm run seed:demo`.** That is the
+> answer to every red verify check on a cleared database — see the measurement
+> below before treating one as a defect.
+
 ```bash
 npm run db:clear -- --database <name>      # keeps BOOTSTRAP_ADMIN_EMAIL's account
 npm run db:clear -- --database <name> --keep you@technopanel.com.sa
