@@ -70,7 +70,8 @@
     "apply": "تطبيق",
     "whoseMove": "بانتظار من",
     "ofTotal": "{shown} من أصل {total}",
-    "newSinceLoad": "{count, plural, one {أمر جديد واحد — تحديث} two {أمران جديدان — تحديث} few {# أمور جديدة — تحديث} many {# أمراً جديداً — تحديث} other {# أمر جديد — تحديث}}"
+    "newSinceLoad": "{count, plural, one {أمر جديد واحد — تحديث} two {أمران جديدان — تحديث} few {# أمور جديدة — تحديث} many {# أمراً جديداً — تحديث} other {# أمر جديد — تحديث}}",
+    "unknownRecord": "سجل لم يعد بإمكانك فتحه"
   },
   "enums": {
     "region": {
@@ -247,6 +248,12 @@
       "title": "غير موجود",
       "body": "هذا السجل غير موجود، أو أنه ليس ضمن سجلاتك.",
       "home": "العودة إلى اليوم"
+    },
+    "failed": {
+      "title": "حدث خطأ",
+      "body": "تعذّر رسم هذه الشاشة. لم يُحفظ ما كتبته. حاول مرة أخرى، وإن تكرّر الأمر فأخبر مديرك واذكر الرمز.",
+      "quote": "الرمز الذي تذكره:",
+      "retry": "حاول مرة أخرى"
     }
   },
   "validation": {
@@ -811,7 +818,8 @@
       "viewTargets": "فتح في تبويب الفريق",
       "handover": "تسليم المهام",
       "handoverHint": "راجع كل ما لا يزال بحوزة هذا الشخص وسلّمه إلى زميل.",
-      "handoverClosed": "يفتح التسليم بعد تعطيل الحساب."
+      "handoverClosed": "يفتح التسليم بعد تعطيل الحساب.",
+      "leave": "إدخال إجازة"
     },
     "origin": {
       "title": "كيف وصلت طلباته",
@@ -1025,13 +1033,23 @@
         "dispatch_refused": "رفض {name} طلب التوريد الخاص بك.",
         "dispatch_cancelled": "ألغى {name} شحناً. لم يعد يُحتسب ضمن شهر أي أحد.",
         "quotation_rejected": "رفض {name} عرض السعر الخاص بك.",
-        "quotation_cancelled": "ألغى {name} عرض السعر الخاص بك."
+        "quotation_cancelled": "ألغى {name} عرض السعر الخاص بك.",
+        "company_archived": "أرشف {name} <company></company>. لم تعد في قائمتك.",
+        "company_kept": "أبقى {name} <company></company> معك. رُفض طلبك بإزالتها.",
+        "company_reassigned": "سلّم {name} <company></company> إلى مندوب آخر. لم تعد في قائمتك.",
+        "company_merged_away": "وجد {name} أن <other></other> هي العميل نفسه <company></company> فضمّها إليها.",
+        "company_merged_in": "ضمّ {name} <other></other> إلى شركتك <company></company> — العميل نفسه مسجّل مرتين."
       },
       "decisionUnknown": {
         "dispatch_refused": "رُفض طلب التوريد الخاص بك.",
         "dispatch_cancelled": "أُلغي شحن. لم يعد يُحتسب ضمن شهر أي أحد.",
         "quotation_rejected": "رُفض عرض السعر الخاص بك.",
-        "quotation_cancelled": "أُلغي عرض السعر الخاص بك."
+        "quotation_cancelled": "أُلغي عرض السعر الخاص بك.",
+        "company_archived": "أُرشفت <company></company>. لم تعد في قائمتك.",
+        "company_kept": "تبقى <company></company> معك. رُفض طلبك بإزالتها.",
+        "company_reassigned": "سُلّمت <company></company> إلى مندوب آخر. لم تعد في قائمتك.",
+        "company_merged_away": "ضُمّت <other></other> إلى <company></company> — العميل نفسه مسجّل مرتين.",
+        "company_merged_in": "ضُمّت <other></other> إلى شركتك <company></company> — العميل نفسه مسجّل مرتين."
       },
       "decisionLink": "افتح السجل",
       "decisionStandsAlone": "هذا السجل ليس من حقك فتحه. السبب أعلاه هو كل ما في الأمر.",
@@ -1184,7 +1202,8 @@
       "lastMonthOf": "{pct}% من {target} م²",
       "quoted": "تم التسعير",
       "quotedUnit": "عرض سعر",
-      "labelCompany": "هدف الشركة لـ {month} · المُسلَّم"
+      "labelCompany": "هدف الشركة لـ {month} · المُسلَّم",
+      "timeOff": "الإجازات"
     },
     "needsYouZero": "لا شيء يحتاج إليك اليوم",
     "counts": {
@@ -1437,6 +1456,47 @@
       "sideMerged": "أحد هذين السجلين طُوي في سجل آخر بالفعل.",
       "survivorNotInPair": "اختر أحد السجلين.",
       "unknownResolution": "اختر إحدى النتائج الثلاث."
+    }
+  },
+  "calendar": {
+    "title": "الإجازات",
+    "hint": "العطل الرسمية والإجازات الشخصية. يتجاوز مؤشر الوتيرة والتذكيرات هذه الأيام، فلا يعود أحد من العيد أو من أسبوعين بعيداً إلى شاشة تقول إنه متأخر.",
+    "empty": "لا شيء مُدخل من هذا الشهر فصاعداً. أضف عطلة أو إجازة أدناه.",
+    "back": "العودة إلى اليوم",
+    "remove": "إزالة",
+    "kind": {
+      "public_holiday": "عطلة رسمية",
+      "leave": "إجازة"
+    },
+    "fields": {
+      "what": "ماذا",
+      "who": "صاحب الإجازة",
+      "from": "من تاريخ",
+      "to": "إلى تاريخ",
+      "label": "ما هي",
+      "enteredBy": "أدخلها"
+    },
+    "leave": {
+      "title": "إجازة",
+      "hint": "إجازة سنوية أو مرضية أو أي غياب — أيام شخص واحد.",
+      "add": "إضافة إجازة"
+    },
+    "holiday": {
+      "title": "عطلة رسمية",
+      "hint": "العيد واليوم الوطني — مدة عطلة للجميع.",
+      "add": "إضافة عطلة"
+    },
+    "errors": {
+      "cannotEnterHoliday": "لا يُدخل العطلة الرسمية إلا من يدير الحسابات.",
+      "cannotEnterOthersLeave": "يمكنك إدخال إجازتك أنت؛ أما إجازة غيرك فيُدخلها من يدير الحسابات.",
+      "kindUnknown": "هذا ليس نوعاً من الإجازات.",
+      "personRequired": "حدّد صاحب الإجازة.",
+      "personInactive": "هذا الحساب غير نشط.",
+      "dateRequired": "التاريخان مطلوبان.",
+      "endsBeforeStart": "لا يمكن أن يسبق اليوم الأخير اليوم الأول.",
+      "labelRequired": "قل ما هي — عيد، إجازة سنوية، إجازة مرضية.",
+      "labelTooLong": "هذا طويل جداً.",
+      "notFound": "هذا الإدخال لم يعد موجوداً."
     }
   }
 }

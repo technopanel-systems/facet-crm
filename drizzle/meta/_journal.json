@@ -253,6 +253,13 @@
       "when": 1788393600000,
       "tag": "0035_the_second_way_in",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1788480000000,
+      "tag": "0036_the_calendar_of_non_working_time",
+      "breakpoints": true
     }
   ]
 }

@@ -30,7 +30,7 @@ lookup silently failed.
 ## The wrong-red ledger
 
 **A check can be wrong in the direction that matters, and this has happened
-seventeen times.** Four shapes:
+eighteen times.** Four shapes:
 
 1. **A wrong assertion.** §17 once asserted the *inverse* of `D20` on its
    own markers, so it went green over the thing the rule forbids.
@@ -46,7 +46,14 @@ seventeen times.** Four shapes:
    (`data-behind="0"`). Found in session 54 only because the SAME slip
    landed in a new §35 check and went red there. **`od -c` a regex that
    reads zero of something that exists**; a terminal renders a backspace
-   as nothing.
+   as nothing. The eighteenth (session 55) read the RIGHT string from the
+   WRONG place: §6's *renders (app)/not-found.tsx, not a bare Next page*
+   matched a class string anywhere in the response, and since session 23
+   every 404 had been Next's error shell with the page only in the script
+   payload — blank with scripts off, `D20` — because the root layout lived
+   under the locale segment. The payload carries every class the DOM would.
+   **A check about rendered markup reads the DOM before the first
+   `<script`**, never the whole response.
 3. **The mirror — a check that FAILS for the wrong reason.** §24 summed one
    page's group headers against the whole scope's total, an equality that
    stops holding the moment a pile falls off page one — red on a screen that

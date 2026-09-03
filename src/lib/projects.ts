@@ -1200,7 +1200,7 @@ export async function getProject(
  * Migration 0013 backfilled the column from each dispatch's thread, so the
  * figures this returns are unchanged for every row that existed before it.
  * `verify:schema25` §11 asserts the two agree for every dispatch ever written
- * — that is the invariant `recordDispatch` enforces, and the backfill landing
+ * — that is the invariant `requestDispatch` enforces, and the backfill landing
  * correctly is a consequence of it rather than a separate claim.
  *
  * Grouped by **the dispatch's own company**, not the thread's: `S26` says a
@@ -1219,7 +1219,7 @@ export async function getProject(
  * **Summed from the LINES since `S116`**, because `dispatches.sqm` is gone: a
  * dispatch's square metres are its lines' generated ones. An INNER join, so a
  * dispatch with no lines contributes nothing rather than a zero — there is no
- * such dispatch (`recordDispatch` refuses one, and `verify:schema25` §14 holds
+ * such dispatch (`requestDispatch` refuses one, and `verify:schema25` §14 holds
  * every row to it), and a figure that quietly absorbed one would hide it.
  *
  * No visibility term of its own: the caller has already proved the project

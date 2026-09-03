@@ -11,10 +11,13 @@
  * Saturday work is recorded but never required. So this is a global rule with
  * no per-rep branch, which is the whole reason `07 D6` made the change.
  *
- * **No holiday calendar** `[21 §8]`. Eid and national holidays are not skipped.
- * No document asks for one, and a table somebody has to keep fed is a table
- * that silently rots. Recorded in `21 §11` as `OPEN — not chosen` rather than
- * guessed at here.
+ * **The holiday calendar is `S94`'s, since session 55**, and it is not read
+ * here: this module stays pure. Every function below takes an optional `off`
+ * set — `YYYY-MM-DD` days that are not working days for the person in
+ * question, which `src/lib/calendar.ts` builds from the public holidays and
+ * that person's leave — and treats a day in it exactly as it treats a Friday.
+ * With no set passed, only the weekend is skipped, which is what the
+ * table-driven checks in `verify:phase10a` §4 hold.
  *
  * This module imports **nothing**. Dates are `YYYY-MM-DD` calendar days in
  * Riyadh — the same strings `reports.today()` produces and `report_date` holds
@@ -74,11 +77,27 @@ function parse(day: string): number {
   return Date.parse(`${day}T00:00:00Z`);
 }
 
-/** True unless the date falls on a Friday or a Saturday. */
-export function isWorkingDay(day: string): boolean {
+/**
+ * A set of calendar days that are not working days for one person — public
+ * holidays plus that person's leave `S94`. `calendar.ts` builds it; every
+ * function here accepts it. An empty set means the weekend alone.
+ */
+export type OffDays = ReadonlySet<string>;
+
+const NO_OFF_DAYS: OffDays = new Set();
+
+/** True unless the date falls on a Friday, a Saturday, or a day in `off`. */
+export function isWorkingDay(day: string, off: OffDays = NO_OFF_DAYS): boolean {
   const time = parse(day);
   if (Number.isNaN(time)) return false;
-  return !WEEKEND_DAYS.has(new Date(time).getUTCDay());
+  return !WEEKEND_DAYS.has(new Date(time).getUTCDay()) && !off.has(day);
+}
+
+function offAt(time: number, off: OffDays): boolean {
+  return (
+    WEEKEND_DAYS.has(new Date(time).getUTCDay()) ||
+    (off.size > 0 && off.has(new Date(time).toISOString().slice(0, 10)))
+  );
 }
 
 /**
@@ -92,14 +111,18 @@ export function isWorkingDay(day: string): boolean {
  * waiting for a negative number of days. A caller that needs direction should
  * compare the dates itself.
  */
-export function workingDaysBetween(from: string, to: string): number {
+export function workingDaysBetween(
+  from: string,
+  to: string,
+  off: OffDays = NO_OFF_DAYS,
+): number {
   const start = parse(from);
   const end = parse(to);
   if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return 0;
 
   let elapsed = 0;
   for (let time = start + MS_PER_DAY; time <= end; time += MS_PER_DAY) {
-    if (!WEEKEND_DAYS.has(new Date(time).getUTCDay())) elapsed += 1;
+    if (!offAt(time, off)) elapsed += 1;
   }
   return elapsed;
 }
@@ -130,7 +153,11 @@ export function shiftDays(day: string, days: number): string {
  * arithmetic shortcut is where an off-by-one lives, and this runs once per
  * query, not once per row.
  */
-export function shiftWorkingDays(day: string, workingDays: number): string {
+export function shiftWorkingDays(
+  day: string,
+  workingDays: number,
+  off: OffDays = NO_OFF_DAYS,
+): string {
   const start = parse(day);
   if (Number.isNaN(start) || workingDays <= 0) return day;
 
@@ -138,7 +165,7 @@ export function shiftWorkingDays(day: string, workingDays: number): string {
   let remaining = workingDays;
   while (remaining > 0) {
     time -= MS_PER_DAY;
-    if (!WEEKEND_DAYS.has(new Date(time).getUTCDay())) remaining -= 1;
+    if (!offAt(time, off)) remaining -= 1;
   }
   return new Date(time).toISOString().slice(0, 10);
 }
@@ -151,10 +178,45 @@ export function shiftWorkingDays(day: string, workingDays: number): string {
  * question the Yesterday band asks. Walked backwards like `shiftWorkingDays`
  * above, and for the same reason: the shortcut is where an off-by-one lives.
  */
-export function previousWorkingDay(day: string): string {
+export function previousWorkingDay(day: string, off: OffDays = NO_OFF_DAYS): string {
   let cursor = shiftDays(day, -1);
-  while (!isWorkingDay(cursor)) cursor = shiftDays(cursor, -1);
+  while (!isWorkingDay(cursor, off)) cursor = shiftDays(cursor, -1);
   return cursor;
+}
+
+/**
+ * How much of the month `today` falls in has been **worked**, and how much of
+ * it there is — `D32`'s expected-to-date, moved here from the Today page in
+ * session 55 so the per-person answer `S94` needs has one home.
+ *
+ * **Working days, not calendar days.** A rep dispatches Sunday to Thursday, so
+ * a calendar denominator would show them slipping every weekend and catching
+ * up every Monday for no real reason. **Today counts**, which is what makes
+ * the fraction reach 100% on the last working day, and it holds at 100%
+ * through any trailing weekend. **A day in `off` is not in either figure**:
+ * a public holiday shortens everyone's month and a fortnight's leave shortens
+ * one person's, so the tick and the expectation move together and a rep back
+ * from leave is not behind for days he could not have worked.
+ */
+export function monthWorked(
+  today: string,
+  off: OffDays = NO_OFF_DAYS,
+): { worked: number; total: number } {
+  const [year, month, dayOfMonth] = today.split("-").map(Number);
+  // Day 0 of the next month is the last day of this one.
+  const days = new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+  let worked = 0;
+  let total = 0;
+  for (let day = 1; day <= days; day += 1) {
+    const date = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    if (!isWorkingDay(date, off)) continue;
+    total += 1;
+    if (day <= dayOfMonth) worked += 1;
+  }
+  // A month with no working day cannot exist. The floor is here so a division
+  // can never be by zero, not because the case is reachable.
+  return { worked, total: Math.max(1, total) };
 }
 
 /**

@@ -872,8 +872,10 @@ persistence was invented to prevent.
 **S92.** A **bell** carries news only, never work: *a rep was handed to you*,
 *you have been shared a record*. A handover raises one summary, not one per
 record. The news also carries **credit granted to you (S129)**, and **a decision
-that ended your work (S128)** — a refusal, a rejection, a cancellation. Both are
-news: nothing is waiting on the person told, so neither belongs on the list.
+that ended your work (S128)** — a refusal, a rejection, a cancellation, and
+since session 55 a decision on your customer: archived, kept, reassigned,
+merged. Both are news: nothing is waiting on the person told, so neither
+belongs on the list.
 
 **Six items and no seventh.** The daily digest was the seventh and the only one
 that ever carried work; it left with the machinery S91 deletes.
@@ -881,7 +883,7 @@ that ever carried work; it left with the machinery S91 deletes.
 **S93.** **Friday and Saturday are the weekend for everyone.** Saturday work is
 recorded and never required.
 
-**S94. [BUILD]** A **calendar of non-working time** exists, in two kinds
+**S94.** A **calendar of non-working time** exists, in two kinds
 (widened session 50, the founder's words). **Public holidays** — Eid, national
 days — entered as a date range, affecting everyone. **Personal leave** —
 annual leave, sick leave, any absence — entered per person. Both are skipped
@@ -889,14 +891,24 @@ by the pace bar and by the reminders: *"if a rep is off for two weeks, his
 pace bar and his reminders should know it, otherwise he comes back to a
 screen telling him he's behind and neglecting customers he couldn't have
 called."* Public affects everyone; leave affects one person; both must be
-enterable.
+enterable. **Built session 55**: one table (`non_working_days`), one screen
+(`/calendar`, reached from the pace panel, the Team tab and a person's own
+page — not a rail item, D49), one reader (`src/lib/calendar.ts`). The pace
+bar (D32, D39, D79) counts a month's working days per person — public
+holidays off everyone's, leave off that person's — and the two working-day
+reminder thresholds (S87) walk back through the reader's own off days. The
+silence clock (S89) is calendar days and is untouched: staying in touch is
+a different question from being at work. A range is removed, never deleted
+(S107). Who may enter what — a person their own leave; the holder of
+`can_manage_users` public holidays and anyone's leave — is the smallest
+reading of *enterable* and is recorded in §16 as a choice, not a rule.
 
 **S95. [BUILD]** Clearing your own queue is what you get back for typing. A rep
 logs; the coordinator approves or refuses. Same list, different act. Both acts
 exist today — the rep logs, and the coordinator approves and refuses (S72).
 What does not is the single list they clear, which is S87's.
 
-**S137. [CHANGE]** **A submitted dispatch request pauses the chase on its
+**S137.** **A submitted dispatch request pauses the chase on its
 quotation thread.** The no-response reminder says the customer has not
 replied; a dispatch raised against the thread IS the reply — the founder's
 words: *"they said yes. The reminder isn't a judgment call, it's just
@@ -909,7 +921,13 @@ reminder (S89) asks a different question, staying in touch, and is untouched.
 pausing while processing removed the need for one; if FACET ever
 distinguishes a regular customer, it is **bought more than once, derived from
 dispatches** — never a rep-maintained flag, because *"a rep-maintained flag
-goes stale the moment someone forgets."*
+goes stale the moment someone forgets."* **Built session 55** as one
+`notExists` term in `silentIssuedThreads` — the one definition of *quoted and
+nothing came back* — so the Reports tab's block follows it too: a customer
+who asked for the goods did come back. A draft request nobody has sent
+pauses nothing. Re-measured before the term went in: company-wide, 106 of
+131 silent issued threads carried a submitted or approved request (a
+verify-residue figure; on a fresh `seed:demo` it was 3 of 15).
 
 **S141.** A rep has **gone silent** when nothing is logged for **a number of
 days** — a settings row, `attention.silent_days`, seeded at **14** (the near
@@ -1011,6 +1029,25 @@ otherwise unchanged: an audit row is never shown without joining back to the
 record and applying its visibility. Here the rep's own credit was taken, so the
 reason reaches them even where the record does not.
 
+**A decision on a rep's customer is such a decision** (amended session 55,
+the founder's answer to §16's *nobody tells the rep*: *a rep must learn when
+a decision lands on his customer*). Five acts join the four above, each one
+item on the bell (S92), landing on `/notifications` and counted unread in the
+rail's badge until read (S91): **archived** — every rep holding the company
+(S107), and the rep who asked for it (S105) whether or not he still holds
+it, with the manager's written reason; **kept** — the rep who asked, with the
+manager's note where one was written, because a keep ends nobody's work and
+answers one person's question; **reassigned** — every departing holder
+(S100), with no reason, since a reassignment carries none; **merged into
+another** — every holder of the folded record (S22), and **another merged
+into yours** — every holder the survivor had going in. A manager is never
+told about his own act. **The item names the company, and a merge names
+both**, whether or not the reader may still open them: an archived company
+leaves the rep's list and a folded one is a tombstone, so a line without the
+name would tell him nothing — the name is his own former customer's and
+reaches him on the same exception as the reason. The bell, not the list: the
+work has ended, so nothing is waiting on the person told (S90).
+
 ---
 
 ## 14. System-wide rules
@@ -1030,7 +1067,11 @@ real person.
 
 **S112.** Every mutation writes to an **audit log**, written by the data layer
 rather than by each feature. An audit row is never shown to a user without
-joining back to the real record and applying its visibility.
+joining back to the real record and applying its visibility. **One write sits
+outside it by design** (named session 55): `getSession` deleting a
+deactivated person's sessions on their next request (S101) — those are
+Auth.js's rows, not a record, and the `user.deactivated` row already carries
+the act that caused it.
 
 **S113.** **Every user-facing string goes through the translation layer** (EN +
 AR), and layout uses logical utilities so RTL works.
@@ -1268,13 +1309,26 @@ asserting a table nobody wants is the check keeping it alive.
   tombstone and off the queue. Re-pointing such a flag at the survivor
   would let one merge raise a new pair without anyone typing anything;
   not done, recorded.
-- **Nobody tells the rep** (S22, S105, session 54). A flag is the
-  manager's and the rep sees nothing on his company; a request's outcome
-  reaches the rep only through the company's own page, where the history
-  says what was decided. S128 names three decisions that must reach the
-  person whose work they end and an archive is not among them. Whether it
-  should be — and whether a rep should see that his company is under a
-  duplicate flag — is his call.
+- **Does the rep see that his company is under a duplicate flag?** (S22,
+  session 54; narrowed session 55). The decision half of this question is
+  closed — S128 now carries archive, keep, reassign and merge to the rep on
+  the bell, the founder's *yes*. What stays open is the flag itself: an open
+  flag is the manager's, and the rep sees nothing on his company until it
+  is resolved. His call.
+- **The calendar's three edges** (S94, session 55). Built with the
+  smallest readings, each his to move: **who enters** — a person their own
+  leave, the account-keeper (`can_manage_users`) public holidays and
+  anyone's; **whose leave a manager's grouped list honours** (S88) — the
+  reader's own today, so a manager's queue does not yet know that Faisal
+  is away; and **the silence clock** (S89) — untouched, because staying in
+  touch is not being at work, though a rep back from a fortnight will find
+  his quiet companies quieter by a fortnight.
+- **Where "this is wrong" goes** (`WORKFLOW §4` row 45, session 55). A
+  screen that breaks now says so in the reader's language, saves nothing,
+  offers a retry and a way home, and asks the person to tell the manager and
+  quote a code — the code Next's own log carries, so the two halves can be
+  paired. Whether a rep should be able to *send* that from the screen — a
+  box, a queue, a bell to the manager — is his call; nothing stores it today.
 - **The Reports tab's windows** (session 52). Built as: a block over
   events takes the period — losses by the day marked lost, quotations by
   their raise, companies by their registration, buyers by dispatch date —

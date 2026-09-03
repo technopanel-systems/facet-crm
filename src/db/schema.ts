@@ -133,6 +133,16 @@ export const companyRepOriginEnum = pgEnum("company_rep_origin", [
  * notified and then re-included with the same rep, reassigned, or archived as
  * out of scope. Nothing is ever deleted `[12 §7]`.
  */
+/**
+ * `S94` — the two kinds of non-working time: a **public holiday** affects
+ * everyone and carries no person; **leave** is one person's absence. Closed
+ * by the rule's own two sentences, so an enum rather than a lookup.
+ */
+export const nonWorkingKindEnum = pgEnum("non_working_kind", [
+  "public_holiday",
+  "leave",
+]);
+
 export const dormancyOutcomeEnum = pgEnum("dormancy_outcome", [
   "reincluded",
   "reassigned",
@@ -1607,7 +1617,7 @@ export const quotationServiceLines = pgTable(
  * per project are analysed from dispatch data and this row is the record of
  * what actually shipped, so it carries its own project rather than borrowing
  * its thread's. Where there IS a thread the two are never different — a rule
- * `recordDispatch` enforces the way it already enforces the company, because
+ * `requestDispatch` enforces the way it already enforces the company, because
  * this pair spans two rows and no CHECK can reach across one.
  *
  * It stays nullable for the direct route: a dispatch with no quotation may
@@ -1847,7 +1857,7 @@ export const dispatches = pgTable(
      * free-entry dispatch `S75` names no version, and one raised from a
      * quotation cannot lack it. Row-local, so the database holds it; which
      * THREAD the version belongs to spans two rows and stays in
-     * `recordDispatch`, beside the company and project pairs it already holds.
+     * `requestDispatch`, beside the company and project pairs it already holds.
      */
     check(
       "dispatches_quotation_pair",
@@ -2516,6 +2526,49 @@ export const notifications = pgTable(
 /* ------------------------------------------------------------------ *
  * 10. Settings — `09 §10`
  * ------------------------------------------------------------------ */
+
+/**
+ * `S94` — **the calendar of non-working time**, one row per range.
+ *
+ * A public holiday is a range with no `user_id`; a person's leave is a range
+ * with one — the CHECK holds the pair to the kind, so a holiday can never
+ * belong to somebody and leave can never belong to nobody. Both are skipped
+ * by the pace bar (`D32`, `D79`, `D39`) and by the working-day reminders
+ * (`S87`'s two working-day thresholds): the readers are `src/lib/calendar.ts`
+ * and nothing else, so the one definition of *a working day for this person*
+ * stays in one place beside `working-days.ts`'s weekend (`S93`).
+ *
+ * **Soft removal** (`removed_at`), because nothing is deleted (`S107`) and a
+ * holiday typed on the wrong week has to stop counting without vanishing from
+ * the audit trail. A removed row is read by no pace or reminder.
+ */
+export const nonWorkingDays = pgTable(
+  "non_working_days",
+  {
+    id: pk(),
+    kind: nonWorkingKindEnum("kind").notNull(),
+    /** Null for a public holiday; the person on leave otherwise. */
+    userId: uuid("user_id").references(() => users.id),
+    startsOn: date("starts_on").notNull(),
+    endsOn: date("ends_on").notNull(),
+    /** Eid al-Fitr, annual leave, sick leave — the words a person typed. */
+    label: text("label").notNull(),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    createdAt: createdAt(),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+    removedByUserId: uuid("removed_by_user_id").references(() => users.id),
+  },
+  (t) => [
+    check(
+      "non_working_days_kind_person",
+      sql`(kind = 'public_holiday') = (user_id is null)`,
+    ),
+    check("non_working_days_range", sql`ends_on >= starts_on`),
+    index("non_working_days_range_idx").on(t.userId, t.startsOn, t.endsOn),
+  ],
+);
 
 /**
  * `09 §10.2` — keyed configuration, intended to be manager-editable rather

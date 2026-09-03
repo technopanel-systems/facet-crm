@@ -701,6 +701,9 @@ const STATIC_ROUTES = [
   "/activity",
   "/follow-ups",
   "/notifications",
+  // `S94` — the calendar, session 55: a rail-less screen every identity
+  // opens, so the anonymous walk and every role drive it.
+  "/calendar",
   "/targets",
   "/users",
   "/users/new",
@@ -1292,9 +1295,43 @@ async function main(): Promise<void> {
     // Next replaces the whole `(app)` subtree — LAYOUT INCLUDED — with the
     // boundary, so the rail is absent here and always has been. Asserting the
     // rail would be asserting a Next.js behaviour FACET does not choose.
+    // **The DOM, never the payload** (session 55): until the root layout
+    // moved to `app/`, every 404 was Next's error shell with the page only
+    // in the script payload — blank with scripts off `D20` — and this
+    // check, reading a class string anywhere in the response, was green
+    // on it. What is asserted now is markup BEFORE the first `<script`.
+    const dom = (html: string): string =>
+      html.slice(Math.max(0, html.indexOf("<body"))).split("<script")[0];
+    // **What holds, said plainly**: the boundary is in the response — in the
+    // script payload, not the document. A `notFound()` THROWN from a page
+    // still answers with Next's error shell after the root-layout move
+    // (measured session 55: `<html id="__next_error__">`, 237 bytes of
+    // markup before the first script), so this 404 is blank with scripts
+    // off. `WORKFLOW §5` carries it; the label says which half is read.
     check(
-      "  and renders (app)/not-found.tsx, not a bare Next page",
-      body.includes("max-w-2xl") && body.includes("items-start"),
+      `  and the response carries (app)/not-found.tsx — in the payload (shell ${body.includes('id="__next_error__"') ? "yes" : "no"}); a thrown notFound() is not yet server-rendered, WORKFLOW §5 [D53] [D20]`,
+      // The payload carries the attribute as escaped JSON, never as markup.
+      /data-slot\\?":\\?"not-found/.test(body) || body.includes('data-slot="not-found"'),
+    );
+
+    // `D53`, session 55 (`WORKFLOW §4` row 45) — a URL nothing claimed used
+    // to fall through to Next's stock English page whatever the locale.
+    // `[locale]/[...rest]` now hands it to `[locale]/not-found.tsx`: a 404,
+    // the marker, the reader's direction, and for an anonymous visitor the
+    // same page rather than a redirect that would say which routes exist.
+    const strayEn = await get(jar, "/en/this-route-does-not-exist");
+    const strayAr = await get(jar, "/ar/this-route-does-not-exist");
+    const strayAnon = await get(new Map(), "/ar/this-route-does-not-exist");
+    check(
+      `*** a URL nothing claimed 404s in the reader's language — en ${strayEn.status}, ar ${strayAr.status} rtl ${dom(strayAr.body).includes('dir="rtl"')}, anonymous ${strayAnon.status} — and renders FACET's page in the document, not Next's shell *** [D53] [D20]`,
+      strayEn.status === 404 &&
+        dom(strayEn.body).includes('data-slot="not-found"') &&
+        strayAr.status === 404 &&
+        dom(strayAr.body).includes('data-slot="not-found"') &&
+        dom(strayAr.body).includes('dir="rtl"') &&
+        strayAnon.status === 404 &&
+        dom(strayAnon.body).includes('data-slot="not-found"') &&
+        !strayAnon.body.includes('id="__next_error__"'),
     );
 
     // `19 §3` — handover opens only AFTER deactivation, and `team.ts:141`
@@ -9534,13 +9571,42 @@ async function main(): Promise<void> {
       } else {
         const overdue = Number(attr(repRow, "data-overdue"));
         const dueSoon = Number(attr(repRow, "data-due-soon"));
-        check(
-          `${locale}: *** rep-a's two counts fold inside his own waiting list — saw ${overdue}+${dueSoon}=${
-            overdue + dueSoon
-          } of a scope of ${repScope} *** [D39] [D34]`,
-          repScope > 0 && overdue + dueSoon <= repScope,
-          `overdue ${overdue} + due soon ${dueSoon} against ${repScope}`,
+        /* **The precondition** (session 55): the table attributes a row to
+           every live holder of its company, while a rep's own list follows
+           what he may SEE — and since a merge can put another rep's project
+           under a company rep-a holds (`S22`, `S30`), the manager can count
+           rows for him that his own list does not carry. `WORKFLOW §5`
+           records it. While such projects exist the fold cannot be measured
+           against his scope, and this says so rather than asserting a
+           bound that no longer holds. */
+        const crossOwned = Number(
+          ((await db.execute(sql`
+            select count(*)::int as n
+            from projects p
+            join project_companies pc on pc.project_id = p.id and pc.removed_at is null
+            join company_reps cr on cr.company_id = pc.company_id and cr.removed_at is null
+            where cr.user_id = ${repAId}::uuid
+              and p.owner_user_id <> ${repAId}::uuid
+              and p.end_state is null
+              and not exists (
+                select 1 from record_shares rs
+                where rs.record_type = 'project' and rs.record_id = p.id
+                  and rs.shared_with_user_id = ${repAId}::uuid and rs.revoked_at is null)
+          `)) as unknown as { n: number }[])[0]?.n ?? 0,
         );
+        if (crossOwned > 0) {
+          console.log(
+            `  --    ${locale}: ${crossOwned} live project(s) under rep-a's companies are owned by somebody else and not shared with him — the table attributes their rows to him and his list cannot (S30) — the waiting fold is NOT MEASURED (WORKFLOW §5)`,
+          );
+        } else {
+          check(
+            `${locale}: *** rep-a's two counts fold inside his own waiting list — saw ${overdue}+${dueSoon}=${
+              overdue + dueSoon
+            } of a scope of ${repScope} *** [D39] [D34]`,
+            repScope > 0 && overdue + dueSoon <= repScope,
+            `overdue ${overdue} + due soon ${dueSoon} against ${repScope}`,
+          );
+        }
       }
 
       /*
@@ -11715,12 +11781,20 @@ async function main(): Promise<void> {
             where r.company_id = t.company_id
               and r.entry_type = 'interaction'
               and r.report_date > (a.created_at at time zone 'Asia/Riyadh')::date
+          ) and not exists (
+            select 1 from dispatches d
+            where d.quotation_thread_id = t.id and d.status in ('submitted', 'approved')
           ))::int as silent,
           count(*) filter (where a.created_at is not null and not exists (
             select 1 from rep_reports r
             where r.company_id = t.company_id
               and r.entry_type = 'interaction'
               and r.report_date > (a.created_at at time zone 'Asia/Riyadh')::date
+          ) and not exists (
+            -- S137 (session 55): a submitted or approved request IS the
+            -- reply, so it leaves the silent set here as it does in the ladder.
+            select 1 from dispatches d
+            where d.quotation_thread_id = t.id and d.status in ('submitted', 'approved')
           ) and (a.created_at at time zone 'Asia/Riyadh')::date <= ${cutoff}::date)::int
             as past
         from quotation_threads t
@@ -13032,6 +13106,37 @@ async function main(): Promise<void> {
       `)) as unknown as { n: number }[];
       return Number(rows[0]?.n ?? -1);
     };
+    /** `S128` since session 55 — the bell rows one person holds about one
+     *  company decision, read straight off the table; the screen is read
+     *  separately, so the two sides come from different places. */
+    type BellRow = { decision: string; reason: string; record_id: string; unread: boolean };
+    const bellRows = async (email: string, decision: string, recordId: string): Promise<BellRow[]> =>
+      (await db.execute(sql`
+        select n.payload->>'decision' as decision, n.payload->>'reason' as reason,
+               n.payload->>'recordId' as record_id, n.read_at is null as unread
+        from notifications n
+        join users u on u.id = n.recipient_user_id
+        join notification_types t on t.id = n.notification_type_id
+        where u.email = ${email} and t.key = 'decision.ended_work'
+          and n.payload->>'decision' = ${decision}
+          and n.payload->>'recordId' = ${recordId}
+        order by n.created_at
+      `)) as unknown as BellRow[];
+    /** The rendered item for one decision on one company, off the reader's
+     *  own `/notifications` — first page, which is where an unread item of
+     *  the last minute sits. */
+    const bellOnScreen = async (jar: Jar, decision: string, companyName: string): Promise<{ status: number; item: string; names: boolean; reason: string | null }> => {
+      const page = await get(jar, "/en/notifications");
+      const item = page.body.match(new RegExp(`<div[^>]*data-decision="${decision}"[\\s\\S]*?</div>`))?.[0] ?? "";
+      const names = item.includes(`data-decision-company="true">${escapeHtmlText(companyName)}</bdi>`);
+      const reason = item.match(/data-decision-reason[^>]*>\s*<bdi>([\s\S]*?)<\/bdi>/)?.[1] ?? null;
+      return { status: page.status, item, names, reason };
+    };
+    /** What Next escapes in text content — the inverse of `unescapeHtml`. */
+    const escapeHtmlText = (value: string): string =>
+      value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
+    const companyNameOf = async (companyId: string): Promise<string> =>
+      ((await db.execute(sql`select name from companies where id = ${companyId}::uuid`)) as unknown as { name: string }[])[0]?.name ?? "";
 
     const stamp45 = Date.now();
     const repJar = jars["rep-a@example.test"];
@@ -13255,6 +13360,24 @@ async function main(): Promise<void> {
                 (await openCount()) === openNow - 1,
               `status ${kept}`,
             );
+            /* 8b. `S128` since session 55 — the rep who asked is TOLD, on the
+                  bell: one `company_kept` row carrying the manager's note,
+                  unread; the manager has none about his own act; and the
+                  rep's own `/notifications` renders it naming the company. */
+            const keptRows = await bellRows("rep-a@example.test", "company_kept", companyId);
+            const managerKept = await bellRows("manager@example.test", "company_kept", companyId);
+            const keptScreen = await bellOnScreen(repJar, "company_kept", await companyNameOf(companyId));
+            check(
+              `*** the keep reaches the rep who asked — ${keptRows.length} bell row(s) carrying the note (${keptRows[0]?.reason}), unread ${keptRows[0]?.unread}, the manager holds ${managerKept.length}; rendered on his /notifications naming the company (${keptScreen.names}) with the note (${keptScreen.reason !== null}) *** [S128] [S92] [S105]`,
+              keptRows.length === 1 &&
+                keptRows[0].reason === `verify45-${stamp45} keep` &&
+                keptRows[0].unread === true &&
+                managerKept.length === 0 &&
+                keptScreen.status === 200 &&
+                keptScreen.names &&
+                keptScreen.reason === `verify45-${stamp45} keep`,
+              `rows ${JSON.stringify(keptRows)}, item ${keptScreen.item.slice(0, 300)}`,
+            );
           }
 
           /* 9. The rep asks again — the form is back once the ruling is
@@ -13303,6 +13426,27 @@ async function main(): Promise<void> {
                   historyLines === 2 &&
                   !actForm(repArchived.body, "removal-request") &&
                   !actForm(repArchived.body, "reinclude"),
+              );
+              /* 11. `S128` since session 55 — the archive reaches the rep on
+                    the bell with the executive's written reason; the
+                    executive holds nothing about his own act; and the item
+                    renders on the rep's /notifications naming the company
+                    he can still open (archived is hidden from work, not
+                    from him `S107`) — so the link is offered. */
+              const archivedRows = await bellRows("rep-a@example.test", "company_archived", companyId);
+              const executiveRows = await bellRows("executive@example.test", "company_archived", companyId);
+              const archivedScreen = await bellOnScreen(repJar, "company_archived", await companyNameOf(companyId));
+              check(
+                `*** the archive reaches the rep — ${archivedRows.length} bell row(s), reason "${archivedRows[0]?.reason}", unread ${archivedRows[0]?.unread}; the executive holds ${executiveRows.length}; rendered naming the company (${archivedScreen.names}) with the reason and the link *** [S128] [S92] [S107]`,
+                archivedRows.length === 1 &&
+                  archivedRows[0].reason === `verify45-${stamp45} moved to Jeddah` &&
+                  archivedRows[0].unread === true &&
+                  executiveRows.length === 0 &&
+                  archivedScreen.status === 200 &&
+                  archivedScreen.names &&
+                  archivedScreen.reason === `verify45-${stamp45} moved to Jeddah` &&
+                  archivedScreen.item.includes(`href="/en/companies/${companyId}"`),
+                `rows ${JSON.stringify(archivedRows)}, item ${archivedScreen.item.slice(0, 300)}`,
               );
             }
           }
@@ -13472,6 +13616,21 @@ async function main(): Promise<void> {
     const coordJar = jars["coordinator@example.test"];
     const repBJar = await login("rep-b@example.test");
     const executiveJar = await login("executive@example.test");
+    /** `S128` since session 55 — one person's bell rows about one merge,
+     *  keyed on the survivor (`recordId`). Off the table; the screen is read
+     *  apart, so the two sides have different origins. */
+    const bellRowsFor = async (email: string, decision: string, survivorId: string) =>
+      (await db.execute(sql`
+        select n.payload->>'otherRecordId' as other_id, n.read_at is null as unread
+        from notifications n
+        join users u on u.id = n.recipient_user_id
+        join notification_types t on t.id = n.notification_type_id
+        where u.email = ${email} and t.key = 'decision.ended_work'
+          and n.payload->>'decision' = ${decision}
+          and n.payload->>'recordId' = ${survivorId}
+      `)) as unknown as { other_id: string; unread: boolean }[];
+    const escapeText = (value: string): string =>
+      value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
     const openBefore = await openFlagCount();
 
     /* --- A. Never blocked, and the phone is the key `S21` `S23` ------- */
@@ -13744,6 +13903,34 @@ async function main(): Promise<void> {
                 tombPage.body.includes(`data-slot="merged-into"`) &&
                 tombPage.body.includes(`data-survivor="${pair.a}"`),
             );
+            /* `S128` since session 55 — rep-b, who lost the customer, is
+               told on the bell and the item names BOTH companies though he
+               may open neither (404 above): it stands alone, no link. rep-a,
+               who held the survivor, is told the other way round; the
+               manager, who decided, holds nothing. */
+            // Keyed on the folded record too: a survivor can take a second
+            // fold in a later run, and that run's rows are not this one's.
+            const ownFold = (rows: { other_id: string }[]) => rows.filter((r) => r.other_id === pair.b);
+            const awayRows = ownFold(await bellRowsFor("rep-b@example.test", "company_merged_away", pair.a));
+            const inRows = ownFold(await bellRowsFor("rep-a@example.test", "company_merged_in", pair.a));
+            const managerRows = ownFold(await bellRowsFor("manager@example.test", "company_merged_away", pair.a));
+            const [names] = (await db.execute(sql`
+              select a.name as survivor, b.name as folded from companies a, companies b
+              where a.id = ${pair.a}::uuid and b.id = ${pair.b}::uuid
+            `)) as unknown as { survivor: string; folded: string }[];
+            const awayPage = await get(repBJar, "/en/notifications");
+            const awayItem = awayPage.body.match(/<div[^>]*data-decision="company_merged_away"[\s\S]*?<\/div>/)?.[0] ?? "";
+            check(
+              `*** the merge reaches both reps — rep-b ${awayRows.length} merged-away row(s), rep-a ${inRows.length} merged-in, the manager ${managerRows.length}; rep-b's item names the survivor and the folded record and offers no link into a company he cannot open *** [S128] [S92] [S22]`,
+              awayRows.length === 1 &&
+                inRows.length === 1 &&
+                managerRows.length === 0 &&
+                awayPage.status === 200 &&
+                awayItem.includes(`data-decision-company="true">${escapeText(names?.survivor ?? "\u0000")}</bdi>`) &&
+                awayItem.includes(`data-decision-other="true">${escapeText(names?.folded ?? "\u0000")}</bdi>`) &&
+                !awayItem.includes(`href="/en/companies/${pair.a}"`),
+              `away ${JSON.stringify(awayRows)}, in ${JSON.stringify(inRows)}, item ${awayItem.slice(0, 300)}`,
+            );
           }
         }
       }
@@ -13795,6 +13982,20 @@ async function main(): Promise<void> {
           const repBOn = await get(repBJar, `/en/companies/${p4.id}`);
           const repAProj = await get(repJar, `/en/projects/${project.id}`);
           const repBProj = await get(repBJar, `/en/projects/${project.id}`);
+          /* `S128` since session 55 — under *shared* rep-b keeps the customer
+             under the survivor's name, so his merged-away item LINKS to it;
+             rep-a is told the newer record was folded into his. */
+          const sharedAway = (await bellRowsFor("rep-b@example.test", "company_merged_away", p4.id)).filter((r) => r.other_id === p5.id);
+          const sharedIn = (await bellRowsFor("rep-a@example.test", "company_merged_in", p4.id)).filter((r) => r.other_id === p5.id);
+          const sharedAwayPage = await get(repBJar, "/en/notifications");
+          const sharedAwayItem = sharedAwayPage.body.match(/<div[^>]*data-decision="company_merged_away"[\s\S]*?<\/div>/)?.[0] ?? "";
+          check(
+            `*** shared tells both — rep-b ${sharedAway.length} merged-away row(s) and his item links to the survivor he now holds; rep-a ${sharedIn.length} merged-in *** [S128] [S22] [S18]`,
+            sharedAway.length === 1 &&
+              sharedIn.length === 1 &&
+              sharedAwayItem.includes(`href="/en/companies/${p4.id}"`),
+            `away ${JSON.stringify(sharedAway)}, in ${JSON.stringify(sharedIn)}, item ${sharedAwayItem.slice(0, 300)}`,
+          );
           check(
             `*** sharing the customer is not sharing the deals — both open the company (${repAOn.status}, ${repBOn.status}); rep-b's project answers him (${repBProj.status}) and not rep-a (${repAProj.status}) *** [S22] [S30]`,
             repAOn.status === 200 && repBOn.status === 200 && repBProj.status === 200 && repAProj.status === 404,
@@ -13911,6 +14112,250 @@ async function main(): Promise<void> {
       }
     }
   }
+  /* ── 47 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n47. The calendar of non-working time — public holidays for everyone, leave for one person, both skipped by the pace bar; a rep enters his own leave and nothing else; a range is removed, never deleted [S94], [D32], [D39], [S107], [D53], [D20]",
+  );
+  {
+    const setup = (step: string, ok: boolean, detail = ""): boolean => {
+      checks += 1;
+      if (ok) {
+        console.log(`  setup ${step}`);
+        return true;
+      }
+      failures += 1;
+      console.log(`  SETUP FAILED at ${step}${detail ? ` — ${detail}` : ""}`);
+      return false;
+    };
+    const actForm = (body: string, act: string): string | undefined =>
+      body.match(new RegExp(`<form[^>]*data-act="${act}"[\\s\\S]*?</form>`))?.[0];
+    /** The status, and — so a refusal names itself in a FAIL line — the
+     *  `role="alert"` messages the re-rendered form carried. */
+    let lastAlerts = "";
+    const post = async (
+      jar: Jar,
+      path: string,
+      form: string,
+      fields: Record<string, string>,
+    ): Promise<number> => {
+      const body = envelopeOf(form);
+      for (const [name, value] of Object.entries(fields)) body.set(name, value);
+      const response = await fetch(`${BASE}${path}`, {
+        method: "POST",
+        headers: { cookie: header(jar), origin: BASE },
+        body,
+        redirect: "manual",
+      });
+      store(jar, response);
+      const text = await response.text();
+      lastAlerts = (text.match(/role="alert"[^>]*>([^<]*)</g) ?? [])
+        .map((m) => m.replace(/^[^>]*>/, "").replace(/<$/, ""))
+        .join(" | ");
+      return response.status;
+    };
+    /** The rep's own pace line — `D32`'s two working-day counts. */
+    const paceOf = (body: string): { worked: number; total: number } | null => {
+      const tag = body.match(/<p[^>]*data-slot="today-pace"[^>]*>/)?.[0];
+      if (!tag) return null;
+      const worked = tag.match(/data-days-worked="(\d+)"/)?.[1];
+      const total = tag.match(/data-days-in-month="(\d+)"/)?.[1];
+      return worked && total ? { worked: Number(worked), total: Number(total) } : null;
+    };
+    /** One person's `data-pace` off the Team tab's table. */
+    const teamPaceOf = (body: string, userId: string): number | null => {
+      const from = body.search(new RegExp(`href="/en/?\\?tab=team&amp;rep=${userId}"`));
+      if (from < 0) return null;
+      const bar = body.slice(from).match(/data-slot="team-bar"[^>]*data-pace="(\d+)"/);
+      return bar ? Number(bar[1]) : null;
+    };
+    type LiveRow = { id: string; kind: string; user_id: string | null; starts_on: string; label: string };
+    const liveRows = async (label: string): Promise<LiveRow[]> =>
+      (await db.execute(sql`
+        select id::text as id, kind::text as kind, user_id::text as user_id,
+               starts_on::text as starts_on, label
+        from non_working_days where label = ${label} and removed_at is null
+      `)) as unknown as LiveRow[];
+    const stamp47 = Date.now();
+    const repJar = jars["rep-a@example.test"];
+    const managerJar = jars["manager@example.test"];
+    const coordJar = jars["coordinator@example.test"];
+
+    /* 1. The screen, both locales, four identities — and who is offered
+          what: the rep his own leave and no holiday, no person picker; the
+          manager both and the picker `D53`. */
+    const repEn = await get(repJar, "/en/calendar");
+    const repAr = await get(repJar, "/ar/calendar");
+    const managerEn = await get(managerJar, "/en/calendar");
+    const managerAr = await get(managerJar, "/ar/calendar");
+    const coordEn = await get(coordJar, "/en/calendar");
+    check(
+      `/calendar answers 200 for the rep (${repEn.status}/${repAr.status}), the manager (${managerEn.status}/${managerAr.status}) and the coordinator (${coordEn.status}) in both locales [S94]`,
+      [repEn, repAr, managerEn, managerAr, coordEn].every((r) => r.status === 200) &&
+        repAr.body.includes('dir="rtl"'),
+    );
+    const repLeave = actForm(repEn.body, "add-leave");
+    const managerLeave = actForm(managerEn.body, "add-leave");
+    const managerHoliday = actForm(managerEn.body, "add-holiday");
+    check(
+      `*** the rep is offered his own leave and not a holiday and no person picker; the manager both, with the picker *** [S94] [D53]`,
+      Boolean(repLeave) &&
+        !actForm(repEn.body, "add-holiday") &&
+        !/name="userId"/.test(repLeave ?? "") &&
+        Boolean(managerLeave) &&
+        Boolean(managerHoliday) &&
+        /name="userId"/.test(managerLeave ?? ""),
+      `rep leave ${Boolean(repLeave)}, rep holiday ${Boolean(actForm(repEn.body, "add-holiday"))}, manager leave ${Boolean(managerLeave)}, holiday ${Boolean(managerHoliday)}`,
+    );
+
+    /*
+     * **The day is derived from the run's month, never typed.** A working
+     * day of THIS month strictly before today, so it is already inside
+     * `worked` and `total` both, and taking it off moves both by exactly one.
+     * On the first working day of a month there is none, and the pace half
+     * is NOT MEASURED rather than measured against a day that changes
+     * nothing.
+     */
+    const todayRiyadh = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh", dateStyle: "short" }).format(new Date());
+    const dayBefore = (() => {
+      const [y, m, d] = todayRiyadh.split("-").map(Number);
+      for (let day = d - 1; day >= 1; day -= 1) {
+        const date = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+        if (weekday !== 5 && weekday !== 6) return date;
+      }
+      return null;
+    })();
+    const [repA] = (await db.execute(sql`select id::text as id from users where email = 'rep-a@example.test'`)) as unknown as { id: string }[];
+    const [repB] = (await db.execute(sql`select id::text as id from users where email = 'rep-b@example.test'`)) as unknown as { id: string }[];
+    const before = paceOf((await get(repJar, "/en")).body);
+    const teamBefore = (await get(managerJar, "/en/?tab=team")).body;
+    const repABefore = repA ? teamPaceOf(teamBefore, repA.id) : null;
+    const repBBefore = repB ? teamPaceOf(teamBefore, repB.id) : null;
+
+    if (!repLeave || !managerHoliday || !repA || !repB) {
+      console.log("  --    the two forms or the two reps could not be found — the calendar is NOT MEASURED");
+    } else if (!dayBefore || !before) {
+      console.log(
+        `  --    no working day of ${todayRiyadh.slice(0, 7)} lies before today, or the rep has no pace line — the pace half is NOT MEASURED`,
+      );
+    } else {
+      const leaveLabel = `verify47-${stamp47} leave`;
+      const holidayLabel = `verify47-${stamp47} holiday`;
+
+      /* 2. Refusals, each a message and no row: ends before it starts; the
+            rep entering a holiday; the rep forging somebody else's leave. */
+      // `kind` is the form's own hidden field; the envelope carries the
+      // action's fields alone, so it is posted as the browser would post it.
+      const backwards = await post(repJar, "/en/calendar", repLeave, {
+        kind: "leave", leaveStartsOn: todayRiyadh, leaveEndsOn: dayBefore, leaveLabel: leaveLabel,
+      });
+      const repHoliday = await post(repJar, "/en/calendar", managerHoliday, {
+        kind: "public_holiday", holidayStartsOn: dayBefore, holidayEndsOn: dayBefore, holidayLabel: holidayLabel,
+      });
+      const forged = await post(repJar, "/en/calendar", managerLeave ?? "", {
+        kind: "leave", userId: repB.id, leaveStartsOn: dayBefore, leaveEndsOn: dayBefore, leaveLabel: leaveLabel,
+      });
+      check(
+        `*** a range ending before it starts (${backwards}), a rep's holiday (${repHoliday}) and a rep's leave for somebody else (${forged}) each answer 200 as a message and write nothing — ${(await liveRows(leaveLabel)).length + (await liveRows(holidayLabel)).length} row(s) *** [S94] [S109]`,
+        backwards === 200 && repHoliday === 200 && forged === 200 &&
+          (await liveRows(leaveLabel)).length === 0 &&
+          (await liveRows(holidayLabel)).length === 0,
+      );
+
+      /* 3. The rep's own leave on that day: one row, his; his pace loses the
+            day from both counts; rep-b's tick on the Team tab does not move
+            while his does `D39` `S94`. */
+      const leave = await post(repJar, "/en/calendar", repLeave, {
+        kind: "leave", leaveStartsOn: dayBefore, leaveEndsOn: dayBefore, leaveLabel: leaveLabel,
+      });
+      const leaveRows = await liveRows(leaveLabel);
+      const afterLeave = paceOf((await get(repJar, "/en")).body);
+      const teamAfterLeave = (await get(managerJar, "/en/?tab=team")).body;
+      const repAAfterLeave = teamPaceOf(teamAfterLeave, repA.id);
+      const repBAfterLeave = teamPaceOf(teamAfterLeave, repB.id);
+      check(
+        `*** the rep's leave on ${dayBefore} lands as his own row (${leave}) and his month loses the day — worked ${before.worked}→${afterLeave?.worked}, total ${before.total}→${afterLeave?.total}; on the Team tab his pace ${repABefore}→${repAAfterLeave} moved and rep-b's ${repBBefore}→${repBAfterLeave} did not *** [S94] [D32] [D39]`,
+        leave === 200 &&
+          leaveRows.length === 1 && leaveRows[0].kind === "leave" && leaveRows[0].user_id === repA.id &&
+          afterLeave !== null &&
+          afterLeave.worked === before.worked - 1 &&
+          afterLeave.total === before.total - 1 &&
+          repABefore !== null && repAAfterLeave !== null && repAAfterLeave !== repABefore &&
+          repBBefore !== null && repBAfterLeave === repBBefore,
+        `rows ${JSON.stringify(leaveRows)}; the form said: ${lastAlerts || "(nothing)"}`,
+      );
+      const repCalendar = await get(repJar, "/en/calendar");
+      check(
+        `the row renders on the rep's calendar with a remove control, and the coordinator's calendar does not list it [S94] [D53]`,
+        repCalendar.body.includes(`data-from="${dayBefore}"`) &&
+          Boolean(actForm(repCalendar.body, "remove-range")) &&
+          !(await get(coordJar, "/en/calendar")).body.includes(`data-user="${repA.id}"`),
+      );
+
+      /* 4. The manager's public holiday on the same day: everyone's month
+            loses it — rep-b's tick moves now; rep-a's counts hold, because
+            a day off twice is off once. */
+      const holiday = await post(managerJar, "/en/calendar", managerHoliday, {
+        kind: "public_holiday", holidayStartsOn: dayBefore, holidayEndsOn: dayBefore, holidayLabel: holidayLabel,
+      });
+      const holidayRows = await liveRows(holidayLabel);
+      const afterHoliday = paceOf((await get(repJar, "/en")).body);
+      const teamAfterHoliday = (await get(managerJar, "/en/?tab=team")).body;
+      const repBAfterHoliday = teamPaceOf(teamAfterHoliday, repB.id);
+      check(
+        `*** the manager's holiday on the same day (${holiday}) is one row for nobody; rep-b's pace ${repBBefore}→${repBAfterHoliday} now moves, and rep-a's counts hold at ${afterHoliday?.worked}/${afterHoliday?.total} — off twice is off once *** [S94] [D32]`,
+        holiday === 200 &&
+          holidayRows.length === 1 && holidayRows[0].kind === "public_holiday" && holidayRows[0].user_id === null &&
+          repBAfterHoliday !== null && repBAfterHoliday !== repBBefore &&
+          afterHoliday !== null &&
+          afterHoliday.worked === before.worked - 1 &&
+          afterHoliday.total === before.total - 1,
+        `rows ${JSON.stringify(holidayRows)}; the form said: ${lastAlerts || "(nothing)"}`,
+      );
+      const repHolidayView = await get(repJar, "/en/calendar");
+      const holidayRow = repHolidayView.body.match(new RegExp(`<tr[^>]*data-kind="public_holiday"[^>]*data-from="${dayBefore}"[\\s\\S]*?</tr>`))?.[0] ?? "";
+      check(
+        `the holiday renders on the rep's calendar and offers him no remove control [S94] [D53]`,
+        holidayRow.length > 0 && !holidayRow.includes('data-act="remove-range"'),
+        holidayRow.slice(0, 200),
+      );
+
+      /* 5. Removal — soft `S107`. The rep removes his leave, the manager the
+            holiday; the rows stay with `removed_at` set, and every figure
+            returns to what it was before the run touched anything. */
+      // The remove forms carry a bound id inside the action envelope, so
+      // the form is found by its ROW, and the row by the run's own label.
+      const rowForm = (body: string, label: string): string | undefined => {
+        const rows = body.match(/<tr[^>]*data-slot="calendar-row"[\s\S]*?<\/tr>/g) ?? [];
+        const row = rows.find((r) => r.includes(label));
+        return row ? actForm(row, "remove-range") : undefined;
+      };
+      const repRemoveForm = rowForm((await get(repJar, "/en/calendar")).body, leaveLabel);
+      const managerRemoveForm = rowForm((await get(managerJar, "/en/calendar")).body, holidayLabel);
+      const removedLeave = repRemoveForm ? await post(repJar, "/en/calendar", repRemoveForm, {}) : -1;
+      const removedHoliday = managerRemoveForm ? await post(managerJar, "/en/calendar", managerRemoveForm, {}) : -1;
+      const kept = (await db.execute(sql`
+        select count(*)::int as n, count(removed_at)::int as removed
+        from non_working_days where label in (${leaveLabel}, ${holidayLabel})
+      `)) as unknown as { n: number; removed: number }[];
+      const afterRemoval = paceOf((await get(repJar, "/en")).body);
+      const restored =
+        afterRemoval !== null &&
+        afterRemoval.worked === before.worked &&
+        afterRemoval.total === before.total;
+      const teamAfterRemoval = (await get(managerJar, "/en/?tab=team")).body;
+      check(
+        `*** removed, never deleted — the rep removes his leave (${removedLeave}) and the manager the holiday (${removedHoliday}): ${kept[0]?.n} rows kept, ${kept[0]?.removed} marked removed, and the pace is back to ${afterRemoval?.worked}/${afterRemoval?.total} with both team ticks where they started *** [S107] [S94]`,
+        removedLeave === 200 && removedHoliday === 200 &&
+          Number(kept[0]?.n) === 2 && Number(kept[0]?.removed) === 2 &&
+          restored &&
+          teamPaceOf(teamAfterRemoval, repA.id) === repABefore &&
+          teamPaceOf(teamAfterRemoval, repB.id) === repBBefore,
+      );
+    }
+  }
+
 }
 
 /**

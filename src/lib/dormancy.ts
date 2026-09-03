@@ -239,7 +239,7 @@ async function answerRequest(
   log: TxArgs[1],
   companyId: string,
   reviewId: string,
-): Promise<void> {
+): Promise<{ requestedByUserId: string } | null> {
   const [answered] = await tx
     .update(companyRemovalRequests)
     .set({ reviewId })
@@ -250,7 +250,7 @@ async function answerRequest(
       ),
     )
     .returning();
-  if (!answered) return;
+  if (!answered) return null;
   log({
     action: "company.removal_request.decided",
     entityType: "company_removal_request",
@@ -258,6 +258,59 @@ async function answerRequest(
     before: { reviewId: null },
     after: { reviewId },
   });
+  return { requestedByUserId: answered.requestedByUserId };
+}
+
+/**
+ * `S128`, session 55 — **the decision reaches the rep.** One
+ * `decision.ended_work` row per person told, on the bell `S92`, never to the
+ * actor about their own act. `raise` itself drops an inactive recipient.
+ *
+ * Who is told is the caller's to say: an archive or a reassignment ends the
+ * work of every live holder `S107` `S100`; a keep ends nobody's and answers
+ * the rep who asked `S105`. The reason is the manager's note where one was
+ * written and empty otherwise — the screen prints no reason line for an
+ * empty one.
+ */
+async function tellDecision(
+  tx: TxArgs[0],
+  log: TxArgs[1],
+  session: AuthSession,
+  companyId: string,
+  decision: "company_archived" | "company_kept" | "company_reassigned",
+  reason: string | null,
+  recipients: Iterable<string>,
+): Promise<void> {
+  const told = new Set<string>();
+  for (const userId of recipients) {
+    if (userId === session.user.id || told.has(userId)) continue;
+    told.add(userId);
+    await raise(tx, log, {
+      typeKey: NOTIFICATION_TYPES.decisionEndedWork,
+      recipientUserId: userId,
+      payload: {
+        decision,
+        reason: reason ?? "",
+        recordType: "company",
+        recordId: companyId,
+        decidedByUserId: session.user.id,
+      },
+    });
+  }
+}
+
+/** Every live holder of the company — `company_reps` with no `removed_at`. */
+async function liveHolderIds(
+  tx: TxArgs[0],
+  companyId: string,
+): Promise<string[]> {
+  const rows = await tx
+    .select({ userId: companyReps.userId })
+    .from(companyReps)
+    .where(
+      and(eq(companyReps.companyId, companyId), isNull(companyReps.removedAt)),
+    );
+  return rows.map((row) => row.userId);
 }
 
 export type DormancyReview = {
@@ -397,7 +450,14 @@ export async function reincludeCompany(
       after: { companyId, outcome: row.outcome, decidedAt: row.decidedAt },
     });
 
-    await answerRequest(tx, log, companyId, row.id);
+    // `S128` — a keep answers the rep who asked; an unrequested keep on a
+    // quiet company ends nobody's work and tells nobody.
+    const answered = await answerRequest(tx, log, companyId, row.id);
+    if (answered) {
+      await tellDecision(tx, log, session, companyId, "company_kept", cleanNote, [
+        answered.requestedByUserId,
+      ]);
+    }
   });
 }
 
@@ -509,7 +569,25 @@ export async function reassignCompany(
       after: { companyId, toUserId, decidedAt: review.decidedAt },
     });
 
-    await answerRequest(tx, log, companyId, review.id);
+    const answered = await answerRequest(tx, log, companyId, review.id);
+
+    // `S128` — the departing holders' work on this company ended here. The
+    // requester was a holder `S105`, so the list already carries them unless
+    // they are the recipient, in which case nothing of theirs ended.
+    await tellDecision(
+      tx,
+      log,
+      session,
+      companyId,
+      "company_reassigned",
+      null,
+      [
+        ...departing.map((row) => row.userId),
+        ...(answered && answered.requestedByUserId !== toUserId
+          ? [answered.requestedByUserId]
+          : []),
+      ],
+    );
 
     // `07 E5` — "a lead assigned to you" is act-now, and this is one record, so
     // it is per-record. `21 §5`'s one-summary rule is about a bulk handover.
@@ -588,6 +666,13 @@ export async function archiveCompany(
       after: { companyId, outcome: review.outcome, decidedAt: review.decidedAt },
     });
 
-    await answerRequest(tx, log, companyId, review.id);
+    // `S128` — an archive ends every holder's work on the company, asked for
+    // or not; the rep who asked is told whether or not he still holds it.
+    const holders = await liveHolderIds(tx, companyId);
+    const answered = await answerRequest(tx, log, companyId, review.id);
+    await tellDecision(tx, log, session, companyId, "company_archived", cleanNote, [
+      ...holders,
+      ...(answered ? [answered.requestedByUserId] : []),
+    ]);
   });
 }

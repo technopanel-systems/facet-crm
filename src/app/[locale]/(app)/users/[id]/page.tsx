@@ -145,10 +145,17 @@ export default async function UserDetailPage({
           <CardTitle>{t("team.detail.targets")}</CardTitle>
           <CardDescription>{t("team.detail.targetsHint")}</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-wrap gap-2">
           <Button asChild size="sm" variant="outline">
             <Link href={`/?tab=team&rep=${user.id}`}>
               {t("team.detail.viewTargets")}
+            </Link>
+          </Button>
+          {/* `S94` — this person's leave is entered on the calendar, by the
+              account-keeper who is the only one reaching this page `D50`. */}
+          <Button asChild size="sm" variant="ghost">
+            <Link href="/calendar" data-slot="time-off-link">
+              {t("team.detail.leave")}
             </Link>
           </Button>
         </CardContent>

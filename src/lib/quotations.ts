@@ -2291,7 +2291,8 @@ export async function cancelThread(
     {
       // No `cancelledAt`: the column was dropped in `0027` after nine
       // cancellations wrote it and nothing ever read one. The
-      // `quotation_thread.end_state_set` audit row carries the moment `S112`.
+      // `quotation_thread.cancelled` audit row — `setEndState` names the row
+      // by the state it set — carries the moment `S112`.
       cancelledByUserId: session.user.id,
       cancellationReason: body,
     },

@@ -53,6 +53,7 @@ import {
 } from "@/lib/authz";
 import { SQM_SCALE, ZERO, fromScaled, toScaled } from "@/lib/decimal";
 import { dispatchesInPeriod, submittedRequestsNow } from "@/lib/dispatches";
+import { offDaysBehind } from "@/lib/calendar";
 import { noResponseCutoff, silentIssuedThreads } from "@/lib/follow-ups";
 import {
   listQuotationThreads,
@@ -368,7 +369,11 @@ async function quotedSilent(session: AuthSession): Promise<QuotedSilent> {
       ),
   ]);
 
-  const cutoff = noResponseCutoff(thresholds);
+  // `S94` — the reader's own off days, as the queue reads them.
+  const cutoff = noResponseCutoff(
+    thresholds,
+    await offDaysBehind(session.user.id, today()),
+  );
   return {
     silent: silent.length,
     pastThreshold: silent.filter((row) => riyadhDayOf(row.issuedAt) <= cutoff)

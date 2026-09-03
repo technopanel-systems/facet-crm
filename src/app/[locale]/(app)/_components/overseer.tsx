@@ -603,6 +603,7 @@ export async function AttentionBlock({
   pacePct,
   daysWorked,
   daysInMonth,
+  paceByUser,
 }: {
   session: AuthSession;
   /** `achievementForPeriod`, already fetched by the page. */
@@ -610,6 +611,9 @@ export async function AttentionBlock({
   pacePct: number;
   daysWorked: number;
   daysInMonth: number;
+  /** `S94` — each person's own pace, their leave skipped; the company's
+   *  figures above stand in for anyone not in the map. */
+  paceByUser: Map<string, { worked: number; total: number; pacePct: number }>;
 }) {
   const t = await getTranslations();
 
@@ -628,6 +632,10 @@ export async function AttentionBlock({
 
   const now = today();
   const measuredBy = new Map(attainment.map((row) => [row.userId, row]));
+  const paceFor = (userId: string) =>
+    paceByUser.get(userId) ?? { worked: daysWorked, total: daysInMonth, pacePct };
+  // The company's opening week, for the block's attribute; each person's own
+  // is asked per row below.
   const opening = isOpeningWeek(daysWorked);
 
   const silent: AttentionRow[] = [];
@@ -652,17 +660,20 @@ export async function AttentionBlock({
     // whole-metre figures a reader could check by hand, never the rounded
     // percentage.
     const measured = measuredBy.get(person.id);
-    if (!opening && measured?.targetSqm != null) {
+    // `S94` — this person's own month: a fortnight's leave is not a fortnight
+    // behind, and the opening week is theirs too.
+    const pace = paceFor(person.id);
+    if (!isOpeningWeek(pace.worked) && measured?.targetSqm != null) {
       const pct = percentOf(measured.achievedSqm, measured.targetSqm, SQM_SCALE);
       const expectedWhole = divideRounded(
         divideRounded(
-          toScaled(measured.targetSqm, SQM_SCALE) * BigInt(daysWorked),
-          BigInt(daysInMonth),
+          toScaled(measured.targetSqm, SQM_SCALE) * BigInt(pace.worked),
+          BigInt(pace.total),
         ),
         pow10(SQM_SCALE),
       );
       const gap = expectedWhole - roundSqm(measured.achievedSqm);
-      if (pct < pacePct && gap > ZERO) {
+      if (pct < pace.pacePct && gap > ZERO) {
         behindRaw.push({
           gap,
           row: {
@@ -671,7 +682,7 @@ export async function AttentionBlock({
             kind: "behind",
             gapSqm: formatWholeSqm(gap),
             pct,
-            expected: pacePct,
+            expected: pace.pacePct,
           },
         });
       }

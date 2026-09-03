@@ -70,7 +70,8 @@
     "apply": "Apply",
     "whoseMove": "Whose move",
     "ofTotal": "{shown} of {total}",
-    "newSinceLoad": "{count, plural, one {# new — refresh} other {# new — refresh}}"
+    "newSinceLoad": "{count, plural, one {# new — refresh} other {# new — refresh}}",
+    "unknownRecord": "a record you can no longer open"
   },
   "enums": {
     "region": {
@@ -247,6 +248,12 @@
       "title": "Not found",
       "body": "This record does not exist, or it is not one of yours.",
       "home": "Back to Today"
+    },
+    "failed": {
+      "title": "Something went wrong",
+      "body": "This screen could not be drawn. Nothing you typed was saved. Try again; if it happens twice, tell your manager and quote the code.",
+      "quote": "The code to quote:",
+      "retry": "Try again"
     }
   },
   "validation": {
@@ -811,7 +818,8 @@
       "viewTargets": "Open on the Team tab",
       "handover": "Handover",
       "handoverHint": "Review everything this person still holds and pass it to a colleague.",
-      "handoverClosed": "Handover opens once the account is deactivated."
+      "handoverClosed": "Handover opens once the account is deactivated.",
+      "leave": "Enter leave"
     },
     "origin": {
       "title": "How their requests arrived",
@@ -1025,13 +1033,23 @@
         "dispatch_refused": "{name} refused your dispatch request.",
         "dispatch_cancelled": "{name} cancelled a dispatch. It no longer counts towards anyone's month.",
         "quotation_rejected": "{name} rejected your quotation.",
-        "quotation_cancelled": "{name} cancelled your quotation."
+        "quotation_cancelled": "{name} cancelled your quotation.",
+        "company_archived": "{name} archived <company></company>. It is off your list.",
+        "company_kept": "{name} kept <company></company> with you. Your request to remove it was declined.",
+        "company_reassigned": "{name} handed <company></company> to another rep. It is off your list.",
+        "company_merged_away": "{name} found <other></other> to be the same customer as <company></company> and folded it in.",
+        "company_merged_in": "{name} folded <other></other> into your company <company></company> — the same customer, recorded twice."
       },
       "decisionUnknown": {
         "dispatch_refused": "Your dispatch request was refused.",
         "dispatch_cancelled": "A dispatch was cancelled. It no longer counts towards anyone's month.",
         "quotation_rejected": "Your quotation was rejected.",
-        "quotation_cancelled": "Your quotation was cancelled."
+        "quotation_cancelled": "Your quotation was cancelled.",
+        "company_archived": "<company></company> was archived. It is off your list.",
+        "company_kept": "<company></company> stays with you. Your request to remove it was declined.",
+        "company_reassigned": "<company></company> was handed to another rep. It is off your list.",
+        "company_merged_away": "<other></other> was folded into <company></company> — the same customer, recorded twice.",
+        "company_merged_in": "<other></other> was folded into your company <company></company> — the same customer, recorded twice."
       },
       "decisionLink": "Open the record",
       "decisionStandsAlone": "The record is not yours to open. The reason above is the whole of it.",
@@ -1184,7 +1202,8 @@
       "lastMonthOf": "{pct}% of {target} m²",
       "quoted": "Quoted",
       "quotedUnit": "quotations",
-      "labelCompany": "{month} company target · dispatched"
+      "labelCompany": "{month} company target · dispatched",
+      "timeOff": "Time off"
     },
     "needsYouZero": "Nothing needs you today",
     "counts": {
@@ -1437,6 +1456,47 @@
       "sideMerged": "One of these records has already been folded into another.",
       "survivorNotInPair": "Pick one of the two records.",
       "unknownResolution": "Choose one of the three outcomes."
+    }
+  },
+  "calendar": {
+    "title": "Time off",
+    "hint": "Public holidays and personal leave. The pace bar and the reminders skip these days, so nobody comes back from Eid or a fortnight away to a screen saying they are behind.",
+    "empty": "Nothing entered from this month on. Add a holiday or a leave below.",
+    "back": "Back to Today",
+    "remove": "Remove",
+    "kind": {
+      "public_holiday": "Public holiday",
+      "leave": "Leave"
+    },
+    "fields": {
+      "what": "What",
+      "who": "Who",
+      "from": "From",
+      "to": "To",
+      "label": "What is it",
+      "enteredBy": "Entered by"
+    },
+    "leave": {
+      "title": "Leave",
+      "hint": "Annual leave, sick leave, any absence — one person's days off.",
+      "add": "Add leave"
+    },
+    "holiday": {
+      "title": "Public holiday",
+      "hint": "Eid, national days — a range that is off for everyone.",
+      "add": "Add holiday"
+    },
+    "errors": {
+      "cannotEnterHoliday": "Only whoever keeps the accounts enters a public holiday.",
+      "cannotEnterOthersLeave": "You may enter your own leave; somebody else's is entered by whoever keeps the accounts.",
+      "kindUnknown": "That is not a kind of time off.",
+      "personRequired": "Say whose leave it is.",
+      "personInactive": "That account is not active.",
+      "dateRequired": "Both dates are needed.",
+      "endsBeforeStart": "The last day cannot come before the first.",
+      "labelRequired": "Say what it is — Eid, annual leave, sick leave.",
+      "labelTooLong": "That is too long.",
+      "notFound": "That entry is not there any more."
     }
   }
 }

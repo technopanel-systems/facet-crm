@@ -21,7 +21,7 @@ export default async function NotFound() {
   const t = await getTranslations();
 
   return (
-    <div className="flex max-w-2xl flex-col items-start gap-4 py-8">
+    <div data-slot="not-found" className="flex max-w-2xl flex-col items-start gap-4 py-8">
       <h1 className="text-start text-xl font-semibold tracking-tight">
         {t("errors.notFound.title")}
       </h1>

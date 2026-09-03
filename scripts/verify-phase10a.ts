@@ -63,8 +63,12 @@ import {
   companies,
   companyDormancyReviews,
   companyReps,
-  notificationTypes,
   notifications,
+  notificationTypes,
+  productClasses,
+  productFireRatings,
+  productSuppliers,
+  productThicknesses,
   projectCompanies,
   projects,
   quotationThreads,
@@ -82,7 +86,20 @@ import {
   type Role,
   type User,
 } from "@/lib/authz";
+import {
+  addNonWorkingDays,
+  listNonWorkingDays,
+  offDaysBehind,
+  offDaysByUser,
+  offDaysFor,
+  removeNonWorkingDays,
+} from "@/lib/calendar";
 import { companyTurn } from "@/lib/coverage";
+import {
+  refuseDispatchRequest,
+  requestDispatch,
+  submitDispatchRequest,
+} from "@/lib/dispatches";
 import { normalizeName } from "@/lib/normalize";
 import {
   archiveCompany,
@@ -121,6 +138,7 @@ import {
   shiftDays,
   shiftWorkingDays,
   workingDaysBetween,
+  monthWorked,
 } from "@/lib/working-days";
 
 import { addQuotationLineRow } from "./quotation-fixture";
@@ -771,14 +789,49 @@ async function main(): Promise<void> {
   );
   check(
     "no holiday calendar: a fortnight is always ten working days [21 §8]",
-    fortnight.filter(isWorkingDay).length === 10,
-    `got ${fortnight.filter(isWorkingDay).length}`,
+    fortnight.filter((day) => isWorkingDay(day)).length === 10,
+    `got ${fortnight.filter((day) => isWorkingDay(day)).length}`,
   );
   check(
     "and the four excluded days are exactly the Fridays and Saturdays [21 §8]",
     fortnight
       .filter((day) => !isWorkingDay(day))
       .every((day) => [5, 6].includes(new Date(`${day}T00:00:00Z`).getUTCDay())),
+  );
+
+  // `S94` since session 55 — the same functions with an off-day set. A day
+  // in the set counts exactly as a Friday does; a weekend day in the set is
+  // not counted twice. Sunday 2026-08-02 to Sunday 2026-08-09 is five working
+  // days; with Monday the 3rd and Tuesday the 4th off it is three, and with
+  // Friday the 7th "off" as well it is still three.
+  const off = new Set(["2026-08-03", "2026-08-04", "2026-08-07"]);
+  check(
+    "a day in the off set is not a working day, and a day outside it still is [S94]",
+    !isWorkingDay("2026-08-03", off) && isWorkingDay("2026-08-05", off) && !isWorkingDay("2026-08-07", off),
+  );
+  check(
+    `workingDaysBetween skips the off days and never double-counts a weekend — ${workingDaysBetween("2026-08-02", "2026-08-09", off)} of 5 [S94]`,
+    workingDaysBetween("2026-08-02", "2026-08-09", off) === 3,
+  );
+  check(
+    `shiftWorkingDays walks back through the off days — five working days before the 9th lands on ${shiftWorkingDays("2026-08-09", 5, off)} against 2026-08-02 with none off [S94]`,
+    shiftWorkingDays("2026-08-09", 5) === "2026-08-02" &&
+      shiftWorkingDays("2026-08-09", 5, off) === "2026-07-29",
+  );
+  // `D32`'s month, as one pure function: August 2026 opens on a Saturday, so
+  // it has four Fridays and five Saturdays — 31 − 9 = 22 working days, six
+  // of them by the 9th. Two days off take two from the total and, being
+  // before the 9th, two from the worked count as well. (The first draft of
+  // this check said 21 and went red on correct code — a hand count is
+  // exactly what a check must not be trusted over.)
+  const augustPlain = monthWorked("2026-08-09");
+  const augustOff = monthWorked("2026-08-09", off);
+  check(
+    `monthWorked on 2026-08-09: ${augustPlain.worked}/${augustPlain.total} plain, ${augustOff.worked}/${augustOff.total} with two working days off — both counts fall by two [D32] [S94]`,
+    augustPlain.total === 22 &&
+      augustPlain.worked === 6 &&
+      augustOff.total === 20 &&
+      augustOff.worked === 4,
   );
 
   /* --- 5. A follow-up writes nothing [21 §1] ------------------------ */
@@ -845,6 +898,52 @@ async function main(): Promise<void> {
     `one ${thresholds.quotationNoResponse - 1} working days old does not [07 D5]`,
     !quoted.has(quotedUnder.thread.id),
   );
+
+  /* --- S137: a submitted request pauses the chase; refused, it returns --- */
+  {
+    const [supplier] = await db.select().from(productSuppliers).limit(1);
+    const [productClass] = await db.select().from(productClasses).limit(1);
+    const [fireRating] = await db.select().from(productFireRatings).limit(1);
+    const [thickness] = await db.select().from(productThicknesses).limit(1);
+    if (!supplier || !productClass || !fireRating || !thickness) {
+      throw new Error("The product lookups are not seeded. Run: npm run db:seed");
+    }
+    const coordinatorUser = await createUser(manager, {
+      name: `${stamp} Coordinator`,
+      email: `${stamp}-coordinator@example.test`,
+      roleId: coordinatorRole.id,
+      password,
+    });
+    const coordinator = asSession(coordinatorUser, coordinatorRole);
+    const request = await requestDispatch(owner, {
+      lines: [{
+        supplierId: supplier.id, classId: productClass.id, fireRatingId: fireRating.id,
+        customColour: "168", thicknessId: thickness.id,
+        widthM: "1.0000", lengthM: "1.0000", quantityPcs: "12.0000", unitPrice: "120.00",
+      }],
+      dispatchDate: today(),
+      quotationThreadId: quotedOver.thread.id,
+      companyId: null, userId: null, projectId: null,
+      stock: "riyadh", shipment: "ct", cargoDestination: null,
+    });
+    const withDraft = await firing(owner, "quotation_no_response");
+    check(
+      "a draft request nobody has sent pauses nothing — the chase still fires [S137]",
+      withDraft.has(quotedOver.thread.id),
+    );
+    await submitDispatchRequest(owner, request.id);
+    const withSubmitted = await firing(owner, "quotation_no_response");
+    check(
+      "*** a SUBMITTED request is the customer's reply — the chase on its thread pauses *** [S137]",
+      !withSubmitted.has(quotedOver.thread.id),
+    );
+    await refuseDispatchRequest(coordinator, request.id, `${stamp} refused`);
+    const afterRefusal = await firing(owner, "quotation_no_response");
+    check(
+      "*** refused, the chase comes back *** [S137] [S124]",
+      afterRefusal.has(quotedOver.thread.id),
+    );
+  }
 
   const stalled = await firing(owner, "project_stage_unchanged");
   check(
@@ -1490,6 +1589,137 @@ async function main(): Promise<void> {
    * raised names the actor who caused it, because a raise happens inside the
    * caller's transaction and never out of band.
    */
+  /* --- 17. The calendar of non-working time, in the data layer [S94] --- */
+
+  console.log("\n16. The calendar — who may enter what, what each person's off-day set holds, and the cut-off that walks through it [S94] [S107] [S109]");
+  {
+    const day = (offset: number): string => shiftDays(today(), offset);
+    // A working day well behind today, so a leave there sits inside the
+    // reminders' look-back and inside nobody's opening week.
+    let back = day(-8);
+    while (!isWorkingDay(back)) back = shiftDays(back, -1);
+    const label = `${stamp} calendar`;
+
+    // Gates — a rep may not enter a holiday, nor another's leave; a keeper
+    // may; a range ending first is refused; so is a blank label and an
+    // inactive person.
+    await refuses(
+      "a rep entering a public holiday is refused [S94] [S109]",
+      "calendar.errors.cannotEnterHoliday",
+      () => addNonWorkingDays(owner, { kind: "public_holiday", startsOn: back, endsOn: back, label }),
+    );
+    await refuses(
+      "a rep entering somebody else's leave is refused [S94] [S109]",
+      "calendar.errors.cannotEnterOthersLeave",
+      () => addNonWorkingDays(owner, { kind: "leave", userId: otherUser.id, startsOn: back, endsOn: back, label }),
+    );
+    await refuses(
+      "a range that ends before it starts is refused [S94]",
+      "calendar.errors.endsBeforeStart",
+      () => addNonWorkingDays(owner, { kind: "leave", userId: ownerUser.id, startsOn: back, endsOn: day(-25), label }),
+    );
+    await refuses(
+      "a blank label is refused — say what it is [S94]",
+      "calendar.errors.labelRequired",
+      () => addNonWorkingDays(owner, { kind: "leave", userId: ownerUser.id, startsOn: back, endsOn: back, label: "   " }),
+    );
+
+    // The writes: the owner's own leave on `back`; the manager's holiday on
+    // the working day after it; and the manager entering the OTHER rep's leave.
+    let next = shiftDays(back, 1);
+    while (!isWorkingDay(next)) next = shiftDays(next, 1);
+    // Read before the writes, so the claim is about THIS run's two days and
+    // holds beside whatever the calendar already carries.
+    const from = day(-30);
+    const base = {
+      owner: await offDaysFor(ownerUser.id, from, today()),
+      other: await offDaysFor(otherUser.id, from, today()),
+      company: await offDaysFor(null, from, today()),
+    };
+    const ownLeave = await addNonWorkingDays(owner, { kind: "leave", userId: ownerUser.id, startsOn: back, endsOn: back, label });
+    const holiday = await addNonWorkingDays(manager, { kind: "public_holiday", startsOn: next, endsOn: next, label });
+    const othersLeave = await addNonWorkingDays(manager, { kind: "leave", userId: otherUser.id, startsOn: next, endsOn: next, label });
+    check(
+      "the owner's own leave, the manager's holiday and the manager's entry of another's leave all land [S94]",
+      Boolean(ownLeave) && Boolean(holiday) && Boolean(othersLeave),
+    );
+
+    // Each person's set: the owner holds his day AND the holiday; the other
+    // rep holds the holiday alone (his leave is on the same day — off twice
+    // is off once); nobody (the company) holds the holiday alone.
+    const ownerOff = await offDaysFor(ownerUser.id, from, today());
+    const otherOff = await offDaysFor(otherUser.id, from, today());
+    const companyOff = await offDaysFor(null, from, today());
+    const byUser = await offDaysByUser([ownerUser.id, otherUser.id], from, today());
+    check(
+      `*** the owner's set holds his leave and the holiday (${[...ownerOff].join(",")}); the other rep's the holiday alone (${[...otherOff].join(",")}); the company's the holiday (${[...companyOff].join(",")}) *** [S94]`,
+      !base.owner.has(back) && !base.owner.has(next) &&
+        ownerOff.has(back) && ownerOff.has(next) && ownerOff.size === base.owner.size + 2 &&
+        !otherOff.has(back) && otherOff.has(next) && otherOff.size === base.other.size + 1 &&
+        !companyOff.has(back) && companyOff.has(next) && companyOff.size === base.company.size + 1,
+    );
+    check(
+      "offDaysByUser answers the same sets as offDaysFor, one query for both people [S94] [D39]",
+      [...(byUser.get(ownerUser.id) ?? [])].sort().join() === [...ownerOff].sort().join() &&
+        [...(byUser.get(otherUser.id) ?? [])].sort().join() === [...otherOff].sort().join(),
+    );
+
+    // The cut-off walks through the off days: both days sit inside the last
+    // ten working days, so ten working days back lands earlier by exactly
+    // two plain working days for the owner and one for the other rep.
+    const plainCutoff = shiftWorkingDays(today(), 10);
+    const ownerCutoff = shiftWorkingDays(today(), 10, await offDaysBehind(ownerUser.id, today()));
+    const otherCutoff = shiftWorkingDays(today(), 10, await offDaysBehind(otherUser.id, today()));
+    check(
+      `*** a ten-working-day cut-off moves earlier through leave — plain ${plainCutoff}, the owner's ${ownerCutoff}, the other rep's ${otherCutoff} *** [S94] [S87]`,
+      workingDaysBetween(ownerCutoff, plainCutoff) === 2 &&
+        workingDaysBetween(otherCutoff, plainCutoff) === 1,
+    );
+    // And the queue still derives with the set in place — nothing throws,
+    // nothing is written `S108`.
+    const [rowsBefore] = await db.select({ n: sql<number>`count(*)::int` }).from(notifications);
+    await followUpScope(owner);
+    const [rowsAfter] = await db.select({ n: sql<number>`count(*)::int` }).from(notifications);
+    check(
+      "the owner's queue derives with his leave in the clock and writes nothing [S94] [S108]",
+      rowsBefore.n === rowsAfter.n,
+    );
+
+    // The list each person reads: the owner sees the holiday and his own
+    // leave, never the other rep's; the manager sees all three.
+    const ownerList = await listNonWorkingDays(owner, from);
+    const managerList = await listNonWorkingDays(manager, from);
+    const mine = ownerList.filter((row) => row.label === label);
+    const all = managerList.filter((row) => row.label === label);
+    check(
+      `*** the owner reads ${mine.length} of the run's rows (his leave and the holiday) and the manager ${all.length} *** [S94] [D53]`,
+      mine.length === 2 && mine.every((row) => row.userId === null || row.userId === ownerUser.id) && all.length === 3,
+    );
+
+    // Removal is soft and gated the same way: the owner cannot remove the
+    // holiday; he removes his own leave; the row stays.
+    await refuses(
+      "a rep removing a public holiday is refused [S94] [S109]",
+      "calendar.errors.cannotEnterHoliday",
+      () => removeNonWorkingDays(owner, holiday),
+    );
+    await removeNonWorkingDays(owner, ownLeave);
+    const [removedRow] = await db.execute(sql`select removed_at is not null as removed from non_working_days where id = ${ownLeave}::uuid`) as unknown as { removed: boolean }[];
+    check(
+      "the owner removes his own leave — the row stays, marked removed, and his set no longer holds the day [S107] [S94]",
+      removedRow?.removed === true &&
+        !(await offDaysFor(ownerUser.id, from, today())).has(back),
+    );
+    await refuses(
+      "removing it twice is refused [S107]",
+      "calendar.errors.notFound",
+      () => removeNonWorkingDays(owner, ownLeave),
+    );
+    // Tidy the two the manager wrote, so the next run's sets start clean.
+    await removeNonWorkingDays(manager, holiday);
+    await removeNonWorkingDays(manager, othersLeave);
+  }
+
   const raised = entries.filter((row) => row.action === "notification.raised");
   check(
     `every notification.raised names its actor — saw ${raised.length} [07 E1], [S91]`,

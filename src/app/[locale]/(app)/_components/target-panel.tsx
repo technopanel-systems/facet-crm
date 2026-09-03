@@ -1,6 +1,8 @@
 import { getTranslations } from "next-intl/server";
 
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Link } from "@/i18n/navigation";
 import {
   divideRounded,
   formatSqm,
@@ -152,6 +154,10 @@ export async function TargetBody({
         data-slot="today-pace"
         data-pct={pacePct}
         data-gap={formatWholeSqm(gap < ZERO ? -gap : gap)}
+        // `S94` — the two working-day counts the pace is made of, so
+        // `verify:routes` §47 can hold the tick to the calendar it read.
+        data-days-worked={worked}
+        data-days-in-month={total}
         // `D32`'s opening week, as a marker: the words are translated, so
         // `verify:routes` §41 holds the attribute to its own working-day count.
         data-opening={opening ? "" : undefined}
@@ -221,7 +227,7 @@ export async function TargetPanel(props: {
 
   return (
     <Card data-slot="today-target" data-scope={props.scope}>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between gap-4">
         <CardTitle className="text-start text-sm">
           {/* **The words say which scope this is, and the panel does not
               otherwise change.** `D38` asks for the same signature panel read
@@ -236,6 +242,15 @@ export async function TargetPanel(props: {
             { month: props.month },
           )}
         </CardTitle>
+        {/* `S94` — the way in to the calendar for a book-holder, on the one
+            screen where his leave is felt: the tick. Not a rail item `D49`. */}
+        {props.scope === "own" ? (
+          <Button asChild size="xs" variant="ghost">
+            <Link href="/calendar" data-slot="time-off-link">
+              {t("today.target.timeOff")}
+            </Link>
+          </Button>
+        ) : null}
       </CardHeader>
       <CardContent>
         <TargetBody

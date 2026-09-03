@@ -63,6 +63,8 @@ import {
 } from "@/db/schema";
 import { withAudit } from "@/lib/audit";
 import { can, type AuthSession } from "@/lib/authz";
+import { NOTIFICATION_TYPES } from "@/lib/enums";
+import { raise } from "@/lib/notifications";
 import { RuleError } from "@/lib/validation";
 
 type TxArgs = Parameters<Parameters<typeof withAudit>[1]>;
@@ -528,6 +530,14 @@ async function mergeCompany(
     loser: await workCounts(tx, loserId),
     survivor: await workCounts(tx, survivorId),
   };
+  // `S128` — read BEFORE the fold so the survivor's holders are the people
+  // who held it going in, not the folded holders `shared` adds below.
+  const survivorHoldersBefore = (
+    await tx
+      .select({ userId: companyReps.userId })
+      .from(companyReps)
+      .where(and(eq(companyReps.companyId, survivorId), isNull(companyReps.removedAt)))
+  ).map((row) => row.userId);
 
   await tx
     .update(contacts)
@@ -660,4 +670,33 @@ async function mergeCompany(
       holdersShared: shareHolders,
     },
   });
+
+  // `S128`, session 55 — **both sides are told, on the bell** `S92`. The
+  // folded record's holders lost a customer (or, under *shared*, kept it
+  // under another name); the survivor's holders gained one's history. The
+  // item names both companies whether or not the reader may open either —
+  // see `DecisionPayload.companyName`. Never the manager about their own act;
+  // a holder on both sides is told once, as the folded side.
+  const told = new Set<string>([session.user.id]);
+  const tell = async (
+    userId: string,
+    decision: "company_merged_away" | "company_merged_in",
+  ) => {
+    if (told.has(userId)) return;
+    told.add(userId);
+    await raise(tx, log, {
+      typeKey: NOTIFICATION_TYPES.decisionEndedWork,
+      recipientUserId: userId,
+      payload: {
+        decision,
+        reason: "",
+        recordType: "company",
+        recordId: survivorId,
+        otherRecordId: loserId,
+        decidedByUserId: session.user.id,
+      },
+    });
+  };
+  for (const row of departed) await tell(row.userId, "company_merged_away");
+  for (const userId of survivorHoldersBefore) await tell(userId, "company_merged_in");
 }

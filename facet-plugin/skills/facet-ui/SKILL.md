@@ -98,7 +98,9 @@ rendering `D58`, and dragging a card to change a position `S134` `D29`.
   **not** top-level, so **a new screen usually belongs inside an existing section** `D49`,
   and nothing renders until something is behind it `D51`. **Performance and Targets are one
   item, Targets** `D49` — `28b` merged them, deleted `/performance`, and `GROUPS` holds
-  the seven.)
+  the seven. **Since session 53 Targets renders for a book-holder alone** — an overseer
+  reads the team on the Team tab `D76` `D39` and `/targets` redirects them there — and
+  the user-management item is labelled **Users**, never *Team*.)
 
 ## Archetypes and building blocks
 

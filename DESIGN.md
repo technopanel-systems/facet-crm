@@ -690,7 +690,12 @@ reconciles against what SMAC issued `S5`.
 
 **Expected to date is working days, and today counts.** Working days done this
 month over the working days in it — Sunday to Thursday, the week
-`working-days.ts` already owns for `S87`'s thresholds and `D35` already draws.
+`working-days.ts` already owns for `S87`'s thresholds and `D35` already draws
+— **less the calendar's off days** (`S94`, session 55): a public holiday
+comes off everyone's month, a person's leave off that person's, so the tick
+on a rep's own panel and on his row of `D39`'s table is *his* month and a
+manager's band is the company's. Two people can therefore carry two ticks on
+one screen, and each is still the one number a reader can hold that row to.
 On the 25th of a 22-working-day August that is 18 of 22: **82%**. Counting only
 the days already finished tops out below 100%, which would make the last day of
 every month read *ahead of pace* while the rep was short. Counting today makes
@@ -1531,7 +1536,14 @@ genuinely empties, so it is the half that carries the empty state, and its
 action is the one `D34` gives a slipping row: Plan.
 
 **D53.** A permission-denied route is `notFound()`. FACET does not tell someone
-a thing exists that they may not see.
+a thing exists that they may not see. **The same page answers a URL nothing
+claims** (session 55, `WORKFLOW §4` row 45): in the reader's language and
+theme, with one way home named as the rail names it, and for an anonymous
+visitor a 404 rather than a redirect that would say which routes exist. **A
+screen that fails says three things and offers two**: nothing typed was saved,
+try again, and — if it happens twice — tell the manager and quote the code
+the server logged; *Try again* and *Today*. It never carries the error's own
+text, which is a leak in a screenshot.
 
 **D54.** There is no skeleton state. Server-rendered pages arrive whole.
 

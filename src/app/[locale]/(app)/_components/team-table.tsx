@@ -134,6 +134,7 @@ export async function TeamTable({
   rows,
   follow,
   pacePct,
+  paceByUser,
   period,
   maySetTargets,
 }: {
@@ -142,8 +143,11 @@ export async function TeamTable({
   rows: AchievementRow[];
   /** `followUpScope`, already derived by `shellCounts()`. */
   follow: FollowUpScope;
-  /** `D32`'s expected-to-date, computed once by the page. */
+  /** `D32`'s expected-to-date for the company — public holidays skipped. */
   pacePct: number;
+  /** `S94` — each person's own pace, their leave skipped too; a person not
+   *  in the map reads the company's. */
+  paceByUser: Map<string, { worked: number; total: number; pacePct: number }>;
   /** `YYYY-MM-01`, for the edit rows. */
   period: string;
   /** `can_set_targets` `S84` — the edit rows render for the holder alone. */
@@ -302,9 +306,12 @@ export async function TeamTable({
                         <NoTarget label={t("today.team.noTarget")} />
                       ) : (
                         <MiniBar
-                          geometry={paceGeometry(achievementPct, pacePct)}
+                          geometry={paceGeometry(
+                            achievementPct,
+                            paceByUser.get(row.userId)?.pacePct ?? pacePct,
+                          )}
                           achievementPct={achievementPct}
-                          pacePct={pacePct}
+                          pacePct={paceByUser.get(row.userId)?.pacePct ?? pacePct}
                           label={t("today.team.paceOf", {
                             pct: String(achievementPct),
                           })}
@@ -485,8 +492,9 @@ function MiniBar({
       data-pct={achievementPct}
       // **The pace, not the tick's position.** The position is `pacePct`
       // divided by this row's own scale, so it legitimately differs down the
-      // table; the pace itself is one number for the whole screen, and that is
-      // the thing a reader can hold every row to `D32`.
+      // table. The pace itself is the company's one number unless this
+      // person is on leave this month `S94`, in which case it is theirs —
+      // and a reader can still hold every row to it, per row `D32`.
       data-pace={pacePct}
       className="bg-surface-2 border-line relative h-[7px] w-32 overflow-hidden rounded-lg border"
       role="progressbar"

@@ -166,16 +166,33 @@ export type MentionPayload = {
 const DECISION_RECORD_TYPES = [
   "dispatch",
   "quotation_thread",
+  "company",
 ] as const satisfies readonly ViewableRecordType[];
 
 export type DecisionRecordType = (typeof DECISION_RECORD_TYPES)[number];
 
-/** `S128`'s four acts, as one closed vocabulary. */
+/**
+ * `S128`'s acts, as one closed vocabulary.
+ *
+ * **Five company decisions joined the four in session 55** — the founder's
+ * answer to `SPEC §16`'s *nobody tells the rep*: a rep must learn when a
+ * decision lands on his customer. `company_archived` and `company_reassigned`
+ * end every holder's work on the company `S107` `S100`; `company_kept` ends
+ * nobody's and answers the rep who asked `S105`; `company_merged_away` is
+ * the folded record's holders learning where their customer went, and
+ * `company_merged_in` the survivor's holders learning what was folded into
+ * it `S22`. Merges carry the other company as `otherRecordId`.
+ */
 export const DECISION_KINDS = [
   "dispatch_refused",
   "dispatch_cancelled",
   "quotation_rejected",
   "quotation_cancelled",
+  "company_archived",
+  "company_kept",
+  "company_reassigned",
+  "company_merged_away",
+  "company_merged_in",
 ] as const;
 
 export type DecisionKind = (typeof DECISION_KINDS)[number];
@@ -219,7 +236,9 @@ export type DecisionKind = (typeof DECISION_KINDS)[number];
 export type DecisionPayload = {
   kind: "decision";
   decision: DecisionKind;
-  /** Shown whether or not the record is `recordViewable` `[S128]`. */
+  /** Shown whether or not the record is `recordViewable` `[S128]`. Empty
+   *  where the act carries no written reason — a reassignment, a keep with
+   *  no note, a merge — and the screen then prints no reason line. */
   reason: string;
   recordType: DecisionRecordType;
   recordId: string;
@@ -228,6 +247,20 @@ export type DecisionPayload = {
   recordViewable: boolean;
   /** Only set when the reader may still open it `[20 §8.2]`. */
   href: string | null;
+  /**
+   * `S128`, session 55 — **the company's name, resolved on read and shown
+   * whether or not the record is viewable.** An archive or a merge is
+   * exactly the case where the rep can no longer open the record: the
+   * archived company drops off his list `S107` and the folded one is a
+   * tombstone `S22`. A line reading *your company was archived* with no name
+   * tells him nothing. The name is his own former customer's, so it reaches
+   * him the way the reason does — the same exception to `S112`, for the same
+   * cause. Null on the four record kinds that are not a company.
+   */
+  companyName: string | null;
+  /** A merge's other side — the folded record for `company_merged_in`, the
+   *  survivor for `company_merged_away`. Resolved on read like `companyName`. */
+  otherCompanyName: string | null;
 };
 
 /**
@@ -705,6 +738,17 @@ async function decisionPayload(
     .where(eq(users.id, decidedByUserId))
     .limit(1);
 
+  // The company's name — see `DecisionPayload.companyName` for why it is
+  // read without a visibility term. The other side of a merge likewise.
+  const otherRecordId =
+    typeof record.otherRecordId === "string" ? record.otherRecordId : null;
+  const companyName =
+    recordType === "company" ? await companyNameOf(recordId) : null;
+  const otherCompanyName =
+    recordType === "company" && otherRecordId
+      ? await companyNameOf(otherRecordId)
+      : null;
+
   return {
     kind: "decision",
     decision,
@@ -715,7 +759,18 @@ async function decisionPayload(
     decidedByName: decidedBy?.name ?? null,
     recordViewable: viewable,
     href: viewable ? recordHref(recordType, recordId) : null,
+    companyName,
+    otherCompanyName,
   };
+}
+
+async function companyNameOf(id: string): Promise<string | null> {
+  const [row] = await db
+    .select({ name: companies.name })
+    .from(companies)
+    .where(eq(companies.id, id))
+    .limit(1);
+  return row?.name ?? null;
 }
 
 /**

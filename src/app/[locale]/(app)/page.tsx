@@ -18,9 +18,11 @@ import {
   achievementForPeriod,
   currentPeriod,
   previousPeriodStart,
+  nextPeriodStart,
 } from "@/lib/targets";
 import { systemHasWork } from "@/lib/timeline";
-import { isWorkingDay, riyadhDayOf } from "@/lib/working-days";
+import { offDaysByUser, offDaysFor } from "@/lib/calendar";
+import { monthWorked, riyadhDayOf, type OffDays } from "@/lib/working-days";
 import { percentOf } from "@/lib/decimal";
 
 import { CompanyBand } from "./_components/company-band";
@@ -103,17 +105,30 @@ export default async function TodayPage({
   const overseer = session.user.role.seesAllReps;
 
   /*
-   * `D32`'s expected-to-date, computed ONCE for the whole screen.
-   *
-   * It is a property of today, never of a person — working days done this month
-   * over the working days in it — so every pace bar and `D79`'s behind-pace
-   * rows read the same number, and no two ticks on one screen can disagree.
+   * `D32`'s expected-to-date — working days done this month over the working
+   * days in it. **Two answers since session 55, not one** `S94`: the
+   * company's, which skips public holidays alone and is what the band and
+   * every company-wide figure read; and each person's, which also skips
+   * their own leave, so a rep's tick and `D79`'s behind-pace row for them
+   * do not count days they could not have worked. Both come from
+   * `monthWorked` with a different off-day set — one derivation, two inputs.
    */
-  const { worked: daysWorked, total: daysInMonth } = monthWorked(
-    riyadhDayOf(new Date()),
-  );
-  // Two plain integers, so the same helper answers at scale 0.
-  const pacePct = percentOf(String(daysWorked), String(daysInMonth), 0);
+  const todayDay = riyadhDayOf(new Date());
+  const monthFrom = `${todayDay.slice(0, 7)}-01`;
+  const monthTo = nextPeriodStart(monthFrom);
+  const paceOf = (off: OffDays) => {
+    const { worked, total } = monthWorked(todayDay, off);
+    // Two plain integers, so the same helper answers at scale 0.
+    return { worked, total, pacePct: percentOf(String(worked), String(total), 0) };
+  };
+  const companyPace = paceOf(await offDaysFor(null, monthFrom, monthTo));
+  const { worked: daysWorked, total: daysInMonth, pacePct } = companyPace;
+  /** Each person's own pace — public holidays plus their leave — one read
+   *  for the whole set `D39` `D79`. */
+  const paceByPerson = async (userIds: string[]) => {
+    const offs = await offDaysByUser(userIds, monthFrom, monthTo);
+    return new Map(userIds.map((id) => [id, paceOf(offs.get(id) ?? new Set())]));
+  };
 
   const month = format.dateTime(new Date(`${period}T00:00:00Z`), {
     month: "long",
@@ -134,6 +149,10 @@ export default async function TodayPage({
     // `D32`'s two side figures cost a second attainment derivation and one
     // unpaginated thread read, so they are fetched only when the panel will
     // actually render `D64`.
+    // `S94` — his own leave shortens his month.
+    const ownPace = measured
+      ? paceOf(await offDaysFor(session.user.id, monthFrom, monthTo))
+      : companyPace;
     const previous = previousPeriodStart(period);
     const [lastMonth, quoted] = measured
       ? await Promise.all([
@@ -178,9 +197,9 @@ export default async function TodayPage({
             lastMonth={lastMonth}
             quoted={quoted}
             scope="own"
-            pacePct={pacePct}
-            daysWorked={daysWorked}
-            daysInMonth={daysInMonth}
+            pacePct={ownPace.pacePct}
+            daysWorked={ownPace.worked}
+            daysInMonth={ownPace.total}
             month={month}
           />
         ) : null}
@@ -239,6 +258,7 @@ export default async function TodayPage({
     // rendering a stranger; the tab is not a route, so no `notFound()` `D53`.
     const person = rep ? await teamPerson(session, rep) : null;
     if (person) {
+      const personPace = paceOf(await offDaysFor(person.id, monthFrom, monthTo));
       return (
         <div className="flex flex-col gap-6">
           <Shortcuts locale={locale} />
@@ -247,9 +267,9 @@ export default async function TodayPage({
             session={session}
             person={person}
             attainment={attainment}
-            pacePct={pacePct}
-            daysWorked={daysWorked}
-            daysInMonth={daysInMonth}
+            pacePct={personPace.pacePct}
+            daysWorked={personPace.worked}
+            daysInMonth={personPace.total}
             period={period}
             maySetTargets={maySetTargets}
             locale={locale}
@@ -259,6 +279,7 @@ export default async function TodayPage({
     }
 
     const rows = await teamRowSet(session, attainment);
+    const paceByUser = await paceByPerson(rows.map((row) => row.userId));
     return (
       <div className="flex flex-col gap-6">
         <Shortcuts locale={locale} />
@@ -280,6 +301,7 @@ export default async function TodayPage({
             rows={rows}
             follow={follow}
             pacePct={pacePct}
+            paceByUser={paceByUser}
             period={period}
             maySetTargets={maySetTargets}
           />
@@ -303,6 +325,15 @@ export default async function TodayPage({
             period={period}
           />
         ) : null}
+        {/* `S94` — the calendar's way in for an overseer: the tab where the
+            ticks it moves are read `D39`. */}
+        <div>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/calendar" data-slot="time-off-link">
+              {t("today.target.timeOff")}
+            </Link>
+          </Button>
+        </div>
       </div>
     );
   }
@@ -356,6 +387,7 @@ export default async function TodayPage({
           pacePct={pacePct}
           daysWorked={daysWorked}
           daysInMonth={daysInMonth}
+          paceByUser={await paceByPerson(attainment.map((row) => row.userId))}
         />
         <BigDealsBlock session={session} />
       </div>
@@ -480,40 +512,3 @@ async function CountsStrip({
   );
 }
 
-/**
- * How much of the month has been **worked**, and how much of it there is —
- * `D32`.
- *
- * **Working days, not calendar days.** A rep dispatches Sunday to Thursday, so
- * a calendar denominator would show them slipping every weekend and catching up
- * every Monday for no real reason. `isWorkingDay` is the one definition of
- * which days those are `S87`; the panel does not get a second answer.
- *
- * **Today counts**, and that is what makes the fraction reach 100% on the last
- * working day. Counting only the days already finished tops out below it, and
- * the last day of every month would read *ahead of pace* while the rep was
- * short. It then **holds at 100% through any trailing Friday and Saturday**.
- *
- * **No public holiday is skipped**, because `working-days.ts` skips none and
- * records a holiday calendar as `OPEN — not chosen` `[21 §8]`. Through Eid the
- * fraction advances while nothing ships. A calendar denominator is equally
- * blind, so this is not a cost of counting working days — `WORKFLOW §5` carries
- * the row.
- */
-function monthWorked(today: string): { worked: number; total: number } {
-  const [year, month, dayOfMonth] = today.split("-").map(Number);
-  // Day 0 of the next month is the last day of this one.
-  const days = new Date(Date.UTC(year, month, 0)).getUTCDate();
-
-  let worked = 0;
-  let total = 0;
-  for (let day = 1; day <= days; day += 1) {
-    const date = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    if (!isWorkingDay(date)) continue;
-    total += 1;
-    if (day <= dayOfMonth) worked += 1;
-  }
-  // A month with no working day cannot exist. The floor is here so a division
-  // can never be by zero, not because the case is reachable.
-  return { worked, total: Math.max(1, total) };
-}

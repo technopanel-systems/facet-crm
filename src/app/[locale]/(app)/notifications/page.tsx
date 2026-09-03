@@ -251,27 +251,51 @@ function NotificationEntry({
           body when the record is closed, because a comment is the record's
           content. A reason for ending somebody's work is theirs. */}
       {row.payload?.kind === "decision" ? (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1" data-decision={row.payload.decision}>
+          {/* `S128`, session 55 — the five company decisions name the company
+              (and a merge's other side) whether or not the record is
+              viewable; the names are the reader's own former customers'. Each
+              is a stored value in either script, so it is isolated in a
+              `<bdi>` `D62` rather than the sentence taking a `dir`. */}
           <p className="text-muted-foreground text-start text-sm">
-            {row.payload.decidedByName
-              ? t(`notifications.detail.decision.${row.payload.decision}`, {
-                  name: row.payload.decidedByName,
-                })
-              : t(
-                  `notifications.detail.decisionUnknown.${row.payload.decision}`,
-                )}
+            {t.rich(
+              row.payload.decidedByName
+                ? `notifications.detail.decision.${row.payload.decision}`
+                : `notifications.detail.decisionUnknown.${row.payload.decision}`,
+              {
+                name: row.payload.decidedByName ?? "",
+                company: () => (
+                  <bdi data-decision-company>
+                    {row.payload?.kind === "decision"
+                      ? (row.payload.companyName ?? t("common.unknownRecord"))
+                      : ""}
+                  </bdi>
+                ),
+                other: () => (
+                  <bdi data-decision-other>
+                    {row.payload?.kind === "decision"
+                      ? (row.payload.otherCompanyName ?? t("common.unknownRecord"))
+                      : ""}
+                  </bdi>
+                ),
+              },
+            )}
           </p>
           {/* `dir="auto"` came OFF this block — `A2-14`'s sighting: the
               attribute resolved the paragraph's direction from the VALUE, and
               `text-start` followed it, so a Latin reason slammed to the far
               edge of the RTL card, a column from its sentence. The `<bdi>`
               isolates the run; the block keeps the page's direction. */}
-          <p
-            className="text-start text-sm whitespace-pre-wrap"
-            data-decision-reason
-          >
-            <bdi>{row.payload.reason}</bdi>
-          </p>
+          {/* An act with no written reason — a reassignment, a merge, a keep
+              with no note — prints no empty line `D70`. */}
+          {row.payload.reason ? (
+            <p
+              className="text-start text-sm whitespace-pre-wrap"
+              data-decision-reason
+            >
+              <bdi>{row.payload.reason}</bdi>
+            </p>
+          ) : null}
           {row.payload.recordViewable && row.payload.href ? (
             <Link
               href={row.payload.href}

@@ -84,7 +84,7 @@ export function readProductLine(
     else if (!DECIMAL.test(value)) fields.fail(name, "validation.notANumber");
   }
   // `S116` — a dispatch line with no price cannot be recorded, and the field
-  // it belongs to is where the message goes. `recordDispatch` refuses it again.
+  // it belongs to is where the message goes. `requestDispatch` refuses it again.
   if (!line.unitPrice && options.priceRequired) {
     fields.fail("unitPrice", "validation.required");
   }

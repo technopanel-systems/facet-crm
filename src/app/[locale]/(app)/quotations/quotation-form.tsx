@@ -210,19 +210,38 @@ export function QuotationForm({
           label={t("quotations.fields.contact")}
           error={errors.contactId}
         >
+          {/* Never disabled `D20` (session 55, `WORKFLOW §5`): the narrowing
+              to the chosen company is an enhancement, and with scripts off
+              `companyId` is whatever the page loaded with — so with no company
+              yet the whole directory is offered, grouped by company, and the
+              data layer refuses a contact that is not the company's `S20`. */}
           <select
             id="contactId"
             name="contactId"
             defaultValue=""
-            disabled={!companyId}
             className={selectClasses}
           >
             <option value="">{t("common.none")}</option>
-            {contactOptions.map((row) => (
-              <option key={row.id} value={row.id} dir="auto">
-                {row.name}
-              </option>
-            ))}
+            {companyId
+              ? contactOptions.map((row) => (
+                  <option key={row.id} value={row.id} dir="auto">
+                    {row.name}
+                  </option>
+                ))
+              : companies.map((group) => {
+                  const rows = contacts.filter(
+                    (contact) => contact.companyId === group.id,
+                  );
+                  return rows.length > 0 ? (
+                    <optgroup key={group.id} label={group.name}>
+                      {rows.map((row) => (
+                        <option key={row.id} value={row.id} dir="auto">
+                          {row.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null;
+                })}
           </select>
         </FormField>
 

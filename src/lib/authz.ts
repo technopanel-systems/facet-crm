@@ -1197,7 +1197,7 @@ export async function isCompanyBookHolder(userId: string): Promise<boolean> {
  * Separate from `listActiveUsers` above rather than a narrowing of it, because
  * the other four callers of that directory ask a different question and are
  * **deliberately** left alone: the rep on a direct dispatch, a credit split's
- * members, a share's recipient and the mention pickers. `SPEC §15`'s F8 row
+ * members, a share's recipient and the mention pickers. `WORKFLOW §5`'s F8 row
  * records what each of them checks today.
  */
 export async function listCompanyBookHolders(): Promise<

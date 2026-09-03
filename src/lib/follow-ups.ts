@@ -92,6 +92,7 @@ import {
   companies,
   companyDormancyReviews,
   companyReps,
+  dispatches,
   projects,
   quotationThreads,
   quotationVersions,
@@ -123,6 +124,7 @@ import {
  */
 import { firstCompanyByName, projectMovement } from "@/lib/projects";
 import { onHoldByCompany, today } from "@/lib/reports";
+import { offDaysBehind } from "@/lib/calendar";
 import { getFollowUpThresholds, type FollowUpThresholds } from "@/lib/settings";
 import { RuleError } from "@/lib/validation";
 import {
@@ -130,6 +132,7 @@ import {
   riyadhDayOf,
   shiftDays,
   shiftWorkingDays,
+  type OffDays,
 } from "@/lib/working-days";
 
 export const FOLLOW_UP_PAGE_SIZE = 25;
@@ -273,8 +276,11 @@ function matchesSearch(row: FollowUpRow, query: string | undefined): boolean {
  */
 /** The day a quotation must have gone out on or before to be chased today —
  *  `07 D5`'s working-day threshold, read off the settings row. */
-export function noResponseCutoff(thresholds: FollowUpThresholds): string {
-  return shiftWorkingDays(today(), thresholds.quotationNoResponse);
+export function noResponseCutoff(
+  thresholds: FollowUpThresholds,
+  off: OffDays = new Set(),
+): string {
+  return shiftWorkingDays(today(), thresholds.quotationNoResponse, off);
 }
 
 /** One live issued quotation nobody has answered — see `silentIssuedThreads`. */
@@ -360,6 +366,25 @@ export async function silentIssuedThreads(
               ),
             ),
         ),
+        // `S137` (built session 55) — *a dispatch raised against the thread
+        // IS the reply.* While a request sits at `submitted` the chase pauses;
+        // approved, the quotation is won and the chase is finished (`S31`);
+        // refused or cancelled, it comes back — and a draft nobody has sent
+        // is not yet a word from the customer. One predicate for both
+        // readers of this function: the Reports tab's *quoted — and nothing
+        // came back* follows it, because a customer who asked for the goods
+        // did come back (`SPEC §16` records the consequence).
+        notExists(
+          subquery
+            .select({ one: sql`1` })
+            .from(dispatches)
+            .where(
+              and(
+                eq(dispatches.quotationThreadId, quotationThreads.id),
+                inArray(dispatches.status, ["submitted", "approved"]),
+              ),
+            ),
+        ),
       ),
     );
 }
@@ -367,8 +392,9 @@ export async function silentIssuedThreads(
 async function quotationNoResponse(
   session: AuthSession,
   thresholds: FollowUpThresholds,
+  off: OffDays,
 ): Promise<FollowUpRow[]> {
-  const rows = await silentIssuedThreads(session, noResponseCutoff(thresholds));
+  const rows = await silentIssuedThreads(session, noResponseCutoff(thresholds, off));
 
   const now = today();
   return rows.map((row) => {
@@ -439,8 +465,9 @@ const REP_EDIT_ACTIONS = [
 async function quotationReturned(
   session: AuthSession,
   thresholds: FollowUpThresholds,
+  off: OffDays,
 ): Promise<FollowUpRow[]> {
-  const cutoff = shiftWorkingDays(today(), thresholds.quotationReturned);
+  const cutoff = shiftWorkingDays(today(), thresholds.quotationReturned, off);
   const returnedOn = riyadhDay(auditLog.createdAt);
   const laterReturn = alias(auditLog, "later_return");
   const repEdit = alias(auditLog, "rep_edit");
@@ -538,8 +565,9 @@ async function quotationReturned(
 async function catalogueNoResponse(
   session: AuthSession,
   thresholds: FollowUpThresholds,
+  off: OffDays,
 ): Promise<FollowUpRow[]> {
-  const cutoff = shiftWorkingDays(today(), thresholds.catalogueNoResponse);
+  const cutoff = shiftWorkingDays(today(), thresholds.catalogueNoResponse, off);
   const later = alias(repReports, "later_report");
 
   const rows = await db
@@ -1075,10 +1103,17 @@ async function gather(
   session: AuthSession,
   thresholds: FollowUpThresholds,
 ): Promise<FollowUpRow[]> {
+  // `S94` — the reader's own non-working days: public holidays and their own
+  // leave. The three working-day cut-offs walk back through them, so a rep
+  // back from a fortnight off is not chased for the fortnight. Read once per
+  // request, here, and never inside a rung. Whose leave a manager's grouped
+  // list should honour (`S88`) is a `SPEC §16` question; today it is the
+  // reader's.
+  const off = await offDaysBehind(session.user.id, today());
   const parts = await Promise.all([
-    quotationNoResponse(session, thresholds),
-    quotationReturned(session, thresholds),
-    catalogueNoResponse(session, thresholds),
+    quotationNoResponse(session, thresholds, off),
+    quotationReturned(session, thresholds, off),
+    catalogueNoResponse(session, thresholds, off),
     projectStageUnchanged(session, thresholds),
     companyQuiet(session, thresholds),
     manualDateDue(session),

@@ -2542,7 +2542,7 @@ async function prefillByVersion(
       quantityPcs: line.quantityPcs,
       // `S58` — an unpriced quotation line arrives unpriced, and the empty box
       // is the point: `S116` makes the rep price it before this is a dispatch,
-      // and `recordDispatch` refuses it if they do not.
+      // and `requestDispatch` refuses it if they do not.
       unitPrice: line.unitPrice ?? "",
     });
     prefill.set(line.versionId, bucket);
