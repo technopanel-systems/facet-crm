@@ -154,13 +154,6 @@ export const dormancyOutcomeEnum = pgEnum("dormancy_outcome", [
  */
 export const projectEndStateEnum = pgEnum("project_end_state", ["lost"]);
 
-/** `[04 Q8]` — deletion is a request to the manager. */
-export const deleteRequestStatusEnum = pgEnum("delete_request_status", [
-  "pending",
-  "granted",
-  "denied",
-]);
-
 /**
  * `[07 C5]`, `[07 C4]` — the three the coordinator may set `S62`.
  *
@@ -1194,26 +1187,42 @@ export const projectCreditSplits = pgTable(
 );
 
 /**
- * `09 §4.3` — deleting requires a stated reason and goes to the manager
- * `[04 Q8]`. On a shared company, granting removes only the requester's
- * membership row.
+ * `S105` — a rep who judges a customer has no potential **requests its
+ * removal, with a reason**. The press is a request, never an action: nothing
+ * leaves the rep's list until the manager rules, and the reason is required
+ * — *"the reason is the point"*.
+ *
+ * **Replaced `delete_requests` in `0035`**, and the vocabulary conflict that
+ * table carried (`pending/granted/denied` against `S105`'s archive · keep ·
+ * reassign) is resolved by the request never naming an outcome: it records
+ * who asked, why and when, and is **answered by the review row that decided
+ * it** — `review_id`, null while the manager has not ruled. `S106`'s one
+ * record stays `company_dormancy_reviews`, whichever way in raised it; the
+ * next decision on the company closes the open request. One open request
+ * per company, held by the partial unique index. Nothing here is ever
+ * deleted `S107`: a decided request keeps its reason beside the review.
  */
-export const deleteRequests = pgTable(
-  "delete_requests",
+export const companyRemovalRequests = pgTable(
+  "company_removal_requests",
   {
     id: pk(),
-    recordType: recordTypeEnum("record_type").notNull(),
-    recordId: uuid("record_id").notNull(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id),
     requestedByUserId: uuid("requested_by_user_id")
       .notNull()
       .references(() => users.id),
     reason: text("reason").notNull(),
-    status: deleteRequestStatusEnum("status").notNull().default("pending"),
-    decidedByUserId: uuid("decided_by_user_id").references(() => users.id),
-    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    /** The decision that answered it `S106`. Null = with the manager. */
+    reviewId: uuid("review_id").references(() => companyDormancyReviews.id),
     createdAt: createdAt(),
   },
-  (t) => [index("delete_requests_record_idx").on(t.recordType, t.recordId)],
+  (t) => [
+    uniqueIndex("company_removal_requests_open_key")
+      .on(t.companyId)
+      .where(sql`review_id is null`),
+    index("company_removal_requests_requester_idx").on(t.requestedByUserId),
+  ],
 );
 
 /* ------------------------------------------------------------------ *
@@ -2340,7 +2349,7 @@ export const comments = pgTable(
      * `13 §1`, `S114` — the **two** kinds that rule names, stated
      * **positively**.
      *
-     * `record_type` is shared with `record_shares`, `delete_requests`,
+     * `record_type` is shared with `record_shares`,
      * `duplicate_flags` and `attachments` (`tasks` and `activities` shared it
      * too, until feature slice 6 dropped both `[26 §2, §6]`; so did
      * `pipeline_snapshots`, until `SPEC §15` did), so it will grow for reasons

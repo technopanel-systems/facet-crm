@@ -19,6 +19,7 @@ import {
   ZERO,
 } from "@/lib/decimal";
 import { dispatchesInPeriod, listDispatches } from "@/lib/dispatches";
+import { listPendingRemovalRequests } from "@/lib/dormancy";
 import type { FollowUpKind } from "@/lib/enums";
 import { biggestOpenDeals } from "@/lib/projects";
 import { listQuotationThreads } from "@/lib/quotations";
@@ -269,6 +270,9 @@ async function Figure({
  * 9), read from the follow-up ladder the waiting list already derived — the
  * counts prop is `followUpScope`'s, so this block costs the ladder nothing.
  */
+/** `D41`'s rows before *and N more* — `D79`'s cap, one fewer. */
+const DECISION_ROWS = 5;
+
 export async function StuckBlock({
   session,
   counts,
@@ -280,14 +284,17 @@ export async function StuckBlock({
 
   const watchesIssuing = !session.user.role.canApproveQuotation;
   const watchesDeciding = !session.user.role.canDispatch;
+  // `D41` — the archive half of *Needs a decision*, on `S8`'s flag.
+  const decides = session.user.role.canApproveDelete;
 
-  const [quotations, dispatchList] = await Promise.all([
+  const [quotations, dispatchList, removals] = await Promise.all([
     watchesIssuing
       ? listQuotationThreads(session, { awaitingIssue: true })
       : Promise.resolve(null),
     watchesDeciding
       ? listDispatches(session, { status: "submitted" })
       : Promise.resolve(null),
+    decides ? listPendingRemovalRequests(session) : Promise.resolve(null),
   ]);
 
   // The submitted pile is oldest-first `S87` `S89`, so the first row IS the
@@ -377,8 +384,72 @@ export async function StuckBlock({
           </div>
         ) : null}
 
-        {/* `D41` — *Needs a decision* would sit here, and it is ABSENT until
-            its writers exist `D78` `D70`. Nothing explains the absence. */}
+        {/* `D41` — *Needs a decision*, present since session 54 for the
+            holder of `can_approve_delete`: the archive requests `S105`,
+            oldest first `S87`, each row a way in to the company where the
+            three decisions are. `D79`'s cap and *and N more*; at zero one
+            line, `D78`'s own shape. Duplicates join it with `S22`'s
+            detector. */}
+        {removals ? (
+          <div
+            data-slot="stuck-decisions"
+            data-requests={removals.total}
+            className="text-start"
+          >
+            <p className="text-faint text-[10.5px] font-semibold tracking-[.09em] uppercase">
+              {t("today.stuck.decisions")}
+            </p>
+            {removals.total === 0 ? (
+              <p className="text-muted-foreground mt-1.5 text-[13px]">
+                {t("today.stuck.decisionsNone")}
+              </p>
+            ) : (
+              <>
+                <p className="mt-1.5 text-[15px]">
+                  <span dir="auto">
+                    {t("today.stuck.removalRequests", { count: removals.total })}
+                  </span>
+                </p>
+                <ul className="mt-1 flex flex-col gap-0.5">
+                  {removals.rows.slice(0, DECISION_ROWS).map((request) => (
+                    <li
+                      key={request.id}
+                      data-slot="stuck-decision"
+                      data-company={request.companyId}
+                      className="text-[12.5px]"
+                    >
+                      <Link
+                        href={`/companies/${request.companyId}`}
+                        className="font-medium hover:underline"
+                      >
+                        <span dir="auto">{request.companyName}</span>
+                      </Link>
+                      <span className="text-faint"> · </span>
+                      <span className="text-muted-foreground" dir="auto">
+                        {t("today.stuck.askedBy", {
+                          name: request.requestedByName,
+                          count: calendarDaysBetween(
+                            riyadhDay(request.createdAt),
+                            today(),
+                          ),
+                        })}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {removals.total > DECISION_ROWS ? (
+                  <p className="text-faint mt-0.5 text-[12.5px]">
+                    <span dir="auto">
+                      {t("today.stuck.andMore", {
+                        count: removals.total - DECISION_ROWS,
+                      })}
+                    </span>
+                  </p>
+                ) : null}
+              </>
+            )}
+          </div>
+        ) : null}
 
         <div
           data-slot="stuck-untouched"

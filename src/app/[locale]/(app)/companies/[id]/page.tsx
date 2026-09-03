@@ -20,16 +20,22 @@ import { getCompany, listCompanyReps } from "@/lib/companies";
 import { listContacts } from "@/lib/contacts";
 import { companyTurn } from "@/lib/coverage";
 import { listDispatches } from "@/lib/dispatches";
-import { dormancyReviews } from "@/lib/dormancy";
+import {
+  dormancyReviews,
+  pendingRemovalRequest,
+  removalRequests,
+} from "@/lib/dormancy";
 import { lookupName, pickName } from "@/lib/lookups";
 import { listProjects } from "@/lib/projects";
 import { listQuotationThreads } from "@/lib/quotations";
 import { companyTimeline, TIMELINE_CARD_LIMIT } from "@/lib/timeline";
+import { riyadhDayOf } from "@/lib/working-days";
 
 import {
   archiveCompanyAction,
   reassignCompanyAction,
   reincludeCompanyAction,
+  requestRemovalAction,
 } from "../actions";
 import { NextFollowUpPanel } from "../../_components/next-follow-up-panel";
 import { projectStateKey } from "../../_components/project-state";
@@ -68,6 +74,8 @@ export default async function CompanyDetailPage({
   const t = await getTranslations();
   const format = await getFormatter();
   const canAssign = can(session, "canAssign");
+  // `S107` — archiving, and the ruling on a rep's request, read `S8`'s flag.
+  const mayDecide = can(session, "canApproveDelete");
   // `22 §4` speaks in the second person to the identity that owes the move, and
   // the quotation rows below borrow `/quotations`' reading of who that is.
   const viewerIsCoordinator = can(session, "canApproveQuotation");
@@ -82,6 +90,8 @@ export default async function CompanyDetailPage({
     turn,
     reviews,
     assignableReps,
+    pending,
+    requests,
   ] = await Promise.all([
     listCompanyReps(company.id),
     // Scoped like any other contact read. Seeing the company is what grants
@@ -106,6 +116,9 @@ export default async function CompanyDetailPage({
     dormancyReviews(company.id),
     // `S9` — the four roles that may be handed a company book.
     canAssign ? listCompanyBookHolders() : Promise.resolve([]),
+    // `S105` — the request with the manager, and every request ever made.
+    pendingRemovalRequest(company.id),
+    removalRequests(company.id),
   ]);
 
   // `getCompany` already answered the visibility question, so this cannot be
@@ -125,6 +138,11 @@ export default async function CompanyDetailPage({
    */
   const holder = reps.find((rep) => rep.isPrimary) ?? reps[0] ?? null;
   const viewerIsHolder = holder?.userId === session.user.id;
+  /** `S105` — the press belongs to somebody HOLDING the company: a live
+   *  membership, which `listCompanyReps` returns and a share is not. */
+  const viewerIsMember = reps.some((rep) => rep.userId === session.user.id);
+  const mayRequest = viewerIsMember && turn.state !== "archived" && !pending;
+  const viewerIsRequester = pending?.requestedByUserId === session.user.id;
 
   /** A `date` column is a calendar day in Riyadh, never an instant. */
   const day = (value: string) =>
@@ -133,12 +151,24 @@ export default async function CompanyDetailPage({
       timeZone: "UTC",
     });
 
-  /** Whose move it is, said in the second person to the person who owes it. */
-  const turnLine = t(companyTurnKey(turn.state, viewerIsHolder), {
-    name: holder?.userName ?? t("common.unknownUser"),
-    date: turn.plannedFor ? day(turn.plannedFor) : "",
-    count: turn.daysSince ?? turn.silentDays,
-  });
+  /** Whose move it is, said in the second person to the person who owes it.
+   *  A pending request `S105` is the manager's move: the decider reads
+   *  *your move*, the requester *you asked*, everyone else the name. */
+  const turnLine =
+    turn.state === "removalRequested" && pending
+      ? t(
+          mayDecide
+            ? "companies.turn.removal.decide"
+            : viewerIsRequester
+              ? "companies.turn.removal.yours"
+              : "companies.turn.removal.theirs",
+          { name: pending.requestedByName },
+        )
+      : t(companyTurnKey(turn.state, viewerIsHolder), {
+          name: holder?.userName ?? t("common.unknownUser"),
+          date: turn.plannedFor ? day(turn.plannedFor) : "",
+          count: turn.daysSince ?? turn.silentDays,
+        });
 
   /**
    * The second line names the next act, never the counter.
@@ -150,7 +180,9 @@ export default async function CompanyDetailPage({
    * stops being read.
    */
   const turnDetail =
-    turn.state === "onHold" && turn.onHoldUntil
+    turn.state === "removalRequested" && pending
+      ? t("companies.turn.removalDetail", { reason: pending.reason })
+      : turn.state === "onHold" && turn.onHoldUntil
       ? t("companies.turn.onHoldDetail", { date: day(turn.onHoldUntil) })
       : turn.state === "planned" || turn.state === "due"
         ? t("companies.turn.plannedDetail", {
@@ -565,8 +597,15 @@ export default async function CompanyDetailPage({
           the customer's work, and this stood third — above the timeline, the
           quotations and the dispatches — carrying an empty note field and a
           line saying nothing had been decided. */}
-      {turn.isQuiet || turn.state === "archived" || reviews.length > 0 ? (
-        <Card>
+      {/* Since session 54 the card also renders for a rep who may ASK
+          `S105` — the second way in does not wait for the clock — and while
+          a request is with the manager. */}
+      {turn.isQuiet ||
+      turn.state === "archived" ||
+      reviews.length > 0 ||
+      requests.length > 0 ||
+      mayRequest ? (
+        <Card data-slot="dormancy-card">
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <CardTitle className="text-start text-sm">
               {t("dormancy.title")}
@@ -575,11 +614,39 @@ export default async function CompanyDetailPage({
               <Badge variant="secondary">
                 {t("enums.dormancyOutcome.archived")}
               </Badge>
+            ) : pending ? (
+              <Badge variant="outline">{t("dormancy.request.pendingBadge")}</Badge>
             ) : turn.isQuiet ? (
               <Badge variant="destructive">{t("dormancy.detail.quiet")}</Badge>
             ) : null}
           </CardHeader>
           <CardContent className="flex flex-col gap-6">
+            {/* `S105` — the request, in the requester's own words, above the
+                three decisions it waits on. Who, when, why: the reason is the
+                point, so it is not folded into a summary line. */}
+            {pending ? (
+              <div
+                data-slot="removal-request-pending"
+                data-requester={pending.requestedByUserId}
+                className="bg-surface-2 border-line flex flex-col gap-1 rounded-[10px] border px-3 py-2.5 text-start text-sm"
+              >
+                <p className="font-medium">
+                  <span dir="auto">
+                    {t("dormancy.request.pending", {
+                      name: pending.requestedByName,
+                    })}
+                  </span>
+                  <span className="text-faint"> · </span>
+                  <span className="text-muted-foreground">
+                    {format.dateTime(pending.createdAt, { dateStyle: "medium" })}
+                  </span>
+                </p>
+                <p className="text-muted-foreground" dir="auto">
+                  {pending.reason}
+                </p>
+              </div>
+            ) : null}
+
             {/* Archiving is the end of the lifecycle: there is nothing left to
                 decide, so no controls are offered. Nothing is deleted, so the
                 record and its history stay `[12 §7]`. */}
@@ -589,15 +656,27 @@ export default async function CompanyDetailPage({
               </p>
             ) : (
               <DormancyPanel
-                reincludeAction={reincludeCompanyAction.bind(null, company.id)}
+                // *Keep* is the manager's ruling while a request is open
+                // `S105`; the rep's own re-inclusion waits.
+                reincludeAction={
+                  pending && !mayDecide
+                    ? undefined
+                    : reincludeCompanyAction.bind(null, company.id)
+                }
                 reassignAction={
                   canAssign
                     ? reassignCompanyAction.bind(null, company.id)
                     : undefined
                 }
+                // `S107` — the delete-approval flag, not the assignment one.
                 archiveAction={
-                  canAssign
+                  mayDecide
                     ? archiveCompanyAction.bind(null, company.id)
+                    : undefined
+                }
+                requestAction={
+                  mayRequest
+                    ? requestRemovalAction.bind(null, company.id)
                     : undefined
                 }
                 reps={assignableReps}
@@ -606,16 +685,37 @@ export default async function CompanyDetailPage({
 
             {/* **Absent, not an empty shell** `D70`. A heading over "No
                 decisions recorded yet" is the block telling you nothing has
-                happened, which is what its absence already says. */}
-            {reviews.length > 0 ? (
+                happened, which is what its absence already says.
+
+                One list, decisions and requests together by day `S106` — a
+                request and the ruling that answered it read as one story. */}
+            {reviews.length > 0 || requests.length > 0 ? (
               <div className="flex flex-col gap-2" data-slot="dormancy-history">
                 <p className="text-start text-sm font-medium">
                   {t("dormancy.detail.history")}
                 </p>
                 <ul className="flex flex-col gap-1">
-                  {reviews.map((review) => (
+                  {[
+                    ...reviews.map((review) => ({
+                      key: `review-${review.id}`,
+                      day: review.decidedAt,
+                      at: review.decidedAt,
+                      review,
+                      request: null,
+                    })),
+                    ...requests.map((request) => ({
+                      key: `request-${request.id}`,
+                      day: riyadhDayOf(request.createdAt),
+                      at: request.createdAt.toISOString(),
+                      review: null,
+                      request,
+                    })),
+                  ]
+                    .sort((a, b) => (a.day === b.day ? (a.at < b.at ? 1 : -1) : a.day < b.day ? 1 : -1))
+                    .map((item) => (
                     <li
-                      key={review.id}
+                      key={item.key}
+                      data-slot={item.review ? "dormancy-review" : "dormancy-request"}
                       className="text-muted-foreground text-start text-sm"
                     >
                       {/* The wrapper case `D62`: this line holds a date, a
@@ -626,23 +726,38 @@ export default async function CompanyDetailPage({
                           marks place the segments themselves (A2-1). */}
                       <span>
                         {format.dateTime(
-                          new Date(`${review.decidedAt}T00:00:00Z`),
+                          new Date(`${item.day}T00:00:00Z`),
                           { dateStyle: "medium", timeZone: "UTC" },
                         )}
                       </span>{" "}
-                      — {t(`enums.dormancyOutcome.${review.outcome}`)}{" "}
-                      <span dir="auto">
-                        {t("dormancy.detail.by", {
-                          name: review.decidedByName,
-                        })}
-                        {review.toName
-                          ? ` ${t("dormancy.detail.to", { name: review.toName })}`
-                          : ""}
-                      </span>
-                      {review.note ? (
+                      {item.review ? (
                         <>
+                          — {t(`enums.dormancyOutcome.${item.review.outcome}`)}{" "}
+                          <span dir="auto">
+                            {t("dormancy.detail.by", {
+                              name: item.review.decidedByName,
+                            })}
+                            {item.review.toName
+                              ? ` ${t("dormancy.detail.to", { name: item.review.toName })}`
+                              : ""}
+                          </span>
+                          {item.review.note ? (
+                            <>
+                              {" — "}
+                              <span dir="auto">{item.review.note}</span>
+                            </>
+                          ) : null}
+                        </>
+                      ) : item.request ? (
+                        <>
+                          —{" "}
+                          <span dir="auto">
+                            {t("dormancy.request.historyLine", {
+                              name: item.request.requestedByName,
+                            })}
+                          </span>
                           {" — "}
-                          <span dir="auto">{review.note}</span>
+                          <span dir="auto">{item.request.reason}</span>
                         </>
                       ) : null}
                     </li>

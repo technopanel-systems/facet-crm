@@ -12,8 +12,10 @@
  *  2. **Reassigned to another rep.** Requires `can_assign` — handing a record
  *     over is an assignment, exactly as `13 §3` settled for the desk rep, and
  *     `07 B1` keeps that manager-initiated.
- *  3. **Archived as out of scope.** Requires `can_assign`. Taking a company out
- *     of the working set is not a rep's call.
+ *  3. **Archived as out of scope.** Requires `can_approve_delete` `S107`
+ *     (`can_assign` until session 54). Taking a company out of the working
+ *     set is not a rep's call — but since session 54 a rep can ASK: the
+ *     second way in `S105` `S106`, `requestRemoval` below.
  *
  * **Every route writes a dated row** `[21 §7]`, never a mutable field: the same
  * shape targets `[07 D1]` and credit splits `[18 §4]` use, because changing one
@@ -34,21 +36,229 @@
  * `verify:phase11` §12 already pins.
  */
 
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/db";
-import { companies, companyDormancyReviews, companyReps, users } from "@/db/schema";
+import {
+  companies,
+  companyDormancyReviews,
+  companyRemovalRequests,
+  companyReps,
+  users,
+} from "@/db/schema";
 import { withAudit } from "@/lib/audit";
 import {
   can,
   canViewRecord,
   isCompanyBookHolder,
+  visibleCompaniesFilter,
   type AuthSession,
 } from "@/lib/authz";
 import { NOTIFICATION_TYPES, type DormancyOutcome } from "@/lib/enums";
 import { raise } from "@/lib/notifications";
 import { today } from "@/lib/reports";
 import { RuleError } from "@/lib/validation";
+
+/** The two halves of `withAudit`'s callback, for the helpers that run inside it. */
+type TxArgs = Parameters<Parameters<typeof withAudit>[1]>;
+
+/* ------------------------------------------------------------------ *
+ * The second way in — `S105`, `S106`
+ * ------------------------------------------------------------------ */
+
+export type RemovalRequest = {
+  id: string;
+  companyId: string;
+  requestedByUserId: string;
+  requestedByName: string;
+  reason: string;
+  createdAt: Date;
+  /** The review that answered it, or null while it is with the manager. */
+  reviewId: string | null;
+};
+
+const REASON_MAX = 500;
+
+/** The open request on one company, or null. No visibility filter of its
+ *  own, for `dormancyReviews`'s reason: every caller has already come
+ *  through `getCompany`. */
+export async function pendingRemovalRequest(
+  companyId: string,
+): Promise<RemovalRequest | null> {
+  const [row] = await db
+    .select({
+      id: companyRemovalRequests.id,
+      companyId: companyRemovalRequests.companyId,
+      requestedByUserId: companyRemovalRequests.requestedByUserId,
+      requestedByName: users.name,
+      reason: companyRemovalRequests.reason,
+      createdAt: companyRemovalRequests.createdAt,
+      reviewId: companyRemovalRequests.reviewId,
+    })
+    .from(companyRemovalRequests)
+    .innerJoin(users, eq(users.id, companyRemovalRequests.requestedByUserId))
+    .where(
+      and(
+        eq(companyRemovalRequests.companyId, companyId),
+        isNull(companyRemovalRequests.reviewId),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+/** Every request ever made on one company, newest first — the history
+ *  beside the decisions `S107`. */
+export async function removalRequests(
+  companyId: string,
+): Promise<RemovalRequest[]> {
+  return db
+    .select({
+      id: companyRemovalRequests.id,
+      companyId: companyRemovalRequests.companyId,
+      requestedByUserId: companyRemovalRequests.requestedByUserId,
+      requestedByName: users.name,
+      reason: companyRemovalRequests.reason,
+      createdAt: companyRemovalRequests.createdAt,
+      reviewId: companyRemovalRequests.reviewId,
+    })
+    .from(companyRemovalRequests)
+    .innerJoin(users, eq(users.id, companyRemovalRequests.requestedByUserId))
+    .where(eq(companyRemovalRequests.companyId, companyId))
+    .orderBy(desc(companyRemovalRequests.createdAt));
+}
+
+/**
+ * The queue — every open request this identity may decide, **oldest first**
+ * `S87`. `D41`'s *Needs a decision*, the archive half.
+ *
+ * The flag is `can_approve_delete` `S8` — the manager, the executive and the
+ * super admin — and the company filter is composed as well, for
+ * `revokeShare`'s reason: the three holders all see every rep today, and a
+ * role with the flag and without `sees_all_reps` is one form submission
+ * away. Empty, not refused, for anyone else: the block is absent `D53`.
+ */
+export async function listPendingRemovalRequests(
+  session: AuthSession,
+): Promise<{ rows: (RemovalRequest & { companyName: string })[]; total: number }> {
+  if (!can(session, "canApproveDelete")) return { rows: [], total: 0 };
+  const rows = await db
+    .select({
+      id: companyRemovalRequests.id,
+      companyId: companyRemovalRequests.companyId,
+      companyName: companies.name,
+      requestedByUserId: companyRemovalRequests.requestedByUserId,
+      requestedByName: users.name,
+      reason: companyRemovalRequests.reason,
+      createdAt: companyRemovalRequests.createdAt,
+      reviewId: companyRemovalRequests.reviewId,
+    })
+    .from(companyRemovalRequests)
+    .innerJoin(companies, eq(companies.id, companyRemovalRequests.companyId))
+    .innerJoin(users, eq(users.id, companyRemovalRequests.requestedByUserId))
+    .where(
+      and(
+        isNull(companyRemovalRequests.reviewId),
+        visibleCompaniesFilter(session),
+      ),
+    )
+    .orderBy(asc(companyRemovalRequests.createdAt));
+  return { rows, total: rows.length };
+}
+
+/**
+ * `S105` — the rep's press. **A request, never an action**: the row is the
+ * whole effect, and nothing about the company changes until a review row
+ * answers it.
+ *
+ * Who may press: somebody **holding** the company — a live `company_reps`
+ * row — because *nothing leaves HIS list* is the rule's own subject. Seeing
+ * the company through a share is not holding it, and an overseer who reads
+ * everything has the three decisions instead. The reason is required and
+ * refused as a message, the way `archiveCompany`'s note is.
+ */
+export async function requestRemoval(
+  session: AuthSession,
+  companyId: string,
+  reason: string,
+): Promise<void> {
+  const company = await loadVisibleCompany(session, companyId);
+  if (!company) throw new RuleError("dormancy.errors.companyNotVisible");
+  if (company.archivedAt) {
+    throw new RuleError("dormancy.errors.alreadyArchived");
+  }
+  const [membership] = await db
+    .select({ id: companyReps.id })
+    .from(companyReps)
+    .where(
+      and(
+        eq(companyReps.companyId, companyId),
+        eq(companyReps.userId, session.user.id),
+        isNull(companyReps.removedAt),
+      ),
+    )
+    .limit(1);
+  if (!membership) throw new RuleError("dormancy.errors.notYourCompany");
+
+  const cleanReason = reason.trim();
+  if (!cleanReason) {
+    throw new RuleError("dormancy.errors.reasonRequired", "reason");
+  }
+  if (cleanReason.length > REASON_MAX) {
+    throw new RuleError("dormancy.errors.noteTooLong", "reason");
+  }
+  if (await pendingRemovalRequest(companyId)) {
+    throw new RuleError("dormancy.errors.requestPending");
+  }
+
+  await withAudit(session.actor, async (tx, log) => {
+    const [row] = await tx
+      .insert(companyRemovalRequests)
+      .values({
+        companyId,
+        requestedByUserId: session.user.id,
+        reason: cleanReason,
+      })
+      .returning();
+    log({
+      action: "company.removal_requested",
+      entityType: "company_removal_request",
+      entityId: row.id,
+      after: { companyId, reason: row.reason },
+    });
+  });
+}
+
+/**
+ * `S106` — the next decision answers the open request, whichever of the
+ * three it is. Inside the deciding transaction, so a request is never
+ * answered by a review that rolled back.
+ */
+async function answerRequest(
+  tx: TxArgs[0],
+  log: TxArgs[1],
+  companyId: string,
+  reviewId: string,
+): Promise<void> {
+  const [answered] = await tx
+    .update(companyRemovalRequests)
+    .set({ reviewId })
+    .where(
+      and(
+        eq(companyRemovalRequests.companyId, companyId),
+        isNull(companyRemovalRequests.reviewId),
+      ),
+    )
+    .returning();
+  if (!answered) return;
+  log({
+    action: "company.removal_request.decided",
+    entityType: "company_removal_request",
+    entityId: answered.id,
+    before: { reviewId: null },
+    after: { reviewId },
+  });
+}
 
 export type DormancyReview = {
   id: string;
@@ -156,6 +366,16 @@ export async function reincludeCompany(
   if (company.archivedAt) {
     throw new RuleError("dormancy.errors.alreadyArchived");
   }
+  // `S105` — while a request is with the manager, *keep* is the manager's
+  // answer, not the rep's withdrawal: the press was a request and the ruling
+  // is somebody else's. The holder of `can_approve_delete` keeps it here and
+  // that closes the request `S106`.
+  if (
+    (await pendingRemovalRequest(companyId)) &&
+    !can(session, "canApproveDelete")
+  ) {
+    throw new RuleError("dormancy.errors.requestPending");
+  }
   const cleanNote = checkNote(note);
 
   await withAudit(session.actor, async (tx, log) => {
@@ -176,6 +396,8 @@ export async function reincludeCompany(
       entityId: row.id,
       after: { companyId, outcome: row.outcome, decidedAt: row.decidedAt },
     });
+
+    await answerRequest(tx, log, companyId, row.id);
   });
 }
 
@@ -287,6 +509,8 @@ export async function reassignCompany(
       after: { companyId, toUserId, decidedAt: review.decidedAt },
     });
 
+    await answerRequest(tx, log, companyId, review.id);
+
     // `07 E5` — "a lead assigned to you" is act-now, and this is one record, so
     // it is per-record. `21 §5`'s one-summary rule is about a bulk handover.
     await raise(tx, log, {
@@ -304,14 +528,23 @@ export async function reassignCompany(
  * A written reason is required, for the same reason `10 §8` requires one on a
  * cancellation: it is cheap, and it is the one field that makes the audit entry
  * worth reading later.
+ *
+ * **Gated by `can_approve_delete` since session 54** — `S107`'s sentence,
+ * built: *archiving is gated by the delete-approval flag (S8)*. This is that
+ * flag's first reader. It was `can_assign` until then, which is the
+ * assignment flag `S100` and still gates route 2; the founder's ruling is
+ * that the manager decides — *book management, not data leaving the system*
+ * — and `S8` gives the flag to the Sales Manager, the Executive and the
+ * Super Admin. The Executive can archive and cannot reassign, and the panel
+ * renders each control on its own flag.
  */
 export async function archiveCompany(
   session: AuthSession,
   companyId: string,
   note: string,
 ): Promise<void> {
-  if (!can(session, "canAssign")) {
-    throw new RuleError("dormancy.errors.cannotAssign");
+  if (!can(session, "canApproveDelete")) {
+    throw new RuleError("dormancy.errors.cannotArchive");
   }
   const company = await loadVisibleCompany(session, companyId);
   if (!company) throw new RuleError("dormancy.errors.companyNotVisible");
@@ -354,5 +587,7 @@ export async function archiveCompany(
       entityId: review.id,
       after: { companyId, outcome: review.outcome, decidedAt: review.decidedAt },
     });
+
+    await answerRequest(tx, log, companyId, review.id);
   });
 }

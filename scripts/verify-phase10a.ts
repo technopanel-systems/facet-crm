@@ -636,9 +636,10 @@ async function main(): Promise<void> {
     "dormancy.errors.cannotAssign",
     () => reassignCompany(owner, quietOver.id, otherUser.id),
   );
+  // `S107` since session 54 — the gate is `can_approve_delete`, with its own key.
   await refuses(
-    "a rep may not archive a company [21 §6]",
-    "dormancy.errors.cannotAssign",
+    "a rep may not archive a company [21 §6] [S107]",
+    "dormancy.errors.cannotArchive",
     () => archiveCompany(owner, quietOver.id, "no"),
   );
   await refuses(

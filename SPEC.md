@@ -64,7 +64,9 @@ the need (decided session 50 — narrower than both this rule's old text and the
 seed). **Delete approval and duplicate resolution are held by Executive, Sales
 Manager and Super Admin** — the founder's words: *"start with the person whose
 job it is; if the pilot shows he's not keeping up, or the decisions look
-wrong, it moves."* All three flags must be read by the code; today none are.
+wrong, it moves."* All three flags must be read by the code: `can_approve_delete`
+is read since session 54 (S107, and the *Needs a decision* section `D41`);
+`can_resolve_duplicate` and `can_export` are still unread.
 
 **S9.** Marketing assigns a company to a **rep, a desk rep, marketing, or the
 coordinator**. **Marketing holds companies exactly as a rep does, and assigns
@@ -938,22 +940,36 @@ authorship and credit never move.
 **S104. [BUILD]** After a handover, **the previous rep's name stays visible** on
 their work, so nobody mistakes it for the new rep's.
 
-**S105. [BUILD]** A rep who judges a customer has no potential **requests its
+**S105.** A rep who judges a customer has no potential **requests its
 removal, with a reason**. The manager reviews and decides: **archive** · **keep**
 · **reassign**. **The press is a request, never an action** — nothing leaves
 the rep's list until the manager rules — **and the reason is required: "the
-reason is the point"** (decided session 50).
+reason is the point"** (decided session 50). **Built session 54**: the
+request is a `company_removal_requests` row — who asked, why, when — pressed
+from the company's own page by a rep holding it, one open request per
+company; while it is open the company's turn is the manager's (`D2`) and
+the rep's own *keep* waits, because the ruling is not his. The request is
+answered by the next review row on the company, whichever of the three.
 
-**S106. [BUILD]** That is the same review, the same three outcomes and the same
+**S106.** That is the same review, the same three outcomes and the same
 record as a company going quiet. The only difference is what raises it — the
 clock, or the rep's judgement. One table, one screen, one manager decision, two
-ways in. The review, the three outcomes and the one record all exist. Only the second way in — the rep's request — is missing.
+ways in. **Both ways in exist since session 54**: the decision is a
+`company_dormancy_reviews` row whichever raised it, and a request points at
+the row that answered it (`review_id`). The vocabulary conflict the schema
+audit recorded — `delete_requests.status` against these three outcomes, and
+a NOT NULL outcome that could hold no pending row — was resolved by the
+request never naming an outcome at all; `delete_requests` and its enum left
+in `0035`.
 
-**S107. [CHANGE]** **Nothing is ever deleted.** "Removed" means archived: if that customer
+**S107.** **Nothing is ever deleted.** "Removed" means archived: if that customer
 resurfaces in two years, the record says they were already known and why someone
-gave up on them. Archiving is gated by the delete-approval flag (S8). That gate
-is not built. `canApproveDelete` has no reader anywhere today (S8), and
-archiving is gated by `canAssign` instead.
+gave up on them. Archiving is gated by the delete-approval flag (S8) — **built
+session 54**: `archiveCompany`, and with it the ruling on a rep's request,
+reads `can_approve_delete`, its first reader; it read `can_assign` until then.
+Reassignment stays an assignment and keeps `can_assign` (S100), so the
+Executive — who holds the first flag and not the second — can archive or keep
+and cannot reassign, and each control renders on its own flag.
 
 **S128.** **A decision that ends someone's work reaches them.** A
 refused dispatch request (S124), a cancelled or rejected quotation (S62), and a
@@ -1164,7 +1180,7 @@ before this file existed. `has_credit_terms` above was not an anomaly.
   `audit_log_actor_idx`, the last being an eleventh AUDIT 1 did not count
 
 **Examined by the sweep and deliberately kept**, because a rule still asks:
-`delete_requests` (S105–S107) · `duplicate_flags` and `non_duplicates`
+`company_removal_requests` (S105–S107, replacing `delete_requests` in session 54 with its writer) · `duplicate_flags` and `non_duplicates`
 (S21–S23) · `companies.merged_into_id` (S21–S23) · `quotation_threads.closed_at`
 and `closed_by_user_id` (S47) · `roles.can_export`, `can_approve_delete` and
 `can_resolve_duplicate` (S8, and item 14 above). Their indexes go with them.

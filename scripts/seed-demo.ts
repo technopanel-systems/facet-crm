@@ -263,7 +263,7 @@ const RECORD_TABLES = [
   "quotation_lines",
   "quotation_versions",
   "quotation_threads",
-  "delete_requests",
+  "company_removal_requests",
   "project_credit_splits",
   "record_shares",
   "project_companies",

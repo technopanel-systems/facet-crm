@@ -14,6 +14,7 @@ import {
   archiveCompany,
   reassignCompany,
   reincludeCompany,
+  requestRemoval,
 } from "@/lib/dormancy";
 import {
   readFields,
@@ -175,6 +176,33 @@ export async function reassignCompanyAction(
 
   revalidatePath("/companies", "layout");
   revalidatePath("/follow-ups");
+  return {};
+}
+
+/**
+ * `S105` — the rep's press. The reason is required here as well as in the
+ * data layer, for the reason `readCompanyForm` gives: only this layer answers
+ * with a key under the field. `revalidatePath("/")` because the manager's
+ * Stuck block counts it `D41`.
+ */
+export async function requestRemovalAction(
+  companyId: string,
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const session = await requireSession();
+  const fields = readFields(formData);
+  const reason = fields.text("reason", { required: true, max: 500 });
+  if (!fields.ok || !reason) return fields.state;
+
+  try {
+    await requestRemoval(session, companyId, reason);
+  } catch (error) {
+    return ruleErrorState(error, fields.values);
+  }
+
+  revalidatePath("/companies", "layout");
+  revalidatePath("/");
   return {};
 }
 

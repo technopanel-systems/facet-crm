@@ -164,6 +164,7 @@ export function TurnPanel({
 export function companyTurnKey(
   state:
     | "archived"
+    | "removalRequested"
     | "onHold"
     | "planned"
     | "due"
@@ -175,6 +176,9 @@ export function companyTurnKey(
   if (state === "archived" || state === "onHold") {
     return `companies.turn.${state}`;
   }
+  // `S105` — the move is the manager's; the page swaps in the decider's and
+  // the requester's own wording where it knows who is reading.
+  if (state === "removalRequested") return "companies.turn.removal.theirs";
   return `companies.turn.${viewerIsHolder ? "yours" : "theirs"}.${state}`;
 }
 

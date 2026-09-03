@@ -326,7 +326,13 @@
       },
       "plannedDetail": "لم يُسجَّل شيء منذ {count} يوم.",
       "quietDetail": "سجّل زيارة أو مكالمة، أو قرّر ما إذا كانت المتابعة ما زالت تستحق.",
-      "neverDetail": "سُجِّلت قبل {count} يوم."
+      "neverDetail": "سُجِّلت قبل {count} يوم.",
+      "removal": {
+        "yours": "بانتظار المدير — طلبتَ إزالة هذا العميل",
+        "theirs": "بانتظار المدير — طلب {name} إزالة هذا العميل",
+        "decide": "دورك — طلب {name} إزالة هذا العميل"
+      },
+      "removalDetail": "السبب: {reason}"
     },
     "filter": {
       "everyone": "الجميع"
@@ -1109,12 +1115,25 @@
     },
     "errors": {
       "companyNotVisible": "هذه الشركة ليست ضمن صلاحيتك للمراجعة.",
-      "cannotAssign": "لا يمكنك إعادة إسناد شركة أو أرشفتها.",
+      "cannotAssign": "لا يمكنك إعادة إسناد شركة.",
       "recipientInactive": "هذا الحساب غير نشط.",
       "recipientNotAHolder": "لا يمكن تسليم الشركة إلا إلى مندوب أو مندوب مكتبي أو التسويق أو المنسق.",
       "alreadyArchived": "هذه الشركة مؤرشفة بالفعل.",
       "noteRequired": "يلزم سبب مكتوب لأرشفة الشركة.",
-      "noteTooLong": "هذه الملاحظة طويلة جداً."
+      "noteTooLong": "هذه الملاحظة طويلة جداً.",
+      "cannotArchive": "لا يمكنك أرشفة شركة.",
+      "notYourCompany": "لا يطلب الإزالة إلا مندوب يحمل هذه الشركة.",
+      "reasonRequired": "اذكر السبب — السبب هو الأساس.",
+      "requestPending": "هناك طلب لدى المدير بالفعل."
+    },
+    "request": {
+      "open": "هذا العميل بلا إمكانات",
+      "hint": "اطلب من المدير إزالته من قائمتك. لا يخرج شيء حتى يقرر، والسبب هو الأساس.",
+      "reason": "لماذا",
+      "send": "إرسال إلى المدير",
+      "pending": "طلب {name} إزالة هذا العميل",
+      "pendingBadge": "طُلبت الإزالة",
+      "historyLine": "طلب الإزالة بواسطة {name}"
     }
   },
   "sharing": {
@@ -1242,7 +1261,12 @@
       "clear": "لا شيء عالق لدى المنسقة.",
       "untouched": "بلا حركة منذ مدة طويلة",
       "untouchedBreakdown": "{companies, plural, one {شركة واحدة} two {شركتان} few {# شركات} many {# شركة} other {# شركة}} · {projects, plural, one {مشروع واحد} two {مشروعان} few {# مشاريع} many {# مشروعًا} other {# مشروع}} · {quotations, plural, one {عرض واحد} two {عرضان} few {# عروض} many {# عرضًا} other {# عرض}}",
-      "untouchedNone": "لا شيء متوقّف لمدة تستحق العدّ."
+      "untouchedNone": "لا شيء متوقّف لمدة تستحق العدّ.",
+      "decisions": "يحتاج قراراً",
+      "decisionsNone": "لا شيء بانتظار قرار.",
+      "removalRequests": "{count, plural, one {طلب إزالة واحد} two {طلبا إزالة} few {# طلبات إزالة} many {# طلب إزالة} other {# طلب إزالة}}",
+      "askedBy": "{name} · {count, plural, one {يوم واحد} two {يومين} few {# أيام} many {# يومًا} other {# يوم}}",
+      "andMore": "و{count} أخرى"
     },
     "attention": {
       "title": "من يحتاج انتباهك",

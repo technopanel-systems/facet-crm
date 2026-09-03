@@ -293,7 +293,7 @@ export const SIGNAL_REFERENCE_MAX = 200;
  * version of it. `0027` dropped the value from `record_type` entirely.
  *
  * **This union is narrower than `record_type`**, which still carries all five
- * for `record_shares`, `delete_requests`, `duplicate_flags` and `attachments`.
+ * for `record_shares`, `duplicate_flags` and `attachments`.
  * A raw `comments.record_type` column therefore no longer assigns to
  * `CommentRecordType` — narrow it at the read site, as `listComments` and
  * `timeline.ts` do.

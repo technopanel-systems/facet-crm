@@ -596,6 +596,7 @@ export async function attentionPeople(
  */
 export type CompanyTurnState =
   | "archived"
+  | "removalRequested"
   | "onHold"
   | "planned"
   | "due"
@@ -620,6 +621,9 @@ export type CompanyTurn = {
   /** The condition the dormancy block renders on `[07 E6]`, kept here so the
    *  screen asks once. Archived and on-hold companies are never quiet. */
   isQuiet: boolean;
+  /** `S105` — a rep's request is with the manager. The company stays on
+   *  every list meanwhile; only whose move it is changes `D2`. */
+  removalPending: boolean;
 };
 
 /**
@@ -648,6 +652,13 @@ export async function companyTurn(
       archivedAt: companies.archivedAt,
       mergedIntoId: companies.mergedIntoId,
       nextFollowUpAt: companies.nextFollowUpAt,
+      // `S105` — both tables named outright: this query joins, and a bare
+      // column in a correlated subquery resolves inside the wrong table
+      // (`CLAUDE.md`).
+      removalPending: sql<boolean>`exists (
+        select 1 from company_removal_requests r
+        where r.company_id = ${companies.id} and r.review_id is null
+      )`,
     })
     .from(companies)
     .innerJoin(silence, eq(silence.companyId, companies.id))
@@ -664,6 +675,7 @@ export async function companyTurn(
     silentDays,
     thresholdDays: Number(row.thresholdDays),
     isQuiet: Boolean(row.isQuiet),
+    removalPending: Boolean(row.removalPending),
   };
 
   // `gather` step 1 — the customer is out of scope. Archived and a merge
@@ -675,6 +687,20 @@ export async function companyTurn(
       onHoldUntil: null,
       plannedFor: null,
       isQuiet: false,
+      removalPending: false,
+    };
+  }
+
+  // `S105` — the move is the manager's while a request is open. Above on
+  // hold and the rep's own date: those say what the REP owes, and the rep
+  // owes nothing while somebody else is deciding whether the customer stays.
+  // `isQuiet` is untouched — nothing leaves any list until the ruling.
+  if (base.removalPending) {
+    return {
+      ...base,
+      state: "removalRequested",
+      onHoldUntil: null,
+      plannedFor: null,
     };
   }
 

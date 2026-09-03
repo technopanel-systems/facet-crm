@@ -494,7 +494,7 @@ const ADAPTER_REQUIRED_TABLES = ["accounts"];
  * this list is the original schema being finished rather than recent drift.
  *
  * **What is deliberately NOT here**, because a rule still asks for it:
- * `attachments` `S115`; `delete_requests` `S105`–`S107`; `duplicate_flags`,
+ * `attachments` `S115`; `company_removal_requests` `S105`–`S107` (its writer built session 54); `duplicate_flags`,
  * `non_duplicates` and `companies.merged_into_id` `S21`–`S23`;
  * `quotation_threads.closed_at` and `closed_by_user_id` `S47`;
  * `roles.can_export`, `can_approve_delete` and `can_resolve_duplicate` `S8`.
@@ -759,7 +759,7 @@ async function main(): Promise<void> {
   // half that would go quiet if a later sweep took them by mistake.
   for (const name of [
     "attachments_record_idx",
-    "delete_requests_record_idx",
+    "company_removal_requests_open_key",
     "duplicate_flags_a_idx",
     "duplicate_flags_b_idx",
     "non_duplicates_pair_key",
@@ -895,7 +895,7 @@ async function main(): Promise<void> {
   // above and break `S115`, `S105`–`S107` and `S21`–`S23` silently.
   for (const [table, rule] of [
     ["attachments", "S115"],
-    ["delete_requests", "S105-S107"],
+    ["company_removal_requests", "S105-S107"],
     ["duplicate_flags", "S21-S23"],
     ["non_duplicates", "S21-S23"],
     ["product_specifications", "SPEC §16"],

@@ -11072,10 +11072,15 @@ async function main(): Promise<void> {
             Number(tagAttr(stuck, "data-total")) ===
               quiet + notMoved + quotations,
         );
-        /* `D41` `D78` — needs-a-decision is ABSENT, and nothing explains it. */
+        /* `D41` `D78` — needs-a-decision renders inside Stuck for the holder
+           of `can_approve_delete` since session 54; §45 drives its count
+           against the records and its absence for the identities without
+           the flag. Here only the presence, so a `D78` regression that drops
+           the section reads red beside the two sections it sits between. */
+        const decisions = openTag(home.body, "stuck-decisions");
         check(
-          "*** needs-a-decision renders NOTHING inside Stuck — no marker, no explaining sentence *** [D41] [D78] [D70]",
-          !home.body.includes('data-slot="stuck-decisions"'),
+          `*** needs-a-decision renders inside Stuck for the manager — data-requests="${tagAttr(decisions, "data-requests")}" *** [D41] [D78]`,
+          decisions !== "" && /^\d+$/.test(tagAttr(decisions, "data-requests")),
         );
       }
     }
@@ -12951,6 +12956,353 @@ async function main(): Promise<void> {
           world.status === 200 &&
             unescapeHtml(tagAttr(allLink, "href")).endsWith(`/companies?rep=${repA}`),
         );
+      }
+    }
+  }
+
+  /* ── 45 ──────────────────────────────────────────────────────────────── */
+
+  console.log(
+    "\n45. Rep-requested archiving — the press is a request, the reason is required, nothing leaves the list, the manager rules through the same three decisions, and the gate is S8's flag [S105], [S106], [S107], [S8], [D41], [D78], [D2]",
+  );
+  {
+    const setup = (step: string, ok: boolean, detail = ""): boolean => {
+      checks += 1;
+      if (ok) {
+        console.log(`  setup ${step}`);
+        return true;
+      }
+      failures += 1;
+      console.log(`  SETUP FAILED at ${step}${detail ? ` — ${detail}` : ""}`);
+      return false;
+    };
+    const openTag = (body: string, slot: string): string =>
+      body.match(
+        new RegExp(`<[a-z]+\\b[^>]*data-slot="${slot}"[^>]*>`),
+      )?.[0] ?? "";
+    const tagAttr = (tag: string, name: string): string =>
+      tag.match(new RegExp(`${name}="([^"]*)"`))?.[1] ?? "";
+    const actForm = (body: string, act: string): string | undefined =>
+      body.match(new RegExp(`<form[^>]*data-act="${act}"[\\s\\S]*?</form>`))?.[0];
+    const listTotal = (body: string): number => {
+      const m = body.match(/data-slot="list-card"[^>]*data-total="(\d+)"/);
+      return m ? Number(m[1]) : -1;
+    };
+    /** A server-action POST to a page, as `§9` posts the registration form:
+     *  the form's own `$ACTION` envelope plus the named fields. The action
+     *  answers 200 with its state whether it accepted or refused — refusal
+     *  is a message under the field, never a 303 or a 500 `[07 E3]`. */
+    const post = async (
+      jar: Jar,
+      path: string,
+      form: string,
+      fields: Record<string, string>,
+    ): Promise<number> => {
+      const body = envelopeOf(form);
+      for (const [name, value] of Object.entries(fields)) body.set(name, value);
+      const response = await fetch(`${BASE}${path}`, {
+        method: "POST",
+        headers: { cookie: header(jar), origin: BASE },
+        body,
+        redirect: "manual",
+      });
+      store(jar, response);
+      await response.text();
+      return response.status;
+    };
+    type RequestRow = { id: string; reason: string; review_id: string | null; outcome: string | null };
+    /** This script's own reading of the request table for one company. */
+    const requestsOf = async (companyId: string): Promise<RequestRow[]> =>
+      (await db.execute(sql`
+        select q.id::text as id, q.reason, q.review_id::text as review_id,
+               v.outcome::text as outcome
+        from company_removal_requests q
+        left join company_dormancy_reviews v on v.id = q.review_id
+        where q.company_id = ${companyId}::uuid
+        order by q.created_at
+      `)) as unknown as RequestRow[];
+    const openCount = async (): Promise<number> => {
+      const rows = (await db.execute(sql`
+        select count(*)::int as n from company_removal_requests where review_id is null
+      `)) as unknown as { n: number }[];
+      return Number(rows[0]?.n ?? -1);
+    };
+
+    const stamp45 = Date.now();
+    const repJar = jars["rep-a@example.test"];
+    const managerJar = jars["manager@example.test"];
+    const coordJar = jars["coordinator@example.test"];
+    const executiveJar = await login("executive@example.test");
+
+    /*
+     * **The fixture is one of rep-a's own live, unarchived companies with no
+     * open request** — chosen by this script's SQL, by name, past the first
+     * few so the company §43 archives and restores is not the one consumed
+     * here. Consumed: the run ends with it archived `S107`, and the next run
+     * picks the next name.
+     */
+    let companyId = "";
+    let repAId = "";
+    let flags = { manager: "", executive: "", coordinator: "" };
+    try {
+      const [rep] = (await db.execute(sql`
+        select id::text as id from users where email = 'rep-a@example.test'
+      `)) as unknown as { id: string }[];
+      repAId = rep?.id ?? "";
+      const [pick] = (await db.execute(sql`
+        select c.id::text as id
+        from companies c
+        join company_reps cr on cr.company_id = c.id and cr.removed_at is null
+        where cr.user_id = ${repAId}::uuid
+          and c.archived_at is null and c.merged_into_id is null
+          and not exists (select 1 from company_removal_requests q
+                          where q.company_id = c.id and q.review_id is null)
+        order by c.name
+        offset 3 limit 1
+      `)) as unknown as { id: string }[];
+      companyId = pick?.id ?? "";
+      const roleFlags = (await db.execute(sql`
+        select u.email, r.can_approve_delete, r.can_assign
+        from users u join roles r on r.id = u.role_id
+        where u.email in ('manager@example.test','executive@example.test','coordinator@example.test')
+      `)) as unknown as { email: string; can_approve_delete: boolean; can_assign: boolean }[];
+      const flagOf = (email: string) => {
+        const row = roleFlags.find((r) => r.email === email);
+        return row ? `approve_delete=${row.can_approve_delete} assign=${row.can_assign}` : "";
+      };
+      flags = {
+        manager: flagOf("manager@example.test"),
+        executive: flagOf("executive@example.test"),
+        coordinator: flagOf("coordinator@example.test"),
+      };
+    } catch (error) {
+      console.log(`  --    the records could not be read — ${String(error)}`);
+    }
+
+    if (!companyId || !repAId) {
+      console.log(
+        "  --    rep-a has no live, unarchived company without an open request — the second way in is NOT MEASURED",
+      );
+    } else {
+      const path = `/en/companies/${companyId}`;
+      const ownBefore = listTotal((await get(repJar, "/en/companies")).body);
+      const openBefore = await openCount();
+
+      /* 1. The rep's page offers the request and none of the manager's
+            decisions; the manager's page offers the decisions and no
+            request. Two identities, so the rendering rule holds both ways. */
+      const repPage = await get(repJar, path);
+      const managerPage = await get(managerJar, path);
+      if (
+        !setup(
+          `rep-a and the manager both open the company (${repPage.status}, ${managerPage.status})`,
+          repPage.status === 200 && managerPage.status === 200,
+        )
+      ) {
+        // nothing below can run
+      } else {
+        const requestForm = actForm(repPage.body, "removal-request");
+        /* On a CALM company with nothing pending the manager has no
+           decision to take, so the card is absent `D70` — the request is
+           what raises it `S106`. Read before the press, so the second read
+           below can show the decisions ARRIVING with the request. */
+        check(
+          `*** rep-a is offered the request and not the archive; the manager, on a calm company with nothing pending, neither *** [S105] [S107] [S106] [D70]`,
+          Boolean(requestForm) &&
+            !actForm(repPage.body, "archive") &&
+            !actForm(managerPage.body, "archive") &&
+            !actForm(managerPage.body, "removal-request"),
+          `rep: request ${requestForm ? "yes" : "no"}, archive ${actForm(repPage.body, "archive") ? "yes" : "no"}; manager: archive ${actForm(managerPage.body, "archive") ? "yes" : "no"}, request ${actForm(managerPage.body, "removal-request") ? "yes" : "no"}`,
+        );
+
+        if (requestForm) {
+          /* 2. No reason — refused as a message, no row `S105`. */
+          const blank = await post(repJar, path, requestForm, { reason: "   " });
+          const afterBlank = await requestsOf(companyId);
+          check(
+            `*** a request with no reason answers 200, not 303 or 500, and writes NO row — ${afterBlank.length} row(s) *** [S105]`,
+            blank === 200 && afterBlank.length === 0,
+            `status ${blank}`,
+          );
+
+          /* 3. The press. A row, with the reason, open; the audit row; and
+                NOTHING about the company changed — the rep's list total is
+                what it was `S105`. */
+          const reason = `verify45-${stamp45} factory closed`;
+          const pressed = await post(repJar, path, requestForm, { reason });
+          const afterPress = await requestsOf(companyId);
+          const audited = (await db.execute(sql`
+            select count(*)::int as n from audit_log
+            where action = 'company.removal_requested'
+              and entity_id = ${afterPress[0]?.id ?? "00000000-0000-0000-0000-000000000000"}
+          `)) as unknown as { n: number }[];
+          const ownAfter = listTotal((await get(repJar, "/en/companies")).body);
+          check(
+            `*** the press is a request, never an action — one open row carrying the reason, audited, and rep-a's list still ${ownAfter} of ${ownBefore} *** [S105] [S112]`,
+            pressed === 200 &&
+              afterPress.length === 1 &&
+              afterPress[0].reason === reason &&
+              afterPress[0].review_id === null &&
+              Number(audited[0]?.n ?? 0) === 1 &&
+              ownAfter === ownBefore &&
+              ownBefore > 0,
+            `status ${pressed}, rows ${afterPress.length}, audited ${audited[0]?.n}, list ${ownBefore} → ${ownAfter}`,
+          );
+
+          /* 4. Whose move it is `D2`: the rep's page shows the pending
+                block, the request control is gone, and so is his own
+                *keep* — the ruling is the manager's `S105`. And the
+                request is what RAISES the review `S106`: the manager's
+                page, which offered nothing a moment ago, now offers all
+                three decisions and no request. */
+          const repPending = await get(repJar, path);
+          const managerPending = await get(managerJar, path);
+          check(
+            `*** the request raises the review — the manager now sees keep, reassign and archive, and no request *** [S106] [S107] [S100]`,
+            Boolean(actForm(managerPending.body, "reinclude")) &&
+              Boolean(actForm(managerPending.body, "reassign")) &&
+              Boolean(actForm(managerPending.body, "archive")) &&
+              !actForm(managerPending.body, "removal-request"),
+          );
+          check(
+            `*** while the request is open the rep sees it, cannot press again and cannot keep it himself *** [S105] [D2]`,
+            repPending.body.includes('data-slot="removal-request-pending"') &&
+              !actForm(repPending.body, "removal-request") &&
+              !actForm(repPending.body, "reinclude"),
+            `pending ${repPending.body.includes('data-slot="removal-request-pending"')}, request form ${Boolean(actForm(repPending.body, "removal-request"))}, reinclude ${Boolean(actForm(repPending.body, "reinclude"))}`,
+          );
+
+          /* 5. A second press with the first still open is refused, and
+                the data layer — not the missing form — is the gate: the
+                stale envelope is replayed. */
+          const again = await post(repJar, path, requestForm, { reason: `${reason} again` });
+          const afterAgain = await requestsOf(companyId);
+          check(
+            `*** a second press while the first is with the manager is refused — still ${afterAgain.length} row(s) *** [S105]`,
+            again === 200 && afterAgain.length === 1,
+          );
+
+          /* 6. `D41` — the manager's and the executive's Stuck carry the
+                count against this script's own open count; the coordinator
+                and the rep have no such section. */
+          const openNow = await openCount();
+          const stuckOf = async (jar: Jar) => openTag((await get(jar, "/en")).body, "stuck-decisions");
+          const managerStuck = await stuckOf(managerJar);
+          const executiveStuck = await stuckOf(executiveJar);
+          const coordStuck = await stuckOf(coordJar);
+          const repStuck = await stuckOf(repJar);
+          check(
+            `*** needs-a-decision: manager ${tagAttr(managerStuck, "data-requests") || "absent"} and executive ${tagAttr(executiveStuck, "data-requests") || "absent"} against ${openNow} open in the records; coordinator ${coordStuck ? "PRESENT" : "absent"}, rep ${repStuck ? "PRESENT" : "absent"} *** [D41] [D78] [S8] [D53]`,
+            openNow >= 1 &&
+              Number(tagAttr(managerStuck, "data-requests")) === openNow &&
+              Number(tagAttr(executiveStuck, "data-requests")) === openNow &&
+              coordStuck === "" &&
+              repStuck === "",
+          );
+          const managerHome = (await get(managerJar, "/en")).body;
+          const rowShown = managerHome.includes(`data-company="${companyId}"`);
+          if (openNow <= 5) {
+            check(
+              `*** the request is a row in the section, a way in to the company *** [D41]`,
+              rowShown,
+            );
+          } else {
+            console.log(`  --    ${openNow} open requests exceed the five rows shown — the row's presence is NOT MEASURED`);
+          }
+
+          /* 7. The gate is `S8`'s flag, asked in the data layer: REP-A —
+                who can open the company and holds no flag — replays the
+                MANAGER's archive envelope and is refused as a message; the
+                company stays live and the request open. (The coordinator
+                would be the wrong identity here: she cannot open rep-a's
+                company at all, so her replay is a 404 before any gate is
+                asked — visibility, not the flag.) */
+          const archiveForm = actForm(managerPending.body, "archive");
+          if (archiveForm) {
+            const repTry = await post(repJar, path, archiveForm, { note: `verify45-${stamp45} rep` });
+            const [afterRep] = (await db.execute(sql`
+              select archived_at is not null as archived from companies where id = ${companyId}::uuid
+            `)) as unknown as { archived: boolean }[];
+            check(
+              `*** rep-a replaying the manager's archive envelope is refused in the data layer — 200, archived ${afterRep?.archived}, ${(await requestsOf(companyId)).filter((r) => !r.review_id).length} still open (coordinator ${flags.coordinator} cannot open the page at all) *** [S107] [S8]`,
+              repTry === 200 && afterRep?.archived === false && (await requestsOf(companyId)).filter((r) => !r.review_id).length === 1,
+              `status ${repTry}`,
+            );
+          }
+
+          /* 8. The manager keeps it — `S106`: the same review row answers
+                the request, and the open count falls by one. */
+          const keepForm = actForm(managerPending.body, "reinclude");
+          if (keepForm) {
+            const kept = await post(managerJar, path, keepForm, { note: `verify45-${stamp45} keep` });
+            const afterKeep = await requestsOf(companyId);
+            const decidedAudit = (await db.execute(sql`
+              select count(*)::int as n from audit_log
+              where action = 'company.removal_request.decided'
+                and entity_id = ${afterKeep[0]?.id ?? "00000000-0000-0000-0000-000000000000"}
+            `)) as unknown as { n: number }[];
+            check(
+              `*** the manager's keep answers the request with a reincluded review — outcome ${afterKeep[0]?.outcome}, audited ${decidedAudit[0]?.n}, open ${await openCount()} against ${openNow - 1} *** [S106] [S105]`,
+              kept === 200 &&
+                afterKeep.length === 1 &&
+                afterKeep[0].outcome === "reincluded" &&
+                Number(decidedAudit[0]?.n ?? 0) === 1 &&
+                (await openCount()) === openNow - 1,
+              `status ${kept}`,
+            );
+          }
+
+          /* 9. The rep asks again — the form is back once the ruling is
+                in — and the EXECUTIVE archives: `can_approve_delete` without
+                `can_assign`, which is the one identity that tells `S107`'s
+                new gate apart from the old one. */
+          const repAfterKeep = await get(repJar, path);
+          const secondForm = actForm(repAfterKeep.body, "removal-request");
+          check(
+            `*** after the ruling the rep may ask again — the request form is back and his own keep too *** [S105]`,
+            Boolean(secondForm) && Boolean(actForm(repAfterKeep.body, "reinclude")),
+          );
+          if (secondForm) {
+            await post(repJar, path, secondForm, { reason: `${reason} second` });
+            const executivePage = await get(executiveJar, path);
+            const executiveArchive = actForm(executivePage.body, "archive");
+            check(
+              `*** the executive (${flags.executive}) is offered archive and NOT reassign *** [S107] [S100] [D51]`,
+              executivePage.status === 200 &&
+                Boolean(executiveArchive) &&
+                !actForm(executivePage.body, "reassign"),
+            );
+            if (executiveArchive) {
+              const archived = await post(executiveJar, path, executiveArchive, { note: `verify45-${stamp45} moved to Jeddah` });
+              const rows = await requestsOf(companyId);
+              const [after] = (await db.execute(sql`
+                select archived_at is not null as archived from companies where id = ${companyId}::uuid
+              `)) as unknown as { archived: boolean }[];
+              check(
+                `*** the executive's archive lands — archived ${after?.archived}, the second request answered by an ${rows[1]?.outcome} review, ${rows.filter((r) => !r.review_id).length} open *** [S107] [S106] [S8]`,
+                archived === 200 &&
+                  after?.archived === true &&
+                  rows.length === 2 &&
+                  rows[1]?.outcome === "archived" &&
+                  rows.every((r) => r.review_id !== null),
+                `status ${archived}, rows ${rows.length}`,
+              );
+              /* 10. Nothing deleted `S107`: both requests stay with their
+                    reasons, the page keeps the history, and the rep can
+                    neither ask nor keep on an archived company. */
+              const repArchived = await get(repJar, path);
+              const historyLines = (repArchived.body.match(/data-slot="dormancy-request"/g) ?? []).length;
+              check(
+                `*** archived means hidden from work, never deleted — ${historyLines} request line(s) in the history, no request form, no keep *** [S107] [S105]`,
+                repArchived.status === 200 &&
+                  historyLines === 2 &&
+                  !actForm(repArchived.body, "removal-request") &&
+                  !actForm(repArchived.body, "reinclude"),
+              );
+            }
+          }
+          console.log(`  --    open requests before ${openBefore}, after ${await openCount()} (the run's own consumed)`);
+        }
       }
     }
   }

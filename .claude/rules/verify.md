@@ -6,7 +6,7 @@ paths:
 # Verify-script rules — load the facet-verify skill before writing or editing a check
 
 **For:** work under `scripts/`. **Prevents:** checks that pass for the wrong
-reason — fifteen sightings — and runs that measure the wrong server. **Safe
+reason — seventeen sightings — and runs that measure the wrong server. **Safe
 to remove when:** the project gains a real test harness (it deliberately has
 none).
 

@@ -1045,16 +1045,22 @@ directly above it, which is `D64`'s *absent, not disabled and not empty*.
 
 **D41. "Needs a decision"** — duplicates (S22) and archive requests (S105). The
 two things the system routes to a manager, on one card, nowhere else. This is
-what makes the manager's version of the waiting list different. It is `D64`'s
-block on `can_assign`.
+what makes the manager's version of the waiting list different. **It is a
+section of Stuck (`D78`), and each half renders on `S8`'s own flag** —
+archive requests on `can_approve_delete`, duplicates on
+`can_resolve_duplicate` — not on `can_assign` as this rule first said: SPEC
+decides who acts, and the Executive holds both of those and not
+`can_assign`.
 
-**It is not built, and what stands in the way is two build paths rather than a
-decision.** Both objects it names have no writer, no reader and no rows: `S21`
-says in its own text that nothing flags a duplicate, and `S106` says the rep's
-request is the only missing half of the archive review. A card reading two empty
-tables would be a reader for something nothing fills — the mirror of
-`CLAUDE.md`'s prohibition on a column without its writer, and `AD4`'s finding one
-register on. `WORKFLOW §4 25e` carries it, with what it waits for.
+**The archive half shipped in session 54** with `S105`'s writer: a count of
+open requests, then up to five rows oldest first (`S87`), each the company's
+name as the way in to its page — where the request sits above the three
+decisions — and the requester with how long ago; *and N more* beyond the cap
+(`D79`'s device); at zero one line, *nothing is waiting for a decision*,
+`D78`'s own zero shape. **The duplicate half waits for `S22`'s detector** and
+renders nothing until it writes — a reader for a table nothing fills is the
+mirror of `CLAUDE.md`'s prohibition on a column without its writer
+(`WORKFLOW §4 25e`).
 
 **D65. The coordinator's dashboard leads with Requests: one heading, two
 columns.** Quotation requests needing issuing on one side, dispatch requests
@@ -1171,10 +1177,10 @@ disagree with itself.
 **D78. Stuck — one full-width block: the things sitting that should
 be moving.** Three sections, in order. **With the coordinator** — `D40`'s
 two counts with its *oldest N days* line; at zero it reads *the bottleneck
-is clear*, which is what a watcher came to read. **Needs a decision** —
-`D41`'s two counts, **absent until its writers exist** (`D41`, `D70`) — and
-no sentence explains the absence: product copy never names unbuilt
-machinery. **Untouched too long** — one figure, **always with its breakdown
+is clear*, which is what a watcher came to read. **Needs a decision** — `D41`'s counts, present for `S8`'s flag holders
+since session 54 (the archive half; the duplicate half stays absent until
+its writer exists, `D41`, `D70`) — and no sentence explains an absence:
+product copy never names unbuilt machinery. **Untouched too long** — one figure, **always with its breakdown
 beneath it**: N companies · N projects · N quotations (the founder's answer
 9 — *191 alone is not actionable; 102 stalled projects and 66 quiet
 companies are different jobs chased differently*). The figure reads the same

@@ -326,7 +326,13 @@
       },
       "plannedDetail": "Nothing recorded for {count, plural, one {# day} other {# days}}.",
       "quietDetail": "Log a visit or a call, or decide whether this is still worth chasing.",
-      "neverDetail": "Registered {count, plural, one {# day} other {# days}} ago."
+      "neverDetail": "Registered {count, plural, one {# day} other {# days}} ago.",
+      "removal": {
+        "yours": "Waiting on the manager — you asked to remove this customer",
+        "theirs": "Waiting on the manager — {name} asked to remove this customer",
+        "decide": "Your move — {name} asked to remove this customer"
+      },
+      "removalDetail": "Reason: {reason}"
     },
     "filter": {
       "everyone": "Everyone"
@@ -1109,12 +1115,25 @@
     },
     "errors": {
       "companyNotVisible": "That company is not yours to review.",
-      "cannotAssign": "You may not reassign or archive a company.",
+      "cannotAssign": "You may not reassign a company.",
       "recipientInactive": "That account is not active.",
       "recipientNotAHolder": "A company can only be handed to a rep, a desk rep, marketing or the coordinator.",
       "alreadyArchived": "That company is already archived.",
       "noteRequired": "A written reason is required to archive a company.",
-      "noteTooLong": "That note is too long."
+      "noteTooLong": "That note is too long.",
+      "cannotArchive": "You may not archive a company.",
+      "notYourCompany": "Only a rep holding this company can ask to remove it.",
+      "reasonRequired": "Say why — the reason is the point.",
+      "requestPending": "A request is already with the manager."
+    },
+    "request": {
+      "open": "This customer has no potential",
+      "hint": "Ask the manager to take it off your list. Nothing leaves until they decide, and the reason is the point.",
+      "reason": "Why",
+      "send": "Send to the manager",
+      "pending": "{name} asked to remove this customer",
+      "pendingBadge": "Removal requested",
+      "historyLine": "removal requested by {name}"
     }
   },
   "sharing": {
@@ -1242,7 +1261,12 @@
       "clear": "The bottleneck is clear.",
       "untouched": "Untouched too long",
       "untouchedBreakdown": "{companies, plural, one {# company} other {# companies}} · {projects, plural, one {# project} other {# projects}} · {quotations, plural, one {# quotation} other {# quotations}}",
-      "untouchedNone": "Nothing has been sitting long enough to count."
+      "untouchedNone": "Nothing has been sitting long enough to count.",
+      "decisions": "Needs a decision",
+      "decisionsNone": "Nothing is waiting for a decision.",
+      "removalRequests": "{count, plural, one {# removal request} other {# removal requests}}",
+      "askedBy": "{name} · {count, plural, one {# day} other {# days}}",
+      "andMore": "and {count} more"
     },
     "attention": {
       "title": "Who needs attention",

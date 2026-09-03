@@ -30,7 +30,7 @@ lookup silently failed.
 ## The wrong-red ledger
 
 **A check can be wrong in the direction that matters, and this has happened
-fifteen times.** Four shapes:
+seventeen times.** Four shapes:
 
 1. **A wrong assertion.** §17 once asserted the *inverse* of `D20` on its
    own markers, so it went green over the thing the rule forbids.
@@ -38,7 +38,15 @@ fifteen times.** Four shapes:
    guard, three of them negatives — correct only because the fixture rows
    happened to be newest. And §20's old `>=` header check was green on the
    exact defect its comment claimed to catch: a header counting the page
-   reads exactly the page, and `25 >= 25` holds.
+   reads exactly the page, and `25 >= 25` holds. The sixteenth was a single
+   BYTE: §41's attention-row regex carried a literal backspace where ``
+   should have been — a Python heredoc turned `\b` into 0x08 on the way
+   into the file — so it matched nothing, read 0 behind rows on every run
+   since session 53, and its check stayed green beside a real second half
+   (`data-behind="0"`). Found in session 54 only because the SAME slip
+   landed in a new §35 check and went red there. **`od -c` a regex that
+   reads zero of something that exists**; a terminal renders a backspace
+   as nothing.
 3. **The mirror — a check that FAILS for the wrong reason.** §24 summed one
    page's group headers against the whole scope's total, an equality that
    stops holding the moment a pile falls off page one — red on a screen that
@@ -48,7 +56,12 @@ fifteen times.** Four shapes:
    legitimate `dir` move read as `tile NaN`. **A check that parses a figure
    out of markup owns every shape that figure may legally take, and prints
    what it failed to parse.** The fifteenth asserted a verbatim class
-   string. A wrong red burns the suite's credibility exactly as a false
+   string. The seventeenth (session 54, caught in-slice): §45 replayed a
+   manager's archive envelope as the COORDINATOR to prove the flag gate,
+   and read a 404 — she cannot open a rep's company at all, so visibility
+   answered before any gate was asked; the right identity was the rep who
+   sees the company and lacks the flag. **A gate test needs an identity
+   that clears every check BEFORE the gate.** A wrong red burns the suite's credibility exactly as a false
    green does — it is the shape that gets a correct screen "fixed", and it
    opened one session with a founder decision to rewrite working code.
 4. **Two sides from ONE computation, balancing by construction.** §25
